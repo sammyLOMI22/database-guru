@@ -71,54 +71,74 @@ async def process_query(
         if not sql_generator.ollama.client:
             await sql_generator.initialize()
 
-        # Get actual database schema
-        schema_inspector = SchemaInspector()
-        if request.schema:
-            # Use provided schema
-            schema = request.schema
-        else:
-            # Auto-introspect schema
-            schema_data = await schema_inspector.get_full_schema(db)
-            schema = schema_inspector.format_schema_for_llm(schema_data)
-            logger.debug(f"Using introspected schema with {len(schema_data['tables'])} tables")
+        # Get active connection to determine database type
+        from src.database.models import DatabaseConnection
+        from src.core.user_db_connector import UserDatabaseConnector
 
-        # Generate SQL
-        generation_result = await sql_generator.generate_sql(
-            question=request.question,
-            schema=schema,
-            database_type=request.database_type,
-            allow_write=request.allow_write,
-            model=request.model,  # Use user-specified model
+        result_conn = await db.execute(
+            select(DatabaseConnection).where(DatabaseConnection.is_active == True)
         )
+        active_connection = result_conn.scalar_one_or_none()
 
-        sql = generation_result["sql"]
-        is_valid = generation_result["is_valid"]
-        is_read_only = generation_result["is_read_only"]
-        warnings = generation_result["warnings"]
-        model_used = generation_result.get("model_used", settings.OLLAMA_MODEL)
-
-        # Execute SQL if valid
-        execution_result = None
-        if is_valid and sql:
-            executor = SQLExecutor(
-                max_rows=1000,
-                timeout_seconds=30,
-                allow_write=request.allow_write,
+        if not active_connection:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No active database connection. Please select a connection first."
             )
 
-            try:
-                execution_result = await executor.execute_query(db, sql)
-                logger.info(f"Query executed: {execution_result['row_count']} rows in {execution_result['execution_time_ms']}ms")
-            except Exception as e:
-                logger.error(f"SQL execution error: {e}")
-                warnings.append(f"Execution error: {str(e)}")
-                execution_result = {
-                    "success": False,
-                    "error": str(e),
-                    "data": [],
-                    "row_count": 0,
-                    "execution_time_ms": 0,
-                }
+        database_type = active_connection.database_type
+        logger.info(f"Using active connection '{active_connection.name}' ({database_type})")
+
+        # Connect to user's database for schema and query execution
+        async with UserDatabaseConnector.get_user_db_session(active_connection) as user_db:
+            # Get actual database schema from USER's database
+            schema_inspector = SchemaInspector()
+            if request.schema:
+                # Use provided schema
+                schema = request.schema
+            else:
+                # Auto-introspect schema from user's database
+                schema_data = await schema_inspector.get_full_schema(user_db)
+                schema = schema_inspector.format_schema_for_llm(schema_data)
+                logger.debug(f"Using introspected schema with {len(schema_data['tables'])} tables")
+
+            # Generate SQL
+            generation_result = await sql_generator.generate_sql(
+                question=request.question,
+                schema=schema,
+                database_type=database_type,  # Use active connection's database type
+                allow_write=request.allow_write,
+                model=request.model,  # Use user-specified model
+            )
+
+            sql = generation_result["sql"]
+            is_valid = generation_result["is_valid"]
+            is_read_only = generation_result["is_read_only"]
+            warnings = generation_result["warnings"]
+            model_used = generation_result.get("model_used", settings.OLLAMA_MODEL)
+
+            # Execute SQL if valid - ON USER'S DATABASE
+            execution_result = None
+            if is_valid and sql:
+                executor = SQLExecutor(
+                    max_rows=1000,
+                    timeout_seconds=30,
+                    allow_write=request.allow_write,
+                )
+
+                try:
+                    execution_result = await executor.execute_query(user_db, sql)
+                    logger.info(f"Query executed: {execution_result['row_count']} rows in {execution_result['execution_time_ms']}ms")
+                except Exception as e:
+                    logger.error(f"SQL execution error: {e}")
+                    warnings.append(f"Execution error: {str(e)}")
+                    execution_result = {
+                        "success": False,
+                        "error": str(e),
+                        "data": [],
+                        "row_count": 0,
+                        "execution_time_ms": 0,
+                    }
 
         # Save to query history
         query_record = QueryHistory(
@@ -129,7 +149,7 @@ async def process_query(
             execution_time_ms=execution_result.get("execution_time_ms") if execution_result else None,
             result_count=execution_result.get("row_count") if execution_result else None,
             error_message=execution_result.get("error") if execution_result and not execution_result.get("success") else None,
-            database_type=request.database_type,
+            database_type=database_type,  # Use detected database type from active connection
             model_used=model_used,  # Use actual model that was used
         )
         db.add(query_record)

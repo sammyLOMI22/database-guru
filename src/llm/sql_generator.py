@@ -99,8 +99,11 @@ class SQLValidator:
         text = re.sub(r'```sql\s*', '', text)
         text = re.sub(r'```\s*', '', text)
 
-        # Remove common prefixes
-        text = re.sub(r'^(SQL Query:|Query:|Answer:)\s*', '', text, flags=re.IGNORECASE)
+        # Remove common prefixes and database type mentions
+        text = re.sub(r'^(SQL Query:|Query:|Answer:|SQLite|PostgreSQL|MySQL|SQL:)\s*', '', text, flags=re.IGNORECASE)
+
+        # Remove inline database type mentions (e.g., "SQLite SELECT" -> "SELECT")
+        text = re.sub(r'\b(sqlite|postgresql|mysql|mongodb)\s+(?=SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)', '', text, flags=re.IGNORECASE)
 
         # Take only the first statement (before semicolon + newline)
         lines = text.split('\n')

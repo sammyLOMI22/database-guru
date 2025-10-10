@@ -1,188 +1,262 @@
 # 🧙‍♂️ Database Guru
 
-Your AI-powered database expert!
-
-## Quick Start
-
-```bash
-./start.sh
-```
-
-Then visit: http://localhost:8000
-
-## Manual Start
-
-```bash
-source venv/bin/activate
-pip install -r requirements.txt
-python src/main.py
-```
-# 🧙‍♂️ Database Guru
-
-> *Your AI-powered database expert that speaks your language*
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green.svg)](https://fastapi.tiangolo.com/)
-
-## 🌟 What is Database Guru?
-
-Database Guru transforms natural language questions into SQL queries, making database interaction accessible to everyone. No SQL knowledge required - just ask your question in plain English!
-
-### ✨ Features
-
-- 🗣️ **Natural Language Queries** - Ask questions in plain English
-- 🔒 **Enterprise Security** - SQL injection prevention, encryption, audit logging
-- 🚀 **High Performance** - Multi-layer caching, query optimization
-- 🧠 **AI-Powered** - Powered by Ollama and LangChain
-- 📊 **Smart Analytics** - Automatic insights and visualizations
-- 🔄 **Multi-Database** - Supports PostgreSQL, MySQL, SQLite, MongoDB
-- 👥 **Team Ready** - Role-based access control
-- 📈 **Production Ready** - Docker, Kubernetes, monitoring included
+AI-powered natural language to SQL query assistant. Ask questions about your database in plain English!
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- macOS 10.15+ (Catalina or later)
 - Python 3.11+
-- Docker Desktop
-- 8GB RAM minimum (16GB recommended for LLMs)
+- Node.js 18+
+- Ollama (for local LLM)
 
-### Installation
+### One-Command Startup
 
-1. **Clone the repository:**
 ```bash
-git clone https://github.com/yourusername/database-guru.git
-cd database-guru
+chmod +x start.sh
+./start.sh
 ```
 
-2. **Run the setup script:**
+This will:
+1. ✅ Create Python virtual environment
+2. ✅ Install all dependencies
+3. ✅ Create sample database
+4. ✅ Start backend (http://localhost:8000)
+5. ✅ Start frontend (http://localhost:3000)
+6. ✅ Check Ollama status
+
+### Manual Setup
+
+If you prefer manual control:
+
+#### 1. Backend Setup
 ```bash
-./start_database_guru.sh
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install fastapi uvicorn[standard] pydantic pydantic-settings python-multipart \
+    sqlalchemy aiosqlite ollama httpx python-dotenv sqlparse greenlet
+
+# Create sample database
+python3 scripts/create_sample_db.py
+
+# Start backend
+python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-3. **Access Database Guru:**
-- Web UI: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-- Health Check: http://localhost:8000/health
-
-## 💬 Usage Examples
-
-### Ask Database Guru:
-- "How many customers do we have?"
-- "Show me the top 10 products by revenue last month"
-- "What's the average order value by region?"
-- "Find all users who signed up this week"
-- "Which products are running low on inventory?"
-
-### API Example:
-```python
-import requests
-
-response = requests.post(
-    "http://localhost:8000/api/query",
-    json={"question": "How many active users this month?"},
-    headers={"Authorization": "Bearer YOUR_TOKEN"}
-)
-
-print(response.json())
-# {
-#   "answer": "You have 1,247 active users this month",
-#   "sql_query": "SELECT COUNT(DISTINCT user_id) FROM ...",
-#   "data": [...],
-#   "insights": ["23% increase from last month"]
-# }
+#### 2. Frontend Setup (in new terminal)
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-## 🏗️ Architecture
-
+#### 3. Ensure Ollama is Running
+```bash
+ollama serve
+# Or: brew services start ollama
 ```
-┌─────────────────────────────────┐
-│     Natural Language Input      │
-└────────────┬────────────────────┘
-             │
-┌────────────▼────────────────────┐
-│       Database Guru API         │
-│   (FastAPI + Authentication)    │
-└────────────┬────────────────────┘
-             │
-      ┌──────┴──────┐
-      │             │
-┌─────▼─────┐ ┌────▼─────┐
-│   Ollama  │ │  Cache   │
-│   (LLM)   │ │  (Redis) │
-└─────┬─────┘ └──────────┘
-      │
-┌─────▼─────────────────┐
-│   SQL Generation &    │
-│   Validation Engine   │
-└─────┬─────────────────┘
-      │
-┌─────▼─────────────────┐
-│   Your Database(s)    │
-│  (PostgreSQL, MySQL,  │
-│   SQLite, MongoDB)    │
-└───────────────────────┘
+
+## 📊 Connect to Sample Database
+
+1. Open http://localhost:3000
+2. Click **"Connections"** tab in sidebar
+3. Click **"+ Add Connection"**
+4. Select **"SQLite"**
+5. Enter path: `/Users/sam/database-guru/sample_ecommerce.db`
+6. Click **"Test Connection"** → **"Save Connection"**
+7. Click the connection to activate it
+8. Start asking questions!
+
+## 💡 Example Questions
+
+Try asking these questions:
+
+- "What are the top 5 best-selling products?"
+- "Show me all orders from customers in California"
+- "What's the average order value?"
+- "Which products have the highest ratings?"
+- "What's the total revenue by category?"
+- "Show me customers who haven't placed orders yet"
+- "What products are low in stock (less than 50 units)?"
+- "Which customer has spent the most money?"
+
+## 🗄️ Sample Database Schema
+
+The sample e-commerce database includes:
+
+- **customers** (15 records) - Customer information
+- **categories** (4 records) - Product categories
+- **products** (20 records) - Product catalog
+- **orders** (50 records) - Order history
+- **order_items** (123 records) - Order line items
+- **reviews** (30 records) - Product reviews
+
+## 🛑 Stopping the App
+
+```bash
+# If using start.sh (press Ctrl+C in terminal)
+# Or run:
+./stop.sh
 ```
 
 ## 🔧 Configuration
 
-Create a `.env` file:
-```env
-# Database Guru Configuration
-DATABASE_URL=postgresql://user:pass@localhost:5432/your_db
-OLLAMA_MODEL=llama3
-CACHE_TTL=3600
-RATE_LIMIT=100
-```
-
-## 🧪 Testing
+Edit `.env` file to customize:
 
 ```bash
-# Run all tests
-make test
+# Ollama settings
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5-coder:32b
 
-# Run specific test suite
-pytest tests/unit/ -v
+# Query limits
+MAX_QUERY_ROWS=1000
+QUERY_TIMEOUT_SECONDS=30
 
-# Check code coverage
-pytest --cov=src --cov-report=html
+# Database (for app metadata, not your data)
+DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
 ```
 
-## 📊 Monitoring
+## 🎯 Features
 
-Database Guru includes built-in monitoring:
-- Prometheus metrics at `/metrics`
-- Grafana dashboards for visualization
-- Query performance tracking
-- Error rate monitoring
-- Usage analytics
+- ✅ Natural language to SQL conversion
+- ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB)
+- ✅ Database connection management
+- ✅ Schema introspection
+- ✅ Query execution with safety limits
+- ✅ Query history tracking
+- ✅ Model selection (choose from your local Ollama models)
+- ✅ Beautiful React UI with real-time updates
+
+## 🏗️ Architecture
+
+**Backend:**
+- FastAPI (Python)
+- SQLAlchemy 2.0 (async)
+- Ollama (local LLM)
+- SQLite for metadata
+
+**Frontend:**
+- React 18 + TypeScript
+- Vite (build tool)
+- Tailwind CSS
+- TanStack Query
+
+## 📁 Project Structure
+
+```
+database-guru/
+├── src/                    # Backend source
+│   ├── api/               # API endpoints
+│   ├── core/              # Business logic
+│   ├── database/          # Database layer
+│   ├── llm/               # LLM integration
+│   └── main.py            # Entry point
+├── frontend/              # React frontend
+│   ├── src/
+│   │   ├── components/    # React components
+│   │   ├── hooks/         # Custom hooks
+│   │   ├── services/      # API client
+│   │   └── types/         # TypeScript types
+│   └── index.html
+├── scripts/               # Utility scripts
+│   └── create_sample_db.py
+├── start.sh              # Startup script
+├── stop.sh               # Shutdown script
+└── sample_ecommerce.db   # Sample database
+```
+
+## 🔐 Security
+
+⚠️ **Development Only** - This configuration is for local development.
+
+For production deployment, see [SECURITY_AUDIT.md](SECURITY_AUDIT.md) for:
+- Password encryption
+- Authentication/Authorization
+- CORS configuration
+- Rate limiting
+- Input validation
+
+## 📚 API Documentation
+
+Once running, visit:
+- Interactive docs: http://localhost:8000/docs
+- Alternative docs: http://localhost:8000/redoc
+
+## 🧪 Adding Your Own Database
+
+1. Go to **Connections** tab
+2. Click **+ Add Connection**
+3. Choose your database type (PostgreSQL, MySQL, SQLite, MongoDB)
+4. Enter connection details
+5. Test and save
+6. Activate the connection
+7. Start querying!
+
+## 🐛 Troubleshooting
+
+**Ollama not found:**
+```bash
+brew install ollama
+ollama serve
+```
+
+**Port already in use:**
+```bash
+# Kill processes on ports 3000 or 8000
+lsof -ti:3000 | xargs kill -9
+lsof -ti:8000 | xargs kill -9
+```
+
+**Frontend build errors:**
+```bash
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+```
+
+**Backend import errors:**
+```bash
+source venv/bin/activate
+pip install --upgrade -r requirements.txt
+```
+
+## 📝 Development
+
+**Backend hot reload:**
+Changes auto-reload when you edit Python files
+
+**Frontend hot reload:**
+React components update instantly on save
+
+**View logs:**
+```bash
+tail -f backend.log
+tail -f frontend.log
+```
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+This is a development project. Feel free to:
+- Add new database adapters
+- Improve SQL generation prompts
+- Enhance UI/UX
+- Add security features
 
-## 📝 License
+## 📄 License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - See LICENSE file
 
-## 🙏 Acknowledgments
+## 🙏 Credits
 
-- Powered by [Ollama](https://ollama.ai)
-- Built with [FastAPI](https://fastapi.tiangolo.com)
-- LLM orchestration by [LangChain](https://langchain.com)
-
-## 📞 Support
-
-- Documentation: [docs.databaseguru.ai](https://docs.databaseguru.ai)
-- Issues: [GitHub Issues](https://github.com/yourusername/database-guru/issues)
-- Discord: [Join our community](https://discord.gg/databaseguru)
+Built with:
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [React](https://react.dev/)
+- [Ollama](https://ollama.ai/)
+- [SQLAlchemy](https://www.sqlalchemy.org/)
+- [Tailwind CSS](https://tailwindcss.com/)
 
 ---
 
-**Database Guru** - *Making databases speak your language* 🧙‍♂️
-
-EOF
-
-# Create main application file with Database Guru branding
-echo "🧙‍♂️ Creating Database Guru application..."
+**Made with ❤️ for developers who hate writing SQL**

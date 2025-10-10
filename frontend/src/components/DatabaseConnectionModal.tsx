@@ -5,11 +5,11 @@ interface DatabaseConnection {
   id?: number;
   name: string;
   database_type: string;
-  host: string;
-  port: number;
+  host?: string;
+  port?: number;
   database_name: string;
-  username: string;
-  password: string;
+  username?: string;
+  password?: string;
 }
 
 interface Props {
@@ -62,26 +62,95 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
   };
 
   const handleTestConnection = async () => {
+    // Validate required fields
+    if (!formData.name || !formData.name.trim()) {
+      setTestResult({
+        success: false,
+        message: 'Connection name is required',
+      });
+      return;
+    }
+
+    if (!formData.database_name || !formData.database_name.trim()) {
+      setTestResult({
+        success: false,
+        message: formData.database_type === 'sqlite'
+          ? 'Database file path is required'
+          : 'Database name is required',
+      });
+      return;
+    }
+
+    // For non-SQLite, validate host and port
+    if (formData.database_type !== 'sqlite') {
+      if (!formData.host || !formData.host.trim()) {
+        setTestResult({
+          success: false,
+          message: 'Host is required',
+        });
+        return;
+      }
+      if (!formData.port || formData.port <= 0) {
+        setTestResult({
+          success: false,
+          message: 'Valid port number is required',
+        });
+        return;
+      }
+      if (!formData.username || !formData.username.trim()) {
+        setTestResult({
+          success: false,
+          message: 'Username is required',
+        });
+        return;
+      }
+    }
+
     setTesting(true);
     setTestResult(null);
 
     try {
+      // Build request payload, excluding empty fields for SQLite
+      const payload: any = {
+        name: formData.name.trim(),
+        database_type: formData.database_type,
+        database_name: formData.database_name.trim(),
+      };
+
+      // Only include host/port/username/password for non-SQLite databases
+      if (formData.database_type !== 'sqlite') {
+        payload.host = formData.host || 'localhost';
+        payload.port = formData.port || 5432;
+        payload.username = formData.username || '';
+        payload.password = formData.password || '';
+      }
+
       // Call backend to test connection
       const response = await fetch('/api/connections/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setTestResult({
+          success: false,
+          message: errorData.detail || `Connection test failed (${response.status})`,
+        });
+        return;
+      }
 
       const data = await response.json();
       setTestResult({
-        success: response.ok,
-        message: response.ok ? 'Connection successful!' : data.detail || 'Connection failed',
+        success: true,
+        message: data.message || 'Connection successful!',
       });
     } catch (error: any) {
+      console.error('Connection test error:', error);
       setTestResult({
         success: false,
-        message: error.message || 'Failed to test connection',
+        message: `Error: ${error.message || 'Failed to test connection'}`,
       });
     } finally {
       setTesting(false);
