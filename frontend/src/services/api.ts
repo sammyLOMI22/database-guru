@@ -10,7 +10,7 @@ import type {
 } from '../types/api';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL: (import.meta as any).env?.VITE_API_URL || '',
   timeout: 60000, // 60 seconds for LLM queries
 });
 
@@ -130,6 +130,98 @@ export const healthAPI = {
   // Health check
   async check(): Promise<HealthCheckResponse> {
     const { data } = await api.get<HealthCheckResponse>('/health');
+    return data;
+  },
+};
+
+// Import new types
+import type {
+  DatabaseConnection,
+  ConnectionListResponse,
+  ChatSession,
+  ChatMessage,
+  CreateChatSessionRequest,
+  UpdateChatSessionRequest,
+  MultiDatabaseQueryRequest,
+  MultiDatabaseQueryResponse,
+} from '../types/api';
+
+export const connectionsAPI = {
+  // List all database connections
+  async listConnections(): Promise<ConnectionListResponse> {
+    const { data } = await api.get<ConnectionListResponse>('/api/connections/');
+    return data;
+  },
+
+  // Get specific connection
+  async getConnection(id: number): Promise<DatabaseConnection> {
+    const { data } = await api.get<DatabaseConnection>(`/api/connections/${id}`);
+    return data;
+  },
+
+  // Activate a connection
+  async activateConnection(id: number): Promise<DatabaseConnection> {
+    const { data } = await api.post<DatabaseConnection>(`/api/connections/${id}/activate`);
+    return data;
+  },
+};
+
+export const chatAPI = {
+  // Create chat session
+  async createSession(request: CreateChatSessionRequest): Promise<ChatSession> {
+    const { data } = await api.post<ChatSession>('/api/chat/sessions', request);
+    return data;
+  },
+
+  // List chat sessions
+  async listSessions(userId?: string, limit = 50, offset = 0): Promise<ChatSession[]> {
+    const { data } = await api.get<ChatSession[]>('/api/chat/sessions', {
+      params: { user_id: userId, limit, offset },
+    });
+    return data;
+  },
+
+  // Get specific chat session
+  async getSession(sessionId: string): Promise<ChatSession> {
+    const { data } = await api.get<ChatSession>(`/api/chat/sessions/${sessionId}`);
+    return data;
+  },
+
+  // Update chat session
+  async updateSession(sessionId: string, request: UpdateChatSessionRequest): Promise<ChatSession> {
+    const { data } = await api.patch<ChatSession>(`/api/chat/sessions/${sessionId}`, request);
+    return data;
+  },
+
+  // Delete chat session
+  async deleteSession(sessionId: string): Promise<void> {
+    await api.delete(`/api/chat/sessions/${sessionId}`);
+  },
+
+  // Get chat messages
+  async getMessages(sessionId: string, limit = 100, offset = 0): Promise<ChatMessage[]> {
+    const { data } = await api.get<ChatMessage[]>(`/api/chat/sessions/${sessionId}/messages`, {
+      params: { limit, offset },
+    });
+    return data;
+  },
+
+  // Create chat message
+  async createMessage(sessionId: string, message: {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    query_history_id?: number;
+    databases_used?: any[];
+  }): Promise<ChatMessage> {
+    const { data } = await api.post<ChatMessage>(`/api/chat/sessions/${sessionId}/messages`, message);
+    return data;
+  },
+};
+
+export const multiQueryAPI = {
+  // Process multi-database query
+  async processQuery(request: MultiDatabaseQueryRequest): Promise<MultiDatabaseQueryResponse> {
+    const { data } = await api.post<MultiDatabaseQueryResponse>('/api/multi-query/', request);
     return data;
   },
 };

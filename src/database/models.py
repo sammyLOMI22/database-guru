@@ -1,5 +1,6 @@
 """Database models for Database Guru"""
 from datetime import datetime
+import uuid
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from src.database.connection import Base
@@ -111,3 +112,47 @@ class UserFeedback(Base):
 
     # Relationship
     query_history = relationship("QueryHistory", backref="feedback")
+
+
+class ChatSession(Base):
+    """Store chat sessions with their associated database connections"""
+    __tablename__ = "chat_sessions"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(255), nullable=False)
+    user_id = Column(String(255), index=True, nullable=True)  # Optional user tracking
+
+    # Multi-database support - stores array of connection IDs
+    active_connection_ids = Column(JSON, nullable=False, default=list)  # [1, 2, 3]
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_active_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_user_last_active', 'user_id', 'last_active_at'),
+    )
+
+
+class ChatMessage(Base):
+    """Store individual messages in a chat session"""
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_session_id = Column(String(36), ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Message content
+    role = Column(String(20), nullable=False)  # 'user', 'assistant', 'system'
+    content = Column(Text, nullable=False)
+
+    # Query metadata (for assistant messages)
+    query_history_id = Column(Integer, ForeignKey("query_history.id"), nullable=True)
+    databases_used = Column(JSON, nullable=True)  # [{"conn_id": 1, "name": "ecommerce", "tables": ["products"]}]
+
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # Relationships
+    chat_session = relationship("ChatSession", backref="messages")
+    query_history = relationship("QueryHistory", backref="chat_messages")

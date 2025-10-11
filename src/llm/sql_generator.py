@@ -8,6 +8,8 @@ from src.llm.prompts import (
     build_sql_prompt,
     build_chat_messages,
     FEW_SHOT_EXAMPLES,
+    MULTI_DATABASE_SYSTEM_PROMPT,
+    MULTI_DATABASE_QUERY_TEMPLATE,
 )
 from src.config.settings import Settings
 
@@ -342,3 +344,164 @@ Provide the corrected SQL query ONLY."""
                 "warnings": [f"Correction failed: {str(e)}"],
                 "raw_output": "",
             }
+
+    async def generate_multi_database_sql(
+        self,
+        question: str,
+        combined_schema: str,
+        allow_write: bool = False,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate SQL queries that may span multiple databases
+
+        Args:
+            question: Natural language question
+            combined_schema: Combined schema from multiple databases
+            allow_write: Whether to allow write operations
+            model: Optional model name to use
+
+        Returns:
+            Dictionary with:
+                - queries: List of queries (each with 'database_name' and 'sql')
+                - is_valid: Whether queries passed validation
+                - warnings: List of warnings
+                - raw_output: Raw LLM output
+                - model_used: Name of model used
+        """
+        try:
+            model_to_use = model or self.settings.OLLAMA_MODEL
+
+            # Build multi-database prompt
+            prompt = MULTI_DATABASE_QUERY_TEMPLATE.format(
+                schema=combined_schema,
+                question=question,
+            )
+
+            messages = [
+                {"role": "system", "content": MULTI_DATABASE_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ]
+
+            # Generate SQL using LLM
+            logger.info(f"Generating multi-database SQL for: {question} (using model: {model_to_use})")
+            raw_output = await self.ollama.chat(
+                messages=messages,
+                model=model_to_use,
+                temperature=0.1,
+            )
+
+            # Parse the output to extract individual queries
+            queries = self._parse_multi_db_output(raw_output)
+
+            # Validate each query
+            all_valid = True
+            all_read_only = True
+            warnings = []
+
+            for query in queries:
+                sql = query.get("sql", "")
+
+                is_valid, error = self.validator.validate_sql_syntax(sql)
+                is_read_only = self.validator.is_read_only(sql)
+                dangerous_ops = self.validator.contains_dangerous_operations(sql)
+
+                query["is_valid"] = is_valid
+                query["is_read_only"] = is_read_only
+
+                if not is_valid:
+                    all_valid = False
+                    warnings.append(f"Query for {query.get('database_name')}: {error}")
+
+                if not is_read_only:
+                    all_read_only = False
+                    if not allow_write:
+                        warnings.append(f"Query for {query.get('database_name')}: Write operations not allowed")
+
+                if dangerous_ops:
+                    warnings.append(
+                        f"Query for {query.get('database_name')}: Dangerous operations detected: {', '.join(dangerous_ops)}"
+                    )
+
+            result = {
+                "queries": queries,
+                "is_valid": all_valid,
+                "is_read_only": all_read_only,
+                "warnings": warnings,
+                "raw_output": raw_output,
+                "question": question,
+                "model_used": model_to_use,
+            }
+
+            logger.info(f"Generated {len(queries)} queries for {len(set(q.get('database_name') for q in queries))} databases")
+            if warnings:
+                logger.warning(f"Warnings: {warnings}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Multi-database SQL generation failed: {e}")
+            return {
+                "queries": [],
+                "is_valid": False,
+                "is_read_only": False,
+                "warnings": [f"Generation error: {str(e)}"],
+                "raw_output": "",
+                "question": question,
+                "model_used": model or self.settings.OLLAMA_MODEL,
+            }
+
+    def _parse_multi_db_output(self, raw_output: str) -> List[Dict[str, str]]:
+        """
+        Parse LLM output that may contain multiple SQL queries for different databases
+
+        Expected format:
+        DATABASE: database_name
+        SELECT ...;
+
+        Args:
+            raw_output: Raw output from LLM
+
+        Returns:
+            List of dicts with 'database_name' and 'sql' keys
+        """
+        queries = []
+        current_db = None
+        current_sql_lines = []
+
+        lines = raw_output.split("\n")
+
+        for line in lines:
+            line_stripped = line.strip()
+
+            # Check for database marker
+            if line_stripped.upper().startswith("DATABASE:"):
+                # Save previous query if exists
+                if current_db and current_sql_lines:
+                    sql = " ".join(current_sql_lines).strip()
+                    sql = self.validator.clean_sql_output(sql)
+                    queries.append({"database_name": current_db, "sql": sql})
+                    current_sql_lines = []
+
+                # Extract new database name
+                current_db = line_stripped.split(":", 1)[1].strip()
+
+            elif line_stripped and current_db:
+                # Skip markdown and comments
+                if line_stripped.startswith("```") or line_stripped.startswith("--"):
+                    continue
+                # Collect SQL lines
+                current_sql_lines.append(line_stripped)
+
+        # Save last query
+        if current_db and current_sql_lines:
+            sql = " ".join(current_sql_lines).strip()
+            sql = self.validator.clean_sql_output(sql)
+            queries.append({"database_name": current_db, "sql": sql})
+
+        # If no database markers found, treat entire output as single query
+        if not queries and raw_output.strip():
+            sql = self.validator.clean_sql_output(raw_output)
+            queries.append({"database_name": None, "sql": sql})
+
+        return queries

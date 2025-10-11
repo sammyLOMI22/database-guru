@@ -8,6 +8,8 @@ from src.database.models import (
     DatabaseConnection,
     QueryCache,
     UserFeedback,
+    ChatSession,
+    ChatMessage,
 )
 
 logging.basicConfig(level=logging.INFO)
