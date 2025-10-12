@@ -1,10 +1,11 @@
 """SQL Execution Engine with safety checks"""
 import logging
 import asyncio
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Union
 from datetime import datetime
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, DBAPIError, OperationalError
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ class SQLExecutor:
 
     async def execute_query(
         self,
-        session: AsyncSession,
+        session: Union[AsyncSession, Session],
         sql: str,
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -48,7 +49,7 @@ class SQLExecutor:
         Execute SQL query with safety checks and timeout protection
 
         Args:
-            session: Database session
+            session: Database session (async or sync)
             sql: SQL query to execute
             params: Optional query parameters
 
@@ -65,11 +66,22 @@ class SQLExecutor:
         start_time = datetime.utcnow()
 
         try:
-            # Execute with timeout
-            result = await asyncio.wait_for(
-                self._execute_with_session(session, sql, params),
-                timeout=self.timeout_seconds
-            )
+            # Check if this is a sync session (e.g., DuckDB)
+            if isinstance(session, Session):
+                # Execute sync session in thread pool to not block event loop
+                result = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    self._execute_with_sync_session,
+                    session,
+                    sql,
+                    params
+                )
+            else:
+                # Execute with timeout for async sessions
+                result = await asyncio.wait_for(
+                    self._execute_with_session(session, sql, params),
+                    timeout=self.timeout_seconds
+                )
 
             end_time = datetime.utcnow()
             execution_time_ms = (end_time - start_time).total_seconds() * 1000
@@ -145,6 +157,66 @@ class SQLExecutor:
                 "error": f"Execution error: {str(e)}",
             }
 
+    def _execute_with_sync_session(
+        self,
+        session: Session,
+        sql: str,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Internal method to execute SQL with synchronous session (for DuckDB)
+
+        Args:
+            session: Synchronous database session
+            sql: SQL query
+            params: Query parameters
+
+        Returns:
+            Dictionary with data, columns, row_count, truncated
+        """
+        # Create SQL statement
+        stmt = text(sql)
+
+        # Execute query
+        result = session.execute(stmt, params or {})
+
+        # Check if this is a SELECT query (has results to fetch)
+        if result.returns_rows:
+            # Fetch results with limit
+            rows = result.fetchmany(self.max_rows + 1)
+
+            # Check if results were truncated
+            truncated = len(rows) > self.max_rows
+            if truncated:
+                rows = rows[:self.max_rows]
+
+            # Get column names
+            columns = list(result.keys())
+
+            # Convert rows to dictionaries
+            data = [
+                {col: self._serialize_value(row[i]) for i, col in enumerate(columns)}
+                for row in rows
+            ]
+
+            return {
+                "data": data,
+                "columns": columns,
+                "row_count": len(data),
+                "truncated": truncated,
+            }
+        else:
+            # For non-SELECT queries (INSERT, UPDATE, DELETE, etc.)
+            session.commit()
+            row_count = result.rowcount
+
+            return {
+                "data": [],
+                "columns": [],
+                "row_count": row_count,
+                "truncated": False,
+            }
+
     async def _execute_with_session(
         self,
         session: AsyncSession,
@@ -152,7 +224,7 @@ class SQLExecutor:
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Internal method to execute SQL with session
+        Internal method to execute SQL with async session
 
         Args:
             session: Database session

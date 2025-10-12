@@ -101,8 +101,8 @@ Response:
     {
       "id": 2,
       "name": "Analytics DB",
-      "database_type": "postgresql",
-      "database_name": "analytics"
+      "database_type": "duckdb",
+      "database_name": "/path/to/analytics.duckdb"
     }
   ],
   "created_at": "2025-10-11T15:30:00Z",
@@ -303,6 +303,36 @@ POST /api/multi-query/
 }
 ```
 
+### 5. DuckDB Analytics Integration
+
+DuckDB is fully supported in multi-database queries! Perfect for combining production data with analytical processing:
+
+```bash
+POST /api/multi-query/
+{
+  "question": "Compare order volumes between PostgreSQL production and DuckDB analytics warehouse",
+  "connection_ids": [1, 7]  # 1=PostgreSQL, 7=DuckDB
+}
+```
+
+Example use case:
+- **Production DB (PostgreSQL)**: Real-time transactional data
+- **Analytics DB (DuckDB)**: Historical data for fast analytical queries
+
+```bash
+POST /api/chat/sessions
+{
+  "name": "Production + Analytics",
+  "connection_ids": [1, 7]  # Mix PostgreSQL and DuckDB
+}
+```
+
+DuckDB excels at:
+- Fast aggregations on large datasets
+- Complex analytical queries
+- Reading Parquet/CSV files directly
+- OLAP workloads
+
 ## Testing
 
 ### Running the Test Script
@@ -410,12 +440,28 @@ The system maintains full backward compatibility:
 3. **SQL Validation** - Same validation rules apply to all queries
 4. **User Isolation** - (Optional) Filter connections by user_id
 
+## Supported Database Types
+
+Multi-database queries work with all supported database types:
+
+- ✅ **PostgreSQL** - Full async support
+- ✅ **MySQL** - Full async support
+- ✅ **SQLite** - File-based, async support
+- ✅ **DuckDB** - File-based, optimized for analytics (sync operations, handled transparently)
+- ✅ **MongoDB** - Document store (limited SQL support)
+
+You can mix and match any combination! For example:
+- PostgreSQL (production) + DuckDB (analytics)
+- SQLite (local dev) + MySQL (staging) + PostgreSQL (production)
+- Multiple DuckDB files for different datasets
+
 ## Limitations
 
 1. **No Cross-Database JOINs** - Queries execute independently on each database
 2. **Client-Side Aggregation** - Combining results happens in application layer
 3. **Database Type Differences** - SQL syntax must be appropriate for each DB type
 4. **Schema Introspection** - Large schemas may impact prompt size
+5. **Sync vs Async** - DuckDB uses sync operations (handled transparently in thread pool)
 
 ## Troubleshooting
 

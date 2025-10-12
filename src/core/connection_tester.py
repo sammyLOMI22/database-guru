@@ -41,6 +41,8 @@ class ConnectionTester:
                 return await self._test_postgresql(host, port, database_name, username, password)
             elif database_type == "mysql":
                 return await self._test_mysql(host, port, database_name, username, password)
+            elif database_type == "duckdb":
+                return await self._test_duckdb(database_name)
             elif database_type == "mongodb":
                 return await self._test_mongodb(host, port, database_name, username, password)
             else:
@@ -150,6 +152,33 @@ class ConnectionTester:
             return {
                 "success": False,
                 "message": f"MySQL connection failed: {str(e)}",
+            }
+
+    async def _test_duckdb(self, database_path: str) -> Dict[str, Any]:
+        """Test DuckDB connection"""
+        try:
+            database_url = f"duckdb:///{database_path}"
+            engine = create_engine(database_url)
+
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT version()"))
+                version = result.scalar()
+
+            engine.dispose()
+
+            return {
+                "success": True,
+                "message": f"Successfully connected to DuckDB: {version}",
+            }
+        except ImportError:
+            return {
+                "success": False,
+                "message": "DuckDB support not installed. Run: pip install duckdb duckdb-engine",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"DuckDB connection failed: {str(e)}",
             }
 
     async def _test_mongodb(
