@@ -215,6 +215,53 @@ python test_multi_db.py
 
 The test script will demonstrate all the new features with real examples.
 
+## Database Type Support
+
+Multi-database queries work seamlessly with all supported database types:
+
+### Supported Databases
+- ✅ **PostgreSQL** - Production-grade relational database
+- ✅ **MySQL** - Popular open-source database
+- ✅ **SQLite** - Lightweight file-based database
+- ✅ **DuckDB** - Fast analytics database (NEW!)
+- ✅ **MongoDB** - NoSQL document database
+
+### Mix and Match Example
+
+You can combine different database types in a single session:
+
+```bash
+POST /api/chat/sessions
+{
+  "name": "Hybrid Analytics",
+  "connection_ids": [1, 2, 3]  # PostgreSQL + DuckDB + SQLite
+}
+```
+
+**Perfect for:**
+- **PostgreSQL** (production OLTP) + **DuckDB** (analytics OLAP)
+- **SQLite** (local dev) + **MySQL** (staging) + **PostgreSQL** (production)
+- Multiple **DuckDB** files for different analytical datasets
+
+### DuckDB Integration Highlights
+
+DuckDB is particularly powerful in multi-database scenarios:
+
+```bash
+# Production data + DuckDB analytics
+POST /api/multi-query/
+{
+  "question": "Compare PostgreSQL live orders with DuckDB historical trends",
+  "connection_ids": [1, 7]  # PostgreSQL + DuckDB
+}
+```
+
+Benefits:
+- **Fast Analytics**: DuckDB excels at complex aggregations
+- **File Formats**: Can query CSV, Parquet, JSON directly
+- **Zero Configuration**: File-based, no server needed
+- **Complementary**: Use with PostgreSQL for best of both worlds
+
 ## Advanced Features
 
 ### Dynamic Connection Management

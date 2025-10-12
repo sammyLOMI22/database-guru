@@ -52,6 +52,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
       mysql: 3306,
       sqlite: 0,
       mongodb: 27017,
+      duckdb: 0,
     };
     setFormData((prev) => ({
       ...prev,
@@ -74,15 +75,15 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
     if (!formData.database_name || !formData.database_name.trim()) {
       setTestResult({
         success: false,
-        message: formData.database_type === 'sqlite'
+        message: (formData.database_type === 'sqlite' || formData.database_type === 'duckdb')
           ? 'Database file path is required'
           : 'Database name is required',
       });
       return;
     }
 
-    // For non-SQLite, validate host and port
-    if (formData.database_type !== 'sqlite') {
+    // For non-SQLite and non-DuckDB, validate host and port
+    if (formData.database_type !== 'sqlite' && formData.database_type !== 'duckdb') {
       if (!formData.host || !formData.host.trim()) {
         setTestResult({
           success: false,
@@ -117,8 +118,8 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
         database_name: formData.database_name.trim(),
       };
 
-      // Only include host/port/username/password for non-SQLite databases
-      if (formData.database_type !== 'sqlite') {
+      // Only include host/port/username/password for non-SQLite and non-DuckDB databases
+      if (formData.database_type !== 'sqlite' && formData.database_type !== 'duckdb') {
         payload.host = formData.host || 'localhost';
         payload.port = formData.port || 5432;
         payload.username = formData.username || '';
@@ -200,8 +201,8 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Database Type *
             </label>
-            <div className="grid grid-cols-4 gap-3">
-              {['postgresql', 'mysql', 'sqlite', 'mongodb'].map((type) => (
+            <div className="grid grid-cols-5 gap-3">
+              {['postgresql', 'mysql', 'sqlite', 'mongodb', 'duckdb'].map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -218,8 +219,8 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
             </div>
           </div>
 
-          {/* SQLite File Path (if SQLite) */}
-          {formData.database_type === 'sqlite' ? (
+          {/* File Path for SQLite and DuckDB */}
+          {(formData.database_type === 'sqlite' || formData.database_type === 'duckdb') ? (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Database File Path *
@@ -230,9 +231,14 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                 value={formData.database_name}
                 onChange={handleChange}
                 required
-                placeholder="/path/to/database.db"
+                placeholder={formData.database_type === 'duckdb' ? '/path/to/database.duckdb' : '/path/to/database.db'}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+              {formData.database_type === 'duckdb' && (
+                <p className="mt-2 text-sm text-gray-500">
+                  Tip: Use <code className="bg-gray-100 px-1 rounded">:memory:</code> for an in-memory database
+                </p>
+              )}
             </div>
           ) : (
             <>

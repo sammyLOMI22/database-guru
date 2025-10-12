@@ -121,7 +121,9 @@ DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
 ## 🎯 Features
 
 - ✅ Natural language to SQL conversion
-- ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB)
+- ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB)
+- ✅ **Multi-database queries** - Query multiple databases simultaneously
+- ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
 - ✅ Query execution with safety limits
@@ -188,11 +190,58 @@ Once running, visit:
 
 1. Go to **Connections** tab
 2. Click **+ Add Connection**
-3. Choose your database type (PostgreSQL, MySQL, SQLite, MongoDB)
+3. Choose your database type (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB)
 4. Enter connection details
 5. Test and save
 6. Activate the connection
 7. Start querying!
+
+### DuckDB Support
+
+DuckDB is now fully supported! To use DuckDB:
+
+1. Create a DuckDB database file or use an existing one
+2. In Database Guru, select "DuckDB" as the database type
+3. Enter the full path to your .duckdb file
+4. Or use `:memory:` for an in-memory database
+
+**Create a sample DuckDB database:**
+```bash
+python scripts/create_sample_duckdb.py
+```
+
+This will create `sample_ecommerce.duckdb` with sample e-commerce data!
+
+## 🔄 Multi-Database Queries
+
+Database Guru supports querying multiple databases simultaneously! Perfect for:
+
+- **Data comparison**: Compare production vs backup databases
+- **Migration validation**: Verify data consistency across databases
+- **Multi-tenant analysis**: Query across tenant databases
+- **Hybrid analytics**: Combine PostgreSQL (OLTP) + DuckDB (OLAP)
+
+### Example Use Cases
+
+```bash
+# Compare data across databases
+"Compare total customers between production and backup databases"
+
+# Mix database types for analytics
+"Show me revenue trends from PostgreSQL and detailed analytics from DuckDB"
+
+# Multi-tenant queries
+"Which tenant database has the most active users?"
+```
+
+### Quick Start with Multi-Database
+
+1. Create multiple database connections
+2. Create a chat session with multiple connections
+3. Ask questions that span databases
+4. Get aggregated results from all databases
+
+See [MULTI_DATABASE_GUIDE.md](docs/MULTI_DATABASE_GUIDE.md) for full documentation.
 
 ## 🐛 Troubleshooting
 
