@@ -121,6 +121,7 @@ DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
 ## 🎯 Features
 
 - ✅ Natural language to SQL conversion
+- ✅ **Self-correcting SQL** - Automatically fixes errors and retries (NEW!)
 - ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB)
 - ✅ **Multi-database queries** - Query multiple databases simultaneously
 - ✅ **Chat sessions** - Maintain context across queries
