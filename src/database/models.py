@@ -156,3 +156,44 @@ class ChatMessage(Base):
     # Relationships
     chat_session = relationship("ChatSession", backref="messages")
     query_history = relationship("QueryHistory", backref="chat_messages")
+
+
+class LearnedCorrection(Base):
+    """Store successful corrections that the system learned from"""
+    __tablename__ = "learned_corrections"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Error pattern matching
+    error_type = Column(String(50), nullable=False, index=True)  # From ErrorType enum
+    error_pattern = Column(Text, nullable=False)  # Pattern to match against errors
+    database_type = Column(String(50), nullable=False, index=True)  # postgres, mysql, duckdb, etc.
+
+    # Original error details
+    original_sql = Column(Text, nullable=False)
+    original_error = Column(Text, nullable=False)
+
+    # Successful correction
+    corrected_sql = Column(Text, nullable=False)
+    correction_description = Column(Text, nullable=True)  # Human-readable description
+
+    # Pattern metadata
+    table_pattern = Column(String(255), nullable=True, index=True)  # e.g., "products" -> table-specific
+    column_pattern = Column(String(255), nullable=True, index=True)  # e.g., "price" -> column-specific
+
+    # Learning metadata
+    times_applied = Column(Integer, default=0)  # How many times this correction was successfully reused
+    success_rate = Column(Float, default=1.0)  # Success rate when applied
+    confidence_score = Column(Float, default=1.0)  # Confidence in this correction (0-1)
+
+    # Timestamps
+    learned_at = Column(DateTime, default=datetime.utcnow, index=True)
+    last_applied_at = Column(DateTime, nullable=True)
+
+    # Indexes for efficient lookups
+    __table_args__ = (
+        Index('idx_error_type_db', 'error_type', 'database_type'),
+        Index('idx_table_pattern', 'table_pattern'),
+        Index('idx_column_pattern', 'column_pattern'),
+        Index('idx_confidence', 'confidence_score'),
+    )

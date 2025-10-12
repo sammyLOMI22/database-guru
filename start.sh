@@ -36,6 +36,13 @@ if [ ! -f "sample_ecommerce.db" ]; then
     echo "✅ Sample database created"
 fi
 
+# Initialize Database Guru metadata database (includes learned_corrections table)
+if [ ! -f "database_guru.db" ]; then
+    echo "💾 Initializing Database Guru metadata..."
+    python -m src.database.init_db
+    echo "✅ Metadata database initialized"
+fi
+
 # Check if .env exists
 if [ ! -f ".env" ]; then
     echo "⚙️  Creating .env configuration..."
@@ -142,6 +149,7 @@ echo ""
 echo "🌐 Frontend:  http://localhost:3000"
 echo "🔧 Backend:   http://localhost:8000"
 echo "📚 API Docs:  http://localhost:8000/docs"
+echo "🧠 Learning:  http://localhost:8000/api/learned-corrections/stats/summary"
 echo ""
 echo "📊 Sample Database: sample_ecommerce.db"
 echo ""
@@ -160,6 +168,10 @@ echo "   • What are the top 5 best-selling products?"
 echo "   • Show me orders from customers in California"
 echo "   • What's the average order value?"
 echo "   • Which products have low stock?"
+echo ""
+echo "✨ NEW: Learning from Corrections is enabled!"
+echo "   The system learns from errors and gets smarter over time."
+echo "   View learning stats: http://localhost:8000/api/learned-corrections/stats/summary"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
