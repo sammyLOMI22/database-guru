@@ -42,6 +42,8 @@ class DatabaseQueryResult(BaseModel):
     row_count: Optional[int] = None
     execution_time_ms: Optional[float] = None
     error: Optional[str] = None
+    correction_attempts: Optional[int] = 0
+    corrections: Optional[List[Dict[str, Any]]] = None
 
 
 class MultiDatabaseQueryResponse(BaseModel):
@@ -204,7 +206,7 @@ async def process_multi_database_query(
             queries, connections
         )
 
-        # Execute queries on appropriate databases
+        # Execute queries on appropriate databases with self-correction
         database_results = []
         total_rows = 0
         total_execution_time = 0.0
@@ -241,10 +243,23 @@ async def process_multi_database_query(
                 )
                 continue
 
-            # Execute query
-            exec_result = await multi_db_handler.execute_query_on_database(
+            # Get individual schema for this database
+            db_schema = None
+            for db_info in combined_schema_data.get("databases", []):
+                if db_info.get("connection_id") == connection.id:
+                    # Format schema for this specific database
+                    db_schema = multi_db_handler._format_single_db_schema(
+                        {"tables": db_info.get("tables", [])}
+                    )
+                    break
+
+            # Execute query with self-correction
+            exec_result = await multi_db_handler.execute_query_with_self_correction(
                 connection=connection,
-                sql=sql,
+                question=request.question,
+                schema=db_schema or combined_schema_text,
+                sql_generator=sql_generator,
+                initial_sql=sql,
                 allow_write=request.allow_write,
             )
 
@@ -253,12 +268,14 @@ async def process_multi_database_query(
                     connection_id=connection.id,
                     connection_name=connection.name,
                     database_type=connection.database_type,
-                    sql=sql,
+                    sql=exec_result.get("sql", sql),
                     success=exec_result.get("success", False),
                     results=exec_result.get("data"),
                     row_count=exec_result.get("row_count", 0),
                     execution_time_ms=exec_result.get("execution_time_ms", 0),
                     error=exec_result.get("error"),
+                    correction_attempts=exec_result.get("correction_attempts", 0),
+                    corrections=exec_result.get("corrections"),
                 )
             )
 

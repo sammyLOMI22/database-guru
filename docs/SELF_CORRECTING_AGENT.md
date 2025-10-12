@@ -4,6 +4,8 @@
 
 The **Self-Correcting SQL Agent** is an intelligent system that automatically detects and fixes SQL errors. Instead of failing on the first error, it analyzes what went wrong and attempts to correct the query automatically.
 
+**✅ Now works with both single-database AND multi-database queries!**
+
 ## How It Works
 
 ### Traditional Flow (Without Self-Correction)
@@ -230,6 +232,70 @@ Currently uses existing Ollama settings. No additional environment variables nee
   "self_corrected": true
 }
 ```
+
+---
+
+## Multi-Database Support
+
+The self-correcting agent now works seamlessly with multi-database queries!
+
+### How It Works
+
+When you query multiple databases simultaneously (via `/api/multi-query/`), the agent:
+
+1. **Applies self-correction to EACH database query independently**
+2. **Uses database-specific schemas** for accurate corrections
+3. **Tracks correction attempts per database**
+4. **Returns aggregated correction metrics**
+
+### Example Multi-Database Response
+
+```json
+{
+  "query_id": 42,
+  "question": "do we have headphones",
+  "database_results": [
+    {
+      "connection_id": 7,
+      "connection_name": "E-Commerce DB",
+      "database_type": "duckdb",
+      "sql": "SELECT * FROM products WHERE name LIKE '%headphones%' LIMIT 10",
+      "success": true,
+      "results": [
+        {"product_id": 3, "name": "Wireless Headphones", "price": 79.99},
+        {"product_id": 11, "name": "Gaming Headphones", "price": 129.99}
+      ],
+      "row_count": 2,
+      "execution_time_ms": 15.3,
+      "correction_attempts": 2,
+      "corrections": [
+        {
+          "attempt_number": 1,
+          "sql": "SELECT * FROM products WHERE product_name LIKE '%headphones%' LIMIT 10",
+          "error": "no such column: product_name",
+          "error_type": "column_not_found",
+          "success": false
+        },
+        {
+          "attempt_number": 2,
+          "sql": "SELECT * FROM products WHERE name LIKE '%headphones%' LIMIT 10",
+          "success": true,
+          "row_count": 2
+        }
+      ]
+    }
+  ],
+  "total_databases_queried": 1,
+  "total_rows": 2
+}
+```
+
+### Benefits for Multi-Database Queries
+
+- ✅ **Independent error handling** - One database error doesn't affect others
+- ✅ **Database-specific corrections** - Uses correct schema for each database
+- ✅ **Parallel processing** - Corrections happen concurrently
+- ✅ **Detailed tracking** - See which databases needed corrections
 
 ---
 

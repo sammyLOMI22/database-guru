@@ -345,6 +345,143 @@ class SelfCorrectingSQLAgent:
             "message": f"Failed after {self.max_retries} attempts"
         }
 
+    async def execute_with_retry(
+        self,
+        sql: str,
+        schema: str,
+        session,
+        database_type: str,
+        question: str,
+        allow_write: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Execute pre-generated SQL with automatic error correction and retry
+
+        This method is useful when you already have SQL generated and just need
+        the retry/correction logic.
+
+        Args:
+            sql: Pre-generated SQL query
+            schema: Database schema information
+            session: Database session for execution
+            database_type: Type of database
+            question: Original natural language question (for context in corrections)
+            allow_write: Whether to allow write operations
+
+        Returns:
+            Dictionary with:
+                - success: bool
+                - sql: Final SQL query (may be corrected)
+                - result: Query results (if successful)
+                - corrections: List of correction attempt details
+                - attempts: Total number of attempts
+                - final_error: Final error message (if failed)
+        """
+        attempts: List[Dict[str, Any]] = []
+        last_error = None
+        current_sql = sql
+
+        executor = SQLExecutor(
+            max_rows=1000,
+            timeout_seconds=30,
+            allow_write=allow_write
+        )
+
+        for attempt_num in range(1, self.max_retries + 1):
+            try:
+                logger.info(f"Attempt {attempt_num}/{self.max_retries}: Executing SQL")
+
+                # Execute SQL
+                exec_result = await executor.execute_query(
+                    session=session,
+                    sql=current_sql
+                )
+
+                # Record attempt
+                attempt_info = {
+                    "attempt_number": attempt_num,
+                    "sql": current_sql,
+                    "error": None if exec_result["success"] else exec_result.get("error"),
+                    "error_type": ErrorType.UNKNOWN.value if not exec_result["success"] else None,
+                    "success": exec_result["success"],
+                    "execution_time_ms": exec_result.get("execution_time_ms"),
+                    "row_count": exec_result.get("row_count")
+                }
+
+                if not exec_result["success"]:
+                    error_type = self.diagnostics.categorize_error(exec_result["error"])
+                    attempt_info["error_type"] = error_type.value
+
+                attempts.append(attempt_info)
+
+                if exec_result["success"]:
+                    # Success!
+                    logger.info(f"✅ Query succeeded on attempt {attempt_num}/{self.max_retries}")
+                    return {
+                        "success": True,
+                        "sql": current_sql,
+                        "result": exec_result,
+                        "corrections": attempts,
+                        "attempts": attempt_num,
+                        "self_corrected": attempt_num > 1,
+                    }
+
+                # Failed - try to correct
+                last_error = exec_result["error"]
+                logger.warning(f"❌ Attempt {attempt_num} failed: {last_error[:200]}")
+
+                # If this is the last attempt, don't retry
+                if attempt_num >= self.max_retries:
+                    break
+
+                # Generate correction
+                error_type = self.diagnostics.categorize_error(last_error)
+                error_context = self.diagnostics.extract_error_context(last_error, error_type)
+                hints = self.diagnostics.generate_fix_hints(error_type, error_context)
+
+                # Add hints to error message
+                enhanced_error = f"{last_error}\n\nHints:\n{hints}"
+
+                # Generate corrected SQL
+                fix_result = await self.generator.fix_sql_error(
+                    sql=current_sql,
+                    error=enhanced_error,
+                    schema=schema,
+                    database_type=database_type
+                )
+                current_sql = fix_result["sql"]
+
+                logger.info(f"Generated corrected SQL: {current_sql[:100]}...")
+
+            except Exception as e:
+                logger.error(f"Exception during attempt {attempt_num}: {e}")
+                last_error = str(e)
+
+                # Record failed attempt
+                attempts.append({
+                    "attempt_number": attempt_num,
+                    "sql": current_sql,
+                    "error": str(e),
+                    "error_type": ErrorType.UNKNOWN.value,
+                    "success": False,
+                    "execution_time_ms": None,
+                    "row_count": None
+                })
+
+                if attempt_num >= self.max_retries:
+                    break
+
+        # All retries exhausted
+        logger.error(f"❌ Query failed after {self.max_retries} attempts")
+        return {
+            "success": False,
+            "sql": current_sql,
+            "final_error": last_error,
+            "corrections": attempts,
+            "attempts": len(attempts),
+            "self_corrected": len(attempts) > 1,
+        }
+
     def get_correction_summary(self, result: Dict[str, Any]) -> str:
         """
         Generate a human-readable summary of the correction process

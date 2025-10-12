@@ -7,6 +7,8 @@ from src.database.models import DatabaseConnection
 from src.core.user_db_connector import UserDatabaseConnector
 from src.core.schema_inspector import SchemaInspector
 from src.core.executor import SQLExecutor
+from src.llm.self_correcting_agent import SelfCorrectingSQLAgent
+from src.llm.sql_generator import SQLGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +152,7 @@ class MultiDatabaseHandler:
         timeout_seconds: int = 30,
     ) -> Dict[str, Any]:
         """
-        Execute a SQL query on a specific database
+        Execute a SQL query on a specific database (WITHOUT self-correction)
 
         Args:
             connection: DatabaseConnection to execute query on
@@ -189,6 +191,136 @@ class MultiDatabaseHandler:
                 "row_count": 0,
                 "execution_time_ms": 0,
             }
+
+    async def execute_query_with_self_correction(
+        self,
+        connection: DatabaseConnection,
+        question: str,
+        schema: str,
+        sql_generator: SQLGenerator,
+        initial_sql: Optional[str] = None,
+        allow_write: bool = False,
+        max_rows: int = 1000,
+        timeout_seconds: int = 30,
+        max_retries: int = 3,
+    ) -> Dict[str, Any]:
+        """
+        Execute a SQL query on a specific database WITH self-correction
+
+        Args:
+            connection: DatabaseConnection to execute query on
+            question: Original natural language question
+            schema: Database schema for this specific connection
+            sql_generator: SQLGenerator instance for generating/fixing SQL
+            initial_sql: Optional pre-generated SQL (if None, will generate)
+            allow_write: Whether to allow write operations
+            max_rows: Maximum number of rows to return
+            timeout_seconds: Query timeout in seconds
+            max_retries: Maximum number of retry attempts
+
+        Returns:
+            Dict with execution results including correction attempts
+        """
+        try:
+            async with UserDatabaseConnector.get_user_db_session(connection) as user_db:
+                # Get schema for this specific database if not provided
+                if not schema:
+                    schema_data = await self.schema_inspector.get_full_schema(user_db)
+                    schema = self._format_single_db_schema(schema_data)
+
+                # Initialize self-correcting agent
+                agent = SelfCorrectingSQLAgent(
+                    sql_generator=sql_generator,
+                    max_retries=max_retries,
+                    enable_diagnostics=True,
+                )
+
+                # If initial SQL provided, use direct retry approach
+                if initial_sql:
+                    # Execute with retry logic
+                    result = await agent.execute_with_retry(
+                        sql=initial_sql,
+                        schema=schema,
+                        session=user_db,
+                        database_type=connection.database_type,
+                        question=question,
+                    )
+                else:
+                    # Generate SQL and execute with retry
+                    result = await agent.generate_and_execute_with_retry(
+                        question=question,
+                        schema=schema,
+                        session=user_db,
+                        database_type=connection.database_type,
+                        allow_write=allow_write,
+                    )
+
+                # Add connection metadata
+                if result.get("success"):
+                    exec_result = result.get("result", {})
+                    return {
+                        "success": True,
+                        "sql": result.get("sql"),
+                        "data": exec_result.get("data", []),
+                        "row_count": exec_result.get("row_count", 0),
+                        "execution_time_ms": exec_result.get("execution_time_ms", 0),
+                        "database_name": connection.name,
+                        "connection_id": connection.id,
+                        "correction_attempts": result.get("attempts", 0),
+                        "corrections": result.get("corrections", []),
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": result.get("final_error", "Unknown error"),
+                        "sql": result.get("sql"),
+                        "database_name": connection.name,
+                        "connection_id": connection.id,
+                        "data": [],
+                        "row_count": 0,
+                        "execution_time_ms": 0,
+                        "correction_attempts": result.get("attempts", 0),
+                        "corrections": result.get("corrections", []),
+                    }
+
+        except Exception as e:
+            logger.error(
+                f"Failed to execute query with self-correction on database '{connection.name}': {e}"
+            )
+            return {
+                "success": False,
+                "error": str(e),
+                "database_name": connection.name,
+                "connection_id": connection.id,
+                "data": [],
+                "row_count": 0,
+                "execution_time_ms": 0,
+                "correction_attempts": 0,
+                "corrections": [],
+            }
+
+    def _format_single_db_schema(self, schema_data: Dict[str, Any]) -> str:
+        """Format schema data for a single database for LLM consumption"""
+        lines = []
+        for table in schema_data.get("tables", []):
+            lines.append(f"Table: {table['name']}")
+            for col in table.get("columns", []):
+                col_def = f"  - {col['name']} ({col['type']})"
+                if col.get("nullable") is False:
+                    col_def += " NOT NULL"
+                if col.get("primary_key"):
+                    col_def += " PRIMARY KEY"
+                lines.append(col_def)
+
+            if table.get("foreign_keys"):
+                lines.append("  Foreign Keys:")
+                for fk in table["foreign_keys"]:
+                    lines.append(
+                        f"    - {fk['constrained_columns']} -> {fk['referred_table']}.{fk['referred_columns']}"
+                    )
+            lines.append("")
+
+        return "\n".join(lines)
 
     async def execute_multi_database_query(
         self,
