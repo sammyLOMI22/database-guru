@@ -186,6 +186,7 @@ class SelfCorrectingSQLAgent:
         max_retries: int = 3,
         enable_diagnostics: bool = True,
         enable_learning: bool = True,
+        enable_schema_fixes: bool = True,
         learner_session = None
     ):
         """
@@ -196,11 +197,13 @@ class SelfCorrectingSQLAgent:
             max_retries: Maximum number of correction attempts
             enable_diagnostics: Whether to provide detailed error diagnostics
             enable_learning: Whether to enable learning from corrections
+            enable_schema_fixes: Whether to enable fast schema-aware fixes
             learner_session: Database session for the learner (optional)
         """
         self.generator = sql_generator
         self.max_retries = max_retries
         self.enable_diagnostics = enable_diagnostics
+        self.enable_schema_fixes = enable_schema_fixes
         self.diagnostics = ErrorDiagnostics()
 
         # Initialize learner if available and enabled
@@ -214,6 +217,11 @@ class SelfCorrectingSQLAgent:
             logger.info("Correction learning enabled")
         elif enable_learning and not LEARNING_AVAILABLE:
             logger.warning("Learning requested but CorrectionLearner not available")
+
+        # Schema-aware fixer will be initialized per-query with schema
+        self.schema_fixer = None
+        if self.enable_schema_fixes:
+            logger.info("Schema-aware fixes enabled")
 
     async def generate_and_execute_with_retry(
         self,
@@ -249,6 +257,19 @@ class SelfCorrectingSQLAgent:
         last_error = None
         sql = None
 
+        # Initialize schema-aware fixer if enabled
+        if self.enable_schema_fixes:
+            try:
+                from src.llm.schema_aware_fixer import SchemaAwareFixer
+                import json
+                # Parse schema if it's a string
+                schema_dict = json.loads(schema) if isinstance(schema, str) else schema
+                self.schema_fixer = SchemaAwareFixer(schema_dict)
+                logger.info("Schema-aware fixer initialized with schema")
+            except Exception as e:
+                logger.warning(f"Failed to initialize schema-aware fixer: {e}")
+                self.schema_fixer = None
+
         executor = SQLExecutor(
             max_rows=1000,
             timeout_seconds=30,
@@ -278,38 +299,60 @@ class SelfCorrectingSQLAgent:
                     error_context = self.diagnostics.extract_error_context(last_error, error_type)
                     hints = self.diagnostics.generate_fix_hints(error_type, error_context)
 
-                    # Check for learned corrections
-                    learned_correction = None
-                    if self.learner:
-                        learned_corrections = await self.learner.find_applicable_corrections(
+                    # Try schema-aware quick fix FIRST (fastest, no LLM call)
+                    quick_fix_used = False
+                    if self.enable_schema_fixes and self.schema_fixer:
+                        from src.llm.schema_aware_fixer import QuickFix
+                        quick_fix = self.schema_fixer.quick_fix(
+                            sql=sql,
                             error_type=error_type,
                             error_message=last_error,
-                            database_type=database_type,
-                            sql=sql,
-                            limit=1
+                            context=error_context
                         )
-                        if learned_corrections:
-                            learned_correction = learned_corrections[0]
+
+                        if quick_fix.success and quick_fix.confidence >= 0.7:
+                            sql = quick_fix.fixed_sql
+                            quick_fix_used = True
                             logger.info(
-                                f"Found learned correction {learned_correction['id']} "
-                                f"(confidence: {learned_correction['confidence_score']:.2f})"
+                                f"⚡ Quick fix applied: {quick_fix.explanation} "
+                                f"(confidence: {quick_fix.confidence:.2f}) - SKIPPED LLM CALL"
                             )
-                            # Add learned correction to hints
-                            hints += f"\n\nLearned correction available: {learned_correction['correction_description']}"
+                            # Continue to execution without LLM call
 
-                    # Add hints to error message for better correction
-                    enhanced_error = f"{last_error}\n\nHints:\n{hints}"
+                    if not quick_fix_used:
+                        # Quick fix didn't work, use learned corrections or LLM
+                        # Check for learned corrections
+                        learned_correction = None
+                        if self.learner:
+                            learned_corrections = await self.learner.find_applicable_corrections(
+                                error_type=error_type,
+                                error_message=last_error,
+                                database_type=database_type,
+                                sql=sql,
+                                limit=1
+                            )
+                            if learned_corrections:
+                                learned_correction = learned_corrections[0]
+                                logger.info(
+                                    f"Found learned correction {learned_correction['id']} "
+                                    f"(confidence: {learned_correction['confidence_score']:.2f})"
+                                )
+                                # Add learned correction to hints
+                                hints += f"\n\nLearned correction available: {learned_correction['correction_description']}"
 
-                    # Generate corrected SQL
-                    fix_result = await self.generator.fix_sql_error(
-                        sql=sql,
-                        error=enhanced_error,
-                        schema=schema,
-                        database_type=database_type
-                    )
-                    sql = fix_result["sql"]
+                        # Add hints to error message for better correction
+                        enhanced_error = f"{last_error}\n\nHints:\n{hints}"
 
-                    logger.info(f"Generated corrected SQL: {sql[:100]}...")
+                        # Generate corrected SQL using LLM
+                        fix_result = await self.generator.fix_sql_error(
+                            sql=sql,
+                            error=enhanced_error,
+                            schema=schema,
+                            database_type=database_type
+                        )
+                        sql = fix_result["sql"]
+
+                        logger.info(f"Generated corrected SQL: {sql[:100]}...")
 
                 # Validate SQL before executing
                 if not gen_result.get("is_valid", True) if attempt_num == 1 else True:
