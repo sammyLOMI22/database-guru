@@ -10,6 +10,7 @@ from src.database.models import (
     UserFeedback,
     ChatSession,
     ChatMessage,
+    LearnedCorrection,
 )
 
 logging.basicConfig(level=logging.INFO)

@@ -10,6 +10,14 @@ from src.database.models import DatabaseConnection
 
 logger = logging.getLogger(__name__)
 
+# Import CorrectionLearner (optional to avoid circular imports)
+try:
+    from src.llm.correction_learner import CorrectionLearner
+    LEARNING_AVAILABLE = True
+except ImportError:
+    LEARNING_AVAILABLE = False
+    logger.warning("CorrectionLearner not available - learning disabled")
+
 
 class ErrorType(Enum):
     """Types of SQL errors for better diagnosis"""
@@ -176,7 +184,9 @@ class SelfCorrectingSQLAgent:
         self,
         sql_generator: SQLGenerator,
         max_retries: int = 3,
-        enable_diagnostics: bool = True
+        enable_diagnostics: bool = True,
+        enable_learning: bool = True,
+        learner_session = None
     ):
         """
         Initialize the self-correcting agent
@@ -185,11 +195,25 @@ class SelfCorrectingSQLAgent:
             sql_generator: SQL generator instance
             max_retries: Maximum number of correction attempts
             enable_diagnostics: Whether to provide detailed error diagnostics
+            enable_learning: Whether to enable learning from corrections
+            learner_session: Database session for the learner (optional)
         """
         self.generator = sql_generator
         self.max_retries = max_retries
         self.enable_diagnostics = enable_diagnostics
         self.diagnostics = ErrorDiagnostics()
+
+        # Initialize learner if available and enabled
+        self.enable_learning = enable_learning and LEARNING_AVAILABLE
+        self.learner = None
+        if self.enable_learning and learner_session:
+            self.learner = CorrectionLearner(
+                db_session=learner_session,
+                enable_learning=True
+            )
+            logger.info("Correction learning enabled")
+        elif enable_learning and not LEARNING_AVAILABLE:
+            logger.warning("Learning requested but CorrectionLearner not available")
 
     async def generate_and_execute_with_retry(
         self,
@@ -254,6 +278,25 @@ class SelfCorrectingSQLAgent:
                     error_context = self.diagnostics.extract_error_context(last_error, error_type)
                     hints = self.diagnostics.generate_fix_hints(error_type, error_context)
 
+                    # Check for learned corrections
+                    learned_correction = None
+                    if self.learner:
+                        learned_corrections = await self.learner.find_applicable_corrections(
+                            error_type=error_type,
+                            error_message=last_error,
+                            database_type=database_type,
+                            sql=sql,
+                            limit=1
+                        )
+                        if learned_corrections:
+                            learned_correction = learned_corrections[0]
+                            logger.info(
+                                f"Found learned correction {learned_correction['id']} "
+                                f"(confidence: {learned_correction['confidence_score']:.2f})"
+                            )
+                            # Add learned correction to hints
+                            hints += f"\n\nLearned correction available: {learned_correction['correction_description']}"
+
                     # Add hints to error message for better correction
                     enhanced_error = f"{last_error}\n\nHints:\n{hints}"
 
@@ -293,6 +336,22 @@ class SelfCorrectingSQLAgent:
                 if exec_result["success"]:
                     # Success!
                     logger.info(f"✅ Query succeeded on attempt {attempt_num}/{self.max_retries}")
+
+                    # Learn from this correction if it was a retry
+                    if attempt_num > 1 and self.learner and len(attempts) > 0:
+                        # Get the original error from the first failed attempt
+                        first_attempt = attempts[0]
+                        if not first_attempt.success and first_attempt.error:
+                            await self.learner.learn_from_correction(
+                                error_type=first_attempt.error_type,
+                                original_sql=first_attempt.sql,
+                                original_error=first_attempt.error,
+                                corrected_sql=sql,
+                                database_type=database_type,
+                                was_successful=True
+                            )
+                            logger.info("✨ Learned from successful correction")
+
                     return {
                         "success": True,
                         "sql": sql,
