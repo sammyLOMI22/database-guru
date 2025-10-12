@@ -18,6 +18,7 @@ from src.models.schemas import (
 from src.api.dependencies import get_db, get_cache, get_sql_generator, get_settings
 from src.database.models import QueryHistory
 from src.llm.sql_generator import SQLGenerator
+from src.llm.self_correcting_agent import SelfCorrectingSQLAgent
 from src.cache.redis_client import RedisCache
 from src.config.settings import Settings
 from src.core.executor import SQLExecutor
@@ -102,43 +103,60 @@ async def process_query(
                 schema = schema_inspector.format_schema_for_llm(schema_data)
                 logger.debug(f"Using introspected schema with {len(schema_data['tables'])} tables")
 
-            # Generate SQL
-            generation_result = await sql_generator.generate_sql(
-                question=request.question,
-                schema=schema,
-                database_type=database_type,  # Use active connection's database type
-                allow_write=request.allow_write,
-                model=request.model,  # Use user-specified model
+            # Use Self-Correcting Agent for automatic error recovery
+            self_correcting_agent = SelfCorrectingSQLAgent(
+                sql_generator=sql_generator,
+                max_retries=3,
+                enable_diagnostics=True
             )
 
-            sql = generation_result["sql"]
-            is_valid = generation_result["is_valid"]
-            is_read_only = generation_result["is_read_only"]
-            warnings = generation_result["warnings"]
-            model_used = generation_result.get("model_used", settings.OLLAMA_MODEL)
+            # Generate and execute with automatic retry
+            agent_result = await self_correcting_agent.generate_and_execute_with_retry(
+                question=request.question,
+                schema=schema,
+                session=user_db,
+                database_type=database_type,
+                allow_write=request.allow_write,
+                model=request.model,
+            )
 
-            # Execute SQL if valid - ON USER'S DATABASE
-            execution_result = None
-            if is_valid and sql:
-                executor = SQLExecutor(
-                    max_rows=1000,
-                    timeout_seconds=30,
-                    allow_write=request.allow_write,
+            # Extract results from agent
+            sql = agent_result["sql"]
+            execution_result = agent_result.get("result") if agent_result["success"] else None
+            model_used = agent_result.get("model_used", settings.OLLAMA_MODEL)
+
+            # Build warnings
+            warnings = []
+            if agent_result["self_corrected"]:
+                warnings.append(
+                    f"✨ Query auto-corrected after {agent_result['total_attempts'] - 1} error(s)"
                 )
+                logger.info(f"🔧 Self-correction successful after {agent_result['total_attempts']} attempts")
 
-                try:
-                    execution_result = await executor.execute_query(user_db, sql)
-                    logger.info(f"Query executed: {execution_result['row_count']} rows in {execution_result['execution_time_ms']}ms")
-                except Exception as e:
-                    logger.error(f"SQL execution error: {e}")
-                    warnings.append(f"Execution error: {str(e)}")
-                    execution_result = {
-                        "success": False,
-                        "error": str(e),
-                        "data": [],
-                        "row_count": 0,
-                        "execution_time_ms": 0,
-                    }
+            if not agent_result["success"]:
+                warnings.append(f"Query failed: {agent_result.get('error', 'Unknown error')}")
+
+            # Determine validity
+            is_valid = agent_result["success"]
+            is_read_only = True  # Determine from SQL if needed
+
+            # Format execution result for compatibility
+            if execution_result:
+                execution_result = {
+                    "success": execution_result.get("success", False),
+                    "data": execution_result.get("data", []),
+                    "row_count": execution_result.get("row_count", 0),
+                    "execution_time_ms": execution_result.get("execution_time_ms", 0),
+                    "error": execution_result.get("error")
+                }
+            else:
+                execution_result = {
+                    "success": False,
+                    "error": agent_result.get("error", "Execution failed"),
+                    "data": [],
+                    "row_count": 0,
+                    "execution_time_ms": 0,
+                }
 
         # Save to query history
         query_record = QueryHistory(

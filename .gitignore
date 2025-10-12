@@ -22,6 +22,8 @@ htmlcov/
 .env.*.local
 configs/*/
 !configs/*/.env.example
+.backend.pid
+.frontend.pid
 
 # IDE
 .vscode/
