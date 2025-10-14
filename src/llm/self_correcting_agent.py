@@ -187,6 +187,7 @@ class SelfCorrectingSQLAgent:
         enable_diagnostics: bool = True,
         enable_learning: bool = True,
         enable_schema_fixes: bool = True,
+        enable_result_verification: bool = True,
         learner_session = None
     ):
         """
@@ -198,12 +199,14 @@ class SelfCorrectingSQLAgent:
             enable_diagnostics: Whether to provide detailed error diagnostics
             enable_learning: Whether to enable learning from corrections
             enable_schema_fixes: Whether to enable fast schema-aware fixes
+            enable_result_verification: Whether to enable result verification
             learner_session: Database session for the learner (optional)
         """
         self.generator = sql_generator
         self.max_retries = max_retries
         self.enable_diagnostics = enable_diagnostics
         self.enable_schema_fixes = enable_schema_fixes
+        self.enable_result_verification = enable_result_verification
         self.diagnostics = ErrorDiagnostics()
 
         # Initialize learner if available and enabled
@@ -222,6 +225,20 @@ class SelfCorrectingSQLAgent:
         self.schema_fixer = None
         if self.enable_schema_fixes:
             logger.info("Schema-aware fixes enabled")
+
+        # Initialize result verification agent
+        self.verification_agent = None
+        if self.enable_result_verification:
+            try:
+                from src.llm.result_verification_agent import ResultVerificationAgent
+                self.verification_agent = ResultVerificationAgent(
+                    enable_diagnostics=True,
+                    enable_auto_fix=True
+                )
+                logger.info("Result verification enabled")
+            except ImportError:
+                logger.warning("ResultVerificationAgent not available - verification disabled")
+                self.enable_result_verification = False
 
     async def generate_and_execute_with_retry(
         self,
@@ -377,8 +394,73 @@ class SelfCorrectingSQLAgent:
                 attempts.append(attempt)
 
                 if exec_result["success"]:
-                    # Success!
+                    # Success! But verify results make sense
                     logger.info(f"✅ Query succeeded on attempt {attempt_num}/{self.max_retries}")
+
+                    # Verify results if enabled
+                    verification_result = None
+                    verification_warnings = []
+                    if self.enable_result_verification and self.verification_agent:
+                        try:
+                            logger.info("🔍 Verifying query results...")
+                            verification_result = await self.verification_agent.verify_results(
+                                question=question,
+                                sql=sql,
+                                result=exec_result,
+                                schema=schema,
+                                database_type=database_type
+                            )
+
+                            if verification_result.is_suspicious:
+                                logger.warning(
+                                    f"⚠️ Suspicious results detected: {verification_result.description} "
+                                    f"(confidence: {verification_result.confidence:.2f})"
+                                )
+
+                                # Run diagnostics if needed
+                                diagnostics = None
+                                if verification_result.diagnostic_queries:
+                                    diagnostics = await self.verification_agent.run_diagnostics(
+                                        sql=sql,
+                                        verification=verification_result,
+                                        session=session,
+                                        database_type=database_type
+                                    )
+                                    logger.info(f"📊 Diagnostics: {diagnostics.diagnosis}")
+
+                                # Generate improvement hints
+                                hints = self.verification_agent.generate_improvement_hints(
+                                    question=question,
+                                    sql=sql,
+                                    verification=verification_result,
+                                    diagnostics=diagnostics
+                                )
+
+                                # If high confidence issue and auto-fix enabled, try to regenerate
+                                if (verification_result.confidence >= 0.7 and
+                                    attempt_num < self.max_retries and
+                                    self.verification_agent.enable_auto_fix):
+
+                                    logger.info("🔧 High confidence issue detected, attempting to regenerate query...")
+
+                                    # Add verification feedback to the next attempt
+                                    last_error = f"Query succeeded but returned suspicious results:\n{hints}"
+
+                                    # Mark this attempt as failed verification
+                                    attempt.success = False
+                                    attempt.error = verification_result.description
+
+                                    # Continue to next attempt
+                                    logger.warning(f"❌ Attempt {attempt_num} failed verification check")
+                                    continue
+                                else:
+                                    # Low confidence or last attempt - return with warning
+                                    verification_warnings.append(
+                                        f"⚠️ Result verification: {verification_result.description}"
+                                    )
+                        except Exception as e:
+                            logger.error(f"Error during result verification: {e}")
+                            verification_warnings.append(f"Result verification failed: {str(e)}")
 
                     # Learn from this correction if it was a retry
                     if attempt_num > 1 and self.learner and len(attempts) > 0:
@@ -403,7 +485,9 @@ class SelfCorrectingSQLAgent:
                         "self_corrected": attempt_num > 1,
                         "total_attempts": attempt_num,
                         "question": question,
-                        "model_used": model or self.generator.settings.OLLAMA_MODEL
+                        "model_used": model or self.generator.settings.OLLAMA_MODEL,
+                        "verification": verification_result,
+                        "verification_warnings": verification_warnings
                     }
 
                 # Failed - save error for next retry
