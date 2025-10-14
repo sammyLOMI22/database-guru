@@ -336,7 +336,7 @@ class TestResultVerificationAgent:
         # Mock executor
         mock_session = MagicMock()
 
-        with patch('src.llm.result_verification_agent.SQLExecutor') as mock_executor_class:
+        with patch('src.core.executor.SQLExecutor') as mock_executor_class:
             mock_executor = MagicMock()
             mock_executor_class.return_value = mock_executor
 
