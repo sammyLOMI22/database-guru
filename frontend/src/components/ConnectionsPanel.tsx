@@ -156,12 +156,20 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
                       )}
                       <span className="font-medium text-gray-900 truncate">{conn.name}</span>
                     </div>
-                    <div className="ml-6 space-y-0.5">
+                    <div className="ml-6 space-y-1">
                       <p className="text-xs text-gray-600">
-                        <span className="font-medium">{conn.database_type}</span>
-                        {conn.host && ` • ${conn.host}:${conn.port}`}
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                          {conn.database_type.toUpperCase()}
+                        </span>
                       </p>
-                      <p className="text-xs text-gray-500 truncate">{conn.database_name}</p>
+                      {conn.host && (
+                        <p className="text-xs text-gray-600 font-mono">
+                          {conn.host}:{conn.port}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-700 font-medium truncate" title={conn.database_name}>
+                        {conn.database_name}
+                      </p>
                     </div>
                   </div>
                   <button

@@ -34,8 +34,40 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
 
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showConnectionString, setShowConnectionString] = useState(false);
 
   if (!isOpen) return null;
+
+  // Generate connection string for display
+  const getConnectionString = (): string => {
+    if (formData.database_type === 'sqlite') {
+      return `sqlite:///${formData.database_name || '/path/to/database.db'}`;
+    } else if (formData.database_type === 'duckdb') {
+      return `duckdb:///${formData.database_name || '/path/to/database.duckdb'}`;
+    } else if (formData.database_type === 'mongodb') {
+      const user = formData.username || 'username';
+      const pass = formData.password ? '****' : 'password';
+      const host = formData.host || 'localhost';
+      const port = formData.port || 27017;
+      const db = formData.database_name || 'database';
+      return `mongodb://${user}:${pass}@${host}:${port}/${db}`;
+    } else if (formData.database_type === 'mysql') {
+      const user = formData.username || 'username';
+      const pass = formData.password ? '****' : 'password';
+      const host = formData.host || 'localhost';
+      const port = formData.port || 3306;
+      const db = formData.database_name || 'database';
+      return `mysql://${user}:${pass}@${host}:${port}/${db}`;
+    } else {
+      // PostgreSQL (default)
+      const user = formData.username || 'username';
+      const pass = formData.password ? '****' : 'password';
+      const host = formData.host || 'localhost';
+      const port = formData.port || 5432;
+      const db = formData.database_name || 'database';
+      return `postgresql://${user}:${pass}@${host}:${port}/${db}`;
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -318,6 +350,32 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
               </div>
             </>
           )}
+
+          {/* Connection String Preview */}
+          <div className="border-t border-gray-200 pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Connection String Preview
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowConnectionString(!showConnectionString)}
+                className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+              >
+                {showConnectionString ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            {showConnectionString && (
+              <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <code className="text-xs text-gray-700 break-all font-mono">
+                  {getConnectionString()}
+                </code>
+                <p className="mt-2 text-xs text-gray-500">
+                  This is how your database connection string will look. The password is masked for security.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Test Result */}
           {testResult && (
