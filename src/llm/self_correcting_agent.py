@@ -58,29 +58,31 @@ class ErrorDiagnostics:
         """
         error_lower = error_message.lower()
 
-        # Syntax errors
-        if any(keyword in error_lower for keyword in [
-            "syntax error", "syntax", "parse error", "unexpected"
-        ]):
-            return ErrorType.SYNTAX_ERROR
+        # Check in order of specificity (most specific first)
 
-        # Table not found
+        # Type mismatch (check before "does not exist" matches)
         if any(keyword in error_lower for keyword in [
-            "table", "relation", "does not exist", "no such table"
+            "operator does not exist", "type mismatch", "cast", "conversion", "incompatible"
         ]):
-            return ErrorType.TABLE_NOT_FOUND
+            return ErrorType.TYPE_MISMATCH
 
-        # Column not found
+        # Column not found (check before table since column errors are more specific)
         if any(keyword in error_lower for keyword in [
             "column", "field", "unknown column", "no such column"
         ]):
             return ErrorType.COLUMN_NOT_FOUND
 
-        # Type mismatch
+        # Table not found
         if any(keyword in error_lower for keyword in [
-            "type", "cast", "conversion", "incompatible"
+            "table", "relation", "no such table", "does not exist"
         ]):
-            return ErrorType.TYPE_MISMATCH
+            return ErrorType.TABLE_NOT_FOUND
+
+        # Syntax errors
+        if any(keyword in error_lower for keyword in [
+            "syntax error", "syntax", "parse error", "unexpected"
+        ]):
+            return ErrorType.SYNTAX_ERROR
 
         # Permission issues
         if any(keyword in error_lower for keyword in [
