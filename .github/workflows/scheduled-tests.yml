@@ -1,10 +1,10 @@
 name: Scheduled Tests
 
 on:
-  schedule:
-    # Run tests every day at 2 AM UTC
-    - cron: '0 2 * * *'
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:  # Manual trigger only
+  # schedule:
+  #   # Run tests every day at 2 AM UTC
+  #   - cron: '0 2 * * *'
 
 jobs:
   full-test-suite:

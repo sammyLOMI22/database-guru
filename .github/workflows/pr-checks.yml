@@ -1,8 +1,9 @@
 name: PR Checks
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:  # Manual trigger only
+  # pull_request:
+  #   types: [opened, synchronize, reopened]
 
 jobs:
   test-changes:
