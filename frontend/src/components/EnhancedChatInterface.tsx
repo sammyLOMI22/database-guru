@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import Message from './Message';
 import QueryInput from './QueryInput';
 import ChatSessionSelector from './ChatSessionSelector';
+import Sidebar from './Sidebar';
 import MultiDatabaseResults from './MultiDatabaseResults';
 import { useMultiQuery } from '../hooks/useMultiQuery';
 import { useModels } from '../hooks/useModels';
@@ -25,6 +26,7 @@ export default function EnhancedChatInterface() {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [showSessionSelector, setShowSessionSelector] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { loading, executeQuery } = useMultiQuery();
@@ -82,6 +84,14 @@ export default function EnhancedChatInterface() {
 
   return (
     <div className="flex h-full">
+      {/* Left Sidebar - Connections/Schema/History */}
+      {showSidebar && (
+        <Sidebar
+          onClose={() => setShowSidebar(false)}
+          onSelectQuery={(question) => handleSubmit(question)}
+        />
+      )}
+
       {/* Session Selector Sidebar */}
       {showSessionSelector && (
         <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
@@ -98,14 +108,25 @@ export default function EnhancedChatInterface() {
         <div className="px-6 py-3 bg-white border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              {/* Toggle sidebar button */}
+              {/* Toggle connections sidebar button */}
+              <button
+                onClick={() => setShowSidebar(!showSidebar)}
+                className="p-1 hover:bg-gray-100 rounded"
+                title="Toggle database connections"
+              >
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                </svg>
+              </button>
+
+              {/* Toggle sessions sidebar button */}
               <button
                 onClick={() => setShowSessionSelector(!showSessionSelector)}
                 className="p-1 hover:bg-gray-100 rounded"
                 title="Toggle sessions panel"
               >
                 <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </button>
 

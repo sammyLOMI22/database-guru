@@ -1,0 +1,76 @@
+name: Coverage Badge
+
+on:
+  workflow_dispatch:  # Manual trigger only
+  # push:
+  #   branches: [ main ]
+
+jobs:
+  coverage-badge:
+    name: Generate Coverage Badge
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        pip install genbadge[coverage]
+
+    - name: Run tests with coverage
+      run: |
+        python -m pytest tests/ \
+          --cov=src \
+          --cov-report=xml \
+          --cov-report=term
+
+    - name: Generate coverage badge
+      run: |
+        genbadge coverage -i coverage.xml -o coverage-badge.svg
+
+    - name: Extract coverage percentage
+      id: coverage
+      run: |
+        COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(root.attrib['line-rate'])")
+        COVERAGE_PERCENT=$(python -c "print(int(float($COVERAGE) * 100))")
+        echo "percentage=$COVERAGE_PERCENT" >> $GITHUB_OUTPUT
+        echo "Coverage: $COVERAGE_PERCENT%"
+
+    - name: Create badges directory
+      run: mkdir -p .github/badges
+
+    - name: Generate test status badge
+      run: |
+        TESTS=$(python -m pytest tests/ --collect-only -q | grep -E "^[0-9]+" | awk '{print $1}')
+        echo "Total tests: $TESTS"
+        # Create a simple badge (using shields.io style)
+
+    - name: Commit and push badges
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add .github/badges/ coverage-badge.svg 2>/dev/null || true
+        git diff --quiet && git diff --staged --quiet || git commit -m "Update coverage badge [skip ci]"
+        git push
+      continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload badge artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-badge
+        path: coverage-badge.svg

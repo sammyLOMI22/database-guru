@@ -1,6 +1,6 @@
 """Database connection management"""
 from typing import AsyncGenerator
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from sqlalchemy.pool import NullPool, QueuePool
@@ -122,11 +122,11 @@ class DatabaseManager:
         try:
             if self.async_engine:
                 async with self.async_engine.connect() as conn:
-                    await conn.execute("SELECT 1")
+                    await conn.execute(text("SELECT 1"))
                 return True
             elif self.engine:
                 with self.engine.connect() as conn:
-                    conn.execute("SELECT 1")
+                    conn.execute(text("SELECT 1"))
                 return True
             return False
         except Exception as e:
