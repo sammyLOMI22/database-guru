@@ -1,5 +1,6 @@
 """Multi-database handler for querying across multiple databases"""
 import logging
+import asyncio
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,11 +20,63 @@ class MultiDatabaseHandler:
     def __init__(self):
         self.schema_inspector = SchemaInspector()
 
+    async def _introspect_single_database(self, conn: DatabaseConnection) -> Dict[str, Any]:
+        """
+        Introspect schema for a single database connection
+
+        Args:
+            conn: DatabaseConnection to introspect
+
+        Returns:
+            Dict with database info and schema, or error info
+        """
+        try:
+            async with UserDatabaseConnector.get_user_db_session(conn) as user_db:
+                # Get schema for this database
+                schema_data = await self.schema_inspector.get_full_schema(user_db)
+
+                # Convert schema tables from dict to list format
+                tables_dict = schema_data.get("tables", {})
+                tables_list = []
+                for table_name, table_info in tables_dict.items():
+                    tables_list.append({
+                        "name": table_name,
+                        **table_info  # Spread the columns, foreign_keys, etc.
+                    })
+
+                # Add database context
+                db_info = {
+                    "connection_id": conn.id,
+                    "name": conn.name,
+                    "database_type": conn.database_type,
+                    "database_name": conn.database_name,
+                    "tables": tables_list,
+                    "table_count": len(tables_list),
+                }
+
+                logger.info(
+                    f"Added schema for database '{conn.name}': {db_info['table_count']} tables"
+                )
+
+                return db_info
+
+        except Exception as e:
+            logger.error(f"Failed to get schema for database '{conn.name}': {e}")
+            # Return error info but allow other databases to continue
+            return {
+                "connection_id": conn.id,
+                "name": conn.name,
+                "database_type": conn.database_type,
+                "error": str(e),
+                "tables": [],
+                "table_count": 0,
+            }
+
     async def build_combined_schema(
         self, connections: List[DatabaseConnection]
     ) -> Dict[str, Any]:
         """
-        Build a combined schema from multiple database connections
+        Build a combined schema from multiple database connections (parallelized)
 
         Args:
             connections: List of DatabaseConnection objects
@@ -37,57 +90,46 @@ class MultiDatabaseHandler:
             "total_columns": 0,
         }
 
-        for conn in connections:
-            try:
-                async with UserDatabaseConnector.get_user_db_session(conn) as user_db:
-                    # Get schema for this database
-                    schema_data = await self.schema_inspector.get_full_schema(user_db)
+        # OPTIMIZATION: Introspect all databases in parallel using asyncio.gather
+        # This reduces total time from N × connection_time to max(connection_time)
+        logger.info(f"Introspecting {len(connections)} database(s) in parallel...")
 
-                    # Convert schema tables from dict to list format
-                    tables_dict = schema_data.get("tables", {})
-                    tables_list = []
-                    for table_name, table_info in tables_dict.items():
-                        tables_list.append({
-                            "name": table_name,
-                            **table_info  # Spread the columns, foreign_keys, etc.
-                        })
+        introspection_tasks = [
+            self._introspect_single_database(conn)
+            for conn in connections
+        ]
 
-                    # Add database context
-                    db_info = {
-                        "connection_id": conn.id,
-                        "name": conn.name,
-                        "database_type": conn.database_type,
-                        "database_name": conn.database_name,
-                        "tables": tables_list,
-                        "table_count": len(tables_list),
-                    }
+        # Gather results (will wait for all to complete, but they run concurrently)
+        db_infos = await asyncio.gather(*introspection_tasks, return_exceptions=True)
 
-                    combined_schema["databases"].append(db_info)
-                    combined_schema["total_tables"] += db_info["table_count"]
+        # Process results
+        for i, db_info in enumerate(db_infos):
+            # Handle exceptions from gather
+            if isinstance(db_info, Exception):
+                conn = connections[i]
+                logger.error(f"Exception introspecting database '{conn.name}': {db_info}")
+                db_info = {
+                    "connection_id": conn.id,
+                    "name": conn.name,
+                    "database_type": conn.database_type,
+                    "error": str(db_info),
+                    "tables": [],
+                    "table_count": 0,
+                }
 
-                    # Count columns
-                    for table in tables_list:
-                        combined_schema["total_columns"] += len(
-                            table.get("columns", [])
-                        )
+            combined_schema["databases"].append(db_info)
+            combined_schema["total_tables"] += db_info.get("table_count", 0)
 
-                logger.info(
-                    f"Added schema for database '{conn.name}': {db_info['table_count']} tables"
+            # Count columns
+            for table in db_info.get("tables", []):
+                combined_schema["total_columns"] += len(
+                    table.get("columns", [])
                 )
 
-            except Exception as e:
-                logger.error(f"Failed to get schema for database '{conn.name}': {e}")
-                # Add error info but continue with other databases
-                combined_schema["databases"].append(
-                    {
-                        "connection_id": conn.id,
-                        "name": conn.name,
-                        "database_type": conn.database_type,
-                        "error": str(e),
-                        "tables": [],
-                        "table_count": 0,
-                    }
-                )
+        logger.info(
+            f"✓ Schema introspection complete: {combined_schema['total_tables']} tables "
+            f"across {len(connections)} database(s)"
+        )
 
         return combined_schema
 
