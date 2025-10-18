@@ -372,6 +372,32 @@ Provide the corrected SQL query ONLY."""
         try:
             model_to_use = model or self.settings.OLLAMA_MODEL
 
+            # Normalize locations in question (California -> CA, etc.)
+            try:
+                from src.core.location_mapper import normalize_location
+                import re
+
+                # Find potential state names and normalize them
+                words = question.split()
+                normalized_question = question
+                for word in words:
+                    # Clean punctuation
+                    clean_word = re.sub(r'[^\w\s]', '', word)
+                    normalized = normalize_location(clean_word)
+                    if normalized and normalized != clean_word:
+                        # Replace in question, preserving case
+                        normalized_question = re.sub(
+                            rf'\b{re.escape(clean_word)}\b',
+                            normalized,
+                            normalized_question,
+                            flags=re.IGNORECASE
+                        )
+                        logger.info(f"Normalized location: {clean_word} -> {normalized}")
+
+                question = normalized_question
+            except Exception as e:
+                logger.warning(f"Location normalization failed: {e}")
+
             # Build multi-database prompt
             prompt = MULTI_DATABASE_QUERY_TEMPLATE.format(
                 schema=combined_schema,
