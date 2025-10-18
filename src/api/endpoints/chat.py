@@ -112,9 +112,16 @@ async def create_chat_session(
         # Get connection details
         connections = []
         if new_session.active_connection_ids:
+            # Ensure active_connection_ids is a list (defensive against bad data)
+            connection_ids = new_session.active_connection_ids
+            if isinstance(connection_ids, int):
+                connection_ids = [connection_ids]
+            elif not isinstance(connection_ids, list):
+                connection_ids = list(connection_ids) if connection_ids else []
+
             result = await db.execute(
                 select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(new_session.active_connection_ids)
+                    DatabaseConnection.id.in_(connection_ids)
                 )
             )
             connections = [
@@ -127,11 +134,18 @@ async def create_chat_session(
                 for conn in result.scalars().all()
             ]
 
+        # Ensure active_connection_ids in response is always a list
+        active_conn_ids = new_session.active_connection_ids
+        if isinstance(active_conn_ids, int):
+            active_conn_ids = [active_conn_ids]
+        elif not isinstance(active_conn_ids, list):
+            active_conn_ids = list(active_conn_ids) if active_conn_ids else []
+
         return ChatSessionResponse(
             id=new_session.id,
             name=new_session.name,
             user_id=new_session.user_id,
-            active_connection_ids=new_session.active_connection_ids,
+            active_connection_ids=active_conn_ids,
             connections=connections,
             created_at=new_session.created_at.isoformat(),
             updated_at=new_session.updated_at.isoformat(),
@@ -174,9 +188,16 @@ async def list_chat_sessions(
             # Get connection details
             connections = []
             if session.active_connection_ids:
+                # Ensure active_connection_ids is a list (defensive against bad data)
+                connection_ids = session.active_connection_ids
+                if isinstance(connection_ids, int):
+                    connection_ids = [connection_ids]
+                elif not isinstance(connection_ids, list):
+                    connection_ids = list(connection_ids) if connection_ids else []
+
                 conn_result = await db.execute(
                     select(DatabaseConnection).where(
-                        DatabaseConnection.id.in_(session.active_connection_ids)
+                        DatabaseConnection.id.in_(connection_ids)
                     )
                 )
                 connections = [
@@ -195,12 +216,19 @@ async def list_chat_sessions(
             )
             message_count = len(msg_count_result.scalars().all())
 
+            # Ensure active_connection_ids in response is always a list
+            active_conn_ids = session.active_connection_ids
+            if isinstance(active_conn_ids, int):
+                active_conn_ids = [active_conn_ids]
+            elif not isinstance(active_conn_ids, list):
+                active_conn_ids = list(active_conn_ids) if active_conn_ids else []
+
             response_sessions.append(
                 ChatSessionResponse(
                     id=session.id,
                     name=session.name,
                     user_id=session.user_id,
-                    active_connection_ids=session.active_connection_ids,
+                    active_connection_ids=active_conn_ids,
                     connections=connections,
                     created_at=session.created_at.isoformat(),
                     updated_at=session.updated_at.isoformat(),
@@ -240,9 +268,16 @@ async def get_chat_session(
         # Get connection details
         connections = []
         if session.active_connection_ids:
+            # Ensure active_connection_ids is a list (defensive against bad data)
+            connection_ids = session.active_connection_ids
+            if isinstance(connection_ids, int):
+                connection_ids = [connection_ids]
+            elif not isinstance(connection_ids, list):
+                connection_ids = list(connection_ids) if connection_ids else []
+
             conn_result = await db.execute(
                 select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(session.active_connection_ids)
+                    DatabaseConnection.id.in_(connection_ids)
                 )
             )
             connections = [
@@ -261,11 +296,18 @@ async def get_chat_session(
         )
         message_count = len(msg_count_result.scalars().all())
 
+        # Ensure active_connection_ids in response is always a list
+        active_conn_ids = session.active_connection_ids
+        if isinstance(active_conn_ids, int):
+            active_conn_ids = [active_conn_ids]
+        elif not isinstance(active_conn_ids, list):
+            active_conn_ids = list(active_conn_ids) if active_conn_ids else []
+
         return ChatSessionResponse(
             id=session.id,
             name=session.name,
             user_id=session.user_id,
-            active_connection_ids=session.active_connection_ids,
+            active_connection_ids=active_conn_ids,
             connections=connections,
             created_at=session.created_at.isoformat(),
             updated_at=session.updated_at.isoformat(),
@@ -332,9 +374,16 @@ async def update_chat_session(
         # Get connection details
         connections = []
         if session.active_connection_ids:
+            # Ensure active_connection_ids is a list (defensive against bad data)
+            connection_ids = session.active_connection_ids
+            if isinstance(connection_ids, int):
+                connection_ids = [connection_ids]
+            elif not isinstance(connection_ids, list):
+                connection_ids = list(connection_ids) if connection_ids else []
+
             conn_result = await db.execute(
                 select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(session.active_connection_ids)
+                    DatabaseConnection.id.in_(connection_ids)
                 )
             )
             connections = [
@@ -353,11 +402,18 @@ async def update_chat_session(
         )
         message_count = len(msg_count_result.scalars().all())
 
+        # Ensure active_connection_ids in response is always a list
+        active_conn_ids = session.active_connection_ids
+        if isinstance(active_conn_ids, int):
+            active_conn_ids = [active_conn_ids]
+        elif not isinstance(active_conn_ids, list):
+            active_conn_ids = list(active_conn_ids) if active_conn_ids else []
+
         return ChatSessionResponse(
             id=session.id,
             name=session.name,
             user_id=session.user_id,
-            active_connection_ids=session.active_connection_ids,
+            active_connection_ids=active_conn_ids,
             connections=connections,
             created_at=session.created_at.isoformat(),
             updated_at=session.updated_at.isoformat(),
