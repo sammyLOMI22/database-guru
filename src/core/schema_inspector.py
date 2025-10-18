@@ -43,10 +43,48 @@ class SchemaInspector:
             else:
                 return session.execute(query)
 
+    async def sample_column_values(
+        self,
+        session: AsyncSession,
+        table_name: str,
+        column_name: str,
+        limit: int = 5,
+    ) -> List[Any]:
+        """
+        Sample distinct values from a column to understand data format
+
+        This helps the LLM understand:
+        - Whether states are stored as codes (NY, CA) or full names (New York, California)
+        - Whether statuses are lowercase or capitalized
+        - Typical value ranges
+
+        Args:
+            session: Database session
+            table_name: Name of table
+            column_name: Name of column to sample
+            limit: Maximum number of distinct values to return
+
+        Returns:
+            List of sample values
+        """
+        try:
+            # Build safe query with quoted identifiers
+            query = text(f'SELECT DISTINCT "{column_name}" FROM "{table_name}" WHERE "{column_name}" IS NOT NULL LIMIT :limit')
+            result = await self._execute_query(session, query, {"limit": limit})
+
+            # Extract values
+            values = [row[0] for row in result.fetchall()]
+            return values
+
+        except Exception as e:
+            logger.debug(f"Failed to sample values from {table_name}.{column_name}: {e}")
+            return []
+
     async def get_full_schema(
         self,
         session: AsyncSession,
         schema_name: Optional[str] = None,
+        include_samples: bool = True,
     ) -> Dict[str, Any]:
         """
         Get complete database schema information
@@ -54,9 +92,10 @@ class SchemaInspector:
         Args:
             session: Database session
             schema_name: Schema name (None for default)
+            include_samples: Whether to include sample values for key columns (state, status, type, etc.)
 
         Returns:
-            Dictionary with tables, columns, relationships, indexes
+            Dictionary with tables, columns, relationships, indexes, and sample values
         """
         try:
             # Get table information
@@ -72,6 +111,9 @@ class SchemaInspector:
                 },
             }
 
+            # Columns to sample (helps LLM understand format)
+            sample_column_keywords = ['state', 'status', 'type', 'category', 'country', 'region']
+
             for table_name in tables:
                 # Get columns
                 columns = await self.get_columns(session, table_name, schema_name)
@@ -84,6 +126,19 @@ class SchemaInspector:
 
                 # Get indexes
                 indexes = await self.get_indexes(session, table_name, schema_name)
+
+                # Sample values for key columns
+                if include_samples:
+                    for column in columns:
+                        col_name = column.get("name", "").lower()
+                        # Check if this is a column we should sample
+                        if any(keyword in col_name for keyword in sample_column_keywords):
+                            samples = await self.sample_column_values(
+                                session, table_name, column["name"], limit=5
+                            )
+                            if samples:
+                                column["sample_values"] = samples
+                                logger.info(f"📊 Sampled {table_name}.{column['name']}: {samples}")
 
                 schema["tables"][table_name] = {
                     "columns": columns,
@@ -464,7 +519,15 @@ class SchemaInspector:
             for col in table_info["columns"]:
                 nullable = "NULL" if col["nullable"] else "NOT NULL"
                 pk_marker = " [PK]" if col["name"] in table_info["primary_keys"] else ""
-                lines.append(f"    - {col['name']}: {col['type']} {nullable}{pk_marker}")
+
+                # Add sample values if available (helps LLM understand format)
+                sample_hint = ""
+                if "sample_values" in col and col["sample_values"]:
+                    samples = col["sample_values"]
+                    sample_str = ", ".join(repr(s) for s in samples[:5])
+                    sample_hint = f"  // Examples: {sample_str}"
+
+                lines.append(f"    - {col['name']}: {col['type']} {nullable}{pk_marker}{sample_hint}")
 
             # Foreign keys
             if table_info["foreign_keys"]:

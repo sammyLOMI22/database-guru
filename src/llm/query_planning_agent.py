@@ -247,6 +247,62 @@ class QueryPlanningAgent:
         self.enable_planning = enable_planning
         self.complexity_threshold = complexity_threshold
 
+    def _calculate_complexity_score(self, question: str, schema_dict: Optional[Dict] = None) -> float:
+        """
+        Calculate query complexity score from 0.0 (simple) to 1.0 (very complex)
+
+        Args:
+            question: Natural language question
+            schema_dict: Optional parsed schema dictionary
+
+        Returns:
+            Complexity score between 0.0 and 1.0
+        """
+        score = 0.0
+        question_lower = question.lower()
+
+        # Multi-table operations (+0.3)
+        multi_table_keywords = ["join", "combine", "merge", "relationship", "between"]
+        if any(kw in question_lower for kw in multi_table_keywords):
+            score += 0.3
+
+        # Aggregations (+0.2)
+        aggregation_keywords = ["total", "sum", "average", "avg", "count", "min", "max"]
+        if any(kw in question_lower for kw in aggregation_keywords):
+            score += 0.2
+
+        # Grouping/categorization (+0.2)
+        grouping_keywords = ["by category", "by type", "by", "group", "per"]
+        if any(kw in question_lower for kw in grouping_keywords):
+            score += 0.2
+
+        # Comparisons/ranking (+0.2)
+        comparison_keywords = ["top", "bottom", "highest", "lowest", "best", "worst", "compare", "versus", "vs"]
+        if any(kw in question_lower for kw in comparison_keywords):
+            score += 0.2
+
+        # Geography/location queries (often need joins) (+0.2)
+        location_keywords = ["shipped to", "delivered to", "sent to", "in california", "in texas", "location", "address", "city", "state", "country"]
+        if any(kw in question_lower for kw in location_keywords):
+            score += 0.2
+
+        # Temporal/trend analysis (+0.1)
+        temporal_keywords = ["trend", "over time", "change", "growth", "decline"]
+        if any(kw in question_lower for kw in temporal_keywords):
+            score += 0.1
+
+        # Multiple table names explicitly mentioned (+0.2)
+        if schema_dict:
+            try:
+                table_names = list(schema_dict.get("tables", {}).keys())
+                tables_mentioned = sum(1 for table in table_names if table.lower() in question_lower)
+                if tables_mentioned >= 2:
+                    score += 0.2
+            except Exception:
+                pass
+
+        return min(score, 1.0)  # Cap at 1.0
+
     async def should_use_planning(self, question: str, schema: str) -> bool:
         """
         Determine if query planning should be used for this question
@@ -261,58 +317,35 @@ class QueryPlanningAgent:
         if not self.enable_planning:
             return False
 
-        # Quick heuristics to detect complex queries
-        question_lower = question.lower()
-
-        # Keywords that suggest complexity
-        complex_keywords = [
-            "compare", "between", "versus", "vs",
-            "join", "relationship", "combine",
-            "group by", "grouped by", "by category", "by type",
-            "total", "sum", "average", "count",
-            "top", "bottom", "highest", "lowest",
-            "trend", "over time", "change",
-            # Location/geography queries (often need joins)
-            "shipped to", "delivered to", "sent to", "from",
-            "in california", "in texas", "in state", "in city",
-            "location", "address", "region", "country"
-        ]
-
-        # Check for multiple table references
-        # Parse schema to count tables
+        # Parse schema for complexity analysis
+        schema_dict = None
         try:
             schema_dict = json.loads(schema) if isinstance(schema, str) else schema
-            num_tables = len(schema_dict.get("tables", []))
-
-            # If schema has multiple tables and question mentions comparison/grouping
-            if num_tables > 1:
-                for keyword in complex_keywords:
-                    if keyword in question_lower:
-                        return True
-
         except Exception as e:
             logger.warning(f"Failed to parse schema for complexity check: {e}")
 
-        # Default: use planning for questions with complex keywords
-        has_complex_keyword = any(keyword in question_lower for keyword in complex_keywords)
+        # Calculate complexity score
+        complexity_score = self._calculate_complexity_score(question, schema_dict)
 
-        # IMPORTANT: For multi-table schemas, always use planning to enable schema validation
-        # This catches schema mismatches early (e.g., looking for columns in wrong tables)
-        # Validation overhead is minimal (<10ms) but prevents costly errors
-        try:
-            schema_dict = json.loads(schema) if isinstance(schema, str) else schema
+        # Log complexity decision
+        logger.info(f"Query complexity score: {complexity_score:.2f} for question: '{question[:50]}...'")
+
+        # Use planning if complexity score >= 0.5 (moderate or higher)
+        # This balances accuracy (planning helps) vs speed (planning costs time)
+        if complexity_score >= 0.5:
+            logger.info(f"✓ Enabling query planning (complexity: {complexity_score:.2f})")
+            return True
+
+        # For very large schemas (>5 tables), use planning for safety even on simple queries
+        # to catch potential schema mismatches (e.g., looking for columns in wrong tables)
+        if schema_dict:
             num_tables = len(schema_dict.get("tables", {}))
-
-            # Enable planning for any multi-table schema query
-            # This ensures schema validation runs and catches mismatches
-            if num_tables > 2:
-                logger.debug(f"Enabling query planning for multi-table schema ({num_tables} tables)")
+            if num_tables > 5 and complexity_score >= 0.3:
+                logger.info(f"✓ Enabling query planning for large schema ({num_tables} tables, complexity: {complexity_score:.2f})")
                 return True
 
-        except Exception:
-            pass
-
-        return has_complex_keyword
+        logger.info(f"✗ Skipping query planning (complexity: {complexity_score:.2f} < 0.5)")
+        return False
 
     async def create_query_plan(
         self,
