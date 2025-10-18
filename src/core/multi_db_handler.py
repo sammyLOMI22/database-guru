@@ -367,6 +367,13 @@ class MultiDatabaseHandler:
                     col_def += " NOT NULL"
                 if col.get("primary_key"):
                     col_def += " PRIMARY KEY"
+
+                # Add sample values if available (helps LLM understand format)
+                if "sample_values" in col and col["sample_values"]:
+                    samples = col["sample_values"]
+                    sample_str = ", ".join(repr(s) for s in samples[:5])
+                    col_def += f"  // Examples: {sample_str}"
+
                 lines.append(col_def)
 
             if table.get("foreign_keys"):

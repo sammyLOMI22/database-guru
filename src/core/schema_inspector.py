@@ -138,7 +138,7 @@ class SchemaInspector:
                             )
                             if samples:
                                 column["sample_values"] = samples
-                                logger.debug(f"Sampled {table_name}.{column['name']}: {samples}")
+                                logger.info(f"📊 Sampled {table_name}.{column['name']}: {samples}")
 
                 schema["tables"][table_name] = {
                     "columns": columns,
