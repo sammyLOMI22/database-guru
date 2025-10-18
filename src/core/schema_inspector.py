@@ -17,6 +17,32 @@ class SchemaInspector:
         """Initialize schema inspector"""
         pass
 
+    async def _execute_query(self, session, query, params=None):
+        """
+        Execute a query handling both sync and async sessions
+
+        Args:
+            session: Database session (async or sync)
+            query: SQL query (text object)
+            params: Optional query parameters
+
+        Returns:
+            Result object
+        """
+        is_async = isinstance(session, AsyncSession)
+
+        if is_async:
+            if params:
+                return await session.execute(query, params)
+            else:
+                return await session.execute(query)
+        else:
+            # Sync session (e.g., DuckDB)
+            if params:
+                return session.execute(query, params)
+            else:
+                return session.execute(query)
+
     async def get_full_schema(
         self,
         session: AsyncSession,
@@ -99,21 +125,41 @@ class SchemaInspector:
             List of table names
         """
         try:
-            # PostgreSQL query
-            query = """
-                SELECT table_name
-                FROM information_schema.tables
-                WHERE table_schema = COALESCE(:schema_name, 'public')
-                AND table_type = 'BASE TABLE'
-                ORDER BY table_name
-            """
+            # Detect database type
+            db_name = session.bind.dialect.name if session.bind else "unknown"
 
-            result = await session.execute(
-                text(query),
-                {"schema_name": schema_name or "public"}
-            )
+            if db_name == "sqlite":
+                # SQLite query
+                query = text("""
+                    SELECT name FROM sqlite_master
+                    WHERE type='table'
+                    AND name NOT LIKE 'sqlite_%'
+                    ORDER BY name
+                """)
+                result = await self._execute_query(session, query)
+            elif db_name == "duckdb":
+                # DuckDB uses information_schema
+                query = text("""
+                    SELECT table_name
+                    FROM information_schema.tables
+                    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+                    AND table_type = 'BASE TABLE'
+                    ORDER BY table_name
+                """)
+                result = await self._execute_query(session, query)
+            else:
+                # PostgreSQL/MySQL query
+                query = text("""
+                    SELECT table_name
+                    FROM information_schema.tables
+                    WHERE table_schema = COALESCE(:schema_name, 'public')
+                    AND table_type = 'BASE TABLE'
+                    ORDER BY table_name
+                """)
+                result = await self._execute_query(session, query, {"schema_name": schema_name or "public"})
 
-            tables = [row[0] for row in result.fetchall()]
+            tables = [row[0] for row in result.all()]
+            logger.debug(f"Found {len(tables)} tables in {db_name} database")
             return tables
 
         except Exception as e:
@@ -138,36 +184,52 @@ class SchemaInspector:
             List of column dictionaries
         """
         try:
-            query = """
-                SELECT
-                    column_name,
-                    data_type,
-                    is_nullable,
-                    column_default,
-                    character_maximum_length
-                FROM information_schema.columns
-                WHERE table_name = :table_name
-                AND table_schema = COALESCE(:schema_name, 'public')
-                ORDER BY ordinal_position
-            """
+            db_name = session.bind.dialect.name if session.bind else "unknown"
 
-            result = await session.execute(
-                text(query),
-                {
-                    "table_name": table_name,
-                    "schema_name": schema_name or "public"
-                }
-            )
+            if db_name == "sqlite":
+                # SQLite query using PRAGMA
+                query = f"PRAGMA table_info({table_name})"
+                result = await self._execute_query(session, text(query))
 
-            columns = []
-            for row in result.fetchall():
-                columns.append({
-                    "name": row[0],
-                    "type": row[1],
-                    "nullable": row[2] == "YES",
-                    "default": row[3],
-                    "max_length": row[4],
-                })
+                columns = []
+                for row in result.all():
+                    # SQLite PRAGMA returns: cid, name, type, notnull, dflt_value, pk
+                    columns.append({
+                        "name": row[1],  # name
+                        "type": row[2],  # type
+                        "nullable": row[3] == 0,  # notnull (0 = nullable)
+                        "default": row[4],  # dflt_value
+                        "max_length": None,  # Not available in SQLite
+                    })
+            else:
+                # PostgreSQL/MySQL query
+                query = """
+                    SELECT
+                        column_name,
+                        data_type,
+                        is_nullable,
+                        column_default,
+                        character_maximum_length
+                    FROM information_schema.columns
+                    WHERE table_name = :table_name
+                    AND table_schema = COALESCE(:schema_name, 'public')
+                    ORDER BY ordinal_position
+                """
+
+                result = await self._execute_query(session, text(query), {
+                        "table_name": table_name,
+                        "schema_name": schema_name or "public"
+                    })
+
+                columns = []
+                for row in result.all():
+                    columns.append({
+                        "name": row[0],
+                        "type": row[1],
+                        "nullable": row[2] == "YES",
+                        "default": row[3],
+                        "max_length": row[4],
+                    })
 
             return columns
 
@@ -193,21 +255,39 @@ class SchemaInspector:
             List of primary key column names
         """
         try:
-            query = """
-                SELECT a.attname
-                FROM pg_index i
-                JOIN pg_attribute a ON a.attrelid = i.indrelid
-                    AND a.attnum = ANY(i.indkey)
-                WHERE i.indrelid = :table_name::regclass
-                AND i.indisprimary
-            """
+            db_name = session.bind.dialect.name if session.bind else "unknown"
 
-            result = await session.execute(
-                text(query),
-                {"table_name": table_name}
-            )
+            if db_name == "sqlite":
+                # SQLite - use PRAGMA
+                query = f"PRAGMA table_info({table_name})"
+                result = await self._execute_query(session, text(query))
+                # pk column is at index 5, returns 1 if primary key
+                return [row[1] for row in result.all() if row[5] == 1]
 
-            return [row[0] for row in result.fetchall()]
+            elif db_name in ["mysql", "duckdb"]:
+                # MySQL and DuckDB - use information_schema
+                query = """
+                    SELECT column_name
+                    FROM information_schema.key_column_usage
+                    WHERE table_name = :table_name
+                    AND constraint_name = 'PRIMARY'
+                    ORDER BY ordinal_position
+                """
+                result = await self._execute_query(session, text(query), {"table_name": table_name})
+                return [row[0] for row in result.all()]
+
+            else:
+                # PostgreSQL - use pg_index
+                query = """
+                    SELECT a.attname
+                    FROM pg_index i
+                    JOIN pg_attribute a ON a.attrelid = i.indrelid
+                        AND a.attnum = ANY(i.indkey)
+                    WHERE i.indrelid = :table_name::regclass
+                    AND i.indisprimary
+                """
+                result = await self._execute_query(session, text(query), {"table_name": table_name})
+                return [row[0] for row in result.all()]
 
         except Exception as e:
             logger.debug(f"Error getting primary keys for {table_name}: {e}")
@@ -231,42 +311,84 @@ class SchemaInspector:
             List of foreign key dictionaries
         """
         try:
-            query = """
-                SELECT
-                    kcu.column_name,
-                    ccu.table_name AS foreign_table_name,
-                    ccu.column_name AS foreign_column_name,
-                    tc.constraint_name
-                FROM information_schema.table_constraints AS tc
-                JOIN information_schema.key_column_usage AS kcu
-                    ON tc.constraint_name = kcu.constraint_name
-                    AND tc.table_schema = kcu.table_schema
-                JOIN information_schema.constraint_column_usage AS ccu
-                    ON ccu.constraint_name = tc.constraint_name
-                    AND ccu.table_schema = tc.table_schema
-                WHERE tc.constraint_type = 'FOREIGN KEY'
-                AND tc.table_name = :table_name
-                AND tc.table_schema = COALESCE(:schema_name, 'public')
-            """
+            db_name = session.bind.dialect.name if session.bind else "unknown"
 
-            result = await session.execute(
-                text(query),
-                {
-                    "table_name": table_name,
-                    "schema_name": schema_name or "public"
-                }
-            )
+            if db_name == "sqlite":
+                # SQLite - use PRAGMA foreign_key_list
+                query = f"PRAGMA foreign_key_list({table_name})"
+                result = await self._execute_query(session, text(query))
 
-            foreign_keys = []
-            for row in result.fetchall():
-                foreign_keys.append({
-                    "column": row[0],
-                    "referred_table": row[1],
-                    "referred_column": row[2],
-                    "constraint_name": row[3],
-                })
+                foreign_keys = []
+                for row in result.all():
+                    # SQLite PRAGMA returns: id, seq, table, from, to, on_update, on_delete, match
+                    foreign_keys.append({
+                        "column": row[3],  # from column
+                        "referred_table": row[2],  # table
+                        "referred_column": row[4],  # to column
+                        "constraint_name": f"fk_{table_name}_{row[0]}",  # Generate name
+                    })
+                return foreign_keys
 
-            return foreign_keys
+            elif db_name in ["mysql", "duckdb"]:
+                # MySQL and DuckDB - use information_schema
+                # Simplified query that works for both
+                query = """
+                    SELECT
+                        kcu.column_name,
+                        kcu.referenced_table_name,
+                        kcu.referenced_column_name,
+                        kcu.constraint_name
+                    FROM information_schema.key_column_usage AS kcu
+                    WHERE kcu.table_name = :table_name
+                    AND kcu.referenced_table_name IS NOT NULL
+                """
+                result = await self._execute_query(session, text(query), {"table_name": table_name})
+
+                foreign_keys = []
+                for row in result.all():
+                    foreign_keys.append({
+                        "column": row[0],
+                        "referred_table": row[1],
+                        "referred_column": row[2],
+                        "constraint_name": row[3],
+                    })
+                return foreign_keys
+
+            else:
+                # PostgreSQL - use information_schema with proper joins
+                query = """
+                    SELECT
+                        kcu.column_name,
+                        ccu.table_name AS foreign_table_name,
+                        ccu.column_name AS foreign_column_name,
+                        tc.constraint_name
+                    FROM information_schema.table_constraints AS tc
+                    JOIN information_schema.key_column_usage AS kcu
+                        ON tc.constraint_name = kcu.constraint_name
+                        AND tc.table_schema = kcu.table_schema
+                    JOIN information_schema.constraint_column_usage AS ccu
+                        ON ccu.constraint_name = tc.constraint_name
+                        AND ccu.table_schema = tc.table_schema
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                    AND tc.table_name = :table_name
+                    AND tc.table_schema = COALESCE(:schema_name, 'public')
+                """
+
+                result = await self._execute_query(session, text(query), {
+                        "table_name": table_name,
+                        "schema_name": schema_name or "public"
+                    })
+
+                foreign_keys = []
+                for row in result.all():
+                    foreign_keys.append({
+                        "column": row[0],
+                        "referred_table": row[1],
+                        "referred_column": row[2],
+                        "constraint_name": row[3],
+                    })
+
+                return foreign_keys
 
         except Exception as e:
             logger.debug(f"Error getting foreign keys for {table_name}: {e}")
@@ -299,16 +421,13 @@ class SchemaInspector:
                 AND schemaname = COALESCE(:schema_name, 'public')
             """
 
-            result = await session.execute(
-                text(query),
-                {
+            result = await self._execute_query(session, text(query), {
                     "table_name": table_name,
                     "schema_name": schema_name or "public"
-                }
-            )
+                })
 
             indexes = []
-            for row in result.fetchall():
+            for row in result.all():
                 indexes.append({
                     "name": row[0],
                     "definition": row[1],

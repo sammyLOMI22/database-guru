@@ -43,21 +43,30 @@ class MultiDatabaseHandler:
                     # Get schema for this database
                     schema_data = await self.schema_inspector.get_full_schema(user_db)
 
+                    # Convert schema tables from dict to list format
+                    tables_dict = schema_data.get("tables", {})
+                    tables_list = []
+                    for table_name, table_info in tables_dict.items():
+                        tables_list.append({
+                            "name": table_name,
+                            **table_info  # Spread the columns, foreign_keys, etc.
+                        })
+
                     # Add database context
                     db_info = {
                         "connection_id": conn.id,
                         "name": conn.name,
                         "database_type": conn.database_type,
                         "database_name": conn.database_name,
-                        "tables": schema_data.get("tables", []),
-                        "table_count": len(schema_data.get("tables", [])),
+                        "tables": tables_list,
+                        "table_count": len(tables_list),
                     }
 
                     combined_schema["databases"].append(db_info)
                     combined_schema["total_tables"] += db_info["table_count"]
 
                     # Count columns
-                    for table in schema_data.get("tables", []):
+                    for table in tables_list:
                         combined_schema["total_columns"] += len(
                             table.get("columns", [])
                         )
@@ -131,8 +140,12 @@ class MultiDatabaseHandler:
                 if table.get("foreign_keys"):
                     lines.append("  Foreign Keys:")
                     for fk in table["foreign_keys"]:
+                        # Handle both old format (constrained_columns) and new format (column)
+                        from_col = fk.get('column') or fk.get('constrained_columns', 'unknown')
+                        to_col = fk.get('referred_column') or fk.get('referred_columns', 'unknown')
+                        to_table = fk.get('referred_table', 'unknown')
                         lines.append(
-                            f"    - {fk['constrained_columns']} -> {fk['referred_table']}.{fk['referred_columns']}"
+                            f"    - {from_col} -> {to_table}.{to_col}"
                         )
 
                 # Add indexes if any
@@ -203,6 +216,7 @@ class MultiDatabaseHandler:
         max_rows: int = 1000,
         timeout_seconds: int = 30,
         max_retries: int = 3,
+        schema_dict: Optional[Dict] = None,
     ) -> Dict[str, Any]:
         """
         Execute a SQL query on a specific database WITH self-correction
@@ -253,6 +267,7 @@ class MultiDatabaseHandler:
                         session=user_db,
                         database_type=connection.database_type,
                         allow_write=allow_write,
+                        schema_dict=schema_dict,
                     )
 
                 # Add connection metadata
@@ -266,8 +281,8 @@ class MultiDatabaseHandler:
                         "execution_time_ms": exec_result.get("execution_time_ms", 0),
                         "database_name": connection.name,
                         "connection_id": connection.id,
-                        "correction_attempts": result.get("attempts", 0),
-                        "corrections": result.get("corrections", []),
+                        "total_attempts": result.get("total_attempts", 0),
+                        "attempts": result.get("attempts", []),
                     }
                 else:
                     return {
@@ -279,8 +294,8 @@ class MultiDatabaseHandler:
                         "data": [],
                         "row_count": 0,
                         "execution_time_ms": 0,
-                        "correction_attempts": result.get("attempts", 0),
-                        "corrections": result.get("corrections", []),
+                        "total_attempts": result.get("total_attempts", 0),
+                        "attempts": result.get("attempts", []),
                     }
 
         except Exception as e:
@@ -295,8 +310,8 @@ class MultiDatabaseHandler:
                 "data": [],
                 "row_count": 0,
                 "execution_time_ms": 0,
-                "correction_attempts": 0,
-                "corrections": [],
+                "total_attempts": 0,
+                "attempts": [],
             }
 
     def _format_single_db_schema(self, schema_data: Dict[str, Any]) -> str:
@@ -315,8 +330,12 @@ class MultiDatabaseHandler:
             if table.get("foreign_keys"):
                 lines.append("  Foreign Keys:")
                 for fk in table["foreign_keys"]:
+                    # Handle both old format (constrained_columns) and new format (column)
+                    from_col = fk.get('column') or fk.get('constrained_columns', 'unknown')
+                    to_col = fk.get('referred_column') or fk.get('referred_columns', 'unknown')
+                    to_table = fk.get('referred_table', 'unknown')
                     lines.append(
-                        f"    - {fk['constrained_columns']} -> {fk['referred_table']}.{fk['referred_columns']}"
+                        f"    - {from_col} -> {to_table}.{to_col}"
                     )
             lines.append("")
 
