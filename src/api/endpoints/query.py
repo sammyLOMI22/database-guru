@@ -187,6 +187,8 @@ async def process_query(
             "execution_time_ms": execution_result.get("execution_time_ms") if execution_result else None,
             "cached": False,
             "timestamp": datetime.utcnow().isoformat(),
+            # Option 2 Enhancement: Include agent trace for observability
+            "agent_trace": agent_result.get("agent_trace"),
         }
 
         # Cache the result

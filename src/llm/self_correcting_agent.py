@@ -3,6 +3,7 @@ import logging
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
+from datetime import datetime
 
 from src.llm.sql_generator import SQLGenerator
 from src.core.executor import SQLExecutor
@@ -17,6 +18,76 @@ try:
 except ImportError:
     LEARNING_AVAILABLE = False
     logger.warning("CorrectionLearner not available - learning disabled")
+
+
+class AgentTrace:
+    """
+    Captures agent execution trace for transparency
+
+    This class records each significant decision point during query processing,
+    allowing users to understand what the agent did and why.
+    """
+
+    def __init__(self):
+        self.steps: List[Dict[str, Any]] = []
+        self.start_time = datetime.utcnow()
+
+    def add_step(
+        self,
+        step_type: str,
+        message: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        icon: Optional[str] = None
+    ):
+        """
+        Add a step to the execution trace
+
+        Args:
+            step_type: Type of step (analysis, planning, attempt_start, success, etc.)
+            message: Human-readable message describing what happened
+            metadata: Additional structured data about this step
+            icon: Optional emoji icon for UI display
+        """
+        elapsed = (datetime.utcnow() - self.start_time).total_seconds() * 1000
+
+        self.steps.append({
+            "timestamp": datetime.utcnow().isoformat(),
+            "elapsed_ms": round(elapsed, 2),
+            "type": step_type,
+            "message": message,
+            "metadata": metadata or {},
+            "icon": icon or self._default_icon(step_type)
+        })
+
+    def _default_icon(self, step_type: str) -> str:
+        """Get default icon for step type"""
+        icons = {
+            "analysis": "🔍",
+            "planning": "📋",
+            "generation": "✨",
+            "execution": "⚡",
+            "attempt_start": "🔄",
+            "success": "✅",
+            "error": "❌",
+            "warning": "⚠️",
+            "fix_attempt": "🔧",
+            "quick_fix": "⚡",
+            "learned_fix": "🧠",
+            "llm_fix": "🤖",
+            "verification": "🔍",
+            "verification_warning": "⚠️",
+            "learning": "📚"
+        }
+        return icons.get(step_type, "•")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert trace to dictionary for API response"""
+        total_elapsed = (datetime.utcnow() - self.start_time).total_seconds() * 1000
+        return {
+            "steps": self.steps,
+            "total_elapsed_ms": round(total_elapsed, 2),
+            "start_time": self.start_time.isoformat()
+        }
 
 
 class ErrorType(Enum):
@@ -290,7 +361,16 @@ class SelfCorrectingSQLAgent:
                 - self_corrected: Whether auto-correction was used
                 - total_attempts: Total number of attempts
                 - error: Final error message (if failed)
+                - agent_trace: Execution trace for observability
         """
+        # Initialize agent trace for observability
+        trace = AgentTrace()
+        trace.add_step(
+            "analysis",
+            f"Analyzing question: {question[:100]}{'...' if len(question) > 100 else ''}",
+            metadata={"database_type": database_type, "model": model or self.generator.settings.OLLAMA_MODEL}
+        )
+
         attempts: List[CorrectionAttempt] = []
         last_error = None
         sql = None
@@ -318,6 +398,7 @@ class SelfCorrectingSQLAgent:
         query_plan = None
         if self.enable_query_planning and self.planning_agent:
             try:
+                trace.add_step("planning", "Checking if query planning should be used")
                 logger.info("🧠 Checking if query planning should be used...")
                 planning_result = await self.planning_agent.plan_and_generate_sql(
                     question=question,
@@ -330,6 +411,15 @@ class SelfCorrectingSQLAgent:
 
                 if planning_result.get("used_planning"):
                     query_plan = planning_result["plan"]
+                    trace.add_step(
+                        "planning",
+                        f"Query plan created (complexity: {query_plan.complexity.value}, confidence: {query_plan.confidence:.2f})",
+                        metadata={
+                            "complexity": query_plan.complexity.value,
+                            "confidence": query_plan.confidence,
+                            "estimated_tables": len(query_plan.tables_needed)
+                        }
+                    )
                     logger.info(
                         f"📋 Query plan created: complexity={query_plan.complexity.value}, "
                         f"confidence={query_plan.confidence:.2f}"
@@ -338,14 +428,18 @@ class SelfCorrectingSQLAgent:
                     if planning_result.get("sql"):
                         sql = planning_result["sql"]
             except Exception as e:
+                trace.add_step("warning", f"Query planning failed: {str(e)[:100]}")
                 logger.warning(f"Query planning failed, falling back to direct generation: {e}")
 
         for attempt_num in range(1, self.max_retries + 1):
             try:
+                trace.add_step("attempt_start", f"Starting attempt {attempt_num}/{self.max_retries}")
+
                 # Generate or fix SQL
                 if attempt_num == 1:
                     # First attempt: generate from scratch (or use plan-based SQL)
                     if sql is None:  # Only generate if not already generated by planner
+                        trace.add_step("generation", "Generating initial SQL query")
                         logger.info(f"Attempt {attempt_num}/{self.max_retries}: Generating SQL for: {question}")
                         gen_result = await self.generator.generate_sql(
                             question=question,
@@ -355,11 +449,14 @@ class SelfCorrectingSQLAgent:
                             model=model
                         )
                         sql = gen_result["sql"]
+                        trace.add_step("generation", f"Generated SQL: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql})
                     else:
+                        trace.add_step("generation", "Using SQL from query plan")
                         logger.info(f"Attempt {attempt_num}/{self.max_retries}: Using SQL from query plan")
                         gen_result = {"sql": sql, "is_valid": True}
                 else:
                     # Retry: fix the error
+                    trace.add_step("fix_attempt", f"Attempting to fix error: {last_error[:100]}{'...' if len(last_error) > 100 else ''}")
                     logger.info(f"Attempt {attempt_num}/{self.max_retries}: Attempting to fix SQL error")
 
                     # Categorize error
@@ -381,6 +478,11 @@ class SelfCorrectingSQLAgent:
                         if quick_fix.success and quick_fix.confidence >= 0.7:
                             sql = quick_fix.fixed_sql
                             quick_fix_used = True
+                            trace.add_step(
+                                "quick_fix",
+                                f"Applied quick fix: {quick_fix.explanation}",
+                                metadata={"confidence": quick_fix.confidence, "method": quick_fix.fix_method}
+                            )
                             logger.info(
                                 f"⚡ Quick fix applied: {quick_fix.explanation} "
                                 f"(confidence: {quick_fix.confidence:.2f}) - SKIPPED LLM CALL"
@@ -401,6 +503,15 @@ class SelfCorrectingSQLAgent:
                             )
                             if learned_corrections:
                                 learned_correction = learned_corrections[0]
+                                trace.add_step(
+                                    "learned_fix",
+                                    f"Found learned correction (confidence: {learned_correction['confidence_score']:.2f})",
+                                    metadata={
+                                        "correction_id": learned_correction['id'],
+                                        "confidence": learned_correction['confidence_score'],
+                                        "description": learned_correction['correction_description']
+                                    }
+                                )
                                 logger.info(
                                     f"Found learned correction {learned_correction['id']} "
                                     f"(confidence: {learned_correction['confidence_score']:.2f})"
@@ -412,6 +523,7 @@ class SelfCorrectingSQLAgent:
                         enhanced_error = f"{last_error}\n\nHints:\n{hints}"
 
                         # Generate corrected SQL using LLM
+                        trace.add_step("llm_fix", "Generating corrected SQL using LLM")
                         fix_result = await self.generator.fix_sql_error(
                             sql=sql,
                             error=enhanced_error,
@@ -419,6 +531,7 @@ class SelfCorrectingSQLAgent:
                             database_type=database_type
                         )
                         sql = fix_result["sql"]
+                        trace.add_step("llm_fix", f"LLM generated fix: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql})
 
                         logger.info(f"Generated corrected SQL: {sql[:100]}...")
 
@@ -427,6 +540,7 @@ class SelfCorrectingSQLAgent:
                     logger.warning(f"Generated SQL failed validation: {gen_result.get('warnings')}")
 
                 # Execute SQL
+                trace.add_step("execution", f"Executing SQL query")
                 exec_result = await executor.execute_query(
                     session=session,
                     sql=sql
@@ -446,6 +560,14 @@ class SelfCorrectingSQLAgent:
 
                 if exec_result["success"]:
                     # Success! But verify results make sense
+                    trace.add_step(
+                        "success",
+                        f"Query executed successfully (rows: {exec_result.get('row_count', 0)}, time: {exec_result.get('execution_time_ms', 0):.2f}ms)",
+                        metadata={
+                            "row_count": exec_result.get('row_count', 0),
+                            "execution_time_ms": exec_result.get('execution_time_ms', 0)
+                        }
+                    )
                     logger.info(f"✅ Query succeeded on attempt {attempt_num}/{self.max_retries}")
 
                     # Verify results if enabled
@@ -453,6 +575,7 @@ class SelfCorrectingSQLAgent:
                     verification_warnings = []
                     if self.enable_result_verification and self.verification_agent:
                         try:
+                            trace.add_step("verification", "Verifying query results for accuracy")
                             logger.info("🔍 Verifying query results...")
                             verification_result = await self.verification_agent.verify_results(
                                 question=question,
@@ -463,6 +586,14 @@ class SelfCorrectingSQLAgent:
                             )
 
                             if verification_result.is_suspicious:
+                                trace.add_step(
+                                    "verification_warning",
+                                    f"Suspicious results detected: {verification_result.description}",
+                                    metadata={
+                                        "confidence": verification_result.confidence,
+                                        "issue": verification_result.issue_type.value if hasattr(verification_result, 'issue_type') else None
+                                    }
+                                )
                                 logger.warning(
                                     f"⚠️ Suspicious results detected: {verification_result.description} "
                                     f"(confidence: {verification_result.confidence:.2f})"
@@ -492,6 +623,7 @@ class SelfCorrectingSQLAgent:
                                     attempt_num < self.max_retries and
                                     self.verification_agent.enable_auto_fix):
 
+                                    trace.add_step("fix_attempt", "High confidence issue detected, attempting to regenerate query")
                                     logger.info("🔧 High confidence issue detected, attempting to regenerate query...")
 
                                     # Add verification feedback to the next attempt
@@ -518,6 +650,7 @@ class SelfCorrectingSQLAgent:
                         # Get the original error from the first failed attempt
                         first_attempt = attempts[0]
                         if not first_attempt.success and first_attempt.error:
+                            trace.add_step("learning", "Learning from successful correction")
                             await self.learner.learn_from_correction(
                                 error_type=first_attempt.error_type,
                                 original_sql=first_attempt.sql,
@@ -540,11 +673,13 @@ class SelfCorrectingSQLAgent:
                         "verification": verification_result,
                         "verification_warnings": verification_warnings,
                         "query_plan": query_plan.to_dict() if query_plan else None,
-                        "used_planning": query_plan is not None
+                        "used_planning": query_plan is not None,
+                        "agent_trace": trace.to_dict()
                     }
 
                 # Failed - save error for next retry
                 last_error = exec_result["error"]
+                trace.add_step("error", f"Attempt {attempt_num} failed: {last_error[:100]}{'...' if len(last_error) > 100 else ''}")
                 logger.warning(f"❌ Attempt {attempt_num} failed: {last_error[:200]}")
 
                 # If this is the last attempt, don't retry
@@ -571,6 +706,7 @@ class SelfCorrectingSQLAgent:
                     break
 
         # All retries exhausted
+        trace.add_step("error", f"All {self.max_retries} attempts exhausted, query failed")
         logger.error(f"❌ Query failed after {self.max_retries} attempts")
         return {
             "success": False,
@@ -581,7 +717,8 @@ class SelfCorrectingSQLAgent:
             "total_attempts": len(attempts),
             "question": question,
             "model_used": model or self.generator.settings.OLLAMA_MODEL,
-            "message": f"Failed after {self.max_retries} attempts"
+            "message": f"Failed after {self.max_retries} attempts",
+            "agent_trace": trace.to_dict()
         }
 
     async def execute_with_retry(
