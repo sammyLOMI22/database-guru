@@ -158,6 +158,17 @@ async def process_query(
                     "execution_time_ms": 0,
                 }
 
+            # Format attempts for UI if present
+            formatted_attempts = None
+            if agent_result.get("attempts"):
+                formatted_attempts = self_correcting_agent.format_attempts_for_ui(
+                    agent_result["attempts"]
+                )
+
+            # Add verification warnings to main warnings if present
+            if agent_result.get("verification_warnings"):
+                warnings.extend(agent_result["verification_warnings"])
+
         # Save to query history
         query_record = QueryHistory(
             natural_language_query=request.question,
@@ -187,6 +198,14 @@ async def process_query(
             "execution_time_ms": execution_result.get("execution_time_ms") if execution_result else None,
             "cached": False,
             "timestamp": datetime.utcnow().isoformat(),
+            # Option 2 Enhancement: Observability fields
+            "agent_trace": agent_result.get("agent_trace"),
+            "query_plan": agent_result.get("query_plan"),
+            "attempts": formatted_attempts,
+            "self_corrected": agent_result.get("self_corrected", False),
+            "total_attempts": agent_result.get("total_attempts", 1),
+            "verification_warnings": agent_result.get("verification_warnings", []),
+            "used_planning": agent_result.get("used_planning", False),
         }
 
         # Cache the result

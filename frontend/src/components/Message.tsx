@@ -48,6 +48,14 @@ export default function Message({ type, content, queryResponse }: MessageProps) 
                 executionTime={queryResponse.execution_time_ms}
                 isValid={queryResponse.is_valid}
                 warnings={queryResponse.warnings}
+                // Option 2: Observability props
+                agentTrace={queryResponse.agent_trace}
+                queryPlan={queryResponse.query_plan}
+                attempts={queryResponse.attempts}
+                selfCorrected={queryResponse.self_corrected}
+                totalAttempts={queryResponse.total_attempts}
+                verificationWarnings={queryResponse.verification_warnings}
+                usedPlanning={queryResponse.used_planning}
               />
             </div>
           )}

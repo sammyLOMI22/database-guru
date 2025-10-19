@@ -43,6 +43,26 @@ class QueryRequest(BaseModel):
         return v.strip()
 
 
+class AgentTraceStep(BaseModel):
+    """Individual step in agent execution trace"""
+    timestamp: str = Field(..., description="ISO timestamp when step occurred")
+    elapsed_ms: float = Field(..., description="Milliseconds elapsed since trace start")
+    type: str = Field(..., description="Type of step (analysis, planning, generation, etc.)")
+    message: str = Field(..., description="Human-readable message describing the step")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata for this step")
+    icon: str = Field(..., description="Emoji icon for UI display")
+
+
+class AgentTrace(BaseModel):
+    """Agent execution trace for observability"""
+    steps: List[AgentTraceStep] = Field(
+        default_factory=list,
+        description="Sequence of steps in agent execution"
+    )
+    total_elapsed_ms: float = Field(..., description="Total execution time in milliseconds")
+    start_time: str = Field(..., description="ISO timestamp when trace started")
+
+
 class QueryResponse(BaseModel):
     """Response model for query results"""
     query_id: Optional[int] = Field(
@@ -88,6 +108,36 @@ class QueryResponse(BaseModel):
     timestamp: str = Field(
         default_factory=lambda: datetime.utcnow().isoformat(),
         description="Response timestamp"
+    )
+    # Option 2 Enhancement: Agent trace for observability
+    agent_trace: Optional[AgentTrace] = Field(
+        default=None,
+        description="Agent execution trace showing decision-making process"
+    )
+    # Option 2 Enhancement: Query plan and correction attempts
+    query_plan: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Query plan details (for complex queries)"
+    )
+    attempts: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Correction attempts with fix methods"
+    )
+    self_corrected: bool = Field(
+        default=False,
+        description="Whether the query was auto-corrected"
+    )
+    total_attempts: int = Field(
+        default=1,
+        description="Total number of execution attempts"
+    )
+    verification_warnings: List[str] = Field(
+        default_factory=list,
+        description="Warnings from result verification"
+    )
+    used_planning: bool = Field(
+        default=False,
+        description="Whether query planning was used"
     )
 
     class Config:

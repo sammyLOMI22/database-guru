@@ -1,5 +1,10 @@
 import { Copy, Check } from 'lucide-react';
 import { useState } from 'react';
+import { AgentTrace as AgentTraceType, QueryPlan, CorrectionAttempt } from '../types/api';
+import { AgentTrace } from './AgentTrace';
+import { CorrectionHistory } from './CorrectionHistory';
+import { QueryPlanVisualization } from './QueryPlanVisualization';
+import { VerificationWarnings } from './VerificationWarnings';
 
 interface QueryResultsProps {
   sql: string;
@@ -8,6 +13,14 @@ interface QueryResultsProps {
   executionTime: number | null;
   isValid: boolean;
   warnings: string[];
+  // Option 2: Observability props
+  agentTrace?: AgentTraceType | null;
+  queryPlan?: QueryPlan | null;
+  attempts?: CorrectionAttempt[] | null;
+  selfCorrected?: boolean;
+  totalAttempts?: number;
+  verificationWarnings?: string[];
+  usedPlanning?: boolean;
 }
 
 export default function QueryResults({
@@ -17,6 +30,13 @@ export default function QueryResults({
   executionTime,
   isValid,
   warnings,
+  agentTrace,
+  queryPlan,
+  attempts,
+  selfCorrected = false,
+  totalAttempts = 1,
+  verificationWarnings = [],
+  usedPlanning = false,
 }: QueryResultsProps) {
   const [copied, setCopied] = useState(false);
 
@@ -60,6 +80,27 @@ export default function QueryResults({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Option 2: Observability Components */}
+      {/* Verification Warnings */}
+      {verificationWarnings && verificationWarnings.length > 0 && (
+        <VerificationWarnings warnings={verificationWarnings} />
+      )}
+
+      {/* Correction History */}
+      {selfCorrected && attempts && attempts.length > 0 && (
+        <CorrectionHistory attempts={attempts} selfCorrected={selfCorrected} />
+      )}
+
+      {/* Query Plan */}
+      {usedPlanning && queryPlan && (
+        <QueryPlanVisualization plan={queryPlan} usedPlanning={usedPlanning} />
+      )}
+
+      {/* Agent Trace */}
+      {agentTrace && (
+        <AgentTrace trace={agentTrace} />
       )}
 
       {/* Results */}

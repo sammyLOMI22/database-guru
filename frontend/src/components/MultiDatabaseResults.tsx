@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import type { DatabaseQueryResult } from '../types/api';
+import { AgentTrace } from './AgentTrace';
+import { CorrectionHistory } from './CorrectionHistory';
+import { QueryPlanVisualization } from './QueryPlanVisualization';
+import { VerificationWarnings } from './VerificationWarnings';
 
 interface MultiDatabaseResultsProps {
   results: DatabaseQueryResult[];
@@ -115,6 +119,41 @@ export default function MultiDatabaseResults({
                     <code>{result.sql}</code>
                   </pre>
                 </div>
+
+                {/* Option 2: Observability Components */}
+                {/* Verification Warnings */}
+                {result.verification_warnings && result.verification_warnings.length > 0 && (
+                  <div className="mb-4">
+                    <VerificationWarnings warnings={result.verification_warnings} />
+                  </div>
+                )}
+
+                {/* Correction History */}
+                {result.self_corrected && result.attempts && result.attempts.length > 0 && (
+                  <div className="mb-4">
+                    <CorrectionHistory
+                      attempts={result.attempts}
+                      selfCorrected={result.self_corrected}
+                    />
+                  </div>
+                )}
+
+                {/* Query Plan */}
+                {result.used_planning && result.query_plan && (
+                  <div className="mb-4">
+                    <QueryPlanVisualization
+                      plan={result.query_plan}
+                      usedPlanning={result.used_planning}
+                    />
+                  </div>
+                )}
+
+                {/* Agent Trace */}
+                {result.agent_trace && (
+                  <div className="mb-4">
+                    <AgentTrace trace={result.agent_trace} />
+                  </div>
+                )}
 
                 {/* Results or Error */}
                 {result.success ? (
