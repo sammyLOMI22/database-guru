@@ -114,6 +114,31 @@ class QueryResponse(BaseModel):
         default=None,
         description="Agent execution trace showing decision-making process"
     )
+    # Option 2 Enhancement: Query plan and correction attempts
+    query_plan: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Query plan details (for complex queries)"
+    )
+    attempts: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Correction attempts with fix methods"
+    )
+    self_corrected: bool = Field(
+        default=False,
+        description="Whether the query was auto-corrected"
+    )
+    total_attempts: int = Field(
+        default=1,
+        description="Total number of execution attempts"
+    )
+    verification_warnings: List[str] = Field(
+        default_factory=list,
+        description="Warnings from result verification"
+    )
+    used_planning: bool = Field(
+        default=False,
+        description="Whether query planning was used"
+    )
 
     class Config:
         json_schema_extra = {

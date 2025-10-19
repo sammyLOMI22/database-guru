@@ -285,6 +285,9 @@ class SelfCorrectingSQLAgent:
         self.enable_query_planning = enable_query_planning
         self.diagnostics = ErrorDiagnostics()
 
+        # Track which fix method was used per attempt (for observability)
+        self.fix_methods: Dict[int, str] = {}
+
         # Initialize learner if available and enabled
         self.enable_learning = enable_learning and LEARNING_AVAILABLE
         self.learner = None
@@ -331,6 +334,32 @@ class SelfCorrectingSQLAgent:
                 logger.warning("QueryPlanningAgent not available - planning disabled")
                 self.enable_query_planning = False
 
+    def format_attempts_for_ui(
+        self,
+        attempts: List[CorrectionAttempt]
+    ) -> List[Dict[str, Any]]:
+        """
+        Format correction attempts for frontend display
+
+        Args:
+            attempts: List of CorrectionAttempt objects
+
+        Returns:
+            List of UI-friendly attempt dictionaries
+        """
+        return [
+            {
+                "attempt_number": a.attempt_number,
+                "sql": a.sql,
+                "success": a.success,
+                "error": a.error,
+                "error_type": a.error_type.value if a.error_type else None,
+                "execution_time_ms": a.execution_time_ms,
+                "row_count": a.row_count,
+                "fix_method": self.fix_methods.get(a.attempt_number)
+            } for a in attempts
+        ]
+
     async def generate_and_execute_with_retry(
         self,
         question: str,
@@ -370,6 +399,9 @@ class SelfCorrectingSQLAgent:
             f"Analyzing question: {question[:100]}{'...' if len(question) > 100 else ''}",
             metadata={"database_type": database_type, "model": model or self.generator.settings.OLLAMA_MODEL}
         )
+
+        # Reset fix methods tracking for this query
+        self.fix_methods = {}
 
         attempts: List[CorrectionAttempt] = []
         last_error = None
@@ -478,6 +510,8 @@ class SelfCorrectingSQLAgent:
                         if quick_fix.success and quick_fix.confidence >= 0.7:
                             sql = quick_fix.fixed_sql
                             quick_fix_used = True
+                            # Track fix method for observability
+                            self.fix_methods[attempt_num] = "quick_fix"
                             trace.add_step(
                                 "quick_fix",
                                 f"Applied quick fix: {quick_fix.explanation}",
@@ -503,6 +537,8 @@ class SelfCorrectingSQLAgent:
                             )
                             if learned_corrections:
                                 learned_correction = learned_corrections[0]
+                                # Track fix method for observability
+                                self.fix_methods[attempt_num] = "learned"
                                 trace.add_step(
                                     "learned_fix",
                                     f"Found learned correction (confidence: {learned_correction['confidence_score']:.2f})",
@@ -523,6 +559,9 @@ class SelfCorrectingSQLAgent:
                         enhanced_error = f"{last_error}\n\nHints:\n{hints}"
 
                         # Generate corrected SQL using LLM
+                        # Track fix method for observability (if not already tracked by learned correction)
+                        if attempt_num not in self.fix_methods:
+                            self.fix_methods[attempt_num] = "llm"
                         trace.add_step("llm_fix", "Generating corrected SQL using LLM")
                         fix_result = await self.generator.fix_sql_error(
                             sql=sql,
