@@ -44,6 +44,14 @@ class DatabaseQueryResult(BaseModel):
     error: Optional[str] = None
     correction_attempts: Optional[int] = 0
     corrections: Optional[List[Dict[str, Any]]] = None
+    # Option 2: Observability fields
+    agent_trace: Optional[Dict[str, Any]] = None
+    query_plan: Optional[Dict[str, Any]] = None
+    attempts: Optional[List[Dict[str, Any]]] = None
+    self_corrected: Optional[bool] = False
+    total_attempts: Optional[int] = 1
+    verification_warnings: Optional[List[str]] = None
+    used_planning: Optional[bool] = False
 
 
 class MultiDatabaseQueryResponse(BaseModel):
@@ -290,6 +298,20 @@ async def process_multi_database_query(
                     elif isinstance(attempt, dict):
                         corrections_dicts.append(attempt)
 
+            # Format attempts for UI if present
+            formatted_attempts = None
+            if attempts_list and isinstance(attempts_list, list):
+                # Use the self_correcting_agent's formatter if available
+                try:
+                    from src.llm.self_correcting_agent import SelfCorrectingSQLAgent
+                    # Create temporary agent to use formatter
+                    temp_agent = SelfCorrectingSQLAgent(sql_generator=sql_generator, max_retries=3)
+                    temp_agent.fix_methods = exec_result.get("fix_methods", {})
+                    formatted_attempts = temp_agent.format_attempts_for_ui(attempts_list)
+                except Exception as e:
+                    logger.warning(f"Could not format attempts: {e}")
+                    formatted_attempts = corrections_dicts if corrections_dicts else None
+
             database_results.append(
                 DatabaseQueryResult(
                     connection_id=connection.id,
@@ -303,6 +325,14 @@ async def process_multi_database_query(
                     error=exec_result.get("error"),
                     correction_attempts=total_attempts,  # Use total_attempts (int)
                     corrections=corrections_dicts if corrections_dicts else None,
+                    # Option 2: Observability fields
+                    agent_trace=exec_result.get("agent_trace"),
+                    query_plan=exec_result.get("query_plan"),
+                    attempts=formatted_attempts,
+                    self_corrected=exec_result.get("self_corrected", False),
+                    total_attempts=exec_result.get("total_attempts", 1),
+                    verification_warnings=exec_result.get("verification_warnings", []),
+                    used_planning=exec_result.get("used_planning", False),
                 )
             )
 

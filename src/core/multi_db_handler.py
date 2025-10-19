@@ -325,11 +325,18 @@ class MultiDatabaseHandler:
                         "connection_id": connection.id,
                         "total_attempts": result.get("total_attempts", 0),
                         "attempts": result.get("attempts", []),
+                        # Option 2: Observability fields
+                        "agent_trace": result.get("agent_trace"),
+                        "query_plan": result.get("query_plan"),
+                        "self_corrected": result.get("self_corrected", False),
+                        "verification_warnings": result.get("verification_warnings", []),
+                        "used_planning": result.get("used_planning", False),
+                        "fix_methods": result.get("fix_methods", {}),  # For attempt formatting
                     }
                 else:
                     return {
                         "success": False,
-                        "error": result.get("final_error", "Unknown error"),
+                        "error": result.get("error") or result.get("final_error", "Unknown error"),
                         "sql": result.get("sql"),
                         "database_name": connection.name,
                         "connection_id": connection.id,
@@ -338,6 +345,13 @@ class MultiDatabaseHandler:
                         "execution_time_ms": 0,
                         "total_attempts": result.get("total_attempts", 0),
                         "attempts": result.get("attempts", []),
+                        # Option 2: Observability fields (even on failure)
+                        "agent_trace": result.get("agent_trace"),
+                        "query_plan": result.get("query_plan"),
+                        "self_corrected": result.get("self_corrected", False),
+                        "verification_warnings": result.get("verification_warnings", []),
+                        "used_planning": result.get("used_planning", False),
+                        "fix_methods": result.get("fix_methods", {}),
                     }
 
         except Exception as e:

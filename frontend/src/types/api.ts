@@ -9,6 +9,77 @@ export interface QueryRequest {
   use_cache?: boolean;
 }
 
+// Option 2: Observability Types
+export interface AgentTraceStep {
+  timestamp: string;
+  elapsed_ms: number;
+  type: string;
+  message: string;
+  metadata: Record<string, any>;
+  icon: string;
+}
+
+export interface AgentTrace {
+  steps: AgentTraceStep[];
+  total_elapsed_ms: number;
+  start_time: string;
+}
+
+export interface CorrectionAttempt {
+  attempt_number: number;
+  sql: string;
+  success: boolean;
+  error?: string | null;
+  error_type?: string | null;
+  execution_time_ms?: number | null;
+  row_count?: number | null;
+  fix_method?: string | null;
+}
+
+export interface QueryPlan {
+  complexity: string;
+  intent: string;
+  confidence: number;
+  reasoning?: string;
+  tables?: Array<{
+    name: string;
+    alias?: string;
+    purpose?: string;
+  }>;
+  joins?: Array<{
+    from: string;
+    to: string;
+    type: string;
+    on: string;
+    purpose?: string;
+  }>;
+  filters?: Array<{
+    column: string;
+    operator: string;
+    value: string;
+    purpose?: string;
+  }>;
+  aggregations?: Array<{
+    function: string;
+    column: string;
+    alias?: string;
+    purpose?: string;
+  }>;
+  grouping?: {
+    columns: string[];
+    purpose?: string;
+  } | null;
+  ordering?: {
+    column: string;
+    direction: string;
+    purpose?: string;
+  } | null;
+  limit?: number | null;
+  joins_count: number;
+  filters_count: number;
+  aggregations_count: number;
+}
+
 export interface QueryResponse {
   query_id: number;
   question: string;
@@ -21,6 +92,14 @@ export interface QueryResponse {
   execution_time_ms: number | null;
   cached: boolean;
   timestamp: string;
+  // Option 2: Observability fields
+  agent_trace?: AgentTrace | null;
+  query_plan?: QueryPlan | null;
+  attempts?: CorrectionAttempt[] | null;
+  self_corrected?: boolean;
+  total_attempts?: number;
+  verification_warnings?: string[];
+  used_planning?: boolean;
 }
 
 export interface Model {
@@ -185,6 +264,14 @@ export interface DatabaseQueryResult {
   row_count?: number;
   execution_time_ms?: number;
   error?: string;
+  // Option 2: Observability fields
+  agent_trace?: AgentTrace | null;
+  query_plan?: QueryPlan | null;
+  attempts?: CorrectionAttempt[] | null;
+  self_corrected?: boolean;
+  total_attempts?: number;
+  verification_warnings?: string[];
+  used_planning?: boolean;
 }
 
 export interface MultiDatabaseQueryResponse {
