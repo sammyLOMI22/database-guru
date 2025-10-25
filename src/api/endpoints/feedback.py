@@ -13,9 +13,10 @@ from src.models.schemas import (
     FeedbackStatsResponse
 )
 from src.api.dependencies.common import get_db
-from src.database.models import UserFeedback, QueryHistory, DatabaseConnection
+from src.database.models import UserFeedback, QueryHistory, DatabaseConnection, SystemSettings
 from src.llm.correction_learner import CorrectionLearner
 from src.llm.self_correcting_agent import ErrorType, ErrorDiagnostics
+from src.llm.feedback_validator import FeedbackValidator
 from src.core.executor import SQLExecutor
 from src.core.user_db_connector import UserDatabaseConnector
 
@@ -39,6 +40,14 @@ async def submit_feedback(
     - Provide domain knowledge
 
     The feedback is stored and can later be applied to the learning system.
+
+    **Smart Auto-Learning (Option 3):**
+    If auto-learning is enabled, the system will automatically apply high-confidence feedback:
+    - High confidence (≥90%) → Auto-apply immediately
+    - Medium confidence (70-89%) → Queue for batch processing (deferred mode)
+    - Low confidence (<70%) → Manual review required
+
+    Settings can be configured via /api/settings endpoint.
     """
     try:
         # Verify query exists
@@ -70,8 +79,136 @@ async def submit_feedback(
 
         logger.info(
             f"User feedback submitted: id={feedback_record.id}, "
-            f"type={feedback.feedback_type}, query_id={feedback.query_id}"
+            f"type={feedback.feedback_type}, query_id={feedback.query_id}, "
+            f"confidence={feedback.user_confidence}"
         )
+
+        # Get system settings for auto-learning
+        settings_stmt = select(SystemSettings).limit(1)
+        settings_result = await db.execute(settings_stmt)
+        settings = settings_result.scalar_one_or_none()
+
+        # Auto-learning logic (Option 3: Smart Auto-Learning)
+        if settings and settings.auto_learning_enabled and feedback.corrected_sql:
+            confidence_threshold = settings.confidence_threshold
+            apply_mode = settings.apply_mode
+            test_before_learning = settings.test_before_learning
+
+            logger.info(
+                f"Auto-learning enabled: threshold={confidence_threshold}, "
+                f"mode={apply_mode}, test={test_before_learning}"
+            )
+
+            # High confidence: Apply immediately
+            if feedback.user_confidence >= 0.90:
+                logger.info(
+                    f"🚀 High confidence feedback (≥90%), attempting auto-apply... "
+                    f"(feedback_id={feedback_record.id})"
+                )
+                try:
+                    # Validate correction if required (ENHANCED VALIDATION)
+                    validation_passed = False
+                    validation_reason = "Validation skipped"
+                    validation_details = None
+
+                    if test_before_learning:
+                        logger.info(f"🔍 Validating user correction with comprehensive testing...")
+
+                        # Get security settings
+                        allow_destructive = getattr(settings, 'allow_destructive_auto_learn', False)
+                        if allow_destructive:
+                            logger.warning(
+                                "⚠️  DANGER: allow_destructive_auto_learn=True! "
+                                "Destructive operations can be auto-learned. This should NEVER be enabled in production!"
+                            )
+
+                        validator = FeedbackValidator(db_session=db, allow_destructive=allow_destructive)
+                        validation_mode = getattr(settings, 'validation_mode', 'strict')
+
+                        validation_passed, validation_reason, validation_details = await validator.validate_correction(
+                            query=query,
+                            corrected_sql=feedback.corrected_sql,
+                            validation_mode=validation_mode
+                        )
+
+                        if not validation_passed:
+                            logger.warning(
+                                f"⚠️ Auto-apply REJECTED by validator: {validation_reason}\n"
+                                f"   Validation details: {validation_details}"
+                            )
+                            # Store validation failure reason in user notes
+                            feedback_record.user_notes = (
+                                f"{feedback_record.user_notes or ''}\n\n"
+                                f"[AUTO-APPLY REJECTED] {validation_reason}"
+                            ).strip()
+                            await db.commit()
+                        else:
+                            logger.info(
+                                f"✅ Validation PASSED: {validation_reason}\n"
+                                f"   Details: {validation_details}"
+                            )
+                    else:
+                        # Skip validation (not recommended!)
+                        validation_passed = True
+                        validation_reason = "Validation disabled by settings"
+                        logger.warning("⚠️ Validation SKIPPED - test_before_learning is OFF (not recommended)")
+
+                    # Apply to learning system if validation passed
+                    if validation_passed:
+                        learner = CorrectionLearner(db_session=db, enable_learning=True)
+
+                        # Determine error type
+                        error_type = ErrorType.UNKNOWN
+                        if query.error_message:
+                            error_type = ErrorDiagnostics.categorize_error(query.error_message)
+
+                        # Create learned correction
+                        learned_id = await learner.learn_from_correction(
+                            error_type=error_type,
+                            original_sql=feedback_record.original_sql,
+                            original_error=query.error_message or "User-reported issue",
+                            corrected_sql=feedback_record.corrected_sql,
+                            database_type=query.database_type,
+                            was_successful=True,
+                            correction_description=feedback_record.correction_description or "User correction (auto-applied)",
+                            source="user_feedback_auto",
+                            confidence_override=feedback_record.user_confidence
+                        )
+
+                        # Update feedback record
+                        feedback_record.applied_successfully = True
+                        feedback_record.applied_at = datetime.utcnow()
+                        feedback_record.learned_correction_id = learned_id
+
+                        await db.commit()
+                        await db.refresh(feedback_record)
+
+                        logger.info(
+                            f"✨ AUTO-APPLIED: High confidence feedback automatically learned! "
+                            f"feedback_id={feedback_record.id}, learned_correction_id={learned_id}"
+                        )
+
+                except Exception as auto_apply_error:
+                    logger.error(
+                        f"⚠️ Auto-apply failed, feedback saved for manual review: {auto_apply_error}",
+                        exc_info=True
+                    )
+                    # Don't raise - just log and continue
+
+            # Medium confidence: Queue for batch processing (deferred mode)
+            elif feedback.user_confidence >= 0.70 and apply_mode == "deferred":
+                logger.info(
+                    f"📋 Medium confidence feedback (70-89%), queued for batch processing "
+                    f"(feedback_id={feedback_record.id})"
+                )
+                # Feedback is already saved, admin can review and apply in batch
+
+            # Low confidence: Manual review required
+            else:
+                logger.info(
+                    f"👁️ Low confidence feedback (<70%), manual review required "
+                    f"(feedback_id={feedback_record.id})"
+                )
 
         return FeedbackResponse.model_validate(feedback_record)
 

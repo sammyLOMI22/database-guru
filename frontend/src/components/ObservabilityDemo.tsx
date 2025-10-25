@@ -147,6 +147,7 @@ export const ObservabilityDemo: React.FC = () => {
   // Mock data with query planning
   const mockWithPlanningResponse: QueryResponse = {
     ...mockQueryResponse,
+    query_id: 456,
     question: "Show total sales by category for each month in 2024",
     sql: "SELECT category, DATE_TRUNC('month', sale_date) as month, SUM(amount) as total FROM sales WHERE sale_date >= '2024-01-01' GROUP BY category, month ORDER BY month DESC",
     self_corrected: false,
@@ -235,6 +236,7 @@ export const ObservabilityDemo: React.FC = () => {
             quick fix, and has a verification warning about low row count.
           </p>
           <QueryResults
+            queryId={mockQueryResponse.query_id}
             sql={mockQueryResponse.sql}
             results={mockQueryResponse.results}
             rowCount={mockQueryResponse.row_count}
@@ -261,6 +263,7 @@ export const ObservabilityDemo: React.FC = () => {
             Includes aggregations, grouping, and ordering.
           </p>
           <QueryResults
+            queryId={mockWithPlanningResponse.query_id}
             sql={mockWithPlanningResponse.sql}
             results={[
               { category: "Electronics", month: "2024-10-01", total: 15420.50 },
@@ -314,6 +317,14 @@ export const ObservabilityDemo: React.FC = () => {
               <div>
                 <strong>Verification Warnings:</strong> Alerts about potentially suspicious results
                 that may not match user expectations.
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-xl">💬</span>
+              <div>
+                <strong>Feedback Button:</strong> Click the "Feedback" button next to the SQL to submit corrections.
+                High-confidence feedback (≥90%) is automatically validated and applied to improve future queries.
+                Destructive operations (DELETE, UPDATE, DROP) are blocked for safety.
               </div>
             </div>
           </div>

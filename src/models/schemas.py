@@ -328,3 +328,37 @@ class FeedbackStatsResponse(BaseModel):
     applied_to_learning: int
     pending: int
     by_type: Dict[str, int]
+
+
+# ============================================================================
+# System Settings Schemas
+# ============================================================================
+
+class SystemSettingsResponse(BaseModel):
+    """System settings response"""
+    id: int
+    auto_learning_enabled: bool
+    confidence_threshold: float
+    apply_mode: str  # "immediate" or "deferred"
+    test_before_learning: bool
+    validation_mode: str  # "strict", "moderate", "lenient"
+    require_result_comparison: bool
+    enable_audit_log: bool
+    max_audit_log_days: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SystemSettingsUpdateRequest(BaseModel):
+    """Update system settings"""
+    auto_learning_enabled: Optional[bool] = None
+    confidence_threshold: Optional[float] = Field(None, ge=0.0, le=1.0)
+    apply_mode: Optional[str] = Field(None, pattern="^(immediate|deferred)$")
+    test_before_learning: Optional[bool] = None
+    validation_mode: Optional[str] = Field(None, pattern="^(strict|moderate|lenient)$")
+    require_result_comparison: Optional[bool] = None
+    enable_audit_log: Optional[bool] = None
+    max_audit_log_days: Optional[int] = Field(None, ge=1, le=365)

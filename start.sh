@@ -43,6 +43,11 @@ if [ ! -f "database_guru.db" ]; then
     echo "✅ Metadata database initialized"
 fi
 
+# Initialize system settings (includes auto-learning configuration)
+echo "⚙️  Initializing system settings..."
+python init_system_settings.py > /dev/null 2>&1 || true
+echo "✅ System settings initialized"
+
 # Check if .env exists
 if [ ! -f ".env" ]; then
     echo "⚙️  Creating .env configuration..."

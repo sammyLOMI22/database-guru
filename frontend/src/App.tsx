@@ -4,6 +4,7 @@ import EnhancedChatInterface from './components/EnhancedChatInterface';
 import Header from './components/Header';
 import { ObservabilityDemo } from './components/ObservabilityDemo';
 import { FeedbackStats } from './components/FeedbackStats';
+import { SettingsPanel } from './components/SettingsPanel';
 import { healthAPI } from './services/api';
 
 const queryClient = new QueryClient({
@@ -18,7 +19,7 @@ const queryClient = new QueryClient({
 function App() {
   const [isHealthy, setIsHealthy] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'feedback'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'feedback' | 'settings'>('chat');
 
   useEffect(() => {
     // Check health on mount
@@ -70,6 +71,16 @@ function App() {
             >
               📊 Feedback Dashboard
             </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'settings'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              ⚙️ Settings
+            </button>
           </div>
         </div>
 
@@ -78,9 +89,13 @@ function App() {
           <main className="flex-1 flex">
             {activeTab === 'chat' ? (
               <EnhancedChatInterface />
-            ) : (
+            ) : activeTab === 'feedback' ? (
               <div className="flex-1 overflow-auto p-6">
                 <FeedbackStats />
+              </div>
+            ) : (
+              <div className="flex-1 overflow-auto">
+                <SettingsPanel />
               </div>
             )}
           </main>
