@@ -126,8 +126,9 @@ DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
 ## 🎯 Features
 
 - ✅ Natural language to SQL conversion
-- ✅ **Query Planning Agent** - 4x better accuracy on complex multi-table queries (NEW!)
-- ✅ **Intelligent Schema Validation** - Auto-detects and corrects schema mismatches (NEW!)
+- ✅ **User Feedback Integration** - Learn from user corrections for continuous improvement (NEW!)
+- ✅ **Query Planning Agent** - 4x better accuracy on complex multi-table queries
+- ✅ **Intelligent Schema Validation** - Auto-detects and corrects schema mismatches
 - ✅ **Self-correcting SQL** - Automatically fixes errors and retries
 - ✅ **Learning from Corrections** - Remembers successful fixes for 50% faster error recovery
 - ✅ **Schema-Aware Fixes** - 200x faster typo correction without LLM
@@ -411,6 +412,81 @@ curl -X POST http://localhost:8000/api/query-planning/plan \
 - [Schema Validation Details](docs/SCHEMA_VALIDATION_IMPROVEMENTS.md)
 - [Quick Start Guide](docs/QUERY_PLANNING_QUICKSTART.md)
 - [Implementation Summary](docs/QUERY_PLANNING_IMPLEMENTATION_SUMMARY.md)
+
+## 🎓 User Feedback Integration (NEW!)
+
+Database Guru now learns from YOUR corrections! When the system makes a mistake, you can provide feedback to help it improve over time.
+
+### What You Can Do:
+- 🔧 **Correct SQL queries** - Fix wrong SQL and teach the system
+- 📝 **Report column/table issues** - Flag incorrect schema usage
+- ⚠️ **Flag result problems** - Report suspicious or wrong results
+- 📊 **Track improvements** - View feedback stats dashboard
+
+### How It Works:
+1. Execute a query and notice an issue
+2. Click the **"Feedback"** button next to the SQL
+3. Choose feedback type and provide correction
+4. Submit feedback with confidence level (0-100%)
+5. System learns and applies to future similar queries!
+
+### Example:
+```
+Query: "Show me all customers"
+Generated SQL: SELECT * FROM customer_data
+Result: ❌ Table not found
+
+→ Click "Feedback" button
+→ Correct to: SELECT * FROM customers
+→ Set confidence: 100%
+→ Submit
+
+✨ System learned! Next time it will use "customers" automatically
+```
+
+### Feedback Types:
+1. **SQL Correction** - Provide corrected SQL query
+2. **Column Name** - Report wrong column name
+3. **Table Name** - Report wrong table name
+4. **Result Issue** - Flag problems with results
+
+### View Feedback Stats:
+- Navigate to Feedback Dashboard in the UI
+- See total feedback, applied corrections, pending reviews
+- Track learning progress over time
+
+### API Endpoints:
+```bash
+# Submit feedback
+curl -X POST http://localhost:8000/api/feedback/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query_id": 123,
+    "feedback_type": "sql_correction",
+    "corrected_sql": "SELECT * FROM customers",
+    "correction_description": "Table name should be customers not customer_data",
+    "user_confidence": 1.0
+  }'
+
+# Apply feedback to learning system
+curl -X POST http://localhost:8000/api/feedback/apply \
+  -H "Content-Type: application/json" \
+  -d '{"feedback_id": 5, "test_before_learning": true}'
+
+# Get feedback stats
+curl http://localhost:8000/api/feedback/stats
+```
+
+### Key Benefits:
+- **Continuous improvement** - System gets smarter over time
+- **Domain-specific learning** - Learns YOUR database patterns
+- **Collaborative** - Team corrections benefit everyone
+- **Confidence tracking** - Know which corrections are most reliable
+
+**Documentation:**
+- [User Feedback System Guide](USER_FEEDBACK_SYSTEM.md)
+- [Week 2 Implementation Summary](WEEK_2_IMPLEMENTATION_SUMMARY.md)
+- [Multi-Database Feedback Integration](MULTI_DB_FEEDBACK_INTEGRATION.md)
 
 ## 🧪 Testing
 

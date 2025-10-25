@@ -234,11 +234,151 @@ Show total sales by category for each month
 
 ---
 
+---
+
+## Week 2: Test User Feedback System
+
+### Testing Feedback Submission
+
+Visit `http://localhost:3000` with backend running and try these scenarios:
+
+#### Scenario 1: Submit SQL Correction
+```
+1. Submit query: "Show all users"
+2. Look for "Feedback" button in the SQL display header
+3. Click "Feedback" button
+4. Modal should open with:
+   - Feedback type dropdown (4 options)
+   - Original SQL (read-only)
+   - Corrected SQL editor (editable for sql_correction type)
+   - Description field (required)
+   - Additional notes (optional)
+   - Confidence slider (0-100%)
+5. Select "SQL Correction"
+6. Edit corrected SQL
+7. Add description
+8. Adjust confidence slider
+9. Click "Submit Feedback"
+10. Modal closes on success
+```
+
+#### Scenario 2: Test Multi-Database Feedback
+```
+1. Submit multi-database query
+2. Each database result should have:
+   - Copy SQL button
+   - Feedback button
+3. Click feedback button for one database
+4. Submit feedback with corrected SQL
+5. Verify feedback submitted for correct database
+```
+
+#### Scenario 3: View Feedback Stats
+```
+1. Navigate to feedback stats dashboard (if implemented)
+2. Should show:
+   - Total feedback count
+   - Applied to learning count
+   - Pending count
+   - Breakdown by type (pie chart or table)
+   - Recent feedback list
+3. Try "Apply to Learning" button (if admin)
+```
+
+### Testing Feedback API
+
+#### Test Submit Feedback
+```bash
+# Submit feedback on a query
+curl -X POST http://localhost:8000/api/feedback/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query_id": 123,
+    "feedback_type": "sql_correction",
+    "corrected_sql": "SELECT * FROM users WHERE active = true",
+    "correction_description": "Should filter for active users only",
+    "user_confidence": 0.9
+  }'
+```
+
+#### Test Get Feedback Stats
+```bash
+curl http://localhost:8000/api/feedback/stats
+```
+
+Expected response:
+```json
+{
+  "total_feedback": 15,
+  "applied_to_learning": 12,
+  "pending": 3,
+  "by_type": {
+    "sql_correction": 10,
+    "column_name": 3,
+    "table_name": 2,
+    "result_issue": 0
+  }
+}
+```
+
+#### Test Get Recent Feedback
+```bash
+curl http://localhost:8000/api/feedback/recent?limit=10
+```
+
+#### Test Apply Feedback to Learning
+```bash
+curl -X POST http://localhost:8000/api/feedback/apply \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feedback_id": 5,
+    "test_before_learning": true
+  }'
+```
+
+### Week 2 Testing Checklist
+
+Frontend:
+- [ ] Feedback button appears on query results
+- [ ] Feedback button appears on multi-database results
+- [ ] FeedbackModal opens when clicked
+- [ ] Feedback type dropdown works (4 options)
+- [ ] SQL Editor displays original SQL (read-only)
+- [ ] SQL Editor allows editing corrected SQL
+- [ ] Description field validates (required)
+- [ ] Confidence slider works (0-100%)
+- [ ] Submit button sends feedback
+- [ ] Modal closes on success
+- [ ] Error messages display on failure
+- [ ] Copy SQL button works on multi-DB results
+
+Backend:
+- [ ] POST /api/feedback/ creates feedback
+- [ ] GET /api/feedback/stats returns statistics
+- [ ] GET /api/feedback/recent returns feedback list
+- [ ] GET /api/feedback/query/{id} returns query feedback
+- [ ] POST /api/feedback/apply applies to learning system
+- [ ] DELETE /api/feedback/{id} deletes feedback
+- [ ] Feedback validation works (feedback_type, confidence)
+- [ ] Learning integration works
+- [ ] UserFeedback model stores all fields correctly
+
+Integration:
+- [ ] Feedback creates learned_correction record
+- [ ] Future queries apply learned corrections
+- [ ] Multi-database queries track query_id per database
+- [ ] Feedback stats update correctly
+- [ ] Applied feedback shows applied_successfully=true
+
+---
+
 ## Success!
 
-If you can see all the components in the demo, Week 1 is complete! 🎉
+If all components work in the demo and feedback system tests pass, **Phase 0 is complete!** 🎉
 
-The observability system is working perfectly. You've successfully implemented:
+You've successfully implemented:
+
+### Week 1 - Observability:
 - ✅ Backend agent trace system
 - ✅ Fix methods tracking
 - ✅ Complete API integration
@@ -247,4 +387,22 @@ The observability system is working perfectly. You've successfully implemented:
 - ✅ Responsive design
 - ✅ Accessible UI
 
-**Ready for Week 2!**
+### Week 2 - User Feedback Integration:
+- ✅ User feedback API (6 endpoints)
+- ✅ FeedbackModal component
+- ✅ SQLEditor component
+- ✅ FeedbackStats dashboard
+- ✅ Multi-database feedback support
+- ✅ Learning system integration
+- ✅ Confidence tracking
+- ✅ 4 feedback types
+
+### Phase 0 Complete - All 6 Features:
+1. ✅ Self-Correcting SQL Agent
+2. ✅ Learning from Corrections
+3. ✅ Schema-Aware Fixes
+4. ✅ Result Verification Agent
+5. ✅ Query Planning Agent
+6. ✅ **User Feedback Integration**
+
+**Database Guru is now a fully self-improving SQL system!** 🚀

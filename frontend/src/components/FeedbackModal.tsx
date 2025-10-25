@@ -88,8 +88,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="mb-4 p-4 bg-red-100 border-2 border-red-500 rounded-lg animate-pulse">
+              <div className="flex items-center">
+                <span className="text-2xl mr-2">⚠️</span>
+                <p className="text-base font-bold text-red-900">{error}</p>
+              </div>
             </div>
           )}
 
@@ -139,14 +142,25 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
           {/* Description */}
           <div className="mb-6">
             <label className="block font-semibold text-gray-900 mb-2">
-              What's wrong? / What should change? *
+              What's wrong? / What should change? <span className="text-red-600 font-bold">*REQUIRED*</span>
             </label>
             <textarea
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) => {
+                setDescription(e.target.value);
+                if (error && e.target.value.trim()) {
+                  setError(null); // Clear error when user starts typing
+                }
+              }}
+              className={`w-full border-2 rounded-lg px-4 py-2 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                !description.trim() && error ? 'border-red-500 bg-red-50' : 'border-gray-300'
+              }`}
               placeholder="E.g., Should use 'category_name' instead of 'category' in the WHERE clause"
+              required
             />
+            {!description.trim() && (
+              <p className="text-sm text-red-600 mt-1 font-semibold">⚠️ This field is required</p>
+            )}
           </div>
 
           {/* Additional Notes */}
