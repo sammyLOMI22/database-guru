@@ -1,7 +1,7 @@
 """Pydantic schemas for API requests and responses"""
 from datetime import datetime
 from typing import Optional, List, Any, Dict
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, field_validator
 
 
 class QueryRequest(BaseModel):
@@ -254,3 +254,77 @@ class StatsResponse(BaseModel):
         default_factory=list,
         description="Most frequent queries"
     )
+
+
+# ============================================================================
+# User Feedback Schemas
+# ============================================================================
+
+class FeedbackCreate(BaseModel):
+    """Create user feedback on a query"""
+    query_id: int = Field(..., description="ID of the query being corrected")
+    feedback_type: str = Field(
+        ...,
+        description="Type of feedback: sql_correction, column_name, table_name, result_issue"
+    )
+    corrected_sql: Optional[str] = Field(None, description="Corrected SQL query")
+    correction_description: Optional[str] = Field(
+        None,
+        description="Description of what was wrong and how it was fixed"
+    )
+    correction_details: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Structured correction data (e.g., {'from': 'category', 'to': 'category_name'})"
+    )
+    user_notes: Optional[str] = Field(None, description="Additional user notes")
+    user_confidence: float = Field(
+        1.0,
+        ge=0.0,
+        le=1.0,
+        description="User's confidence in the correction (0.0 to 1.0)"
+    )
+
+    @field_validator('feedback_type')
+    @classmethod
+    def validate_feedback_type(cls, v):
+        valid_types = ['sql_correction', 'column_name', 'table_name', 'result_issue']
+        if v not in valid_types:
+            raise ValueError(f'feedback_type must be one of {valid_types}')
+        return v
+
+
+class FeedbackResponse(BaseModel):
+    """User feedback response"""
+    id: int
+    query_id: int
+    feedback_type: str
+    original_sql: str
+    corrected_sql: Optional[str]
+    correction_description: Optional[str]
+    correction_details: Optional[Dict[str, Any]]
+    user_confidence: float
+    applied_successfully: bool
+    learned_correction_id: Optional[int]
+    user_notes: Optional[str]
+    created_at: datetime
+    applied_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class FeedbackApplyRequest(BaseModel):
+    """Apply user feedback to learning system"""
+    feedback_id: int = Field(..., description="ID of the feedback to apply")
+    test_before_learning: bool = Field(
+        True,
+        description="Test the correction before adding to learning system"
+    )
+
+
+class FeedbackStatsResponse(BaseModel):
+    """Feedback statistics"""
+    total_feedback: int
+    applied_to_learning: int
+    pending: int
+    by_type: Dict[str, int]

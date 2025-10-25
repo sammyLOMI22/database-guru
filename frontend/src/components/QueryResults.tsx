@@ -1,10 +1,12 @@
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 import { AgentTrace as AgentTraceType, QueryPlan, CorrectionAttempt } from '../types/api';
 import { AgentTrace } from './AgentTrace';
 import { CorrectionHistory } from './CorrectionHistory';
 import { QueryPlanVisualization } from './QueryPlanVisualization';
 import { VerificationWarnings } from './VerificationWarnings';
+import { FeedbackModal, FeedbackData } from './FeedbackModal';
+import { feedbackAPI } from '../services/api';
 
 interface QueryResultsProps {
   sql: string;
@@ -13,6 +15,7 @@ interface QueryResultsProps {
   executionTime: number | null;
   isValid: boolean;
   warnings: string[];
+  queryId?: number | null; // Added for feedback functionality
   // Option 2: Observability props
   agentTrace?: AgentTraceType | null;
   queryPlan?: QueryPlan | null;
@@ -30,6 +33,7 @@ export default function QueryResults({
   executionTime,
   isValid,
   warnings,
+  queryId,
   agentTrace,
   queryPlan,
   attempts,
@@ -39,11 +43,23 @@ export default function QueryResults({
   usedPlanning = false,
 }: QueryResultsProps) {
   const [copied, setCopied] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(sql);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleFeedbackSubmit = async (feedback: FeedbackData) => {
+    try {
+      await feedbackAPI.submitFeedback(feedback);
+      // Success notification could be added here
+      setShowFeedbackModal(false);
+    } catch (error) {
+      console.error('Failed to submit feedback:', error);
+      throw error;
+    }
   };
 
   return (
@@ -52,13 +68,25 @@ export default function QueryResults({
       <div className="bg-gray-900 rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-gray-400 uppercase">Generated SQL</span>
-          <button
-            onClick={handleCopy}
-            className="text-gray-400 hover:text-white transition-colors p-1"
-            title="Copy SQL"
-          >
-            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          </button>
+          <div className="flex items-center gap-2">
+            {queryId && (
+              <button
+                onClick={() => setShowFeedbackModal(true)}
+                className="text-gray-400 hover:text-white transition-colors p-1 flex items-center gap-1 text-xs"
+                title="Provide Feedback"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Feedback</span>
+              </button>
+            )}
+            <button
+              onClick={handleCopy}
+              className="text-gray-400 hover:text-white transition-colors p-1"
+              title="Copy SQL"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
         <pre className="text-sm text-green-400 font-mono overflow-x-auto">
           {sql}
@@ -167,6 +195,16 @@ export default function QueryResults({
             {isValid ? 'No results returned' : 'Query could not be executed'}
           </p>
         </div>
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && queryId && (
+        <FeedbackModal
+          queryId={queryId}
+          originalSQL={sql}
+          onSubmit={handleFeedbackSubmit}
+          onClose={() => setShowFeedbackModal(false)}
+        />
       )}
     </div>
   );
