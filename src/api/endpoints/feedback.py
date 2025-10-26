@@ -169,10 +169,7 @@ async def submit_feedback(
                             original_error=query.error_message or "User-reported issue",
                             corrected_sql=feedback_record.corrected_sql,
                             database_type=query.database_type,
-                            was_successful=True,
-                            correction_description=feedback_record.correction_description or "User correction (auto-applied)",
-                            source="user_feedback_auto",
-                            confidence_override=feedback_record.user_confidence
+                            was_successful=True
                         )
 
                         # Update feedback record
@@ -306,10 +303,7 @@ async def apply_feedback_to_learning(
             original_error=query.error_message or "User-reported issue",
             corrected_sql=feedback.corrected_sql or feedback.original_sql,
             database_type=query.database_type,
-            was_successful=True,
-            correction_description=feedback.correction_description or "User correction",
-            source="user_feedback",
-            confidence_override=feedback.user_confidence
+            was_successful=True
         )
 
         # Update feedback record

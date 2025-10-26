@@ -1,17 +1,21 @@
 """Test script for Database Guru API"""
 import asyncio
 import httpx
+import pytest
 
 
 BASE_URL = "http://localhost:8000"
 
 
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_api():
     """Test the Database Guru API endpoints"""
     print("🧪 Testing Database Guru API\n")
     print("=" * 70)
 
-    async with httpx.AsyncClient() as client:
+    # Use longer timeout for LLM endpoints (default is 5 seconds)
+    async with httpx.AsyncClient(timeout=60.0) as client:
         # Test 1: Health Check
         print("\n1️⃣  Testing Health Check")
         print("-" * 70)

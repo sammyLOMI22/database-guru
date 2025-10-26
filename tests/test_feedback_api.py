@@ -13,11 +13,13 @@ import pytest
 from fastapi.testclient import TestClient
 from datetime import datetime
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, scoped_session
 
 from src.main import app
 from src.database.models import Base, UserFeedback, QueryHistory, LearnedCorrection
 from src.database.connection import get_db
+
+
 
 
 @pytest.fixture
@@ -39,8 +41,11 @@ def client(db_session):
     """Create a test client with overridden database dependency."""
     def override_get_db():
         try:
+            # Important: Always use the same session and ensure it's fresh
+            db_session.expire_all()  # Expire cached objects before each request
             yield db_session
         finally:
+            # Don't commit here - let the endpoint handle it
             pass
 
     app.dependency_overrides[get_db] = override_get_db
@@ -377,19 +382,37 @@ class TestFeedbackStats:
 
     def test_get_stats_with_feedback(self, client, sample_query_history, db_session):
         """Test getting stats with various feedback types."""
-        # Create feedback of different types
+        # Create feedback of different types using the API
         feedback_types = ["sql_correction", "column_name", "table_name", "result_issue"]
+        created_feedback_ids = []
+
         for i, ftype in enumerate(feedback_types):
-            feedback = UserFeedback(
-                query_id=sample_query_history.id,
-                feedback_type=ftype,
-                original_sql=sample_query_history.generated_sql,
-                correction_description=f"Test {ftype}",
-                user_confidence=0.8,
-                applied_successfully=(i % 2 == 0)  # Alternate applied/pending
-            )
-            db_session.add(feedback)
+            feedback_data = {
+                "query_id": sample_query_history.id,
+                "feedback_type": ftype,
+                "correction_description": f"Test {ftype}",
+                "user_confidence": 0.5,  # Low confidence so it doesn't auto-apply
+            }
+            if ftype == "sql_correction":
+                feedback_data["corrected_sql"] = "SELECT * FROM customers"
+
+            response = client.post("/api/feedback/", json=feedback_data)
+            assert response.status_code == 201
+            created_feedback_ids.append(response.json()["id"])
+
+        # Manually mark some as applied (alternate) via raw SQL to ensure visibility
+        from sqlalchemy import text
+        for i, feedback_id in enumerate(created_feedback_ids):
+            if i % 2 == 0:
+                # Use raw SQL update with proper text() wrapper
+                db_session.execute(
+                    text("UPDATE user_feedback SET applied_successfully = 1 WHERE id = :id"),
+                    {"id": feedback_id}
+                )
         db_session.commit()
+
+        # Important: Clear session cache so API sees fresh data
+        db_session.expunge_all()
 
         response = client.get("/api/feedback/stats")
 
@@ -397,7 +420,7 @@ class TestFeedbackStats:
         data = response.json()
 
         assert data["total_feedback"] >= 4
-        assert data["applied_to_learning"] >= 2  # Two were marked as applied
+        assert data["applied_to_learning"] >= 2, f"Expected >= 2 applied, got {data['applied_to_learning']}"
         assert data["pending"] >= 2  # Two were not applied
 
         # Check by_type breakdown
@@ -411,22 +434,21 @@ class TestFeedbackApply:
 
     def test_apply_feedback_manually(self, client, sample_query_history, db_session):
         """Test manually applying feedback to learning system."""
-        # Create feedback that hasn't been applied yet
-        feedback = UserFeedback(
-            query_id=sample_query_history.id,
-            feedback_type="sql_correction",
-            original_sql=sample_query_history.generated_sql,
-            corrected_sql="SELECT * FROM customers WHERE status = 'active'",
-            correction_description="Fixed table name and added filter",
-            user_confidence=0.7,  # Medium confidence, not auto-applied
-            applied_successfully=False
-        )
-        db_session.add(feedback)
-        db_session.commit()
-        db_session.refresh(feedback)
+        # Create feedback via API
+        feedback_data = {
+            "query_id": sample_query_history.id,
+            "feedback_type": "sql_correction",
+            "corrected_sql": "SELECT * FROM customers WHERE status = 'active'",
+            "correction_description": "Fixed table name and added filter",
+            "user_confidence": 0.5,  # Low confidence, not auto-applied
+        }
+
+        response = client.post("/api/feedback/", json=feedback_data)
+        assert response.status_code == 201
+        feedback_id = response.json()["id"]
 
         apply_data = {
-            "feedback_id": feedback.id,
+            "feedback_id": feedback_id,
             "test_before_learning": True
         }
 
@@ -438,21 +460,21 @@ class TestFeedbackApply:
 
     def test_apply_feedback_with_testing_disabled(self, client, sample_query_history, db_session):
         """Test applying feedback without pre-testing."""
-        feedback = UserFeedback(
-            query_id=sample_query_history.id,
-            feedback_type="sql_correction",
-            original_sql=sample_query_history.generated_sql,
-            corrected_sql="SELECT * FROM customers",
-            correction_description="Fixed table name",
-            user_confidence=0.7,
-            applied_successfully=False
-        )
-        db_session.add(feedback)
-        db_session.commit()
-        db_session.refresh(feedback)
+        # Create feedback via API
+        feedback_data = {
+            "query_id": sample_query_history.id,
+            "feedback_type": "sql_correction",
+            "corrected_sql": "SELECT * FROM customers",
+            "correction_description": "Fixed table name",
+            "user_confidence": 0.5,  # Low confidence
+        }
+
+        response = client.post("/api/feedback/", json=feedback_data)
+        assert response.status_code == 201
+        feedback_id = response.json()["id"]
 
         apply_data = {
-            "feedback_id": feedback.id,
+            "feedback_id": feedback_id,
             "test_before_learning": False  # Skip validation
         }
 
@@ -474,39 +496,30 @@ class TestFeedbackApply:
 
     def test_apply_already_applied_feedback(self, client, sample_query_history, db_session):
         """Test applying feedback that's already been applied."""
-        # Create learned correction
-        learned = LearnedCorrection(
-            error_type="table_not_found",
-            error_pattern="Table 'customer' doesn't exist",
-            database_type="postgres",
-            original_sql="SELECT * FROM customer",
-            original_error="Table 'customer' doesn't exist",
-            corrected_sql="SELECT * FROM customers",
-            confidence_score=0.95,
-            times_applied=1,
-            success_rate=1.0
-        )
-        db_session.add(learned)
-        db_session.commit()
-        db_session.refresh(learned)
+        # Create feedback via API
+        feedback_data = {
+            "query_id": sample_query_history.id,
+            "feedback_type": "sql_correction",
+            "corrected_sql": "SELECT * FROM customers",
+            "correction_description": "Already applied",
+            "user_confidence": 0.5,  # Low confidence
+        }
 
-        # Create feedback that's already applied
-        feedback = UserFeedback(
-            query_id=sample_query_history.id,
-            feedback_type="sql_correction",
-            original_sql=sample_query_history.generated_sql,
-            corrected_sql="SELECT * FROM customers",
-            correction_description="Already applied",
-            user_confidence=0.9,
-            applied_successfully=True,
-            learned_correction_id=learned.id
+        response = client.post("/api/feedback/", json=feedback_data)
+        assert response.status_code == 201
+        feedback_id = response.json()["id"]
+
+        # Mark as already applied via raw SQL to ensure visibility
+        from sqlalchemy import text
+        db_session.execute(
+            text("UPDATE user_feedback SET applied_successfully = 1 WHERE id = :id"),
+            {"id": feedback_id}
         )
-        db_session.add(feedback)
         db_session.commit()
-        db_session.refresh(feedback)
+        db_session.expunge_all()  # Clear session cache
 
         apply_data = {
-            "feedback_id": feedback.id,
+            "feedback_id": feedback_id,
             "test_before_learning": True
         }
 
@@ -521,27 +534,27 @@ class TestFeedbackDeletion:
 
     def test_delete_feedback_success(self, client, sample_query_history, db_session):
         """Test successful feedback deletion."""
-        feedback = UserFeedback(
-            query_id=sample_query_history.id,
-            feedback_type="sql_correction",
-            original_sql=sample_query_history.generated_sql,
-            corrected_sql="SELECT * FROM customers",
-            correction_description="To be deleted",
-            user_confidence=0.8,
-            applied_successfully=False
-        )
-        db_session.add(feedback)
-        db_session.commit()
-        db_session.refresh(feedback)
+        # Create feedback via API
+        feedback_data = {
+            "query_id": sample_query_history.id,
+            "feedback_type": "sql_correction",
+            "corrected_sql": "SELECT * FROM customers",
+            "correction_description": "To be deleted",
+            "user_confidence": 0.8,
+        }
 
-        response = client.delete(f"/api/feedback/{feedback.id}")
+        response = client.post("/api/feedback/", json=feedback_data)
+        assert response.status_code == 201
+        feedback_id = response.json()["id"]
+
+        response = client.delete(f"/api/feedback/{feedback_id}")
 
         assert response.status_code == 204
 
         # Verify deletion
         get_response = client.get(f"/api/feedback/query/{sample_query_history.id}")
         data = get_response.json()
-        assert not any(item["id"] == feedback.id for item in data)
+        assert not any(item["id"] == feedback_id for item in data)
 
     def test_delete_nonexistent_feedback(self, client):
         """Test deleting non-existent feedback."""
@@ -551,36 +564,29 @@ class TestFeedbackDeletion:
 
     def test_delete_applied_feedback(self, client, sample_query_history, db_session):
         """Test deleting feedback that has been applied to learning."""
-        learned = LearnedCorrection(
-            error_type="table_not_found",
-            error_pattern="Table 'test' doesn't exist",
-            database_type="postgres",
-            original_sql="SELECT * FROM test",
-            original_error="Table 'test' doesn't exist",
-            corrected_sql="SELECT * FROM tests",
-            confidence_score=0.9,
-            times_applied=1,
-            success_rate=1.0
-        )
-        db_session.add(learned)
-        db_session.commit()
-        db_session.refresh(learned)
+        # Create feedback via API
+        feedback_data = {
+            "query_id": sample_query_history.id,
+            "feedback_type": "sql_correction",
+            "corrected_sql": "SELECT * FROM customers",
+            "correction_description": "Applied feedback",
+            "user_confidence": 0.5,  # Low confidence
+        }
 
-        feedback = UserFeedback(
-            query_id=sample_query_history.id,
-            feedback_type="sql_correction",
-            original_sql=sample_query_history.generated_sql,
-            corrected_sql="SELECT * FROM customers",
-            correction_description="Applied feedback",
-            user_confidence=0.9,
-            applied_successfully=True,
-            learned_correction_id=learned.id
-        )
-        db_session.add(feedback)
-        db_session.commit()
-        db_session.refresh(feedback)
+        response = client.post("/api/feedback/", json=feedback_data)
+        assert response.status_code == 201
+        feedback_id = response.json()["id"]
 
-        response = client.delete(f"/api/feedback/{feedback.id}")
+        # Mark as applied via raw SQL to ensure visibility
+        from sqlalchemy import text
+        db_session.execute(
+            text("UPDATE user_feedback SET applied_successfully = 1 WHERE id = :id"),
+            {"id": feedback_id}
+        )
+        db_session.commit()
+        db_session.expunge_all()  # Clear session cache
+
+        response = client.delete(f"/api/feedback/{feedback_id}")
 
         # Should either succeed or return error (policy decision)
         assert response.status_code in [204, 400, 403]

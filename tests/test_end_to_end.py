@@ -1,11 +1,14 @@
 """End-to-end test for Database Guru with real SQL execution"""
 import asyncio
 import httpx
+import pytest
 
 
 BASE_URL = "http://localhost:8000"
 
 
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_end_to_end():
     """Test the complete Database Guru workflow"""
     print("=" * 80)

@@ -1,11 +1,14 @@
 """Test script for model management"""
 import asyncio
 import httpx
+import pytest
 
 
 BASE_URL = "http://localhost:8000"
 
 
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_models():
     """Test model management features"""
     print("=" * 80)

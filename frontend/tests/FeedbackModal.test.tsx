@@ -1,564 +1,376 @@
 /**
  * Tests for FeedbackModal component
  *
- * Tests cover:
- * - Component rendering
- * - Form field interactions
- * - Validation
- * - Submission flow
- * - Error handling
- * - User interactions
+ * Testing the actual component that exists in production
  */
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import '@testing-library/jest-dom';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FeedbackModal } from '../src/components/FeedbackModal';
-import { feedbackAPI } from '../src/services/api';
 
-// Mock the API
-jest.mock('../src/services/api', () => ({
-  feedbackAPI: {
-    submitFeedback: jest.fn(),
-  },
+// Mock SQLEditor component since it's complex
+vi.mock('../src/components/SQLEditor', () => ({
+  SQLEditor: ({ initialSQL, onChange, readOnly, label }: any) => (
+    <div data-testid={readOnly ? 'sql-editor-readonly' : 'sql-editor-editable'}>
+      <label>{label}</label>
+      {!readOnly && (
+        <textarea
+          data-testid="sql-editor-textarea"
+          value={initialSQL}
+          onChange={(e) => onChange?.(e.target.value)}
+        />
+      )}
+      {readOnly && <div data-testid="readonly-sql">{initialSQL}</div>}
+    </div>
+  ),
 }));
 
 describe('FeedbackModal', () => {
-  const mockOnClose = jest.fn();
-  const mockOnSuccess = jest.fn();
-
+  const mockOnSubmit = vi.fn();
+  const mockOnClose = vi.fn();
   const defaultProps = {
-    isOpen: true,
-    onClose: mockOnClose,
-    onSuccess: mockOnSuccess,
     queryId: 123,
-    originalSql: 'SELECT * FROM customer',
+    originalSQL: 'SELECT * FROM users',
+    onSubmit: mockOnSubmit,
+    onClose: mockOnClose,
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Rendering', () => {
-    it('should render when open', () => {
+    it('renders the modal with correct title', () => {
       render(<FeedbackModal {...defaultProps} />);
-
-      expect(screen.getByText(/submit feedback/i)).toBeInTheDocument();
-      expect(screen.getByText(/original sql/i)).toBeInTheDocument();
+      expect(screen.getByText('Provide Feedback')).toBeInTheDocument();
     });
 
-    it('should not render when closed', () => {
-      render(<FeedbackModal {...defaultProps} isOpen={false} />);
-
-      expect(screen.queryByText(/submit feedback/i)).not.toBeInTheDocument();
+    it('displays the original SQL in read-only editor', () => {
+      render(<FeedbackModal {...defaultProps} />);
+      expect(screen.getByTestId('sql-editor-readonly')).toBeInTheDocument();
+      expect(screen.getByTestId('readonly-sql')).toHaveTextContent('SELECT * FROM users');
     });
 
-    it('should display original SQL in read-only field', () => {
+    it('shows all feedback type options', () => {
       render(<FeedbackModal {...defaultProps} />);
+      const select = screen.getByRole('combobox');
+      expect(select).toBeInTheDocument();
 
-      const originalSqlField = screen.getByDisplayValue(defaultProps.originalSql);
-      expect(originalSqlField).toBeInTheDocument();
-      expect(originalSqlField).toHaveAttribute('readonly');
+      // Check for all options
+      expect(screen.getByRole('option', { name: /SQL Correction/i })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: /Column Name Issue/i })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: /Table Name Issue/i })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: /Result Issue/i })).toBeInTheDocument();
     });
 
-    it('should render all feedback type options', () => {
+    it('shows description field with required marker', () => {
       render(<FeedbackModal {...defaultProps} />);
-
-      expect(screen.getByText(/sql correction/i)).toBeInTheDocument();
-      expect(screen.getByText(/column name/i)).toBeInTheDocument();
-      expect(screen.getByText(/table name/i)).toBeInTheDocument();
-      expect(screen.getByText(/result issue/i)).toBeInTheDocument();
+      expect(screen.getByText(/What's wrong/i)).toBeInTheDocument();
+      expect(screen.getByText('*REQUIRED*')).toBeInTheDocument();
     });
 
-    it('should render confidence slider', () => {
+    it('shows confidence slider defaulting to 100%', () => {
       render(<FeedbackModal {...defaultProps} />);
-
-      const slider = screen.getByRole('slider');
-      expect(slider).toBeInTheDocument();
-      expect(slider).toHaveAttribute('type', 'range');
+      expect(screen.getByText(/How confident are you/i)).toBeInTheDocument();
+      expect(screen.getByText('100%')).toBeInTheDocument();
     });
 
-    it('should render submit and cancel buttons', () => {
+    it('shows Submit and Cancel buttons', () => {
       render(<FeedbackModal {...defaultProps} />);
-
-      expect(screen.getByRole('button', { name: /submit/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Submit Feedback/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
     });
   });
 
-  describe('Form Interactions', () => {
-    it('should allow selecting feedback type', async () => {
-      const user = userEvent.setup();
+  describe('Feedback Type Selection', () => {
+    it('defaults to sql_correction type', () => {
       render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'sql_correction');
-
-      expect(select).toHaveValue('sql_correction');
+      const select = screen.getByRole('combobox') as HTMLSelectElement;
+      expect(select.value).toBe('sql_correction');
     });
 
-    it('should show corrected SQL field when SQL correction is selected', async () => {
-      const user = userEvent.setup();
+    it('shows corrected SQL editor when sql_correction is selected', () => {
       render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'sql_correction');
-
-      expect(screen.getByLabelText(/corrected sql/i)).toBeInTheDocument();
+      expect(screen.getByTestId('sql-editor-editable')).toBeInTheDocument();
     });
 
-    it('should allow entering corrected SQL', async () => {
+    it('hides corrected SQL editor when changing to column_name', async () => {
       const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'sql_correction');
-
-      const correctedSqlField = screen.getByLabelText(/corrected sql/i);
-      await user.type(correctedSqlField, 'SELECT * FROM customers');
-
-      expect(correctedSqlField).toHaveValue('SELECT * FROM customers');
-    });
-
-    it('should allow entering description', async () => {
-      const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Fixed table name from customer to customers');
-
-      expect(descriptionField).toHaveValue('Fixed table name from customer to customers');
-    });
-
-    it('should allow entering notes', async () => {
-      const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      const notesField = screen.getByLabelText(/additional notes/i);
-      await user.type(notesField, 'The error message clearly indicated the issue');
-
-      expect(notesField).toHaveValue('The error message clearly indicated the issue');
-    });
-
-    it('should allow adjusting confidence slider', async () => {
-      const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      const slider = screen.getByRole('slider');
-      await user.clear(slider);
-      await user.type(slider, '85');
-
-      expect(slider).toHaveValue('85');
-    });
-
-    it('should display confidence percentage', () => {
-      render(<FeedbackModal {...defaultProps} />);
-
-      const slider = screen.getByRole('slider');
-      const confidenceValue = slider.getAttribute('value') || '100';
-
-      expect(screen.getByText(new RegExp(`${confidenceValue}%`))).toBeInTheDocument();
-    });
-  });
-
-  describe('Validation', () => {
-    it('should require description field', async () => {
-      const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
-
-      // Should show validation error
-      await waitFor(() => {
-        expect(screen.getByText(/description is required/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should require corrected SQL for SQL correction type', async () => {
-      const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'sql_correction');
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Test description');
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
-
-      // Should show validation error for missing corrected SQL
-      await waitFor(() => {
-        expect(screen.getByText(/corrected sql is required/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should validate confidence is between 0 and 100', async () => {
-      const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      const slider = screen.getByRole('slider');
-
-      // Try setting invalid value
-      fireEvent.change(slider, { target: { value: '150' } });
-
-      // Should be clamped or show error
-      expect(parseInt(slider.value)).toBeLessThanOrEqual(100);
-    });
-
-    it('should not allow empty corrected SQL for SQL correction', async () => {
-      const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'sql_correction');
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Test');
-
-      const correctedSqlField = screen.getByLabelText(/corrected sql/i);
-      await user.clear(correctedSqlField);
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
-
-      // Should prevent submission
-      expect(feedbackAPI.submitFeedback).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Submission', () => {
-    it('should submit valid feedback', async () => {
-      const user = userEvent.setup();
-      (feedbackAPI.submitFeedback as jest.Mock).mockResolvedValue({
-        id: 1,
-        query_id: 123,
-        feedback_type: 'sql_correction',
-        corrected_sql: 'SELECT * FROM customers',
-        user_confidence: 0.95,
-      });
-
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'sql_correction');
-
-      const correctedSqlField = screen.getByLabelText(/corrected sql/i);
-      await user.type(correctedSqlField, 'SELECT * FROM customers');
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Fixed table name');
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(feedbackAPI.submitFeedback).toHaveBeenCalledWith({
-          query_id: 123,
-          feedback_type: 'sql_correction',
-          corrected_sql: 'SELECT * FROM customers',
-          correction_description: 'Fixed table name',
-          user_notes: '',
-          user_confidence: 1.0, // Default value
-        });
-      });
-    });
-
-    it('should call onSuccess after successful submission', async () => {
-      const user = userEvent.setup();
-      (feedbackAPI.submitFeedback as jest.Mock).mockResolvedValue({
-        id: 1,
-        applied_successfully: true,
-      });
-
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'sql_correction');
-
-      const correctedSqlField = screen.getByLabelText(/corrected sql/i);
-      await user.type(correctedSqlField, 'SELECT * FROM customers');
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Fixed table name');
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(mockOnSuccess).toHaveBeenCalled();
-      });
-    });
-
-    it('should close modal after successful submission', async () => {
-      const user = userEvent.setup();
-      (feedbackAPI.submitFeedback as jest.Mock).mockResolvedValue({ id: 1 });
-
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'sql_correction');
-
-      const correctedSqlField = screen.getByLabelText(/corrected sql/i);
-      await user.type(correctedSqlField, 'SELECT * FROM customers');
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Fixed table name');
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(mockOnClose).toHaveBeenCalled();
-      });
-    });
-
-    it('should submit with custom confidence value', async () => {
-      const user = userEvent.setup();
-      (feedbackAPI.submitFeedback as jest.Mock).mockResolvedValue({ id: 1 });
-
       render(<FeedbackModal {...defaultProps} />);
 
       const select = screen.getByRole('combobox');
       await user.selectOptions(select, 'column_name');
 
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Column name issue');
+      expect(screen.queryByTestId('sql-editor-editable')).not.toBeInTheDocument();
+    });
+
+    it('shows appropriate help text for each feedback type', async () => {
+      const user = userEvent.setup();
+      render(<FeedbackModal {...defaultProps} />);
+
+      const select = screen.getByRole('combobox');
+
+      // SQL Correction
+      await user.selectOptions(select, 'sql_correction');
+      expect(screen.getByText(/Provide a corrected version/i)).toBeInTheDocument();
+
+      // Column Name
+      await user.selectOptions(select, 'column_name');
+      expect(screen.getByText(/incorrect column name/i)).toBeInTheDocument();
+
+      // Table Name
+      await user.selectOptions(select, 'table_name');
+      expect(screen.getByText(/incorrect table name/i)).toBeInTheDocument();
+
+      // Result Issue
+      await user.selectOptions(select, 'result_issue');
+      expect(screen.getByText(/issue with the query results/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('Form Validation', () => {
+    it('shows error when submitting without description', async () => {
+      const user = userEvent.setup();
+      render(<FeedbackModal {...defaultProps} />);
+
+      const submitButton = screen.getByRole('button', { name: /Submit Feedback/i });
+      await user.click(submitButton);
+
+      expect(await screen.findByText(/Please provide a description/i)).toBeInTheDocument();
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+    });
+
+    it('shows error when corrected SQL is same as original', async () => {
+      const user = userEvent.setup();
+      render(<FeedbackModal {...defaultProps} />);
+
+      // Add description
+      const descriptionField = screen.getByPlaceholderText(/E.g.,/i);
+      await user.type(descriptionField, 'Test description');
+
+      // Submit (corrected SQL is already same as original by default)
+      const submitButton = screen.getByRole('button', { name: /Submit Feedback/i });
+      await user.click(submitButton);
+
+      expect(await screen.findByText(/Corrected SQL is the same/i)).toBeInTheDocument();
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+    });
+
+    it('clears error when user starts typing in description', async () => {
+      const user = userEvent.setup();
+      render(<FeedbackModal {...defaultProps} />);
+
+      // Trigger error first
+      const submitButton = screen.getByRole('button', { name: /Submit Feedback/i });
+      await user.click(submitButton);
+      expect(await screen.findByText(/Please provide a description/i)).toBeInTheDocument();
+
+      // Start typing
+      const descriptionField = screen.getByPlaceholderText(/E.g.,/i);
+      await user.type(descriptionField, 'Fix');
+
+      // Error should be cleared
+      await waitFor(() => {
+        expect(screen.queryByText(/Please provide a description/i)).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Form Submission', () => {
+    it('submits valid feedback with all fields', async () => {
+      const user = userEvent.setup();
+      mockOnSubmit.mockResolvedValue(undefined);
+
+      render(<FeedbackModal {...defaultProps} />);
+
+      // Fill out form
+      const descriptionField = screen.getByPlaceholderText(/E.g.,/i);
+      await user.type(descriptionField, 'Should use category_name');
+
+      const notesField = screen.getByPlaceholderText(/additional context/i);
+      await user.type(notesField, 'Additional notes here');
+
+      // Change corrected SQL
+      const sqlTextarea = screen.getByTestId('sql-editor-textarea');
+      await user.clear(sqlTextarea);
+      await user.type(sqlTextarea, 'SELECT * FROM customers');
+
+      // Adjust confidence
+      const slider = screen.getByRole('slider');
+      fireEvent.change(slider, { target: { value: '0.8' } });
+
+      // Submit
+      const submitButton = screen.getByRole('button', { name: /Submit Feedback/i });
+      await user.click(submitButton);
+
+      // Verify submission
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith({
+          query_id: 123,
+          feedback_type: 'sql_correction',
+          corrected_sql: 'SELECT * FROM customers',
+          correction_description: 'Should use category_name',
+          user_notes: 'Additional notes here',
+          user_confidence: 0.8,
+        });
+      });
+
+      // Modal should close on success
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+
+    it('submits column_name feedback without corrected_sql', async () => {
+      const user = userEvent.setup();
+      mockOnSubmit.mockResolvedValue(undefined);
+
+      render(<FeedbackModal {...defaultProps} />);
+
+      // Change to column_name type
+      const select = screen.getByRole('combobox');
+      await user.selectOptions(select, 'column_name');
+
+      // Fill description
+      const descriptionField = screen.getByPlaceholderText(/E.g.,/i);
+      await user.type(descriptionField, 'Column name is wrong');
+
+      // Submit
+      const submitButton = screen.getByRole('button', { name: /Submit Feedback/i });
+      await user.click(submitButton);
+
+      // Verify - should not include corrected_sql for non-SQL corrections
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith({
+          query_id: 123,
+          feedback_type: 'column_name',
+          corrected_sql: undefined,
+          correction_description: 'Column name is wrong',
+          user_notes: undefined,
+          user_confidence: 1.0,
+        });
+      });
+    });
+
+    it('shows submitting state during submission', async () => {
+      const user = userEvent.setup();
+      let resolveSubmit: any;
+      mockOnSubmit.mockReturnValue(new Promise((resolve) => { resolveSubmit = resolve; }));
+
+      render(<FeedbackModal {...defaultProps} />);
+
+      // Fill and submit
+      const descriptionField = screen.getByPlaceholderText(/E.g.,/i);
+      await user.type(descriptionField, 'Test');
+
+      // Change SQL to avoid same-as-original error
+      const sqlTextarea = screen.getByTestId('sql-editor-textarea');
+      await user.clear(sqlTextarea);
+      await user.type(sqlTextarea, 'SELECT * FROM customers');
+
+      const submitButton = screen.getByRole('button', { name: /Submit Feedback/i });
+      await user.click(submitButton);
+
+      // Should show submitting state
+      expect(await screen.findByText(/Submitting.../i)).toBeInTheDocument();
+      expect(submitButton).toBeDisabled();
+
+      // Resolve
+      resolveSubmit();
+    });
+
+    it('shows error message when submission fails', async () => {
+      const user = userEvent.setup();
+      mockOnSubmit.mockRejectedValue(new Error('Network error'));
+
+      render(<FeedbackModal {...defaultProps} />);
+
+      // Fill and submit
+      const descriptionField = screen.getByPlaceholderText(/E.g.,/i);
+      await user.type(descriptionField, 'Test');
+
+      const sqlTextarea = screen.getByTestId('sql-editor-textarea');
+      await user.clear(sqlTextarea);
+      await user.type(sqlTextarea, 'SELECT * FROM customers');
+
+      const submitButton = screen.getByRole('button', { name: /Submit Feedback/i });
+      await user.click(submitButton);
+
+      // Should show error
+      expect(await screen.findByText(/Network error/i)).toBeInTheDocument();
+      expect(mockOnClose).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Modal Interactions', () => {
+    it('calls onClose when Cancel button is clicked', async () => {
+      const user = userEvent.setup();
+      render(<FeedbackModal {...defaultProps} />);
+
+      const cancelButton = screen.getByRole('button', { name: /Cancel/i });
+      await user.click(cancelButton);
+
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+
+    it('calls onClose when X button is clicked', async () => {
+      const user = userEvent.setup();
+      render(<FeedbackModal {...defaultProps} />);
+
+      // Find the close X button (it's the first button in the header)
+      const buttons = screen.getAllByRole('button');
+      const closeButton = buttons.find(btn =>
+        btn.querySelector('svg') &&
+        btn.className.includes('text-gray-400')
+      );
+
+      expect(closeButton).toBeDefined();
+      await user.click(closeButton!);
+
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+
+    it('disables buttons during submission', async () => {
+      const user = userEvent.setup();
+      let resolveSubmit: any;
+      mockOnSubmit.mockReturnValue(new Promise((resolve) => { resolveSubmit = resolve; }));
+
+      render(<FeedbackModal {...defaultProps} />);
+
+      // Fill and submit
+      const descriptionField = screen.getByPlaceholderText(/E.g.,/i);
+      await user.type(descriptionField, 'Test');
+
+      const sqlTextarea = screen.getByTestId('sql-editor-textarea');
+      await user.clear(sqlTextarea);
+      await user.type(sqlTextarea, 'SELECT * FROM customers');
+
+      const submitButton = screen.getByRole('button', { name: /Submit Feedback/i });
+      await user.click(submitButton);
+
+      // Both buttons should be disabled
+      const cancelButton = screen.getByRole('button', { name: /Cancel/i });
+      expect(submitButton).toBeDisabled();
+      expect(cancelButton).toBeDisabled();
+
+      resolveSubmit();
+    });
+  });
+
+  describe('Confidence Slider', () => {
+    it('updates confidence percentage when slider changes', async () => {
+      render(<FeedbackModal {...defaultProps} />);
 
       const slider = screen.getByRole('slider');
-      await user.clear(slider);
-      await user.type(slider, '75');
 
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
+      fireEvent.change(slider, { target: { value: '0.5' } });
+      expect(screen.getByText('50%')).toBeInTheDocument();
 
-      await waitFor(() => {
-        expect(feedbackAPI.submitFeedback).toHaveBeenCalledWith(
-          expect.objectContaining({
-            user_confidence: 0.75,
-          })
-        );
-      });
-    });
+      fireEvent.change(slider, { target: { value: '0.75' } });
+      expect(screen.getByText('75%')).toBeInTheDocument();
 
-    it('should submit metadata correction with details', async () => {
-      const user = userEvent.setup();
-      (feedbackAPI.submitFeedback as jest.Mock).mockResolvedValue({ id: 1 });
-
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'table_name');
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Table should be customers not customer');
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(feedbackAPI.submitFeedback).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should display error message on submission failure', async () => {
-      const user = userEvent.setup();
-      (feedbackAPI.submitFeedback as jest.Mock).mockRejectedValue(
-        new Error('Network error')
-      );
-
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'result_issue');
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Results are wrong');
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/error/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should not close modal on submission failure', async () => {
-      const user = userEvent.setup();
-      (feedbackAPI.submitFeedback as jest.Mock).mockRejectedValue(
-        new Error('Validation failed')
-      );
-
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'sql_correction');
-
-      const correctedSqlField = screen.getByLabelText(/corrected sql/i);
-      await user.type(correctedSqlField, 'INVALID SQL');
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Test');
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/error/i)).toBeInTheDocument();
-      });
-
-      // Modal should still be visible
-      expect(screen.getByText(/submit feedback/i)).toBeInTheDocument();
-    });
-
-    it('should allow retry after error', async () => {
-      const user = userEvent.setup();
-      (feedbackAPI.submitFeedback as jest.Mock)
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({ id: 1 });
-
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'result_issue');
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Test');
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-
-      // First attempt - fails
-      await user.click(submitButton);
-      await waitFor(() => {
-        expect(screen.getByText(/error/i)).toBeInTheDocument();
-      });
-
-      // Second attempt - succeeds
-      await user.click(submitButton);
-      await waitFor(() => {
-        expect(mockOnSuccess).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Cancel Interaction', () => {
-    it('should close modal when cancel is clicked', async () => {
-      const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      const cancelButton = screen.getByRole('button', { name: /cancel/i });
-      await user.click(cancelButton);
-
-      expect(mockOnClose).toHaveBeenCalled();
-    });
-
-    it('should not submit when cancel is clicked', async () => {
-      const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Some feedback');
-
-      const cancelButton = screen.getByRole('button', { name: /cancel/i });
-      await user.click(cancelButton);
-
-      expect(feedbackAPI.submitFeedback).not.toHaveBeenCalled();
-    });
-
-    it('should reset form when closed and reopened', async () => {
-      const user = userEvent.setup();
-      const { rerender } = render(<FeedbackModal {...defaultProps} />);
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Test feedback');
-
-      // Close modal
-      rerender(<FeedbackModal {...defaultProps} isOpen={false} />);
-
-      // Reopen modal
-      rerender(<FeedbackModal {...defaultProps} isOpen={true} />);
-
-      const newDescriptionField = screen.getByLabelText(/description/i);
-      expect(newDescriptionField).toHaveValue('');
-    });
-  });
-
-  describe('Loading States', () => {
-    it('should disable submit button while submitting', async () => {
-      const user = userEvent.setup();
-      (feedbackAPI.submitFeedback as jest.Mock).mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve({ id: 1 }), 1000))
-      );
-
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'result_issue');
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Test');
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
-
-      // Button should be disabled during submission
-      expect(submitButton).toBeDisabled();
-    });
-
-    it('should show loading indicator while submitting', async () => {
-      const user = userEvent.setup();
-      (feedbackAPI.submitFeedback as jest.Mock).mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve({ id: 1 }), 1000))
-      );
-
-      render(<FeedbackModal {...defaultProps} />);
-
-      const select = screen.getByRole('combobox');
-      await user.selectOptions(select, 'result_issue');
-
-      const descriptionField = screen.getByLabelText(/description/i);
-      await user.type(descriptionField, 'Test');
-
-      const submitButton = screen.getByRole('button', { name: /submit/i });
-      await user.click(submitButton);
-
-      // Should show loading text or spinner
-      expect(screen.getByText(/submitting/i) || screen.getByRole('status')).toBeInTheDocument();
-    });
-  });
-
-  describe('Accessibility', () => {
-    it('should have proper ARIA labels', () => {
-      render(<FeedbackModal {...defaultProps} />);
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByLabelText(/feedback type/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
-    });
-
-    it('should allow keyboard navigation', async () => {
-      const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      // Tab through form elements
-      await user.tab();
-      expect(screen.getByRole('combobox')).toHaveFocus();
-
-      await user.tab();
-      expect(screen.getByLabelText(/description/i)).toHaveFocus();
-    });
-
-    it('should support ESC key to close', async () => {
-      const user = userEvent.setup();
-      render(<FeedbackModal {...defaultProps} />);
-
-      await user.keyboard('{Escape}');
-
-      expect(mockOnClose).toHaveBeenCalled();
+      fireEvent.change(slider, { target: { value: '0' } });
+      expect(screen.getByText('0%')).toBeInTheDocument();
     });
   });
 });
