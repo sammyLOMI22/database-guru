@@ -264,6 +264,7 @@ export interface DatabaseQueryResult {
   row_count?: number;
   execution_time_ms?: number;
   error?: string;
+  query_id?: number; // For user feedback integration
   // Option 2: Observability fields
   agent_trace?: AgentTrace | null;
   query_plan?: QueryPlan | null;

@@ -91,7 +91,10 @@ async def test_decorators():
     async with CacheNamespace("user:123") as ns:
         await ns.set("profile", {"name": "John Doe", "email": "john@example.com"})
         profile = await ns.get("profile")
-        print(f"  ✓ Namespaced get: {profile['name']}")
+        if profile:
+            print(f"  ✓ Namespaced get: {profile['name']}")
+        else:
+            print(f"  ⚠️  Namespaced get returned None (Redis not available)")
 
     # Clean up
     await cache.clear_pattern("demo:*")

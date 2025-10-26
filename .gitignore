@@ -16,6 +16,13 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+yarn.lock
+pnpm-lock.yaml
+# Note: package-lock.json is intentionally NOT ignored (good for reproducible builds)
+
 # Environment
 .env
 .env.local

@@ -44,6 +44,7 @@ class DatabaseQueryResult(BaseModel):
     error: Optional[str] = None
     correction_attempts: Optional[int] = 0
     corrections: Optional[List[Dict[str, Any]]] = None
+    query_id: Optional[int] = None  # For user feedback integration
     # Option 2: Observability fields
     agent_trace: Optional[Dict[str, Any]] = None
     query_plan: Optional[Dict[str, Any]] = None
@@ -154,6 +155,10 @@ async def process_multi_database_query(
 
         logger.info(f"Processing query across {len(connections)} database(s): {[c.name for c in connections]}")
 
+        # DEBUG: Log session info if using chat session
+        if request.chat_session_id:
+            logger.info(f"Chat session ID: {request.chat_session_id}, active_connection_ids: {session.active_connection_ids if 'session' in locals() else 'N/A'}")
+
         # Initialize multi-database handler
         multi_db_handler = MultiDatabaseHandler()
 
@@ -165,8 +170,10 @@ async def process_multi_database_query(
         combined_schema_data = await multi_db_handler.build_combined_schema(connections)
         combined_schema_text = multi_db_handler.format_schema_for_llm(combined_schema_data)
 
-        # Generate cache key
-        cache_key_data = f"{request.question}:{'-'.join(str(c.id) for c in connections)}"
+        # Generate cache key with version to handle schema changes
+        # Version 2: includes query_id for each database result
+        CACHE_VERSION = "v2"
+        cache_key_data = f"{CACHE_VERSION}:{request.question}:{'-'.join(str(c.id) for c in connections)}"
         cache_key_hash = hashlib.sha256(cache_key_data.encode()).hexdigest()[:16]
         cache_key = f"multi_query:{cache_key_hash}"
 
@@ -178,9 +185,19 @@ async def process_multi_database_query(
 
             cached_result = await cache.get(cache_key)
             if cached_result:
-                logger.info(f"Cache hit for multi-database query: {request.question[:50]}...")
-                cached_result["cached"] = True
-                return MultiDatabaseQueryResponse(**cached_result)
+                logger.info(f"Cache hit for multi-database query (v2): {request.question[:50]}...")
+                # Validate cache has required fields (query_id in each database result)
+                if "database_results" in cached_result:
+                    all_have_query_id = all(
+                        "query_id" in result
+                        for result in cached_result.get("database_results", [])
+                    )
+                    if all_have_query_id:
+                        cached_result["cached"] = True
+                        return MultiDatabaseQueryResponse(**cached_result)
+                    else:
+                        logger.warning("Cached result missing query_id in some database results, regenerating")
+                        cached_result = None
 
         # OPTIMIZATION: Don't pre-generate SQL for multi-DB queries
         # Let each database's self-correcting agent generate SQL against its own schema
@@ -312,6 +329,29 @@ async def process_multi_database_query(
                     logger.warning(f"Could not format attempts: {e}")
                     formatted_attempts = corrections_dicts if corrections_dicts else None
 
+            # Create individual QueryHistory record for this database
+            # This enables user feedback per database in multi-database queries
+            individual_query_record = None
+            try:
+                individual_query_record = QueryHistory(
+                    natural_language_query=request.question,
+                    generated_sql=exec_result.get("sql", sql),
+                    sql_validated=exec_result.get("success", False),
+                    executed=exec_result.get("success", False),
+                    execution_time_ms=exec_result.get("execution_time_ms", 0),
+                    result_count=exec_result.get("row_count", 0),
+                    error_message=exec_result.get("error"),
+                    database_type=connection.database_type,
+                    model_used=model_used,
+                )
+                db.add(individual_query_record)
+                await db.flush()  # Flush to get the ID without committing
+                await db.refresh(individual_query_record)
+                logger.info(f"Created QueryHistory record with ID: {individual_query_record.id} for {connection.name}")
+            except Exception as e:
+                logger.error(f"Failed to create QueryHistory record for {connection.name}: {e}", exc_info=True)
+                individual_query_record = None
+
             database_results.append(
                 DatabaseQueryResult(
                     connection_id=connection.id,
@@ -325,6 +365,7 @@ async def process_multi_database_query(
                     error=exec_result.get("error"),
                     correction_attempts=total_attempts,  # Use total_attempts (int)
                     corrections=corrections_dicts if corrections_dicts else None,
+                    query_id=individual_query_record.id if individual_query_record else None,  # Add query_id for feedback
                     # Option 2: Observability fields
                     agent_trace=exec_result.get("agent_trace"),
                     query_plan=exec_result.get("query_plan"),

@@ -2,10 +2,13 @@
 import asyncio
 import httpx
 import json
+import pytest
 
 BASE_URL = "http://localhost:8000/api"
 
 
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_multi_database_queries():
     """Test multi-database query functionality"""
     print("="*60)

@@ -126,8 +126,9 @@ DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
 ## 🎯 Features
 
 - ✅ Natural language to SQL conversion
-- ✅ **Query Planning Agent** - 4x better accuracy on complex multi-table queries (NEW!)
-- ✅ **Intelligent Schema Validation** - Auto-detects and corrects schema mismatches (NEW!)
+- ✅ **User Feedback Integration** - Learn from user corrections for continuous improvement (NEW!)
+- ✅ **Query Planning Agent** - 4x better accuracy on complex multi-table queries
+- ✅ **Intelligent Schema Validation** - Auto-detects and corrects schema mismatches
 - ✅ **Self-correcting SQL** - Automatically fixes errors and retries
 - ✅ **Learning from Corrections** - Remembers successful fixes for 50% faster error recovery
 - ✅ **Schema-Aware Fixes** - 200x faster typo correction without LLM
@@ -411,6 +412,142 @@ curl -X POST http://localhost:8000/api/query-planning/plan \
 - [Schema Validation Details](docs/SCHEMA_VALIDATION_IMPROVEMENTS.md)
 - [Quick Start Guide](docs/QUERY_PLANNING_QUICKSTART.md)
 - [Implementation Summary](docs/QUERY_PLANNING_IMPLEMENTATION_SUMMARY.md)
+
+## 🎓 User Feedback Integration with Smart Auto-Learning (NEW!)
+
+Database Guru now learns from YOUR corrections with **production-grade validation**! When the system makes a mistake, you can provide feedback to help it improve over time - with built-in security to prevent bad corrections.
+
+### 🛡️ Smart Auto-Learning (NEW!)
+- 🤖 **Automatic validation** - High-confidence feedback (≥90%) auto-applied after comprehensive testing
+- 🔍 **Comparative testing** - Validates corrections actually improve results
+- 🚫 **Destructive operation blocking** - DELETE/UPDATE/DROP operations NEVER auto-learned
+- ⚙️ **3 Validation Modes** - Strict (production), Moderate (balanced), Lenient (testing)
+- 📊 **Pattern detection** - Blocks suspicious changes automatically
+
+### What You Can Do:
+- 🔧 **Correct SQL queries** - Fix wrong SQL and teach the system (safe operations only)
+- 📝 **Report column/table issues** - Flag incorrect schema usage
+- ⚠️ **Flag result problems** - Report suspicious or wrong results
+- 📊 **Track improvements** - View feedback stats dashboard
+- ⚙️ **Configure auto-learning** - Control validation strictness and behavior
+
+### How It Works:
+1. Execute a query and notice an issue
+2. Click the **"Feedback"** button next to the SQL
+3. Choose feedback type and provide correction
+4. Submit feedback with confidence level (0-100%)
+5. **Smart Validation** - System runs comprehensive checks:
+   - ✅ Corrected SQL must execute successfully
+   - ✅ Original SQL must fail (strict mode)
+   - ✅ Checks for suspicious patterns
+   - ✅ Blocks destructive operations (DELETE, UPDATE, DROP, etc.)
+6. **Auto-Apply** - If validation passes, learns immediately!
+
+### Example - Safe Correction (Auto-Applied):
+```
+Query: "Show me all customers"
+Generated SQL: SELECT * FROM customer_data
+Result: ❌ Table not found
+
+→ Click "Feedback" button
+→ Correct to: SELECT * FROM customers
+→ Set confidence: 95%
+→ Submit
+
+🔍 Validating...
+✅ Corrected SQL works (5 rows)
+✅ Original SQL fails (table not found)
+✅ No suspicious patterns
+✨ AUTO-APPLIED! Next time it will use "customers" automatically
+```
+
+### Example - Destructive Operation (Blocked):
+```
+Query: "Show inactive users"
+Generated SQL: SELECT * FROM users WHERE active = 0
+
+→ User "corrects" to: DELETE FROM users WHERE active = 0
+→ Set confidence: 100%
+→ Submit
+
+🔍 Validating...
+❌ BLOCKED: Destructive operation (DELETE) detected
+📝 Saved for manual admin review
+🛡️ System protected from learning destructive operations!
+```
+
+### Feedback Types:
+1. **SQL Correction** - Provide corrected SQL query
+2. **Column Name** - Report wrong column name
+3. **Table Name** - Report wrong table name
+4. **Result Issue** - Flag problems with results
+
+### View Feedback Stats:
+- Navigate to Feedback Dashboard in the UI
+- See total feedback, applied corrections, pending reviews
+- Track learning progress over time
+
+### API Endpoints:
+```bash
+# Submit feedback (auto-validates if enabled)
+curl -X POST http://localhost:8000/api/feedback/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query_id": 123,
+    "feedback_type": "sql_correction",
+    "corrected_sql": "SELECT * FROM customers",
+    "correction_description": "Table name should be customers not customer_data",
+    "user_confidence": 0.95
+  }'
+# → Auto-applies if validation passes!
+
+# Configure auto-learning settings
+curl -X PUT http://localhost:8000/api/settings/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "auto_learning_enabled": true,
+    "validation_mode": "strict",
+    "test_before_learning": true
+  }'
+
+# Get current settings
+curl http://localhost:8000/api/settings/
+
+# Get feedback stats
+curl http://localhost:8000/api/feedback/stats
+```
+
+### Key Benefits:
+- **Production-grade security** - Blocks destructive operations (DELETE, UPDATE, DROP)
+- **Comprehensive validation** - Compares original vs corrected before learning
+- **Continuous improvement** - System gets smarter over time
+- **Domain-specific learning** - Learns YOUR database patterns
+- **Collaborative** - Team corrections benefit everyone
+- **Confidence tracking** - Know which corrections are most reliable
+- **Audit trail** - All auto-applied feedback logged for compliance
+
+### Security & Validation:
+The system uses **3 layers of protection**:
+1. **Confidence filter** - Only ≥90% confidence considered for auto-apply
+2. **Comprehensive validation** - Executes both original and corrected SQL
+3. **Pattern detection** - Blocks destructive operations and suspicious changes
+
+**Blocked Operations (NEVER auto-learned):**
+- `DELETE` - Even with WHERE clauses
+- `UPDATE` - Even with WHERE clauses
+- `DROP` - Tables, databases, indexes, etc.
+- `ALTER` - Schema modifications
+- `TRUNCATE` - Table truncation
+
+These require manual admin review for safety.
+
+**Documentation:**
+- **[Auto-Learning Guide](docs/AUTO_LEARNING_GUIDE.md)** - Complete user guide
+- **[Validation System](docs/VALIDATION_SYSTEM.md)** - Technical validation details
+- **[Security Policy](docs/SECURITY_POLICY.md)** - Enterprise security controls
+- **[Security Enhancements Summary](docs/SECURITY_ENHANCEMENTS_SUMMARY.md)** - What changed and why
+- [User Feedback System Guide](USER_FEEDBACK_SYSTEM.md)
+- [Multi-Database Feedback Integration](MULTI_DB_FEEDBACK_INTEGRATION.md)
 
 ## 🧪 Testing
 

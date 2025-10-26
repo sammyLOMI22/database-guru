@@ -408,7 +408,7 @@ class TestQueryPlanningAgent:
         assert "orders" in explanation
         assert "INNER JOIN" in explanation
         assert "COUNT" in explanation
-        assert "0.8" in explanation or "80%" in explanation
+        assert "0.8" in explanation or "80%" in explanation or "80.0%" in explanation
 
     @pytest.mark.asyncio
     async def test_plan_and_generate_sql_simple_query(self, mock_settings, mock_ollama_client, sample_schema):

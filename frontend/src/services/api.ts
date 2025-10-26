@@ -226,4 +226,80 @@ export const multiQueryAPI = {
   },
 };
 
+// Feedback API types
+export interface FeedbackCreateRequest {
+  query_id: number;
+  feedback_type: string;
+  corrected_sql?: string;
+  correction_description?: string;
+  correction_details?: any;
+  user_notes?: string;
+  user_confidence: number;
+}
+
+export interface FeedbackResponse {
+  id: number;
+  query_id: number;
+  feedback_type: string;
+  original_sql: string;
+  corrected_sql?: string;
+  correction_description?: string;
+  correction_details?: any;
+  user_confidence: number;
+  applied_successfully: boolean;
+  learned_correction_id?: number;
+  user_notes?: string;
+  created_at: string;
+  applied_at?: string;
+}
+
+export interface FeedbackStatsResponse {
+  total_feedback: number;
+  applied_to_learning: number;
+  pending: number;
+  by_type: Record<string, number>;
+}
+
+export const feedbackAPI = {
+  // Submit user feedback
+  async submitFeedback(feedback: FeedbackCreateRequest): Promise<FeedbackResponse> {
+    const { data } = await api.post<FeedbackResponse>('/api/feedback/', feedback);
+    return data;
+  },
+
+  // Apply feedback to learning system
+  async applyFeedback(feedbackId: number, testBeforeLearning = true): Promise<FeedbackResponse> {
+    const { data } = await api.post<FeedbackResponse>('/api/feedback/apply', {
+      feedback_id: feedbackId,
+      test_before_learning: testBeforeLearning,
+    });
+    return data;
+  },
+
+  // Get feedback for specific query
+  async getQueryFeedback(queryId: number): Promise<FeedbackResponse[]> {
+    const { data } = await api.get<FeedbackResponse[]>(`/api/feedback/query/${queryId}`);
+    return data;
+  },
+
+  // Get recent feedback
+  async getRecentFeedback(limit = 50, offset = 0): Promise<FeedbackResponse[]> {
+    const { data } = await api.get<FeedbackResponse[]>('/api/feedback/recent', {
+      params: { limit, offset },
+    });
+    return data;
+  },
+
+  // Get feedback statistics
+  async getStats(): Promise<FeedbackStatsResponse> {
+    const { data } = await api.get<FeedbackStatsResponse>('/api/feedback/stats');
+    return data;
+  },
+
+  // Delete feedback
+  async deleteFeedback(feedbackId: number): Promise<void> {
+    await api.delete(`/api/feedback/${feedbackId}`);
+  },
+};
+
 export default api;

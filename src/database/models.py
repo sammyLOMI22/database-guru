@@ -33,6 +33,9 @@ class QueryHistory(Base):
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
+    # Relationships
+    feedbacks = relationship("UserFeedback", back_populates="query", cascade="all, delete-orphan")
+
     # Indexes for common queries
     __table_args__ = (
         Index('idx_user_created', 'user_id', 'created_at'),
@@ -93,25 +96,54 @@ class QueryCache(Base):
 
 
 class UserFeedback(Base):
-    """Store user feedback on query results"""
+    """
+    User corrections and feedback on queries
+
+    Stores user-provided corrections to enable continuous learning.
+    Feedback can be SQL corrections, column/table name fixes, or result issues.
+    """
     __tablename__ = "user_feedback"
 
     id = Column(Integer, primary_key=True, index=True)
-    query_history_id = Column(Integer, ForeignKey("query_history.id"), nullable=False)
 
-    # Feedback
-    rating = Column(Integer)  # 1-5 stars
-    was_helpful = Column(Boolean)
-    corrected_sql = Column(Text, nullable=True)  # User-provided correction
-    comments = Column(Text, nullable=True)
+    # Link to original query
+    query_id = Column(Integer, ForeignKey("query_history.id"), nullable=False, index=True)
 
-    # User info
-    user_id = Column(String(255), index=True, nullable=True)
+    # Feedback type
+    feedback_type = Column(String(50), nullable=False, index=True)
+    # Types: "sql_correction", "column_name", "table_name", "result_issue"
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    # Original and corrected content
+    original_sql = Column(Text, nullable=False)
+    corrected_sql = Column(Text, nullable=True)
+    correction_description = Column(Text, nullable=True)
 
-    # Relationship
-    query_history = relationship("QueryHistory", backref="feedback")
+    # Specific corrections (structured data)
+    # Example: {"from": "category", "to": "category_name", "table": "products"}
+    correction_details = Column(JSON, nullable=True)
+
+    # Quality indicators
+    user_confidence = Column(Float, default=1.0)  # 0.0 to 1.0
+    applied_successfully = Column(Boolean, default=False, index=True)
+
+    # Learning integration
+    learned_correction_id = Column(
+        Integer,
+        ForeignKey("learned_corrections.id"),
+        nullable=True
+    )
+
+    # Metadata
+    user_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    applied_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    query = relationship("QueryHistory", back_populates="feedbacks")
+    learned_correction = relationship("LearnedCorrection")
+
+    def __repr__(self):
+        return f"<UserFeedback(id={self.id}, type={self.feedback_type}, query_id={self.query_id})>"
 
 
 class ChatSession(Base):
@@ -197,3 +229,40 @@ class LearnedCorrection(Base):
         Index('idx_column_pattern', 'column_pattern'),
         Index('idx_confidence', 'confidence_score'),
     )
+
+
+class SystemSettings(Base):
+    """System-wide settings for Database Guru
+
+    Stores configuration for auto-learning, confidence thresholds, etc.
+    Only one row should exist in this table (singleton pattern).
+    """
+    __tablename__ = "system_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Auto-Learning Settings
+    auto_learning_enabled = Column(Boolean, default=False, nullable=False)
+    confidence_threshold = Column(Float, default=0.80, nullable=False)  # 0.0-1.0
+    apply_mode = Column(String(20), default="immediate", nullable=False)  # "immediate" or "deferred"
+    test_before_learning = Column(Boolean, default=True, nullable=False)
+    validation_mode = Column(String(20), default="strict", nullable=False)  # "strict", "moderate", "lenient"
+    require_result_comparison = Column(Boolean, default=True, nullable=False)  # Compare original vs corrected results
+
+    # Security Settings (Future: Admin Mode)
+    allow_destructive_auto_learn = Column(Boolean, default=False, nullable=False)  # NEVER enable in production!
+    require_admin_approval = Column(Boolean, default=True, nullable=False)  # Require admin for destructive ops
+
+    # Audit Settings
+    enable_audit_log = Column(Boolean, default=True, nullable=False)
+    max_audit_log_days = Column(Integer, default=90, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return (
+            f"<SystemSettings(auto_learning={self.auto_learning_enabled}, "
+            f"threshold={self.confidence_threshold}, mode={self.apply_mode})>"
+        )

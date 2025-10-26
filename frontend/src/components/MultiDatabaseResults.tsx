@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { MessageSquare, Copy, Check } from 'lucide-react';
 import type { DatabaseQueryResult } from '../types/api';
 import { AgentTrace } from './AgentTrace';
 import { CorrectionHistory } from './CorrectionHistory';
 import { QueryPlanVisualization } from './QueryPlanVisualization';
 import { VerificationWarnings } from './VerificationWarnings';
+import { FeedbackModal, FeedbackData } from './FeedbackModal';
+import { feedbackAPI } from '../services/api';
 
 interface MultiDatabaseResultsProps {
   results: DatabaseQueryResult[];
@@ -16,11 +19,12 @@ export default function MultiDatabaseResults({
   results,
   totalRows,
   totalExecutionTime,
-  question,
 }: MultiDatabaseResultsProps) {
   const [expandedDatabases, setExpandedDatabases] = useState<Set<number>>(
     new Set(results.map((r) => r.connection_id))
   );
+  const [feedbackModal, setFeedbackModal] = useState<{ queryId: number; sql: string } | null>(null);
+  const [copiedStates, setCopiedStates] = useState<Record<number, boolean>>({});
 
   const toggleDatabase = (connectionId: number) => {
     setExpandedDatabases((prev) => {
@@ -32,6 +36,24 @@ export default function MultiDatabaseResults({
       }
       return newSet;
     });
+  };
+
+  const handleCopy = async (connectionId: number, sql: string) => {
+    await navigator.clipboard.writeText(sql);
+    setCopiedStates((prev) => ({ ...prev, [connectionId]: true }));
+    setTimeout(() => {
+      setCopiedStates((prev) => ({ ...prev, [connectionId]: false }));
+    }, 2000);
+  };
+
+  const handleFeedbackSubmit = async (feedback: FeedbackData) => {
+    try {
+      await feedbackAPI.submitFeedback(feedback);
+      setFeedbackModal(null);
+    } catch (error) {
+      console.error('Failed to submit feedback:', error);
+      throw error;
+    }
   };
 
   const successfulQueries = results.filter((r) => r.success).length;
@@ -114,7 +136,37 @@ export default function MultiDatabaseResults({
               <div className="border-t border-gray-200 p-4 bg-white">
                 {/* SQL Query */}
                 <div className="mb-4">
-                  <h5 className="text-xs font-semibold text-gray-700 mb-2">Generated SQL</h5>
+                  <div className="flex items-center justify-between mb-2">
+                    <h5 className="text-xs font-semibold text-gray-700">
+                      Generated SQL {/* DEBUG */}
+                      {result.query_id ? ` (ID: ${result.query_id})` : ' (No query_id)'}
+                    </h5>
+                    <div className="flex items-center gap-2">
+                      {result.query_id ? (
+                        <button
+                          onClick={() => setFeedbackModal({ queryId: result.query_id!, sql: result.sql })}
+                          className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-xs font-bold"
+                          title="Provide Feedback"
+                        >
+                          <MessageSquare className="w-3 h-3 inline mr-1" />
+                          FEEDBACK
+                        </button>
+                      ) : (
+                        <span className="text-xs text-red-500 font-bold">NO QUERY_ID</span>
+                      )}
+                      <button
+                        onClick={() => handleCopy(result.connection_id, result.sql)}
+                        className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                        title="Copy SQL"
+                      >
+                        {copiedStates[result.connection_id] ? (
+                          <Check className="w-3 h-3" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
                   <pre className="bg-gray-900 text-gray-100 p-3 rounded text-xs overflow-x-auto">
                     <code>{result.sql}</code>
                   </pre>
@@ -230,6 +282,16 @@ export default function MultiDatabaseResults({
             {expandedDatabases.size === results.length ? 'Collapse All' : 'Expand All'}
           </button>
         </div>
+      )}
+
+      {/* Feedback Modal */}
+      {feedbackModal && (
+        <FeedbackModal
+          queryId={feedbackModal.queryId}
+          originalSQL={feedbackModal.sql}
+          onSubmit={handleFeedbackSubmit}
+          onClose={() => setFeedbackModal(null)}
+        />
       )}
     </div>
   );
