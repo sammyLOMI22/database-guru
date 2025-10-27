@@ -18,10 +18,15 @@ htmlcov/
 
 # Node / Frontend
 node_modules/
-frontend/node_modules/
+**/node_modules/
+.vite/
+**/.vite/
 yarn.lock
 pnpm-lock.yaml
 # Note: package-lock.json is intentionally NOT ignored (good for reproducible builds)
+# Build outputs
+frontend/dist/
+frontend/build/
 
 # Environment
 .env
@@ -63,3 +68,7 @@ build/
 *.tfstate
 *.tfstate.*
 .terraform/
+frontend/node_modules/.vite/deps/_metadata.json
+frontend/node_modules/.vite/deps/_metadata.json
+frontend/node_modules/.vite/deps/@tanstack_react-query.js
+frontend/node_modules/.vite/deps/@tanstack_react-query.js

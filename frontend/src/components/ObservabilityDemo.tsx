@@ -5,6 +5,7 @@ import { QueryResponse } from '../types/api';
 /**
  * Demo component to showcase all observability features
  * This demonstrates what the UI looks like with full observability data
+ * including confidence scoring, agent traces, query planning, and verification warnings
  */
 export const ObservabilityDemo: React.FC = () => {
   // Mock data showing a query that was auto-corrected with full observability
@@ -129,7 +130,8 @@ export const ObservabilityDemo: React.FC = () => {
         error_type: "table_not_found",
         execution_time_ms: 5.2,
         row_count: null,
-        fix_method: null
+        fix_method: null,
+        confidence_prediction: null  // First attempt never has confidence
       },
       {
         attempt_number: 2,
@@ -139,7 +141,20 @@ export const ObservabilityDemo: React.FC = () => {
         error_type: null,
         execution_time_ms: 45.2,
         row_count: 3,
-        fix_method: "quick_fix"
+        fix_method: "quick_fix",
+        confidence_prediction: {
+          overall: 0.925,
+          level: 'HIGH' as const,
+          factors: {
+            error_type: 0.255,
+            schema_match: 0.250,
+            historical_success: 0.170,
+            correction_complexity: 0.150,
+            similarity: 0.100
+          },
+          reasoning: "This correction has high confidence (92.5%). Table Not Found errors are relatively easy to fix. The correction references valid schema objects. The correction is relatively simple.",
+          recommendation: "EXECUTE - High confidence, likely to succeed"
+        }
       }
     ]
   };
@@ -229,11 +244,12 @@ export const ObservabilityDemo: React.FC = () => {
         {/* Scenario 1: Auto-corrected query with verification warning */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Scenario 1: Auto-Corrected Query
+            Scenario 1: Auto-Corrected Query with Confidence Scoring
           </h2>
           <p className="text-sm text-gray-600 mb-4">
             Shows a query that failed initially due to wrong table name, was auto-corrected using
-            quick fix, and has a verification warning about low row count.
+            quick fix with <strong>92.5% HIGH confidence</strong>, and has a verification warning about low row count.
+            Click on the correction history to see the confidence badge and factor breakdown!
           </p>
           <QueryResults
             queryId={mockQueryResponse.query_id}

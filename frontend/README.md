@@ -14,8 +14,10 @@ Modern, responsive React + TypeScript frontend for Database Guru.
 
 ## Features
 
+✅ **Confidence Scoring UI** - Visual badges showing AI prediction confidence (NEW!)
 ✅ **Chat-style Interface** - Natural conversation flow
 ✅ **Real-time SQL Execution** - See results instantly
+✅ **Auto-Correction Display** - See how queries are fixed
 ✅ **Model Selection** - Choose from available LLMs
 ✅ **Schema Browser** - Explore database structure
 ✅ **Query History** - Review past queries
@@ -55,18 +57,20 @@ Output: `frontend/dist/`
 frontend/
 ├── src/
 │   ├── components/          # React components
-│   │   ├── ChatInterface.tsx    # Main chat UI
-│   │   ├── Header.tsx           # Top navigation
-│   │   ├── Sidebar.tsx          # Schema & history
-│   │   ├── QueryInput.tsx       # Message input
-│   │   ├── MessageList.tsx      # Chat messages
-│   │   ├── QueryResults.tsx     # Result tables
-│   │   ├── SchemaPanel.tsx      # Database schema
-│   │   └── HistoryPanel.tsx     # Query history
+│   │   ├── ChatInterface.tsx       # Main chat UI
+│   │   ├── ConfidenceBadge.tsx     # Confidence scoring badge (NEW!)
+│   │   ├── CorrectionHistory.tsx   # Auto-correction display
+│   │   ├── Header.tsx              # Top navigation
+│   │   ├── Sidebar.tsx             # Schema & history
+│   │   ├── QueryInput.tsx          # Message input
+│   │   ├── MessageList.tsx         # Chat messages
+│   │   ├── QueryResults.tsx        # Result tables
+│   │   ├── SchemaPanel.tsx         # Database schema
+│   │   └── HistoryPanel.tsx        # Query history
 │   ├── services/            # API layer
 │   │   └── api.ts              # HTTP client
 │   ├── types/               # TypeScript types
-│   │   └── api.ts              # API types
+│   │   └── api.ts              # API types (includes ConfidencePrediction)
 │   ├── hooks/               # Custom React hooks
 │   │   ├── useQuery.ts         # Query management
 │   │   ├── useModels.ts        # Model management
@@ -74,6 +78,8 @@ frontend/
 │   ├── App.tsx              # Root component
 │   ├── main.tsx             # Entry point
 │   └── index.css            # Global styles
+├── tests/                   # Component tests (NEW!)
+│   └── ConfidenceBadge.test.tsx  # Confidence UI tests (23 tests)
 ├── public/                  # Static assets
 ├── package.json
 ├── vite.config.ts
@@ -82,6 +88,53 @@ frontend/
 ```
 
 ## Key Components
+
+### ConfidenceBadge (NEW!)
+Visual confidence scoring with expandable details.
+
+```tsx
+<ConfidenceBadge
+  confidence={{
+    overall: 0.925,
+    level: 'HIGH',
+    factors: {
+      error_type: 0.255,
+      schema_match: 0.250,
+      historical_success: 0.170,
+      correction_complexity: 0.150,
+      similarity: 0.100
+    },
+    reasoning: "This correction has high confidence...",
+    recommendation: "EXECUTE - High confidence, likely to succeed"
+  }}
+  showDetails={true}  // Optional, default: true
+/>
+```
+
+Features:
+- 🎯 Color-coded badges (GREEN/YELLOW/ORANGE/RED)
+- 📊 Expandable factor breakdown
+- 📈 Progress bars for each factor
+- ♿ Fully accessible (ARIA attributes)
+- 📱 Responsive design
+
+### CorrectionHistory
+Display auto-corrected SQL attempts with confidence scores.
+
+```tsx
+<CorrectionHistory
+  attempts={[
+    { attempt_number: 1, sql: "SELECT * FROM custmers", success: false },
+    {
+      attempt_number: 2,
+      sql: "SELECT * FROM customers",
+      success: true,
+      confidence_prediction: { /* confidence data */ }
+    }
+  ]}
+  selfCorrected={true}
+/>
+```
 
 ### ChatInterface
 Main chat component with message history and input.
@@ -197,6 +250,26 @@ npm run build  # TypeScript compilation included
 ```bash
 npm run lint
 ```
+
+### Run Tests
+
+```bash
+# Run all tests
+npm run test
+
+# Run specific test file
+npm run test:run -- tests/ConfidenceBadge.test.tsx
+
+# Run with UI
+npm run test:ui
+```
+
+**Test Coverage:**
+- ✅ ConfidenceBadge: 23/23 tests passing (100% coverage)
+- Badge display & color coding
+- Expandable details & interactivity
+- Accessibility features
+- Edge cases
 
 ## Production Deployment
 

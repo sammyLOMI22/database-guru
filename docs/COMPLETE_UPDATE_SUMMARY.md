@@ -195,7 +195,7 @@ npm install
 # Start dev server
 npm run dev
 
-# Frontend runs on http://localhost:5173
+# Frontend runs on http://localhost:3000
 ```
 
 ### Test the Features

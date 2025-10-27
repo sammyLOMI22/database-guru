@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CorrectionAttempt } from '../types/api';
+import { ConfidenceBadge } from './ConfidenceBadge';
 
 interface CorrectionHistoryProps {
   attempts: CorrectionAttempt[];
@@ -102,6 +103,14 @@ export const CorrectionHistory: React.FC<CorrectionHistoryProps> = ({
                     {attempt.success ? '✓ Success' : '✗ Failed'}
                   </span>
                 </div>
+
+                {/* Confidence Prediction */}
+                {attempt.confidence_prediction && (
+                  <div className="mb-3">
+                    <p className="text-xs text-gray-600 mb-1.5">Confidence Score:</p>
+                    <ConfidenceBadge confidence={attempt.confidence_prediction} />
+                  </div>
+                )}
 
                 {/* SQL Query */}
                 <div className="mb-2">
