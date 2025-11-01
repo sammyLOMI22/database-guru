@@ -225,7 +225,7 @@ UserFeedback (N) ←→ (1) LearnedCorrection
    cd frontend
    npm run dev
    ```
-   Frontend runs on: http://localhost:5173
+   Frontend runs on: http://localhost:3000
 
 3. **Submit Feedback**:
    - Execute a query

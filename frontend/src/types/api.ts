@@ -25,6 +25,20 @@ export interface AgentTrace {
   start_time: string;
 }
 
+export interface ConfidencePrediction {
+  overall: number;
+  level: 'HIGH' | 'MEDIUM' | 'LOW' | 'VERY_LOW';
+  factors: {
+    error_type: number;
+    schema_match: number;
+    historical_success: number;
+    correction_complexity: number;
+    similarity: number;
+  };
+  reasoning: string;
+  recommendation: string;
+}
+
 export interface CorrectionAttempt {
   attempt_number: number;
   sql: string;
@@ -34,6 +48,7 @@ export interface CorrectionAttempt {
   execution_time_ms?: number | null;
   row_count?: number | null;
   fix_method?: string | null;
+  confidence_prediction?: ConfidencePrediction | null;
 }
 
 export interface QueryPlan {

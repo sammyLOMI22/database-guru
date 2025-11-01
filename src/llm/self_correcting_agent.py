@@ -19,6 +19,14 @@ except ImportError:
     LEARNING_AVAILABLE = False
     logger.warning("CorrectionLearner not available - learning disabled")
 
+# Import Confidence Scorer
+try:
+    from src.llm.confidence_scorer import get_confidence_scorer, ConfidenceScore
+    CONFIDENCE_SCORING_AVAILABLE = True
+except ImportError:
+    CONFIDENCE_SCORING_AVAILABLE = False
+    logger.warning("Confidence scorer not available - confidence scoring disabled")
+
 
 class AgentTrace:
     """
@@ -111,6 +119,7 @@ class CorrectionAttempt:
     success: bool
     execution_time_ms: Optional[float]
     row_count: Optional[int]
+    confidence_score: Optional[Dict[str, Any]] = None  # Confidence prediction before execution
 
 
 class ErrorDiagnostics:
@@ -356,7 +365,8 @@ class SelfCorrectingSQLAgent:
                 "error_type": a.error_type.value if a.error_type else None,
                 "execution_time_ms": a.execution_time_ms,
                 "row_count": a.row_count,
-                "fix_method": self.fix_methods.get(a.attempt_number)
+                "fix_method": self.fix_methods.get(a.attempt_number),
+                "confidence_prediction": a.confidence_score  # Include confidence score
             } for a in attempts
         ]
 
@@ -467,6 +477,9 @@ class SelfCorrectingSQLAgent:
             try:
                 trace.add_step("attempt_start", f"Starting attempt {attempt_num}/{self.max_retries}")
 
+                # Initialize confidence prediction for this attempt
+                confidence_prediction = None
+
                 # Generate or fix SQL
                 if attempt_num == 1:
                     # First attempt: generate from scratch (or use plan-based SQL)
@@ -574,6 +587,73 @@ class SelfCorrectingSQLAgent:
 
                         logger.info(f"Generated corrected SQL: {sql[:100]}...")
 
+                    # Calculate confidence score for this correction attempt
+                    if CONFIDENCE_SCORING_AVAILABLE and attempt_num > 1:  # Only for corrections, not first attempt
+                        try:
+                            scorer = get_confidence_scorer()
+                            # Get historical success rate for this error type
+                            stats = scorer.get_stats()
+                            historical_rate = None
+                            if error_type.value in stats:
+                                historical_rate = stats[error_type.value].get("success_rate")
+
+                            # Get previous SQL for comparison
+                            previous_sql = attempts[-1].sql if attempts else sql
+
+                            confidence_prediction = scorer.predict_success_probability(
+                                error_type=error_type.value,
+                                original_sql=previous_sql,
+                                correction_sql=sql,
+                                schema=schema_dict,
+                                historical_success_rate=historical_rate,
+                                error_message=last_error,
+                                context={"database_type": database_type}
+                            )
+
+                            trace.add_step(
+                                "planning",
+                                f"Confidence prediction: {confidence_prediction.get_level()} ({confidence_prediction.overall:.1%})",
+                                metadata={
+                                    "confidence": confidence_prediction.overall,
+                                    "level": confidence_prediction.get_level(),
+                                    "recommendation": confidence_prediction.recommendation,
+                                    "reasoning": confidence_prediction.reasoning
+                                }
+                            )
+
+                            logger.info(
+                                f"📊 Confidence: {confidence_prediction.get_level()} "
+                                f"({confidence_prediction.overall:.1%}) - {confidence_prediction.reasoning}"
+                            )
+
+                            # Skip execution if confidence is very low (< 0.2)
+                            if confidence_prediction.overall < 0.2:
+                                logger.warning(
+                                    f"⚠️ Very low confidence ({confidence_prediction.overall:.1%}), "
+                                    f"skipping execution to save resources"
+                                )
+                                trace.add_step(
+                                    "warning",
+                                    f"Skipping execution due to very low confidence ({confidence_prediction.overall:.1%})"
+                                )
+                                # Record failed attempt without execution
+                                attempt = CorrectionAttempt(
+                                    attempt_number=attempt_num,
+                                    sql=sql,
+                                    error="Skipped due to very low confidence score",
+                                    error_type=error_type,
+                                    success=False,
+                                    execution_time_ms=0,
+                                    row_count=0,
+                                    confidence_score=confidence_prediction.to_dict() if confidence_prediction else None
+                                )
+                                attempts.append(attempt)
+                                continue  # Skip to next attempt
+
+                        except Exception as e:
+                            logger.warning(f"Failed to calculate confidence score: {e}")
+                            confidence_prediction = None
+
                 # Validate SQL before executing
                 if not gen_result.get("is_valid", True) if attempt_num == 1 else True:
                     logger.warning(f"Generated SQL failed validation: {gen_result.get('warnings')}")
@@ -593,9 +673,21 @@ class SelfCorrectingSQLAgent:
                     error_type=ErrorType.UNKNOWN if exec_result["success"] else self.diagnostics.categorize_error(exec_result["error"]),
                     success=exec_result["success"],
                     execution_time_ms=exec_result.get("execution_time_ms"),
-                    row_count=exec_result.get("row_count")
+                    row_count=exec_result.get("row_count"),
+                    confidence_score=confidence_prediction.to_dict() if confidence_prediction else None
                 )
                 attempts.append(attempt)
+
+                # Update confidence scorer statistics after execution
+                if CONFIDENCE_SCORING_AVAILABLE and confidence_prediction and attempt_num > 1:
+                    try:
+                        scorer = get_confidence_scorer()
+                        scorer.update_historical_stats(
+                            error_type=error_type.value,
+                            success=exec_result["success"]
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to update confidence stats: {e}")
 
                 if exec_result["success"]:
                     # Success! But verify results make sense
