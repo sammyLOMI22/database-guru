@@ -92,7 +92,8 @@ The system uses a multi-agent architecture with specialized agents that work tog
    - Manages conversation context for multi-turn dialogs
    - Retrieves recent queries from chat session history
    - Builds context-aware prompts with conversation history
-   - Smart detection of contextual vs standalone questions
+   - Smart detection of contextual vs standalone questions (SECURITY FIXED: only triggers on question start)
+   - **Production-grade security**: Uses `create_safe_context_prompt()` with prompt injection protection
    - Default 3-query window (configurable)
    - Key methods: `get_context()`, `build_context_prompt()`, `should_use_context()`
 
@@ -127,13 +128,26 @@ The system uses a multi-agent architecture with specialized agents that work tog
    - Handles table names, column names, and common SQL errors
    - Key method: `try_quick_fix()` - returns corrected SQL or None
 
+8. **Prompt Sanitizer** (`src/security/prompt_sanitizer.py`) **NEW - November 2, 2025**
+   - Multi-layer prompt injection protection
+   - Input sanitization (removes control chars, normalizes whitespace)
+   - Injection detection (15+ attack patterns blocked)
+   - Safe prompt construction with XML-like delimiters
+   - Token limits (500 chars for questions, 8000 for prompts)
+   - Defense in depth: API → Agent → Prompt layers
+   - Key methods: `sanitize_input()`, `detect_injection_attempts()`, `create_safe_context_prompt()`
+
 ### Data Flow
 
 ```
 Natural Language Query (with optional session_id)
   ↓
+Input Sanitization (Prompt Sanitizer) → Removes control chars, checks token limits **NEW**
+  ↓
+Injection Detection → Blocks 15+ attack patterns **NEW**
+  ↓
 Conversational Memory Agent → Retrieves conversation history (if session_id provided)
-  ↓                          → Builds context-aware prompt
+  ↓                          → Builds secure context-aware prompt with safe delimiters **UPDATED**
   ↓
 Query Planning Agent → Creates structured plan with schema validation
   ↓
@@ -184,6 +198,15 @@ Return Results
 - 3 validation modes: strict (production), moderate (balanced), lenient (testing)
 - Blocks destructive operations (DELETE, UPDATE, DROP) from auto-learning
 - Comprehensive testing validates corrections actually improve results
+
+**Security System (NEW - November 2, 2025):**
+- `PromptSanitizer` (`src/security/prompt_sanitizer.py`) - Multi-layer prompt injection protection
+- Input sanitization at API boundary (Pydantic validators)
+- Injection detection (15+ attack patterns)
+- Safe prompt construction with XML-like delimiters
+- Token limits prevent resource exhaustion
+- Security logging for monitoring
+- 29 comprehensive security tests passing
 
 ### Database Schema
 
@@ -315,18 +338,22 @@ Settings managed via Pydantic in `src/config/settings.py`:
 - **Multi-DB queries**: `src/core/multi_db_handler.py:96` - `execute_multi_db_query()` method
 - **Schema validation**: `src/core/schema_validator.py` - `validate_schema_references()`
 - **SQL execution**: `src/core/executor.py:42` - `execute_query()` with timeout handling
+- **Security/Prompt Sanitization**: `src/security/prompt_sanitizer.py` - Input sanitization and injection detection (NEW)
+- **Security Tests**: `tests/test_prompt_sanitizer.py` - 29 comprehensive security tests (NEW)
 
 ## Documentation
 
 Key docs in `docs/`:
-- `CONVERSATIONAL_MEMORY_IMPLEMENTATION.md` - Conversational memory technical guide (NEW!)
-- `PHASE_1_COMPLETE.md` - Conversational memory completion summary (NEW!)
-- `TEST_CONVERSATIONAL_MEMORY.md` - Conversational memory testing guide (NEW!)
+- `CONVERSATIONAL_MEMORY_IMPLEMENTATION.md` - Conversational memory technical guide (UPDATED with security)
+- `PHASE_1_COMPLETE.md` - Conversational memory completion summary (UPDATED with security)
+- `TEST_CONVERSATIONAL_MEMORY.md` - Conversational memory testing guide
+- `SECURITY_IMPROVEMENTS.md` - Recent security fixes and remaining issues (NEW - Nov 2, 2025!)
+- `FUTURE_PLANS.md` - Prioritized roadmap with security fixes (NEW - Nov 2, 2025!)
 - `QUERY_PLANNING_AGENT.md` - Query planning system deep dive
 - `CONFIDENCE_SCORING.md` - Confidence scoring system
 - `LEARNING_FROM_CORRECTIONS.md` - Correction learning system
 - `RESULT_VERIFICATION_AGENT.md` - Result verification details
 - `AUTO_LEARNING_GUIDE.md` - User feedback and auto-learning
 - `MULTI_DATABASE_GUIDE.md` - Multi-database queries
-- `SECURITY_POLICY.md` - Security controls and validation
+- `SECURITY_POLICY.md` - Security controls and validation (UPDATED with prompt injection)
 - `tests/TESTING.md` - Testing guide

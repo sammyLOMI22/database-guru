@@ -7,6 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import ChatMessage, QueryHistory
+from src.security.prompt_sanitizer import (
+    create_safe_context_prompt,
+    sanitize_question_for_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -134,44 +138,33 @@ class ConversationalMemoryAgent:
         context: ConversationContext
     ) -> str:
         """
-        Build context-aware prompt for SQL generation
+        Build context-aware prompt for SQL generation with security sanitization
+
+        This method uses structured prompts with XML-like delimiters and input
+        sanitization to prevent prompt injection attacks.
 
         Args:
             question: Current user question
             context: Conversation context
 
         Returns:
-            Enhanced question with conversation context
+            Enhanced question with conversation context (sanitized)
         """
         if not context.has_context:
-            # No context - return question as-is
-            return question
+            # No context - sanitize and return question
+            return sanitize_question_for_prompt(question)
 
-        # Build context string
-        context_lines = ["CONVERSATION HISTORY:"]
-
-        for i, msg in enumerate(context.messages, 1):
-            context_lines.append(f"\nQuery {i}:")
-            context_lines.append(f"  Question: {msg['question']}")
-
-            if msg.get('sql'):
-                context_lines.append(f"  SQL Generated: {msg['sql']}")
-
-            if msg.get('success'):
-                result_info = f" ({msg.get('result_count', 0)} rows)"
-                context_lines.append(f"  Result: Success{result_info}")
-            elif msg.get('executed'):
-                context_lines.append(f"  Result: Error")
-
-        context_lines.append("\n---")
-        context_lines.append("\nCURRENT QUESTION:")
-        context_lines.append(question)
-        context_lines.append("\nIMPORTANT:")
-        context_lines.append("- If the current question refers to a previous query (e.g., 'filter that', 'sort it', 'add where clause'), modify the most recent SQL accordingly")
-        context_lines.append("- If the current question is standalone, generate a new query from scratch")
-        context_lines.append("- Use the conversation history to understand context and user intent")
-
-        return "\n".join(context_lines)
+        # Use secure prompt builder with sanitization
+        try:
+            return create_safe_context_prompt(
+                question=question,
+                context_messages=context.messages,
+                max_context_size=self.context_window
+            )
+        except Exception as e:
+            logger.error(f"Error creating safe context prompt: {str(e)}")
+            # Fallback to sanitized question only
+            return sanitize_question_for_prompt(question)
 
     def should_use_context(self, question: str) -> bool:
         """
@@ -196,14 +189,16 @@ class ConversationalMemoryAgent:
             if indicator in question_lower:
                 return True
 
-        # Modification keywords (but not at start of question)
+        # Modification keywords that indicate refining a previous query
+        # Only trigger context if they START the question (e.g., "Filter by price")
+        # Don't trigger if they appear in the middle (e.g., "Show filtered results")
         modification_keywords = [
             "filter", "sort", "order", "add", "include", "exclude", "remove"
         ]
 
-        # Check if modification keywords appear (but not if they start the sentence with "show")
+        # Check if modification keywords START the question
         for keyword in modification_keywords:
-            if keyword in question_lower and not question_lower.startswith("show"):
+            if question_lower.startswith(keyword):
                 return True
 
         # Check for short questions (likely refinements) - but not if they're complete sentences

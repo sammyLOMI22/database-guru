@@ -145,6 +145,7 @@ DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
 
 - ✅ Natural language to SQL conversion
 - ✅ **Conversational Memory** - Natural multi-turn conversations with context awareness (NEW!)
+- ✅ **Production-Grade Security** - Multi-layer prompt injection protection and input sanitization (NEW!)
 - ✅ **Confidence Scoring** - AI predicts success probability before executing corrections
 - ✅ **User Feedback Integration** - Learn from user corrections for continuous improvement
 - ✅ **Query Planning Agent** - 4x better accuracy on complex multi-table queries
@@ -203,14 +204,34 @@ database-guru/
 
 ## 🔐 Security
 
+### Production-Grade Security Features (NEW!)
+
+✅ **Prompt Injection Protection** - Multi-layer defense against malicious prompts
+✅ **Input Sanitization** - Removes control characters and malicious patterns
+✅ **Destructive Operation Blocking** - Prevents DELETE/UPDATE/DROP from auto-learning
+✅ **Token Limits** - Prevents resource exhaustion attacks
+✅ **Context Detection Security** - Prevents keyword manipulation exploits
+✅ **Safe Prompt Construction** - XML-like delimiters with escape protection
+
+### Recent Security Improvements
+
+**November 2, 2025 - Conversational Memory Security Hardening:**
+1. Fixed context detection bug where keywords anywhere triggered context usage
+2. Implemented comprehensive prompt injection protection system
+3. Added multi-layer input sanitization (API → Agent → Prompt)
+4. Deployed 15+ attack pattern detection rules
+5. All 44 security and conversational memory tests passing
+
 ⚠️ **Development Only** - This configuration is for local development.
 
-For production deployment, see [SECURITY_AUDIT.md](SECURITY_AUDIT.md) for:
+For production deployment, see [docs/SECURITY_POLICY.md](docs/SECURITY_POLICY.md) for:
 - Password encryption
 - Authentication/Authorization
 - CORS configuration
 - Rate limiting
 - Input validation
+- Prompt injection defenses
+- Auto-learning security controls
 
 ## 📚 API Documentation
 
@@ -429,9 +450,16 @@ curl -X DELETE http://localhost:8000/api/chat/sessions/{session_id}/context
 ```
 
 **Documentation:**
-- [Conversational Memory Implementation](CONVERSATIONAL_MEMORY_IMPLEMENTATION.md) - Technical deep dive
-- [Phase 1 Complete Summary](PHASE_1_COMPLETE.md) - Feature completion report
-- [Testing Guide](TEST_CONVERSATIONAL_MEMORY.md) - How to test the feature
+- [Conversational Memory Implementation](docs/CONVERSATIONAL_MEMORY_IMPLEMENTATION.md) - Technical deep dive
+- [Phase 1 Complete Summary](docs/PHASE_1_COMPLETE.md) - Feature completion report
+- [Testing Guide](docs/TEST_CONVERSATIONAL_MEMORY.md) - How to test the feature
+
+**Security Features:**
+- Multi-layer prompt injection detection and prevention
+- Input sanitization removes control characters and malicious patterns
+- Safe prompt construction with delimiter protection
+- Token limits prevent resource exhaustion
+- Defense in depth: API validation → Agent validation → Prompt sanitization
 
 ## 🧠 Learning from Corrections
 

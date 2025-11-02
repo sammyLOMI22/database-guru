@@ -214,28 +214,47 @@ class TestConversationalMemoryAgent:
         question = "Sort by price"
         enhanced = agent.build_context_prompt(question, context)
 
-        # Should include context
-        assert "CONVERSATION HISTORY:" in enhanced
+        # Should include context with new secure XML-like format
+        assert "<conversation_history>" in enhanced
+        assert "<current_query>" in enhanced
         assert "Show me all products" in enhanced
         assert "Filter by electronics" in enhanced
         assert "Sort by price" in enhanced
-        assert "previous query" in enhanced.lower()
+        assert "previous query" in enhanced.lower() or "conversation history" in enhanced.lower()
 
     async def test_should_use_context(self):
         """Test context detection logic"""
         agent = ConversationalMemoryAgent()
 
-        # Should use context
+        # Should use context - strong indicators (pronouns, directives)
         assert agent.should_use_context("filter that") is True
         assert agent.should_use_context("sort it") is True
         assert agent.should_use_context("also show") is True
         assert agent.should_use_context("add price") is True
+        assert agent.should_use_context("those results") is True
+        assert agent.should_use_context("the previous query") is True
+
+        # Should use context - modification keywords at START
+        assert agent.should_use_context("filter by price") is True
+        assert agent.should_use_context("Filter by category") is True
+        assert agent.should_use_context("sort by name") is True
+        assert agent.should_use_context("order by date") is True
+        assert agent.should_use_context("add where clause") is True
 
         # Short questions likely refinements
         assert agent.should_use_context("by category") is True
 
-        # Standalone questions
+        # Standalone questions - complete queries with modification words in middle
         assert agent.should_use_context("Show me all customers from California") is False
+        assert agent.should_use_context("Show all filtered results") is False
+        assert agent.should_use_context("Get all sorted data") is False
+        assert agent.should_use_context("Display products ordered by price") is False
+
+        # Standalone questions - complete queries starting with modification keywords
+        # Note: These will return True with current logic, which is a known limitation
+        # but better than catching false positives in the middle of sentences
+        assert agent.should_use_context("Filter all products by category") is True
+        assert agent.should_use_context("Sort all customers by name") is True
 
     async def test_format_context_for_display(self):
         """Test formatting context for UI display"""
