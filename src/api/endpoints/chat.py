@@ -438,7 +438,7 @@ async def delete_chat_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a chat session"""
+    """Delete a chat session and all associated messages"""
     try:
         result = await db.execute(
             select(ChatSession).where(ChatSession.id == session_id)
@@ -451,8 +451,16 @@ async def delete_chat_session(
                 detail=f"Chat session {session_id} not found"
             )
 
+        # Delete all messages first (to avoid FK constraint issues)
+        await db.execute(
+            delete(ChatMessage).where(ChatMessage.chat_session_id == session_id)
+        )
+
+        # Now delete the session
         await db.delete(session)
         await db.commit()
+
+        logger.info(f"Deleted chat session {session_id} and all associated messages")
 
     except HTTPException:
         raise

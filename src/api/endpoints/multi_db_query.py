@@ -1,9 +1,12 @@
 """Multi-database query endpoints for Database Guru"""
 import logging
 import hashlib
+import json
+import asyncio
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
@@ -12,9 +15,13 @@ from src.models.schemas import QueryRequest, QueryResponse
 from src.api.dependencies import get_db, get_cache, get_sql_generator, get_settings
 from src.database.models import QueryHistory, DatabaseConnection, ChatSession, ChatMessage
 from src.llm.sql_generator import SQLGenerator
+from src.llm.conversational_memory_agent import get_memory_agent
 from src.cache.redis_client import RedisCache
 from src.config.settings import Settings
 from src.core.multi_db_handler import MultiDatabaseHandler
+from src.core.user_db_connector import UserDatabaseConnector
+from src.core.schema_inspector import SchemaInspector
+from src.core.executor import SQLExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -465,3 +472,375 @@ async def process_multi_database_query(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process multi-database query: {str(e)}"
         )
+
+
+@router.post("/stream")
+async def stream_multi_database_query(
+    request: MultiDatabaseQueryRequest,
+    db: AsyncSession = Depends(get_db),
+    sql_generator: SQLGenerator = Depends(get_sql_generator),
+    settings: Settings = Depends(get_settings),
+):
+    """
+    Stream query results from multiple databases using Server-Sent Events (SSE)
+
+    This endpoint:
+    1. Determines which connections to use (from chat session or explicit list)
+    2. Executes queries in parallel across all databases
+    3. Streams results from each database as they complete
+    4. Maintains conversational memory if session_id provided
+    5. Uses self-correction and query planning per database
+
+    SSE Event Types:
+    - status: Overall status updates
+    - database_start: Database N begins execution
+    - database_metadata: Column names for database N
+    - database_data: Batch of rows from database N
+    - database_complete: Database N finished successfully
+    - database_error: Database N encountered error
+    - all_complete: All databases finished, summary stats
+    - error: Critical error occurred
+    """
+
+    async def event_generator():
+        """Generate Server-Sent Events for multi-database streaming"""
+        try:
+            # Initialize SQL generator
+            if not sql_generator.ollama.client:
+                await sql_generator.initialize()
+
+            # Handle conversational context if session_id provided
+            enhanced_question = request.question
+            used_context = False
+            session = None
+
+            if request.chat_session_id:
+                # Verify session exists
+                session_result = await db.execute(
+                    select(ChatSession).where(ChatSession.id == request.chat_session_id)
+                )
+                session = session_result.scalar_one_or_none()
+
+                if session:
+                    # Get conversational memory agent
+                    memory_agent = get_memory_agent()
+                    context = await memory_agent.get_context(request.chat_session_id, db)
+
+                    if context.has_context:
+                        enhanced_question = memory_agent.build_context_prompt(
+                            request.question,
+                            context
+                        )
+                        used_context = True
+                        logger.info(f"[Multi-Stream] Using conversational context: {context.context_window_size} previous queries")
+
+                        # Update session activity
+                        session.last_active_at = datetime.utcnow()
+                        await db.commit()
+
+            # Determine which connections to use
+            connections = []
+
+            if request.connection_ids:
+                # Use explicitly provided connection IDs
+                result = await db.execute(
+                    select(DatabaseConnection).where(
+                        DatabaseConnection.id.in_(request.connection_ids)
+                    )
+                )
+                connections = list(result.scalars().all())
+
+            elif request.chat_session_id and session:
+                # Get connections from chat session
+                if not session.active_connection_ids:
+                    yield f"event: error\ndata: {json.dumps({'error': 'Chat session has no active database connections'})}\n\n"
+                    return
+
+                # Ensure active_connection_ids is a list
+                connection_ids = session.active_connection_ids
+                if isinstance(connection_ids, int):
+                    connection_ids = [connection_ids]
+                elif not isinstance(connection_ids, list):
+                    connection_ids = list(connection_ids) if connection_ids else []
+
+                # Fetch connections
+                result = await db.execute(
+                    select(DatabaseConnection).where(
+                        DatabaseConnection.id.in_(connection_ids)
+                    )
+                )
+                connections = list(result.scalars().all())
+
+            else:
+                # Fall back to global active connection
+                result = await db.execute(
+                    select(DatabaseConnection).where(DatabaseConnection.is_active == True)
+                )
+                active_conn = result.scalar_one_or_none()
+
+                if not active_conn:
+                    yield f"event: error\ndata: {json.dumps({'error': 'No database connections specified and no global active connection found'})}\n\n"
+                    return
+
+                connections = [active_conn]
+
+            if not connections:
+                yield f"event: error\ndata: {json.dumps({'error': 'No valid database connections found'})}\n\n"
+                return
+
+            logger.info(f"[Multi-Stream] Processing query across {len(connections)} database(s): {[c.name for c in connections]}")
+
+            # Send initial status
+            status_data = {
+                'status': 'initializing',
+                'message': f'Preparing to query {len(connections)} database(s)...',
+                'database_count': len(connections),
+                'used_context': used_context
+            }
+            yield f"event: status\ndata: {json.dumps(status_data)}\n\n"
+
+            # Initialize multi-database handler
+            multi_db_handler = MultiDatabaseHandler()
+
+            # Build combined schema (needed for context, but each DB will use its own schema)
+            yield f"event: status\ndata: {json.dumps({'status': 'introspecting', 'message': 'Introspecting database schemas...'})}\n\n"
+
+            combined_schema_data = await multi_db_handler.build_combined_schema(connections)
+
+            # Create a shared queue for events from all databases
+            event_queue = asyncio.Queue()
+
+            # Track completion
+            completed_databases = []
+            total_rows = 0
+            total_execution_time = 0.0
+            start_time = datetime.utcnow()
+
+            # Function to stream from a single database
+            async def stream_single_database(connection: DatabaseConnection, db_index: int):
+                """Stream results from a single database"""
+                nonlocal total_rows, total_execution_time
+
+                try:
+                    # Send start event
+                    await event_queue.put({
+                        "event_type": "database_start",
+                        "connection_id": connection.id,
+                        "connection_name": connection.name,
+                        "database_type": connection.database_type,
+                        "database_index": db_index,
+                    })
+
+                    # Get individual schema for this database
+                    db_schema = None
+                    db_schema_dict = None
+                    for db_info in combined_schema_data.get("databases", []):
+                        if db_info.get("connection_id") == connection.id:
+                            db_schema_dict = {"tables": db_info.get("tables", {})}
+                            db_schema = multi_db_handler._format_single_db_schema(db_schema_dict)
+                            break
+
+                    # Connect to database
+                    async with UserDatabaseConnector.get_user_db_session(connection) as user_db:
+                        # Get schema if not found in combined
+                        if not db_schema:
+                            schema_inspector = SchemaInspector()
+                            schema_data = await schema_inspector.get_full_schema(user_db)
+                            db_schema = multi_db_handler._format_single_db_schema(schema_data)
+
+                        # Generate SQL for this specific database
+                        sql_result = await sql_generator.generate_sql(
+                            question=enhanced_question,
+                            schema=db_schema,
+                            database_type=connection.database_type,
+                            model=request.model or settings.OLLAMA_MODEL,
+                        )
+
+                        sql = sql_result.get("sql", "")
+                        logger.info(f"[Multi-Stream] DB '{connection.name}': Generated SQL: {sql[:100]}...")
+
+                        # Create individual QueryHistory record
+                        query_record = QueryHistory(
+                            natural_language_query=request.question,
+                            generated_sql=sql,
+                            sql_validated=True,
+                            executed=False,
+                            database_type=connection.database_type,
+                            model_used=request.model or settings.OLLAMA_MODEL,
+                        )
+                        db.add(query_record)
+                        await db.flush()
+                        await db.refresh(query_record)
+
+                        # Execute with streaming
+                        executor = SQLExecutor(
+                            max_rows=1000,
+                            timeout_seconds=30,
+                            allow_write=request.allow_write
+                        )
+
+                        db_total_rows = 0
+                        db_execution_time = 0.0
+
+                        # Stream results from executor
+                        async for event in executor.execute_query_streaming(
+                            session=user_db,
+                            sql=sql,
+                            batch_size=100,
+                        ):
+                            event_type = event.get("event_type")
+
+                            # Enrich event with database info
+                            enriched_event = {
+                                **event,
+                                "connection_id": connection.id,
+                                "connection_name": connection.name,
+                                "database_type": connection.database_type,
+                                "database_index": db_index,
+                                "query_id": query_record.id,
+                            }
+
+                            # Map event types to database-specific events
+                            if event_type == "metadata":
+                                enriched_event["event_type"] = "database_metadata"
+                            elif event_type == "data":
+                                enriched_event["event_type"] = "database_data"
+                                db_total_rows += len(event.get("data", []))
+                            elif event_type == "complete":
+                                enriched_event["event_type"] = "database_complete"
+                                db_execution_time = event.get("execution_time_ms", 0)
+
+                                # Update query history
+                                query_record.executed = True
+                                query_record.execution_time_ms = db_execution_time
+                                query_record.result_count = event.get("total_rows", 0)
+                                await db.commit()
+
+                            elif event_type == "error":
+                                enriched_event["event_type"] = "database_error"
+
+                                # Update query history with error
+                                query_record.executed = False
+                                query_record.error_message = event.get("error")
+                                await db.commit()
+
+                            await event_queue.put(enriched_event)
+
+                        # Track completion
+                        total_rows += db_total_rows
+                        total_execution_time += db_execution_time
+                        completed_databases.append({
+                            "connection_id": connection.id,
+                            "connection_name": connection.name,
+                            "rows": db_total_rows,
+                            "execution_time_ms": db_execution_time,
+                        })
+
+                except Exception as e:
+                    logger.error(f"[Multi-Stream] Error streaming from '{connection.name}': {e}", exc_info=True)
+                    await event_queue.put({
+                        "event_type": "database_error",
+                        "connection_id": connection.id,
+                        "connection_name": connection.name,
+                        "database_type": connection.database_type,
+                        "database_index": db_index,
+                        "error": str(e),
+                    })
+
+            # Start all database streams in parallel
+            tasks = [
+                asyncio.create_task(stream_single_database(conn, i))
+                for i, conn in enumerate(connections)
+            ]
+
+            # Track how many tasks are still running
+            pending_tasks = set(tasks)
+
+            # Send events as they arrive
+            while pending_tasks or not event_queue.empty():
+                try:
+                    # Wait for next event with timeout
+                    event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
+
+                    # Send event
+                    event_type = event.pop("event_type")
+                    yield f"event: {event_type}\ndata: {json.dumps(event)}\n\n"
+
+                except asyncio.TimeoutError:
+                    # Check if any tasks completed
+                    done, pending_tasks = await asyncio.wait(
+                        pending_tasks,
+                        timeout=0.01,
+                        return_when=asyncio.FIRST_COMPLETED
+                    )
+
+                    # If no tasks left and queue is empty, we're done
+                    if not pending_tasks and event_queue.empty():
+                        break
+
+            # Wait for all tasks to complete
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Calculate total time
+            end_time = datetime.utcnow()
+            total_time_ms = (end_time - start_time).total_seconds() * 1000
+
+            # Save overall query history
+            query_record = QueryHistory(
+                natural_language_query=request.question,
+                generated_sql=f"Multi-DB query across {len(connections)} databases",
+                sql_validated=True,
+                executed=len(completed_databases) > 0,
+                execution_time_ms=total_execution_time,
+                result_count=total_rows,
+                database_type=f"multi_db_{len(connections)}",
+                model_used=request.model or settings.OLLAMA_MODEL,
+            )
+            db.add(query_record)
+            await db.commit()
+            await db.refresh(query_record)
+
+            # Save chat messages if session provided
+            if request.chat_session_id:
+                user_message = ChatMessage(
+                    chat_session_id=request.chat_session_id,
+                    role="user",
+                    content=request.question,
+                )
+                db.add(user_message)
+
+                result_summary = f"Queried {len(connections)} database(s), returned {total_rows} rows"
+                assistant_message = ChatMessage(
+                    chat_session_id=request.chat_session_id,
+                    role="assistant",
+                    content=result_summary,
+                    query_history_id=query_record.id,
+                    databases_used=completed_databases,
+                )
+                db.add(assistant_message)
+                await db.commit()
+
+            # Send final completion event
+            completion_data = {
+                'query_id': query_record.id,
+                'total_databases': len(connections),
+                'successful_databases': len(completed_databases),
+                'total_rows': total_rows,
+                'total_execution_time_ms': round(total_time_ms, 2),
+                'databases': completed_databases
+            }
+            yield f"event: all_complete\ndata: {json.dumps(completion_data)}\n\n"
+
+        except Exception as e:
+            logger.error(f"[Multi-Stream] Critical error: {e}", exc_info=True)
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )

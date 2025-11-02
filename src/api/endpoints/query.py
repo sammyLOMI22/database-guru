@@ -636,3 +636,55 @@ async def get_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch statistics: {str(e)}"
         )
+
+
+@router.delete("/history/{query_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_query_history(
+    query_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Delete a query history record and all associated data
+
+    This will:
+    1. Remove references from chat messages (set query_history_id to NULL)
+    2. Delete the query history record
+    """
+    try:
+        # Check if query exists
+        result = await db.execute(
+            select(QueryHistory).where(QueryHistory.id == query_id)
+        )
+        query = result.scalar_one_or_none()
+
+        if not query:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Query with ID {query_id} not found"
+            )
+
+        # Update chat messages to remove reference (set query_history_id to NULL)
+        # This is necessary because the FK constraint has NO ACTION on delete
+        from src.database.models import ChatMessage
+        from sqlalchemy import update
+
+        await db.execute(
+            update(ChatMessage)
+            .where(ChatMessage.query_history_id == query_id)
+            .values(query_history_id=None)
+        )
+
+        # Now delete the query history record
+        await db.delete(query)
+        await db.commit()
+
+        logger.info(f"Deleted query history record {query_id}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete query history {query_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete query history: {str(e)}"
+        )
