@@ -401,9 +401,13 @@ export const feedbackAPI = {
   },
 
   // Get recent feedback
-  async getRecentFeedback(limit = 50, offset = 0): Promise<FeedbackResponse[]> {
+  async getRecentFeedback(limit = 50, offset = 0, appliedFilter?: 'all' | 'pending' | 'applied'): Promise<FeedbackResponse[]> {
     const { data } = await api.get<FeedbackResponse[]>('/api/feedback/recent', {
-      params: { limit, offset },
+      params: {
+        limit,
+        offset,
+        applied_filter: appliedFilter
+      },
     });
     return data;
   },
