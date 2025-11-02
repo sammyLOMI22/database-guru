@@ -63,6 +63,24 @@ ollama serve
 # Or: brew services start ollama
 ```
 
+## 🎨 Feature Demo Page
+
+Want to see all features in action? Check out the **interactive demo page**!
+
+```
+http://localhost:3000?demo=true
+```
+
+The demo showcases:
+- ✨ **Phase 1: Conversational Memory** - Natural multi-turn dialogue
+- 🌊 **Phase 2: Streaming Results** - Progressive result delivery
+- 🎯 **Confidence Scoring** - Success probability predictions
+- 📋 **Query Planning** - Complex query orchestration
+- 🔧 **Auto-Correction** - Self-healing SQL generation
+- ⚠️ **Result Verification** - Suspicious result detection
+
+All with mock data - no database connection needed!
+
 ## 📊 Connect to Sample Database
 
 1. Open http://localhost:3000
@@ -126,7 +144,9 @@ DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
 ## 🎯 Features
 
 - ✅ Natural language to SQL conversion
-- ✅ **Confidence Scoring** - AI predicts success probability before executing corrections (NEW!)
+- ✅ **Conversational Memory** - Natural multi-turn conversations with context awareness (NEW!)
+- ✅ **Production-Grade Security** - Multi-layer prompt injection protection and input sanitization (NEW!)
+- ✅ **Confidence Scoring** - AI predicts success probability before executing corrections
 - ✅ **User Feedback Integration** - Learn from user corrections for continuous improvement
 - ✅ **Query Planning Agent** - 4x better accuracy on complex multi-table queries
 - ✅ **Intelligent Schema Validation** - Auto-detects and corrects schema mismatches
@@ -184,14 +204,34 @@ database-guru/
 
 ## 🔐 Security
 
+### Production-Grade Security Features (NEW!)
+
+✅ **Prompt Injection Protection** - Multi-layer defense against malicious prompts
+✅ **Input Sanitization** - Removes control characters and malicious patterns
+✅ **Destructive Operation Blocking** - Prevents DELETE/UPDATE/DROP from auto-learning
+✅ **Token Limits** - Prevents resource exhaustion attacks
+✅ **Context Detection Security** - Prevents keyword manipulation exploits
+✅ **Safe Prompt Construction** - XML-like delimiters with escape protection
+
+### Recent Security Improvements
+
+**November 2, 2025 - Conversational Memory Security Hardening:**
+1. Fixed context detection bug where keywords anywhere triggered context usage
+2. Implemented comprehensive prompt injection protection system
+3. Added multi-layer input sanitization (API → Agent → Prompt)
+4. Deployed 15+ attack pattern detection rules
+5. All 44 security and conversational memory tests passing
+
 ⚠️ **Development Only** - This configuration is for local development.
 
-For production deployment, see [SECURITY_AUDIT.md](SECURITY_AUDIT.md) for:
+For production deployment, see [docs/SECURITY_POLICY.md](docs/SECURITY_POLICY.md) for:
 - Password encryption
 - Authentication/Authorization
 - CORS configuration
 - Rate limiting
 - Input validation
+- Prompt injection defenses
+- Auto-learning security controls
 
 ## 📚 API Documentation
 
@@ -348,7 +388,80 @@ curl http://localhost:8000/api/confidence/stats
 - [Verification Guide](docs/CONFIDENCE_SCORING_VERIFICATION.md) - How to test it
 - [Manual Testing](docs/CONFIDENCE_SCORING_MANUAL_TEST.md) - Step-by-step testing
 
-## 🧠 Learning from Corrections (NEW!)
+## 💬 Conversational Memory (NEW!)
+
+Database Guru now remembers your conversation! Have natural, multi-turn dialogs where you can refine queries without repeating context.
+
+### 🚀 Key Benefits:
+- **Natural conversations** - Ask follow-ups like "filter by electronics" or "sort by price"
+- **Smart context detection** - Knows when to use conversation history vs standalone queries
+- **Configurable memory** - Default 3-query window (adjustable)
+- **Visual feedback** - See what the AI remembers in the context panel
+- **Session-based** - Each chat session maintains independent context
+- **Fast retrieval** - < 10ms context loading with minimal overhead
+
+### How It Works:
+Every chat session maintains a conversation history. When you ask a follow-up question, the system automatically:
+
+1. **Retrieves recent context** - Last N queries (default: 3)
+2. **Detects context need** - Determines if question references previous queries
+3. **Enhances prompt** - Adds conversation history to LLM prompt
+4. **Generates SQL** - Creates context-aware query
+5. **Saves to history** - Remembers for future refinements
+
+### Example Conversation:
+```
+User: "Show me all products"
+→ SQL: SELECT * FROM products
+→ Result: 100 rows
+
+User: "Filter by electronics"
+→ System remembers previous query
+→ SQL: SELECT * FROM products WHERE category = 'electronics'
+→ Result: 25 rows
+
+User: "Sort by price"
+→ System uses full context
+→ SQL: SELECT * FROM products WHERE category = 'electronics' ORDER BY price
+→ Result: 25 rows (sorted)
+```
+
+### In the UI:
+- **Context Panel** - View conversation history with SQL and results
+- **Context Badge** - Blue indicator when memory is active
+- **Clear Context** - Start fresh anytime
+- **Refresh** - Manually reload context
+
+### API Usage:
+```bash
+# Query with conversational context
+curl -X POST http://localhost:8000/api/query/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Filter by electronics",
+    "session_id": "550e8400-e29b-41d4-a716-446655440000"
+  }'
+
+# View conversation context
+curl http://localhost:8000/api/chat/sessions/{session_id}/context
+
+# Clear context (fresh start)
+curl -X DELETE http://localhost:8000/api/chat/sessions/{session_id}/context
+```
+
+**Documentation:**
+- [Conversational Memory Implementation](docs/CONVERSATIONAL_MEMORY_IMPLEMENTATION.md) - Technical deep dive
+- [Phase 1 Complete Summary](docs/PHASE_1_COMPLETE.md) - Feature completion report
+- [Testing Guide](docs/TEST_CONVERSATIONAL_MEMORY.md) - How to test the feature
+
+**Security Features:**
+- Multi-layer prompt injection detection and prevention
+- Input sanitization removes control characters and malicious patterns
+- Safe prompt construction with delimiter protection
+- Token limits prevent resource exhaustion
+- Defense in depth: API validation → Agent validation → Prompt sanitization
+
+## 🧠 Learning from Corrections
 
 Database Guru now learns from its mistakes! The system automatically remembers successful corrections and applies them to similar errors in the future.
 

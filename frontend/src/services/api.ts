@@ -7,6 +7,7 @@ import type {
   SchemaResponse,
   QueryHistoryItem,
   HealthCheckResponse,
+  ConversationContextResponse,
 } from '../types/api';
 
 const api = axios.create({
@@ -43,6 +44,109 @@ export const queryAPI = {
   async processQuery(request: QueryRequest): Promise<QueryResponse> {
     const { data } = await api.post<QueryResponse>('/api/query/', request);
     return data;
+  },
+
+  // Stream query results with Server-Sent Events
+  async streamQuery(
+    request: QueryRequest,
+    callbacks: {
+      onStatus?: (status: { status: string; message: string }) => void;
+      onSqlGenerated?: (data: { sql: string; used_context: boolean }) => void;
+      onMetadata?: (data: { columns: string[] }) => void;
+      onData?: (data: { data: any[]; batch_number: number; rows_in_batch: number; rows_sent: number }) => void;
+      onComplete?: (data: { truncated: boolean; total_rows: number; execution_time_ms: number }) => void;
+      onError?: (error: string) => void;
+    }
+  ): Promise<void> {
+    const baseURL = (import.meta as any).env?.VITE_API_URL || '';
+    const url = `${baseURL}/api/query/stream`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        // Decode chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete events from buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        let currentEvent = '';
+        let currentData = '';
+
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            currentEvent = line.substring(6).trim();
+          } else if (line.startsWith('data:')) {
+            currentData = line.substring(5).trim();
+          } else if (line === '') {
+            // Empty line signals end of event
+            if (currentEvent && currentData) {
+              try {
+                const parsedData = JSON.parse(currentData);
+
+                // Route to appropriate callback
+                switch (currentEvent) {
+                  case 'status':
+                    callbacks.onStatus?.(parsedData);
+                    break;
+                  case 'sql_generated':
+                    callbacks.onSqlGenerated?.(parsedData);
+                    break;
+                  case 'metadata':
+                    callbacks.onMetadata?.(parsedData);
+                    break;
+                  case 'data':
+                    callbacks.onData?.(parsedData);
+                    break;
+                  case 'complete':
+                    callbacks.onComplete?.(parsedData);
+                    break;
+                  case 'error':
+                    callbacks.onError?.(parsedData.error || 'Unknown error');
+                    break;
+                }
+              } catch (parseError) {
+                console.error('[Stream] Error parsing event data:', parseError);
+              }
+
+              currentEvent = '';
+              currentData = '';
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[Stream] Error:', error);
+      callbacks.onError?.(error instanceof Error ? error.message : 'Stream error');
+      throw error;
+    }
   },
 
   // Get query history
@@ -216,6 +320,20 @@ export const chatAPI = {
     const { data } = await api.post<ChatMessage>(`/api/chat/sessions/${sessionId}/messages`, message);
     return data;
   },
+
+  // Get conversation context
+  async getContext(sessionId: string): Promise<ConversationContextResponse> {
+    const { data } = await api.get<ConversationContextResponse>(`/api/chat/sessions/${sessionId}/context`);
+    return data;
+  },
+
+  // Clear conversation context
+  async clearContext(sessionId: string): Promise<{ success: boolean; message: string }> {
+    const { data } = await api.delete<{ success: boolean; message: string }>(
+      `/api/chat/sessions/${sessionId}/context`
+    );
+    return data;
+  },
 };
 
 export const multiQueryAPI = {
@@ -283,9 +401,13 @@ export const feedbackAPI = {
   },
 
   // Get recent feedback
-  async getRecentFeedback(limit = 50, offset = 0): Promise<FeedbackResponse[]> {
+  async getRecentFeedback(limit = 50, offset = 0, appliedFilter?: 'all' | 'pending' | 'applied'): Promise<FeedbackResponse[]> {
     const { data } = await api.get<FeedbackResponse[]>('/api/feedback/recent', {
-      params: { limit, offset },
+      params: {
+        limit,
+        offset,
+        applied_filter: appliedFilter
+      },
     });
     return data;
   },

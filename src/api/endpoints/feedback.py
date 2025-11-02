@@ -1,6 +1,6 @@
 """User feedback endpoints for continuous learning"""
 import logging
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, desc, func
@@ -361,16 +361,22 @@ async def get_query_feedback(
 async def get_recent_feedback(
     limit: int = 50,
     offset: int = 0,
+    applied_filter: Optional[str] = None,  # "all", "pending", or "applied"
     db: AsyncSession = Depends(get_db)
 ):
-    """Get recent feedback submissions"""
+    """Get recent feedback submissions with optional filtering by applied status"""
     try:
-        stmt = (
-            select(UserFeedback)
-            .order_by(desc(UserFeedback.created_at))
-            .limit(limit)
-            .offset(offset)
-        )
+        stmt = select(UserFeedback).order_by(desc(UserFeedback.created_at))
+
+        # Apply filter based on applied_filter parameter
+        if applied_filter == "pending":
+            stmt = stmt.where(UserFeedback.applied_successfully == False)
+        elif applied_filter == "applied":
+            stmt = stmt.where(UserFeedback.applied_successfully == True)
+        # "all" or None means no filter
+
+        stmt = stmt.limit(limit).offset(offset)
+
         result = await db.execute(stmt)
         feedbacks = result.scalars().all()
 

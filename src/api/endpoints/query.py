@@ -1,9 +1,11 @@
 """Query endpoints for Database Guru"""
 import logging
 import hashlib
+import json
 from datetime import datetime
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,9 +18,10 @@ from src.models.schemas import (
     StatsResponse,
 )
 from src.api.dependencies import get_db, get_cache, get_sql_generator, get_settings
-from src.database.models import QueryHistory
+from src.database.models import QueryHistory, ChatSession, ChatMessage
 from src.llm.sql_generator import SQLGenerator
 from src.llm.self_correcting_agent import SelfCorrectingSQLAgent
+from src.llm.conversational_memory_agent import get_memory_agent
 from src.cache.redis_client import RedisCache
 from src.config.settings import Settings
 from src.core.executor import SQLExecutor
@@ -72,6 +75,44 @@ async def process_query(
         if not sql_generator.ollama.client:
             await sql_generator.initialize()
 
+        # Handle conversational context if session_id provided
+        conversation_context = None
+        enhanced_question = request.question
+        used_context = False
+
+        if request.session_id:
+            # Verify session exists
+            session_result = await db.execute(
+                select(ChatSession).where(ChatSession.id == request.session_id)
+            )
+            session = session_result.scalar_one_or_none()
+
+            if not session:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Chat session {request.session_id} not found"
+                )
+
+            # Get conversational memory agent
+            memory_agent = get_memory_agent()
+
+            # Retrieve conversation context
+            context = await memory_agent.get_context(request.session_id, db)
+
+            if context.has_context:
+                # Build context-aware prompt
+                enhanced_question = memory_agent.build_context_prompt(
+                    request.question,
+                    context
+                )
+                conversation_context = memory_agent.format_context_for_display(context)
+                used_context = True
+                logger.info(f"Using conversational context: {context.context_window_size} previous queries")
+
+                # Update session last_active_at
+                session.last_active_at = datetime.utcnow()
+                await db.commit()
+
         # Get active connection to determine database type
         from src.database.models import DatabaseConnection
         from src.core.user_db_connector import UserDatabaseConnector
@@ -111,8 +152,9 @@ async def process_query(
             )
 
             # Generate and execute with automatic retry
+            # Use enhanced_question if conversational context is available
             agent_result = await self_correcting_agent.generate_and_execute_with_retry(
-                question=request.question,
+                question=enhanced_question,
                 schema=schema,
                 session=user_db,
                 database_type=database_type,
@@ -171,7 +213,7 @@ async def process_query(
 
         # Save to query history
         query_record = QueryHistory(
-            natural_language_query=request.question,
+            natural_language_query=request.question,  # Save original question, not enhanced
             generated_sql=sql,
             sql_validated=is_valid,
             executed=execution_result is not None and execution_result.get("success", False),
@@ -184,6 +226,44 @@ async def process_query(
         db.add(query_record)
         await db.commit()
         await db.refresh(query_record)
+
+        # Save chat messages if session_id provided
+        if request.session_id:
+            # Save user message
+            user_message = ChatMessage(
+                chat_session_id=request.session_id,
+                role="user",
+                content=request.question,
+                query_history_id=query_record.id,
+                databases_used=[{
+                    "conn_id": active_connection.id,
+                    "name": active_connection.name,
+                    "database_type": database_type
+                }]
+            )
+            db.add(user_message)
+
+            # Save assistant message with SQL
+            assistant_content = f"```sql\n{sql}\n```"
+            if execution_result and execution_result.get("success"):
+                assistant_content += f"\n\nReturned {execution_result.get('row_count', 0)} rows"
+            elif not agent_result["success"]:
+                assistant_content += f"\n\n⚠️ Error: {agent_result.get('error', 'Unknown error')}"
+
+            assistant_message = ChatMessage(
+                chat_session_id=request.session_id,
+                role="assistant",
+                content=assistant_content,
+                query_history_id=query_record.id,
+                databases_used=[{
+                    "conn_id": active_connection.id,
+                    "name": active_connection.name,
+                    "database_type": database_type
+                }]
+            )
+            db.add(assistant_message)
+            await db.commit()
+            logger.info(f"Saved conversation to session {request.session_id}")
 
         # Build response
         response_data = {
@@ -206,6 +286,8 @@ async def process_query(
             "total_attempts": agent_result.get("total_attempts", 1),
             "verification_warnings": agent_result.get("verification_warnings", []),
             "used_planning": agent_result.get("used_planning", False),
+            "conversation_context": conversation_context,
+            "used_context": used_context,
         }
 
         # Cache the result
@@ -220,6 +302,193 @@ async def process_query(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process query: {str(e)}"
         )
+
+
+@router.post("/stream")
+async def stream_query_results(
+    request: QueryRequest,
+    db: AsyncSession = Depends(get_db),
+    sql_generator: SQLGenerator = Depends(get_sql_generator),
+    settings: Settings = Depends(get_settings),
+):
+    """
+    Stream query results using Server-Sent Events (SSE)
+
+    This endpoint:
+    1. Generates SQL using the same logic as regular query endpoint
+    2. Executes query with streaming enabled
+    3. Yields results in batches for progressive rendering
+    4. Sends metadata, data batches, and completion events
+
+    SSE Event Types:
+    - metadata: Column names and query info
+    - data: Batch of rows
+    - complete: Final event with statistics
+    - error: Error occurred during processing
+    """
+
+    async def event_generator():
+        """Generate Server-Sent Events"""
+        try:
+            # Initialize SQL generator
+            if not sql_generator.ollama.client:
+                await sql_generator.initialize()
+
+            # Handle conversational context if session_id provided
+            enhanced_question = request.question
+            used_context = False
+
+            if request.session_id:
+                # Verify session exists
+                session_result = await db.execute(
+                    select(ChatSession).where(ChatSession.id == request.session_id)
+                )
+                session = session_result.scalar_one_or_none()
+
+                if session:
+                    # Get conversational memory agent
+                    memory_agent = get_memory_agent()
+                    context = await memory_agent.get_context(request.session_id, db)
+
+                    if context.has_context:
+                        enhanced_question = memory_agent.build_context_prompt(
+                            request.question,
+                            context
+                        )
+                        used_context = True
+                        logger.info(f"[Stream] Using conversational context: {context.context_window_size} previous queries")
+
+                        # Update session activity
+                        session.last_active_at = datetime.utcnow()
+                        await db.commit()
+
+            # Get active connection
+            from src.database.models import DatabaseConnection
+            from src.core.user_db_connector import UserDatabaseConnector
+
+            result_conn = await db.execute(
+                select(DatabaseConnection).where(DatabaseConnection.is_active == True)
+            )
+            active_connection = result_conn.scalar_one_or_none()
+
+            if not active_connection:
+                # Send error event
+                yield f"event: error\ndata: {json.dumps({'error': 'No active database connection'})}\n\n"
+                return
+
+            database_type = active_connection.database_type
+            logger.info(f"[Stream] Using connection '{active_connection.name}' ({database_type})")
+
+            # Send initial status event
+            yield f"event: status\ndata: {json.dumps({'status': 'generating_sql', 'message': 'Generating SQL query...'})}\n\n"
+
+            # Connect to user's database
+            async with UserDatabaseConnector.get_user_db_session(active_connection) as user_db:
+                # Get schema
+                schema_inspector = SchemaInspector()
+                if request.schema:
+                    schema = request.schema
+                else:
+                    schema_data = await schema_inspector.get_full_schema(user_db)
+                    schema = schema_inspector.format_schema_for_llm(schema_data)
+
+                # Generate SQL (without execution yet)
+                sql = await sql_generator.generate_sql(
+                    question=enhanced_question,
+                    schema=schema,
+                    database_type=database_type,
+                    model=request.model or settings.OLLAMA_MODEL,
+                )
+
+                logger.info(f"[Stream] Generated SQL: {sql[:100]}...")
+
+                # Send SQL generated event
+                yield f"event: sql_generated\ndata: {json.dumps({'sql': sql, 'used_context': used_context})}\n\n"
+
+                # Save to query history (before execution)
+                query_record = QueryHistory(
+                    natural_language_query=request.question,
+                    generated_sql=sql,
+                    sql_validated=True,
+                    executed=False,
+                    database_type=database_type,
+                    model_used=request.model or settings.OLLAMA_MODEL,
+                )
+                db.add(query_record)
+                await db.commit()
+                await db.refresh(query_record)
+
+                # Save chat message if session provided
+                if request.session_id:
+                    user_message = ChatMessage(
+                        chat_session_id=request.session_id,
+                        role="user",
+                        content=request.question,
+                        query_history_id=query_record.id,
+                        databases_used=[{
+                            "conn_id": active_connection.id,
+                            "name": active_connection.name,
+                            "database_type": database_type
+                        }]
+                    )
+                    db.add(user_message)
+                    await db.commit()
+
+                # Send execution starting event
+                yield f"event: status\ndata: {json.dumps({'status': 'executing', 'message': 'Executing query...'})}\n\n"
+
+                # Execute with streaming
+                executor = SQLExecutor(
+                    max_rows=1000,
+                    timeout_seconds=30,
+                    allow_write=request.allow_write
+                )
+
+                # Stream results
+                async for event in executor.execute_query_streaming(
+                    session=user_db,
+                    sql=sql,
+                    batch_size=100,
+                ):
+                    event_type = event.get("event_type")
+
+                    # Forward executor events as SSE
+                    if event_type == "metadata":
+                        yield f"event: metadata\ndata: {json.dumps(event)}\n\n"
+
+                    elif event_type == "data":
+                        yield f"event: data\ndata: {json.dumps(event)}\n\n"
+
+                    elif event_type == "complete":
+                        # Update query history with results
+                        query_record.executed = True
+                        query_record.execution_time_ms = event.get("execution_time_ms")
+                        query_record.result_count = event.get("total_rows", 0)
+                        await db.commit()
+
+                        yield f"event: complete\ndata: {json.dumps(event)}\n\n"
+
+                    elif event_type == "error":
+                        # Update query history with error
+                        query_record.executed = False
+                        query_record.error_message = event.get("error")
+                        await db.commit()
+
+                        yield f"event: error\ndata: {json.dumps(event)}\n\n"
+
+        except Exception as e:
+            logger.error(f"[Stream] Error: {e}", exc_info=True)
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
 
 
 @router.post("/explain", response_model=ExplainResponse)
@@ -366,4 +635,56 @@ async def get_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch statistics: {str(e)}"
+        )
+
+
+@router.delete("/history/{query_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_query_history(
+    query_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Delete a query history record and all associated data
+
+    This will:
+    1. Remove references from chat messages (set query_history_id to NULL)
+    2. Delete the query history record
+    """
+    try:
+        # Check if query exists
+        result = await db.execute(
+            select(QueryHistory).where(QueryHistory.id == query_id)
+        )
+        query = result.scalar_one_or_none()
+
+        if not query:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Query with ID {query_id} not found"
+            )
+
+        # Update chat messages to remove reference (set query_history_id to NULL)
+        # This is necessary because the FK constraint has NO ACTION on delete
+        from src.database.models import ChatMessage
+        from sqlalchemy import update
+
+        await db.execute(
+            update(ChatMessage)
+            .where(ChatMessage.query_history_id == query_id)
+            .values(query_history_id=None)
+        )
+
+        # Now delete the query history record
+        await db.delete(query)
+        await db.commit()
+
+        logger.info(f"Deleted query history record {query_id}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete query history {query_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete query history: {str(e)}"
         )

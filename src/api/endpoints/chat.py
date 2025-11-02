@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 from src.api.dependencies import get_db
 from src.database.models import ChatSession, ChatMessage, DatabaseConnection
 
+from src.llm.conversational_memory_agent import get_memory_agent
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -436,7 +438,7 @@ async def delete_chat_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a chat session"""
+    """Delete a chat session and all associated messages"""
     try:
         result = await db.execute(
             select(ChatSession).where(ChatSession.id == session_id)
@@ -449,8 +451,16 @@ async def delete_chat_session(
                 detail=f"Chat session {session_id} not found"
             )
 
+        # Delete all messages first (to avoid FK constraint issues)
+        await db.execute(
+            delete(ChatMessage).where(ChatMessage.chat_session_id == session_id)
+        )
+
+        # Now delete the session
         await db.delete(session)
         await db.commit()
+
+        logger.info(f"Deleted chat session {session_id} and all associated messages")
 
     except HTTPException:
         raise
@@ -569,4 +579,95 @@ async def create_chat_message(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create chat message: {str(e)}"
+        )
+
+
+# Conversational Memory Endpoints
+@router.get("/sessions/{session_id}/context")
+async def get_conversation_context(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get conversational context for a chat session
+
+    Returns the recent queries that will be used for context-aware generation.
+    """
+    try:
+        # Verify session exists
+        session_result = await db.execute(
+            select(ChatSession).where(ChatSession.id == session_id)
+        )
+        session = session_result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat session {session_id} not found"
+            )
+
+        # Get memory agent and retrieve context
+        memory_agent = get_memory_agent()
+        context = await memory_agent.get_context(session_id, db)
+
+        return {
+            "session_id": session_id,
+            "context": memory_agent.format_context_for_display(context),
+            "window_size": context.context_window_size
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get conversation context: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get conversation context: {str(e)}"
+        )
+
+
+@router.delete("/sessions/{session_id}/context", status_code=status.HTTP_200_OK)
+async def clear_conversation_context(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Clear conversational context for a chat session
+
+    This deletes all messages in the session, providing a fresh start.
+    The session itself is preserved.
+    """
+    try:
+        # Verify session exists
+        session_result = await db.execute(
+            select(ChatSession).where(ChatSession.id == session_id)
+        )
+        session = session_result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat session {session_id} not found"
+            )
+
+        # Delete all messages in the session
+        await db.execute(
+            delete(ChatMessage).where(ChatMessage.chat_session_id == session_id)
+        )
+        await db.commit()
+
+        logger.info(f"Cleared conversation context for session {session_id}")
+
+        return {
+            "success": True,
+            "message": f"Cleared conversation context for session {session_id}"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to clear conversation context: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear conversation context: {str(e)}"
         )

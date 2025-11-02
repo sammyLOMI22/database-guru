@@ -7,6 +7,7 @@ export interface QueryRequest {
   model?: string;
   allow_write?: boolean;
   use_cache?: boolean;
+  session_id?: string;
 }
 
 // Option 2: Observability Types
@@ -95,6 +96,26 @@ export interface QueryPlan {
   aggregations_count: number;
 }
 
+// Conversational Memory Types
+export interface ConversationMessage {
+  question: string;
+  sql: string;
+  success: boolean;
+  timestamp?: string;
+}
+
+export interface ConversationContext {
+  has_context: boolean;
+  window_size: number;
+  messages: ConversationMessage[];
+}
+
+export interface ConversationContextResponse {
+  session_id: string;
+  context: ConversationContext;
+  window_size: number;
+}
+
 export interface QueryResponse {
   query_id: number;
   question: string;
@@ -115,6 +136,9 @@ export interface QueryResponse {
   total_attempts?: number;
   verification_warnings?: string[];
   used_planning?: boolean;
+  // Conversational Memory fields
+  conversation_context?: ConversationContext | null;
+  used_context?: boolean;
 }
 
 export interface Model {

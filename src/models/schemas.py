@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field, validator, field_validator
 
+from src.security.prompt_sanitizer import sanitize_user_input, detect_injection_attempt
+
 
 class QueryRequest(BaseModel):
     """Request model for natural language query"""
@@ -35,12 +37,34 @@ class QueryRequest(BaseModel):
         default=True,
         description="Use cached results if available",
     )
+    session_id: Optional[str] = Field(
+        default=None,
+        description="Chat session ID for conversational context (optional)",
+        example="550e8400-e29b-41d4-a716-446655440000"
+    )
 
     @validator('question')
     def question_not_empty(cls, v):
+        """Validate and sanitize user question to prevent prompt injection"""
         if not v or not v.strip():
             raise ValueError('Question cannot be empty')
-        return v.strip()
+
+        # Sanitize input (removes control characters, normalizes whitespace)
+        sanitized = sanitize_user_input(v)
+
+        if not sanitized:
+            raise ValueError('Question cannot be empty after sanitization')
+
+        # Detect potential injection attempts
+        is_suspicious, reason = detect_injection_attempt(sanitized)
+        if is_suspicious:
+            # Log but don't block - the sanitizer will clean it up
+            # We log for security monitoring
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Suspicious input detected in question: {reason}")
+
+        return sanitized
 
 
 class AgentTraceStep(BaseModel):
@@ -138,6 +162,14 @@ class QueryResponse(BaseModel):
     used_planning: bool = Field(
         default=False,
         description="Whether query planning was used"
+    )
+    conversation_context: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Conversation context used for this query"
+    )
+    used_context: bool = Field(
+        default=False,
+        description="Whether conversational memory was used"
     )
 
     class Config:

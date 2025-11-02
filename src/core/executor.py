@@ -362,6 +362,262 @@ class SQLExecutor:
 
         return result
 
+    async def execute_query_streaming(
+        self,
+        session: Union[AsyncSession, Session],
+        sql: str,
+        params: Optional[Dict[str, Any]] = None,
+        batch_size: int = 100,
+    ):
+        """
+        Execute SQL query and stream results in batches (async generator)
+
+        Args:
+            session: Database session (async or sync)
+            sql: SQL query to execute
+            params: Optional query parameters
+            batch_size: Number of rows per batch
+
+        Yields:
+            Dictionary with:
+                - event_type: 'metadata' | 'data' | 'complete' | 'error'
+                - columns: Column names (only in metadata event)
+                - data: Batch of rows (only in data event)
+                - batch_number: Current batch number
+                - rows_sent: Total rows sent so far
+                - execution_time_ms: Time elapsed (in complete event)
+                - error: Error message (only in error event)
+        """
+        start_time = datetime.utcnow()
+
+        try:
+            # Check if this is a sync session (e.g., DuckDB)
+            if isinstance(session, Session):
+                async for event in self._stream_with_sync_session(session, sql, params, batch_size, start_time):
+                    yield event
+            else:
+                # Stream with async sessions
+                # Note: Timeout handling is done per-batch in _stream_with_async_session
+                async for event in self._stream_with_async_session(session, sql, params, batch_size, start_time):
+                    yield event
+
+        except Exception as e:
+            logger.error(f"Unexpected error in streaming query: {e}", exc_info=True)
+            yield {
+                "event_type": "error",
+                "error": f"Execution error: {str(e)}",
+                "execution_time_ms": (datetime.utcnow() - start_time).total_seconds() * 1000,
+            }
+
+    async def _stream_with_async_session(
+        self,
+        session: AsyncSession,
+        sql: str,
+        params: Optional[Dict[str, Any]],
+        batch_size: int,
+        start_time: datetime,
+    ):
+        """Stream results from async session"""
+        stmt = text(sql)
+        result = await session.execute(stmt, params or {})
+
+        if not result.returns_rows:
+            # Non-SELECT query
+            await session.commit()
+            yield {
+                "event_type": "complete",
+                "rows_affected": result.rowcount,
+                "execution_time_ms": (datetime.utcnow() - start_time).total_seconds() * 1000,
+            }
+            return
+
+        # Send metadata first
+        columns = list(result.keys())
+        yield {
+            "event_type": "metadata",
+            "columns": columns,
+        }
+
+        # Stream data in batches
+        batch_number = 0
+        total_rows_sent = 0
+
+        while True:
+            # Fetch next batch
+            rows = result.fetchmany(batch_size)
+
+            if not rows:
+                # No more data
+                break
+
+            batch_number += 1
+
+            # Check if we've exceeded max_rows
+            remaining_capacity = self.max_rows - total_rows_sent
+            if remaining_capacity <= 0:
+                # Send truncation warning and stop
+                yield {
+                    "event_type": "complete",
+                    "truncated": True,
+                    "total_rows": total_rows_sent,
+                    "execution_time_ms": (datetime.utcnow() - start_time).total_seconds() * 1000,
+                }
+                return
+
+            # Truncate batch if needed
+            if len(rows) > remaining_capacity:
+                rows = rows[:remaining_capacity]
+                truncated = True
+            else:
+                truncated = False
+
+            # Convert rows to dictionaries
+            data = [
+                {col: self._serialize_value(row[i]) for i, col in enumerate(columns)}
+                for row in rows
+            ]
+
+            total_rows_sent += len(data)
+
+            # Send batch
+            yield {
+                "event_type": "data",
+                "data": data,
+                "batch_number": batch_number,
+                "rows_in_batch": len(data),
+                "rows_sent": total_rows_sent,
+            }
+
+            if truncated:
+                # Reached max_rows limit
+                yield {
+                    "event_type": "complete",
+                    "truncated": True,
+                    "total_rows": total_rows_sent,
+                    "execution_time_ms": (datetime.utcnow() - start_time).total_seconds() * 1000,
+                }
+                return
+
+        # All data sent
+        execution_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+        yield {
+            "event_type": "complete",
+            "truncated": False,
+            "total_rows": total_rows_sent,
+            "execution_time_ms": execution_time_ms,
+        }
+
+    async def _stream_with_sync_session(
+        self,
+        session: Session,
+        sql: str,
+        params: Optional[Dict[str, Any]],
+        batch_size: int,
+        start_time: datetime,
+    ):
+        """Stream results from sync session (e.g., DuckDB) in thread pool"""
+        # Execute in thread pool to avoid blocking
+        def sync_execute():
+            stmt = text(sql)
+            result = session.execute(stmt, params or {})
+
+            if not result.returns_rows:
+                session.commit()
+                return {
+                    "type": "non_select",
+                    "rowcount": result.rowcount,
+                }
+
+            return {
+                "type": "select",
+                "result": result,
+                "columns": list(result.keys()),
+            }
+
+        exec_result = await asyncio.get_event_loop().run_in_executor(None, sync_execute)
+
+        if exec_result["type"] == "non_select":
+            yield {
+                "event_type": "complete",
+                "rows_affected": exec_result["rowcount"],
+                "execution_time_ms": (datetime.utcnow() - start_time).total_seconds() * 1000,
+            }
+            return
+
+        # Send metadata
+        columns = exec_result["columns"]
+        yield {
+            "event_type": "metadata",
+            "columns": columns,
+        }
+
+        # Stream batches
+        result = exec_result["result"]
+        batch_number = 0
+        total_rows_sent = 0
+
+        while True:
+            # Fetch batch in thread pool
+            def fetch_batch():
+                return result.fetchmany(batch_size)
+
+            rows = await asyncio.get_event_loop().run_in_executor(None, fetch_batch)
+
+            if not rows:
+                break
+
+            batch_number += 1
+
+            # Check max_rows limit
+            remaining_capacity = self.max_rows - total_rows_sent
+            if remaining_capacity <= 0:
+                yield {
+                    "event_type": "complete",
+                    "truncated": True,
+                    "total_rows": total_rows_sent,
+                    "execution_time_ms": (datetime.utcnow() - start_time).total_seconds() * 1000,
+                }
+                return
+
+            if len(rows) > remaining_capacity:
+                rows = rows[:remaining_capacity]
+                truncated = True
+            else:
+                truncated = False
+
+            # Convert to dicts
+            data = [
+                {col: self._serialize_value(row[i]) for i, col in enumerate(columns)}
+                for row in rows
+            ]
+
+            total_rows_sent += len(data)
+
+            yield {
+                "event_type": "data",
+                "data": data,
+                "batch_number": batch_number,
+                "rows_in_batch": len(data),
+                "rows_sent": total_rows_sent,
+            }
+
+            if truncated:
+                yield {
+                    "event_type": "complete",
+                    "truncated": True,
+                    "total_rows": total_rows_sent,
+                    "execution_time_ms": (datetime.utcnow() - start_time).total_seconds() * 1000,
+                }
+                return
+
+        # Complete
+        yield {
+            "event_type": "complete",
+            "truncated": False,
+            "total_rows": total_rows_sent,
+            "execution_time_ms": (datetime.utcnow() - start_time).total_seconds() * 1000,
+        }
+
     def validate_query_safety(self, sql: str) -> Tuple[bool, Optional[str]]:
         """
         Validate query for dangerous operations
