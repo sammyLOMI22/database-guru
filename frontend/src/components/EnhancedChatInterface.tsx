@@ -4,6 +4,7 @@ import QueryInput from './QueryInput';
 import ChatSessionSelector from './ChatSessionSelector';
 import Sidebar from './Sidebar';
 import MultiDatabaseResults from './MultiDatabaseResults';
+import ConversationContextPanel from './ConversationContextPanel';
 import { useMultiQuery } from '../hooks/useMultiQuery';
 import { useModels } from '../hooks/useModels';
 import type { ChatSession, MultiDatabaseQueryResponse } from '../types/api';
@@ -27,6 +28,8 @@ export default function EnhancedChatInterface() {
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [showSessionSelector, setShowSessionSelector] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showContextPanel, setShowContextPanel] = useState(true);
+  const [hasContext, setHasContext] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { loading, executeQuery } = useMultiQuery();
@@ -187,10 +190,30 @@ export default function EnhancedChatInterface() {
               ))}
             </div>
           )}
+
+          {/* Context awareness indicator */}
+          {hasContext && (
+            <div className="mt-2 flex items-center text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              <span>Conversational memory active - I'll remember your queries!</span>
+            </div>
+          )}
         </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+          {/* Conversation Context Panel */}
+          {currentSession && showContextPanel && (
+            <div className="mb-4">
+              <ConversationContextPanel
+                sessionId={currentSession?.id || null}
+                onContextUpdate={setHasContext}
+              />
+            </div>
+          )}
+
           {messages.map((message) => (
             <div key={message.id} className="flex items-start space-x-3">
               {/* Avatar */}

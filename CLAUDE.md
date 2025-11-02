@@ -88,32 +88,40 @@ The system uses a multi-agent architecture with specialized agents that work tog
    - Uses `AgentTrace` for execution transparency
    - Key method: `process_query()` - main entry point
 
-2. **Query Planning Agent** (`src/llm/query_planning_agent.py`)
+2. **Conversational Memory Agent** (`src/llm/conversational_memory_agent.py`)
+   - Manages conversation context for multi-turn dialogs
+   - Retrieves recent queries from chat session history
+   - Builds context-aware prompts with conversation history
+   - Smart detection of contextual vs standalone questions
+   - Default 3-query window (configurable)
+   - Key methods: `get_context()`, `build_context_prompt()`, `should_use_context()`
+
+3. **Query Planning Agent** (`src/llm/query_planning_agent.py`)
    - Chain-of-thought reasoning for complex queries
    - Creates structured execution plans before SQL generation
    - Validates schema references and suggests corrections
    - 4x better accuracy on multi-table queries
    - Key method: `create_plan()` - generates `QueryPlan` dataclass
 
-3. **Confidence Scorer** (`src/llm/confidence_scorer.py`)
+4. **Confidence Scorer** (`src/llm/confidence_scorer.py`)
    - Predicts success probability of SQL corrections (0.0-1.0)
    - 5 weighted factors: error type (30%), schema match (25%), historical success (20%), complexity (15%), similarity (10%)
    - Auto-skips corrections below 20% confidence
    - Key method: `score_correction()` - returns `ConfidenceScore` dataclass
 
-4. **Result Verification Agent** (`src/llm/result_verification_agent.py`)
+5. **Result Verification Agent** (`src/llm/result_verification_agent.py`)
    - Validates query results for logical correctness
    - Detects empty results, NULL values, extreme values, suspicious counts
    - Triggers re-generation on high-confidence issues
    - Key method: `verify_result()` - returns `VerificationResult`
 
-5. **Correction Learner** (`src/llm/correction_learner.py`)
+6. **Correction Learner** (`src/llm/correction_learner.py`)
    - Learns from successful corrections for instant future fixes
    - 50% faster recovery on repeated errors
    - Pattern-based matching with fuzzy similarity
    - Key methods: `learn_correction()`, `try_apply_learned_fix()`
 
-6. **Schema-Aware Fixer** (`src/llm/schema_aware_fixer.py`)
+7. **Schema-Aware Fixer** (`src/llm/schema_aware_fixer.py`)
    - Fast typo correction without LLM calls (200x faster)
    - Uses fuzzy matching against actual schema
    - Handles table names, column names, and common SQL errors
@@ -122,11 +130,14 @@ The system uses a multi-agent architecture with specialized agents that work tog
 ### Data Flow
 
 ```
-Natural Language Query
+Natural Language Query (with optional session_id)
+  ↓
+Conversational Memory Agent → Retrieves conversation history (if session_id provided)
+  ↓                          → Builds context-aware prompt
   ↓
 Query Planning Agent → Creates structured plan with schema validation
   ↓
-SQL Generator → Generates SQL from validated plan
+SQL Generator → Generates SQL from validated plan (with context if applicable)
   ↓
 Confidence Scorer → Predicts success probability
   ↓
@@ -137,6 +148,7 @@ Result Verification Agent → Validates logical correctness
 [If Error] → Schema-Aware Fixer (instant) → Correction Learner (learned patterns) → Self-Correcting Agent (LLM retry)
   ↓
 [If Success] → Learn correction pattern for future
+  ↓                          → Save to chat history (if session_id provided)
   ↓
 Return Results
 ```
@@ -189,10 +201,10 @@ The system maintains its own metadata database (`database_guru.db`):
 ### API Structure
 
 Endpoints organized by domain (`src/api/endpoints/`):
-- `query.py` - Main query processing endpoint
+- `query.py` - Main query processing endpoint (supports session_id for conversational context)
 - `multi_db_query.py` - Multi-database query handling
 - `connections.py` - Database connection management
-- `chat.py` - Chat session management
+- `chat.py` - Chat session management + conversation context endpoints (GET/DELETE /sessions/{id}/context)
 - `feedback.py` - User feedback submission and stats
 - `learned_corrections.py` - View learned patterns
 - `result_verification.py` - Manual result verification
@@ -233,10 +245,10 @@ class MockOllamaClient:
 ### Frontend Component Structure
 
 Located in `frontend/src/`:
-- `components/` - React components (QueryInterface, ConnectionManager, ConfidenceDisplay, etc.)
+- `components/` - React components (QueryInterface, ConnectionManager, ConfidenceDisplay, ConversationContextPanel, etc.)
 - `services/` - API client (`api.ts`) using axios
 - `hooks/` - Custom React hooks (`useQuery`, `useConnections`, etc.)
-- `types/` - TypeScript type definitions
+- `types/` - TypeScript type definitions (includes ConversationContext types)
 - Uses TanStack Query for server state management
 - Zustand for client state (if used)
 
@@ -296,6 +308,8 @@ Settings managed via Pydantic in `src/config/settings.py`:
 
 - **Main application entry**: `src/main.py:54` - FastAPI app initialization
 - **Query processing flow**: `src/api/endpoints/query.py:32` - `/api/query/` endpoint
+- **Conversational memory**: `src/llm/conversational_memory_agent.py` - Context retrieval and management
+- **Context endpoints**: `src/api/endpoints/chat.py` - GET/DELETE context endpoints
 - **Self-correction logic**: `src/llm/self_correcting_agent.py:261` - `process_query()` method
 - **Confidence scoring**: `src/llm/confidence_scorer.py:147` - `score_correction()` method
 - **Multi-DB queries**: `src/core/multi_db_handler.py:96` - `execute_multi_db_query()` method
@@ -305,6 +319,9 @@ Settings managed via Pydantic in `src/config/settings.py`:
 ## Documentation
 
 Key docs in `docs/`:
+- `CONVERSATIONAL_MEMORY_IMPLEMENTATION.md` - Conversational memory technical guide (NEW!)
+- `PHASE_1_COMPLETE.md` - Conversational memory completion summary (NEW!)
+- `TEST_CONVERSATIONAL_MEMORY.md` - Conversational memory testing guide (NEW!)
 - `QUERY_PLANNING_AGENT.md` - Query planning system deep dive
 - `CONFIDENCE_SCORING.md` - Confidence scoring system
 - `LEARNING_FROM_CORRECTIONS.md` - Correction learning system
