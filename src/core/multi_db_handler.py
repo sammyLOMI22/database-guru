@@ -247,6 +247,80 @@ class MultiDatabaseHandler:
                 "execution_time_ms": 0,
             }
 
+    async def _execute_single_query_task(
+        self,
+        connection: DatabaseConnection,
+        question: str,
+        sql: str,
+        schema: str,
+        sql_generator: SQLGenerator,
+        combined_schema_data: Dict[str, Any],
+        allow_write: bool = False,
+        model_used: str = "unknown",
+    ) -> Dict[str, Any]:
+        """
+        Internal helper method to execute a single database query with self-correction
+        Used for parallel execution in multi-database queries
+
+        Args:
+            connection: Database connection
+            question: Natural language question
+            sql: Pre-generated SQL (can be empty for agent to generate)
+            schema: Schema for this database
+            sql_generator: SQL generator instance
+            combined_schema_data: Full schema data for all databases
+            allow_write: Allow write operations
+            model_used: LLM model name for tracking
+
+        Returns:
+            Dict with execution results and metadata (NOT including QueryHistory record)
+        """
+        try:
+            # Get individual schema for this database
+            db_schema = None
+            db_schema_dict = None
+            for db_info in combined_schema_data.get("databases", []):
+                if db_info.get("connection_id") == connection.id:
+                    # Store schema dict for location normalization
+                    db_schema_dict = {"tables": db_info.get("tables", {})}
+                    # Format schema for this specific database
+                    db_schema = self._format_single_db_schema(db_schema_dict)
+                    break
+
+            # Execute query with self-correction
+            exec_result = await self.execute_query_with_self_correction(
+                connection=connection,
+                question=question,
+                schema=db_schema or schema,
+                sql_generator=sql_generator,
+                initial_sql=sql,
+                allow_write=allow_write,
+                schema_dict=db_schema_dict,
+            )
+
+            # Return result with connection metadata
+            return {
+                **exec_result,
+                "connection": connection,  # Include connection for later QueryHistory creation
+                "model_used": model_used,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to execute query on database '{connection.name}': {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "database_name": connection.name,
+                "connection_id": connection.id,
+                "connection": connection,
+                "model_used": model_used,
+                "data": [],
+                "row_count": 0,
+                "execution_time_ms": 0,
+                "total_attempts": 0,
+                "attempts": [],
+            }
+
     async def execute_query_with_self_correction(
         self,
         connection: DatabaseConnection,
@@ -411,7 +485,7 @@ class MultiDatabaseHandler:
         allow_write: bool = False,
     ) -> List[Dict[str, Any]]:
         """
-        Execute multiple queries across different databases
+        Execute multiple queries across different databases IN PARALLEL
 
         Args:
             queries: List of dicts with 'connection_id' and 'sql' keys
@@ -424,39 +498,60 @@ class MultiDatabaseHandler:
         # Create connection lookup
         conn_lookup = {conn.id: conn for conn in connections}
 
-        results = []
+        # Create tasks for parallel execution
+        tasks = []
         for query_info in queries:
             conn_id = query_info.get("connection_id")
             sql = query_info.get("sql")
 
             if not conn_id or not sql:
-                results.append(
-                    {
+                # For missing data, create a resolved future with error
+                async def error_result(msg):
+                    return {
                         "success": False,
-                        "error": "Missing connection_id or sql",
+                        "error": msg,
                         "data": [],
                     }
-                )
+                tasks.append(error_result("Missing connection_id or sql"))
                 continue
 
             connection = conn_lookup.get(conn_id)
             if not connection:
-                results.append(
-                    {
+                async def conn_error():
+                    return {
                         "success": False,
                         "error": f"Connection ID {conn_id} not found",
                         "data": [],
                     }
-                )
+                tasks.append(conn_error())
                 continue
 
-            # Execute query
-            result = await self.execute_query_on_database(
-                connection=connection, sql=sql, allow_write=allow_write
+            # Add query execution task
+            tasks.append(
+                self.execute_query_on_database(
+                    connection=connection, sql=sql, allow_write=allow_write
+                )
             )
-            results.append(result)
 
-        return results
+        # Execute all queries in parallel (handles both async and sync/DuckDB via executor)
+        # return_exceptions=True ensures one failure doesn't stop others
+        logger.info(f"Executing {len(tasks)} database queries in parallel...")
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Handle any exceptions from gather
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(f"Exception in parallel query {i}: {result}")
+                processed_results.append({
+                    "success": False,
+                    "error": str(result),
+                    "data": [],
+                })
+            else:
+                processed_results.append(result)
+
+        return processed_results
 
     def parse_multi_database_sql(self, llm_output: str) -> List[Dict[str, Any]]:
         """

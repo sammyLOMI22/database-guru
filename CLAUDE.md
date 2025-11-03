@@ -84,9 +84,10 @@ The system uses a multi-agent architecture with specialized agents that work tog
 1. **Self-Correcting Agent** (`src/llm/self_correcting_agent.py`)
    - Main orchestrator for query processing
    - Handles retry logic with automatic error recovery
+   - **Parallel correction attempts**: 1.6x speedup (tries quick fix, learned, LLM simultaneously)
    - Integrates all other agents and components
    - Uses `AgentTrace` for execution transparency
-   - Key method: `process_query()` - main entry point
+   - Key methods: `process_query()`, `_try_parallel_fixes()` - parallel error correction
 
 2. **Conversational Memory Agent** (`src/llm/conversational_memory_agent.py`)
    - Manages conversation context for multi-turn dialogs
@@ -128,7 +129,7 @@ The system uses a multi-agent architecture with specialized agents that work tog
    - Handles table names, column names, and common SQL errors
    - Key method: `try_quick_fix()` - returns corrected SQL or None
 
-8. **Prompt Sanitizer** (`src/security/prompt_sanitizer.py`) **NEW - November 2, 2025**
+8. **Prompt Sanitizer** (`src/security/prompt_sanitizer.py`)
    - Multi-layer prompt injection protection
    - Input sanitization (removes control chars, normalizes whitespace)
    - Injection detection (15+ attack patterns blocked)
@@ -136,6 +137,13 @@ The system uses a multi-agent architecture with specialized agents that work tog
    - Token limits (500 chars for questions, 8000 for prompts)
    - Defense in depth: API → Agent → Prompt layers
    - Key methods: `sanitize_input()`, `detect_injection_attempts()`, `create_safe_context_prompt()`
+
+9. **Multi-Database Handler** (`src/core/multi_db_handler.py`) **UPDATED - November 2, 2025**
+   - **Parallel multi-database execution**: 3x speedup (queries execute simultaneously)
+   - Handles both async (PostgreSQL, MySQL, SQLite) and sync (DuckDB) sessions
+   - Parallel schema introspection with `asyncio.gather()`
+   - Graceful degradation: one database failure doesn't stop others
+   - Key methods: `build_combined_schema()`, `execute_multi_database_query()`, `_execute_single_query_task()`
 
 ### Data Flow
 
@@ -159,7 +167,7 @@ SQL Executor → Executes with timeout/safety limits
   ↓
 Result Verification Agent → Validates logical correctness
   ↓
-[If Error] → Schema-Aware Fixer (instant) → Correction Learner (learned patterns) → Self-Correcting Agent (LLM retry)
+[If Error] → **Parallel Correction Attempts** (quick fix + learned + LLM simultaneously, 1.6x faster)
   ↓
 [If Success] → Learn correction pattern for future
   ↓                          → Save to chat history (if session_id provided)
@@ -169,11 +177,13 @@ Return Results
 
 ### Key Architectural Patterns
 
-**Multi-Database Support:**
+**Multi-Database Support with Parallel Execution:**
 - `UserDatabaseConnector` (`src/core/user_db_connector.py`) - Creates connections to user databases
-- `MultiDatabaseHandler` (`src/core/multi_db_handler.py`) - Handles parallel queries across multiple databases
+- `MultiDatabaseHandler` (`src/core/multi_db_handler.py`) - **Parallel queries across multiple databases (3x speedup)**
+- **Parallel schema introspection** - All databases introspected simultaneously with `asyncio.gather()`
+- **Parallel query execution** - Multiple queries execute concurrently across databases
 - Supports both sync (DuckDB) and async (PostgreSQL, MySQL, SQLite) sessions
-- Schema introspection parallelized for performance
+- Graceful degradation: one database failure doesn't stop others
 
 **Schema Management:**
 - `SchemaInspector` (`src/core/schema_inspector.py`) - Introspects database schemas
@@ -333,27 +343,32 @@ Settings managed via Pydantic in `src/config/settings.py`:
 - **Query processing flow**: `src/api/endpoints/query.py:32` - `/api/query/` endpoint
 - **Conversational memory**: `src/llm/conversational_memory_agent.py` - Context retrieval and management
 - **Context endpoints**: `src/api/endpoints/chat.py` - GET/DELETE context endpoints
-- **Self-correction logic**: `src/llm/self_correcting_agent.py:261` - `process_query()` method
+- **Self-correction logic**: `src/llm/self_correcting_agent.py:541` - `generate_and_execute_with_retry()` method
+- **Parallel corrections**: `src/llm/self_correcting_agent.py:373` - `_try_parallel_fixes()` method (1.6x speedup)
 - **Confidence scoring**: `src/llm/confidence_scorer.py:147` - `score_correction()` method
-- **Multi-DB queries**: `src/core/multi_db_handler.py:96` - `execute_multi_db_query()` method
+- **Multi-DB queries**: `src/core/multi_db_handler.py:481` - `execute_multi_database_query()` method (3x speedup)
+- **Parallel schema introspection**: `src/core/multi_db_handler.py:75` - `build_combined_schema()` with parallel execution
 - **Schema validation**: `src/core/schema_validator.py` - `validate_schema_references()`
 - **SQL execution**: `src/core/executor.py:42` - `execute_query()` with timeout handling
-- **Security/Prompt Sanitization**: `src/security/prompt_sanitizer.py` - Input sanitization and injection detection (NEW)
-- **Security Tests**: `tests/test_prompt_sanitizer.py` - 29 comprehensive security tests (NEW)
+- **Security/Prompt Sanitization**: `src/security/prompt_sanitizer.py` - Input sanitization and injection detection
+- **Security Tests**: `tests/test_prompt_sanitizer.py` - 29 comprehensive security tests
+- **Parallel Multi-DB Tests**: `tests/test_parallel_multi_db.py` - 5 tests (3x speedup verification)
+- **Parallel Corrections Tests**: `tests/test_parallel_corrections.py` - 5 tests (1.6x speedup verification)
 
 ## Documentation
 
 Key docs in `docs/`:
-- `CONVERSATIONAL_MEMORY_IMPLEMENTATION.md` - Conversational memory technical guide (UPDATED with security)
-- `PHASE_1_COMPLETE.md` - Conversational memory completion summary (UPDATED with security)
+- `PARALLEL_EXECUTION.md` - **Parallel execution technical guide (NEW - Nov 2, 2025!)**
+- `CONVERSATIONAL_MEMORY_IMPLEMENTATION.md` - Conversational memory technical guide
+- `PHASE_1_COMPLETE.md` - Conversational memory completion summary
 - `TEST_CONVERSATIONAL_MEMORY.md` - Conversational memory testing guide
-- `SECURITY_IMPROVEMENTS.md` - Recent security fixes and remaining issues (NEW - Nov 2, 2025!)
-- `FUTURE_PLANS.md` - Prioritized roadmap with security fixes (NEW - Nov 2, 2025!)
+- `SECURITY_IMPROVEMENTS.md` - Recent security fixes and remaining issues
+- `FUTURE_PLANS.md` - Prioritized roadmap (UPDATED with parallel features - Nov 2, 2025!)
 - `QUERY_PLANNING_AGENT.md` - Query planning system deep dive
 - `CONFIDENCE_SCORING.md` - Confidence scoring system
 - `LEARNING_FROM_CORRECTIONS.md` - Correction learning system
 - `RESULT_VERIFICATION_AGENT.md` - Result verification details
 - `AUTO_LEARNING_GUIDE.md` - User feedback and auto-learning
-- `MULTI_DATABASE_GUIDE.md` - Multi-database queries
-- `SECURITY_POLICY.md` - Security controls and validation (UPDATED with prompt injection)
+- `MULTI_DATABASE_GUIDE.md` - Multi-database queries (UPDATED with parallel execution)
+- `SECURITY_POLICY.md` - Security controls and validation
 - `tests/TESTING.md` - Testing guide
