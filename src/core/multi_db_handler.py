@@ -1,6 +1,7 @@
 """Multi-database handler for querying across multiple databases"""
 import logging
 import asyncio
+from asyncio import Semaphore
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,7 @@ from src.core.schema_inspector import SchemaInspector
 from src.core.executor import SQLExecutor
 from src.llm.self_correcting_agent import SelfCorrectingSQLAgent
 from src.llm.sql_generator import SQLGenerator
+from src.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -498,8 +500,17 @@ class MultiDatabaseHandler:
         # Create connection lookup
         conn_lookup = {conn.id: conn for conn in connections}
 
-        # Create tasks for parallel execution
+        # FIX #1: Add semaphore for max concurrent operations (prevents resource exhaustion)
+        settings = Settings()
+        max_parallel = settings.MAX_PARALLEL_DATABASES
+        semaphore = Semaphore(max_parallel)
+
+        logger.info(f"Parallel execution throttled to {max_parallel} concurrent databases")
+
+        # FIX #3: Track metadata for each task (preserves connection context on exceptions)
         tasks = []
+        task_metadata = []  # Store connection info for error handling
+
         for query_info in queries:
             conn_id = query_info.get("connection_id")
             sql = query_info.get("sql")
@@ -513,6 +524,7 @@ class MultiDatabaseHandler:
                         "data": [],
                     }
                 tasks.append(error_result("Missing connection_id or sql"))
+                task_metadata.append({"connection": None, "query_info": query_info})
                 continue
 
             connection = conn_lookup.get(conn_id)
@@ -524,30 +536,58 @@ class MultiDatabaseHandler:
                         "data": [],
                     }
                 tasks.append(conn_error())
+                task_metadata.append({"connection": None, "query_info": query_info})
                 continue
 
-            # Add query execution task
-            tasks.append(
-                self.execute_query_on_database(
-                    connection=connection, sql=sql, allow_write=allow_write
-                )
-            )
+            # FIX #1: Wrap task with semaphore for throttling
+            async def execute_with_semaphore(conn, sql_query, allow_w):
+                async with semaphore:
+                    return await self.execute_query_on_database(
+                        connection=conn, sql=sql_query, allow_write=allow_w
+                    )
+
+            # Add query execution task with semaphore throttling
+            tasks.append(execute_with_semaphore(connection, sql, allow_write))
+            task_metadata.append({"connection": connection, "query_info": query_info})
 
         # Execute all queries in parallel (handles both async and sync/DuckDB via executor)
         # return_exceptions=True ensures one failure doesn't stop others
         logger.info(f"Executing {len(tasks)} database queries in parallel...")
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Handle any exceptions from gather
+        # FIX #3: Handle any exceptions from gather, preserving connection context
         processed_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error(f"Exception in parallel query {i}: {result}")
-                processed_results.append({
-                    "success": False,
-                    "error": str(result),
-                    "data": [],
-                })
+                # Get connection metadata for this task
+                metadata = task_metadata[i]
+                connection = metadata.get("connection")
+
+                # Build error message with connection context
+                if connection:
+                    error_msg = (
+                        f"Exception in query for database '{connection.name}' "
+                        f"(ID: {connection.id}, Type: {connection.database_type}): {result}"
+                    )
+                    logger.error(error_msg)
+                    processed_results.append({
+                        "success": False,
+                        "error": str(result),
+                        "database_name": connection.name,
+                        "connection_id": connection.id,
+                        "database_type": connection.database_type,
+                        "data": [],
+                        "row_count": 0,
+                        "execution_time_ms": 0,
+                    })
+                else:
+                    # No connection info available (validation error)
+                    logger.error(f"Exception in parallel query {i}: {result}")
+                    processed_results.append({
+                        "success": False,
+                        "error": str(result),
+                        "data": [],
+                    })
             else:
                 processed_results.append(result)
 
