@@ -10,6 +10,7 @@ export const FeedbackStats: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [filterMode, setFilterMode] = useState<'all' | 'pending' | 'applied'>('pending');
   const [expandedSql, setExpandedSql] = useState<Set<number>>(new Set());
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const pageSize = 20;
 
   const toggleSqlExpanded = (feedbackId: number) => {
@@ -28,6 +29,17 @@ export const FeedbackStats: React.FC = () => {
     loadStats();
   }, [currentPage, filterMode]);
 
+  // Auto-refresh every 10 seconds when enabled
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      loadStats();
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, currentPage, filterMode]);
+
   const loadStats = async () => {
     setLoading(true);
     setError(null);
@@ -43,6 +55,19 @@ export const FeedbackStats: React.FC = () => {
       setError(err.message || 'Failed to load feedback statistics');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Get tier information based on confidence
+  const getTierInfo = (confidence: number) => {
+    if (confidence >= 0.90) {
+      return { tier: 1, label: 'Tier 1', color: 'bg-green-100 text-green-800', emoji: '🚀', description: 'Auto-applied (STRICT)' };
+    } else if (confidence >= 0.80) {
+      return { tier: 2, label: 'Tier 2', color: 'bg-blue-100 text-blue-800', emoji: '⚡', description: 'Auto-applied (MODERATE)' };
+    } else if (confidence >= 0.70) {
+      return { tier: 3, label: 'Tier 3', color: 'bg-yellow-100 text-yellow-800', emoji: '📋', description: 'Queued for batch' };
+    } else {
+      return { tier: 0, label: 'Manual', color: 'bg-gray-100 text-gray-800', emoji: '👁️', description: 'Manual review' };
     }
   };
 
@@ -173,6 +198,41 @@ export const FeedbackStats: React.FC = () => {
         </div>
       </div>
 
+      {/* Tier Distribution */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Auto-Approval Tiers (Phase 1)</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="text-xs text-green-600 font-medium mb-1">🚀 Tier 1 (≥90%)</div>
+            <div className="text-lg font-bold text-green-700">
+              {recentFeedback.filter(f => f.user_confidence >= 0.90).length}
+            </div>
+            <div className="text-xs text-green-600 mt-1">Auto-apply (STRICT)</div>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="text-xs text-blue-600 font-medium mb-1">⚡ Tier 2 (≥80%)</div>
+            <div className="text-lg font-bold text-blue-700">
+              {recentFeedback.filter(f => f.user_confidence >= 0.80 && f.user_confidence < 0.90).length}
+            </div>
+            <div className="text-xs text-blue-600 mt-1">Auto-apply (MODERATE)</div>
+          </div>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <div className="text-xs text-yellow-600 font-medium mb-1">📋 Tier 3 (≥70%)</div>
+            <div className="text-lg font-bold text-yellow-700">
+              {recentFeedback.filter(f => f.user_confidence >= 0.70 && f.user_confidence < 0.80).length}
+            </div>
+            <div className="text-xs text-yellow-600 mt-1">Batch queue</div>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <div className="text-xs text-gray-600 font-medium mb-1">👁 Manual (&lt;70%)</div>
+            <div className="text-lg font-bold text-gray-700">
+              {recentFeedback.filter(f => f.user_confidence < 0.70).length}
+            </div>
+            <div className="text-xs text-gray-600 mt-1">Manual review</div>
+          </div>
+        </div>
+      </div>
+
       {/* Feedback by Type */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Feedback by Type</h3>
@@ -205,9 +265,22 @@ export const FeedbackStats: React.FC = () => {
       <div className="bg-white rounded-lg shadow overflow-hidden max-w-full">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Recent Feedback
-            </h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Recent Feedback
+              </h3>
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`px-3 py-1 text-xs rounded font-medium transition-colors ${
+                  autoRefresh
+                    ? 'bg-green-100 text-green-700 border border-green-300'
+                    : 'bg-gray-100 text-gray-600 border border-gray-300'
+                }`}
+                title={autoRefresh ? 'Auto-refresh enabled (every 10s)' : 'Enable auto-refresh'}
+              >
+                {autoRefresh ? '🔄 Auto-refresh ON' : '⏸️ Auto-refresh OFF'}
+              </button>
+            </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3 text-sm">
                 <label className="flex items-center gap-1.5 cursor-pointer">
@@ -281,9 +354,22 @@ export const FeedbackStats: React.FC = () => {
                       }`}>
                         {feedback.feedback_type.replace('_', ' ').toUpperCase()}
                       </span>
+                      {(() => {
+                        const tierInfo = getTierInfo(feedback.user_confidence);
+                        return (
+                          <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${tierInfo.color}`} title={tierInfo.description}>
+                            {tierInfo.emoji} {tierInfo.label}
+                          </span>
+                        );
+                      })()}
                       {feedback.applied_successfully && (
                         <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 text-green-800">
                           ✓ Applied
+                        </span>
+                      )}
+                      {feedback.learned_correction_id && (
+                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-800" title="Learned Correction ID">
+                          🧠 LC-{feedback.learned_correction_id}
                         </span>
                       )}
                       <span className="text-xs text-gray-500">
@@ -295,6 +381,14 @@ export const FeedbackStats: React.FC = () => {
                       <p className="text-xs text-gray-700 mb-1.5 break-all overflow-hidden">
                         {feedback.correction_description}
                       </p>
+                    )}
+
+                    {/* Show validation rejection message if present */}
+                    {feedback.user_notes && feedback.user_notes.includes('[AUTO-APPLY REJECTED]') && (
+                      <div className="text-xs bg-red-50 border border-red-200 rounded p-2 mb-2 overflow-hidden">
+                        <span className="font-semibold text-red-900">⚠️ Validation Rejected: </span>
+                        <span className="text-red-700">{feedback.user_notes.replace('[AUTO-APPLY REJECTED]', '').trim()}</span>
+                      </div>
                     )}
 
                     {/* Show correction details for table_name/column_name feedback */}
