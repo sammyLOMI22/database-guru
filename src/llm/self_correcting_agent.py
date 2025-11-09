@@ -8,6 +8,7 @@ from datetime import datetime
 from src.llm.sql_generator import SQLGenerator
 from src.core.executor import SQLExecutor
 from src.database.models import DatabaseConnection
+from src.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -489,41 +490,124 @@ class SelfCorrectingSQLAgent:
                 logger.warning(f"LLM fix failed: {e}")
                 return None
 
-        # Execute all fix strategies in parallel
+        # Execute all fix strategies in parallel with timeout protection
         tasks = [try_quick_fix(), try_learned_fix(), try_llm_fix()]
         start_time = asyncio.get_event_loop().time()
 
-        # Use return_exceptions=True to handle failures gracefully
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # FIX #5: Add timeout wrapper to prevent indefinite hangs
+        settings = Settings()
+        timeout = settings.PARALLEL_CORRECTIONS_TIMEOUT
 
-        elapsed = asyncio.get_event_loop().time() - start_time
-        logger.info(f"⚡ Parallel fixes completed in {elapsed:.3f}s")
+        # Metrics tracking
+        metrics = {
+            "strategies_attempted": len(tasks),
+            "strategies_succeeded": 0,
+            "strategies_failed": 0,
+            "strategies_timed_out": 0,
+            "winning_strategy": None,
+            "elapsed_ms": 0,
+            "timed_out": False,
+        }
+
+        try:
+            # Use return_exceptions=True to handle failures gracefully
+            # Wrap with timeout to prevent hanging
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=timeout
+            )
+
+            elapsed = asyncio.get_event_loop().time() - start_time
+            metrics["elapsed_ms"] = round(elapsed * 1000, 2)
+            logger.info(f"⚡ Parallel fixes completed in {elapsed:.3f}s")
+
+        except asyncio.TimeoutError:
+            # FIX #5: Handle timeout - fallback to LLM fix
+            elapsed = asyncio.get_event_loop().time() - start_time
+            metrics["elapsed_ms"] = round(elapsed * 1000, 2)
+            metrics["timed_out"] = True
+            metrics["strategies_timed_out"] = len(tasks)
+
+            logger.warning(f"⚠️ Parallel fixes timed out after {timeout}s, using fallback LLM fix")
+            trace.add_step(
+                "warning",
+                f"Parallel fixes timed out after {timeout}s, using fallback",
+                metadata=metrics
+            )
+
+            # Fallback to direct LLM fix
+            enhanced_error = f"{last_error}\n\nHints:\n{hints}"
+            fix_result = await self.generator.fix_sql_error(
+                sql=sql,
+                error=enhanced_error,
+                schema=schema,
+                database_type=database_type
+            )
+
+            metrics["winning_strategy"] = "llm_fallback_timeout"
+            metrics["strategies_succeeded"] = 1
+
+            return {
+                "sql": fix_result["sql"],
+                "fix_method": "llm_fallback_timeout",
+                "confidence": 0.4,  # Lower confidence due to timeout
+                "explanation": f"Fallback LLM correction (parallel strategies timed out after {timeout}s)",
+                "metrics": metrics,
+            }
 
         # Find the first successful fix
         successful_fixes = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 logger.warning(f"Fix strategy {i} raised exception: {result}")
+                metrics["strategies_failed"] += 1
                 continue
             if result is not None:
                 successful_fixes.append(result)
+                metrics["strategies_succeeded"] += 1
                 method = result["fix_method"]
                 conf = result.get("confidence", 0)
+
+                # Track first (winning) strategy
+                if metrics["winning_strategy"] is None:
+                    metrics["winning_strategy"] = method
+
                 trace.add_step(
                     "quick_fix" if method == "quick_fix" else "learned_fix" if method == "learned" else "llm_fix",
                     f"{method.replace('_', ' ').title()} succeeded: {result['explanation']}",
-                    metadata={"confidence": conf, "elapsed_ms": elapsed * 1000}
+                    metadata={"confidence": conf, "elapsed_ms": metrics["elapsed_ms"]}
                 )
+            else:
+                metrics["strategies_failed"] += 1
 
         if successful_fixes:
             # Return the first (fastest) successful fix
             best_fix = successful_fixes[0]
-            logger.info(f"✅ Parallel fix succeeded using: {best_fix['fix_method']} (confidence: {best_fix.get('confidence', 0):.2f})")
+
+            # FIX #6: Add metrics to response
+            best_fix["metrics"] = metrics
+
+            logger.info(
+                f"✅ Parallel fix succeeded using: {best_fix['fix_method']} "
+                f"(confidence: {best_fix.get('confidence', 0):.2f}) - "
+                f"Metrics: {metrics['strategies_succeeded']}/{metrics['strategies_attempted']} strategies succeeded"
+            )
+
+            # Add metrics to trace
+            trace.add_step(
+                "planning",
+                f"Parallel corrections metrics: {metrics['winning_strategy']} won in {metrics['elapsed_ms']}ms",
+                metadata=metrics
+            )
+
             return best_fix
         else:
             # All strategies failed - fallback to LLM as last resort
+            metrics["winning_strategy"] = "llm_fallback_all_failed"
+            metrics["strategies_failed"] = metrics["strategies_attempted"]
+
             logger.warning("⚠️ All parallel fix strategies failed, falling back to sequential LLM fix")
-            trace.add_step("warning", "All parallel fixes failed, using fallback LLM fix")
+            trace.add_step("warning", "All parallel fixes failed, using fallback LLM fix", metadata=metrics)
             enhanced_error = f"{last_error}\n\nHints:\n{hints}"
             fix_result = await self.generator.fix_sql_error(
                 sql=sql,
@@ -536,6 +620,7 @@ class SelfCorrectingSQLAgent:
                 "fix_method": "llm_fallback",
                 "confidence": 0.5,
                 "explanation": "Fallback LLM correction (parallel strategies failed)",
+                "metrics": metrics,
             }
 
     async def generate_and_execute_with_retry(
@@ -1046,6 +1131,7 @@ class SelfCorrectingSQLAgent:
         database_type: str,
         question: str,
         allow_write: bool = False,
+        model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Execute pre-generated SQL with automatic error correction and retry
@@ -1060,6 +1146,7 @@ class SelfCorrectingSQLAgent:
             database_type: Type of database
             question: Original natural language question (for context in corrections)
             allow_write: Whether to allow write operations
+            model: Optional model name to use for SQL correction
 
         Returns:
             Dictionary with:
@@ -1140,7 +1227,8 @@ class SelfCorrectingSQLAgent:
                     sql=current_sql,
                     error=enhanced_error,
                     schema=schema,
-                    database_type=database_type
+                    database_type=database_type,
+                    model=model,
                 )
                 current_sql = fix_result["sql"]
 

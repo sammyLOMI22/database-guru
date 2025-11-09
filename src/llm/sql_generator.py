@@ -291,6 +291,7 @@ Provide a clear, non-technical explanation."""
         error: str,
         schema: str,
         database_type: str = "postgresql",
+        model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Attempt to fix a SQL query that resulted in an error
@@ -300,6 +301,7 @@ Provide a clear, non-technical explanation."""
             error: Error message
             schema: Database schema
             database_type: Type of database
+            model: Optional model name to use
 
         Returns:
             Result dictionary with corrected SQL
@@ -324,6 +326,7 @@ Provide the corrected SQL query ONLY."""
                 prompt=prompt,
                 system=SYSTEM_PROMPT,
                 temperature=0.1,
+                model=model,
             )
 
             corrected_sql = self.validator.clean_sql_output(raw_output)

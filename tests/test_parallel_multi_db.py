@@ -261,6 +261,86 @@ class TestParallelMultiDatabaseExecution:
         # Verify logging
         assert "Executing 2 database queries in parallel" in caplog.text
 
+    @pytest.mark.asyncio
+    async def test_parallel_execution_timeout_protection(self):
+        """Test that individual database queries timeout properly without holding semaphore"""
+        from unittest.mock import patch
+
+        handler = MultiDatabaseHandler()
+
+        connections = [
+            DatabaseConnection(id=1, name="db1", database_type="postgresql", database_name="test1"),
+            DatabaseConnection(id=2, name="db2", database_type="mysql", database_name="test2"),
+            DatabaseConnection(id=3, name="db3", database_type="sqlite", database_name="test3"),
+        ]
+
+        queries = [
+            {"connection_id": 1, "sql": "SELECT 1"},  # Will succeed fast
+            {"connection_id": 2, "sql": "SELECT 2"},  # Will hang and timeout
+            {"connection_id": 3, "sql": "SELECT 3"},  # Will succeed (not blocked by db2)
+        ]
+
+        # Mock execution: db1 and db3 succeed quickly, db2 hangs
+        async def mock_execution(connection, sql, allow_write=False):
+            if connection.id == 2:
+                # Simulate hanging query (longer than timeout)
+                await asyncio.sleep(100)
+                return {"success": True, "data": [], "row_count": 0, "execution_time_ms": 100000}
+            else:
+                # Fast execution
+                await asyncio.sleep(0.1)
+                return {
+                    "success": True,
+                    "data": [{"result": connection.id}],
+                    "row_count": 1,
+                    "execution_time_ms": 100,
+                }
+
+        handler.execute_query_on_database = mock_execution
+
+        # Mock settings to use a short timeout (1 second for testing)
+        with patch('src.core.multi_db_handler.Settings') as mock_settings_class:
+            mock_settings = Mock()
+            mock_settings.MAX_PARALLEL_DATABASES = 10
+            mock_settings.QUERY_TIMEOUT_SECONDS = 1  # 1 second timeout
+            mock_settings_class.return_value = mock_settings
+
+            import time
+            start_time = time.time()
+
+            # Execute in parallel
+            results = await handler.execute_multi_database_query(
+                queries=queries,
+                connections=connections,
+                allow_write=False,
+            )
+
+            elapsed = time.time() - start_time
+
+            # Verify timeout occurred quickly (not 100 seconds)
+            # Should be around 1 + 5 = 6 seconds timeout, not 100 seconds
+            assert elapsed < 10, f"Expected timeout in ~6s, took {elapsed:.2f}s"
+            assert elapsed >= 1, f"Timeout too fast: {elapsed:.2f}s"
+
+            # Verify results
+            assert len(results) == 3
+
+            # db1 should succeed
+            assert results[0]["success"] is True
+            assert results[0]["row_count"] == 1
+
+            # db2 should timeout with proper error message
+            assert results[1]["success"] is False
+            assert "timed out" in results[1]["error"].lower()
+            assert results[1]["database_name"] == "db2"
+            assert results[1]["connection_id"] == 2
+
+            # db3 should succeed (not blocked by db2 timeout)
+            assert results[2]["success"] is True
+            assert results[2]["row_count"] == 1
+
+            print(f"\n✓ Timeout protection works: db2 timed out in ~{elapsed:.1f}s without blocking db1/db3")
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

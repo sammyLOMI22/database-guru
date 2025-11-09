@@ -286,6 +286,174 @@ class TestParallelCorrections:
         assert hasattr(agent, 'max_retries')
         assert agent.max_retries == 3
 
+    @pytest.mark.asyncio
+    async def test_parallel_corrections_timeout(self):
+        """Test that parallel corrections timeout after configured duration"""
+
+        sql_generator = Mock(spec=SQLGenerator)
+        sql_generator.settings = Mock(OLLAMA_MODEL="qwen2.5-coder:32b")
+        sql_generator.ollama = Mock()
+
+        # Mock LLM fix (takes longer than timeout - will be used as fallback)
+        async def mock_llm_fix(sql, error, schema, database_type):
+            # This should be called as the fallback after timeout
+            return {"sql": "SELECT * FROM products -- Fallback after timeout"}
+
+        sql_generator.fix_sql_error = mock_llm_fix
+
+        agent = SelfCorrectingSQLAgent(
+            sql_generator=sql_generator,
+            max_retries=3,
+            enable_schema_fixes=True,
+            enable_learning=True,
+        )
+
+        # Mock all strategies to hang indefinitely (simulating slow network/DB)
+        mock_schema_fixer = Mock()
+
+        def mock_slow_quick_fix(sql, error_type, error_message, context):
+            time.sleep(20)  # Hangs for 20 seconds (way longer than timeout)
+            from src.llm.schema_aware_fixer import QuickFix
+            return QuickFix(
+                success=True,
+                fixed_sql="Should not see this",
+                confidence=0.9,
+                explanation="Should timeout before this",
+                correction_type="fuzzy_match"
+            )
+
+        mock_schema_fixer.quick_fix = mock_slow_quick_fix
+        agent.schema_fixer = mock_schema_fixer
+
+        # Mock learner (hangs)
+        mock_learner = AsyncMock()
+
+        async def mock_slow_learner(error_type, error_message, database_type, sql, limit):
+            await asyncio.sleep(20)  # Hangs for 20 seconds
+            return []
+
+        mock_learner.find_applicable_corrections = mock_slow_learner
+        agent.learner = mock_learner
+
+        trace = AgentTrace()
+
+        # Mock settings to use a short timeout (1 second for testing)
+        with patch('src.llm.self_correcting_agent.Settings') as mock_settings_class:
+            mock_settings = Mock()
+            mock_settings.PARALLEL_CORRECTIONS_TIMEOUT = 1  # 1 second timeout
+            mock_settings_class.return_value = mock_settings
+
+            start_time = time.time()
+
+            # Execute parallel fixes - should timeout and use fallback
+            result = await agent._try_parallel_fixes(
+                sql="SELECT * FROM prodcts",
+                last_error="Table 'prodcts' does not exist",
+                error_type=ErrorType.TABLE_NOT_FOUND,
+                error_context={},
+                hints="Check table name",
+                schema='{}',
+                database_type="postgresql",
+                trace=trace,
+            )
+
+            elapsed = time.time() - start_time
+
+            # Verify timeout occurred (should be ~1 second, not 20)
+            assert elapsed < 3, f"Expected timeout in ~1s, took {elapsed:.2f}s"
+            assert elapsed >= 0.9, f"Timeout too fast: {elapsed:.2f}s"
+
+            # Verify fallback was used
+            assert result is not None
+            assert result["fix_method"] == "llm_fallback_timeout"
+            assert "Fallback after timeout" in result["sql"]
+            assert result["confidence"] == 0.4  # Lower confidence due to timeout
+
+            # Verify metrics
+            assert "metrics" in result
+            metrics = result["metrics"]
+            assert metrics["timed_out"] is True
+            assert metrics["strategies_timed_out"] == 3
+            assert metrics["winning_strategy"] == "llm_fallback_timeout"
+
+            print(f"\n✓ Timeout protection works: {elapsed:.2f}s (expected ~1s)")
+
+    @pytest.mark.asyncio
+    async def test_parallel_corrections_metrics(self):
+        """Test that parallel corrections track metrics correctly"""
+
+        sql_generator = Mock(spec=SQLGenerator)
+        sql_generator.settings = Mock(OLLAMA_MODEL="qwen2.5-coder:32b")
+        sql_generator.ollama = Mock()
+
+        # Mock LLM fix
+        async def mock_llm_fix(sql, error, schema, database_type):
+            return {"sql": "SELECT * FROM products -- LLM"}
+
+        sql_generator.fix_sql_error = mock_llm_fix
+
+        agent = SelfCorrectingSQLAgent(
+            sql_generator=sql_generator,
+            max_retries=3,
+            enable_schema_fixes=True,
+            enable_learning=True,
+        )
+
+        # Mock quick fix (succeeds fast)
+        mock_schema_fixer = Mock()
+
+        def mock_quick_fix(sql, error_type, error_message, context):
+            from src.llm.schema_aware_fixer import QuickFix
+            return QuickFix(
+                success=True,
+                fixed_sql="SELECT * FROM products -- Quick",
+                confidence=0.95,
+                explanation="Quick fix applied",
+                correction_type="fuzzy_match"
+            )
+
+        mock_schema_fixer.quick_fix = mock_quick_fix
+        agent.schema_fixer = mock_schema_fixer
+
+        # Mock learner (fails)
+        mock_learner = AsyncMock()
+        mock_learner.find_applicable_corrections = AsyncMock(return_value=[])
+        agent.learner = mock_learner
+
+        trace = AgentTrace()
+
+        result = await agent._try_parallel_fixes(
+            sql="SELECT * FROM prodcts",
+            last_error="Table not found",
+            error_type=ErrorType.TABLE_NOT_FOUND,
+            error_context={},
+            hints="",
+            schema='{}',
+            database_type="postgresql",
+            trace=trace,
+        )
+
+        # Verify metrics are included
+        assert "metrics" in result
+        metrics = result["metrics"]
+
+        # Check metric structure
+        assert "strategies_attempted" in metrics
+        assert "strategies_succeeded" in metrics
+        assert "strategies_failed" in metrics
+        assert "winning_strategy" in metrics
+        assert "elapsed_ms" in metrics
+        assert "timed_out" in metrics
+
+        # Verify values
+        assert metrics["strategies_attempted"] == 3  # quick, learned, llm
+        assert metrics["strategies_succeeded"] >= 1  # At least quick fix succeeded
+        assert metrics["winning_strategy"] == "quick_fix"  # Quick fix won
+        assert metrics["timed_out"] is False  # No timeout
+        assert metrics["elapsed_ms"] > 0  # Some time elapsed
+
+        print(f"\n✓ Metrics tracked: {metrics}")
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

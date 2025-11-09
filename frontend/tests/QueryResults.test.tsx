@@ -54,6 +54,19 @@ vi.mock('../src/components/FeedbackModal', () => ({
   ),
 }));
 
+vi.mock('../src/components/ParallelExecutionMetrics', () => ({
+  ParallelDatabaseMetrics: ({ metrics }: any) => (
+    <div data-testid="parallel-database-metrics">
+      Parallel Database Metrics: {metrics.total_queries} queries, {metrics.speedup}x speedup
+    </div>
+  ),
+  ParallelCorrectionsMetrics: ({ metrics }: any) => (
+    <div data-testid="parallel-corrections-metrics">
+      Parallel Corrections Metrics: {metrics.winning_strategy} in {metrics.elapsed_ms}ms
+    </div>
+  ),
+}));
+
 // Mock the API
 vi.mock('../src/services/api', () => ({
   feedbackAPI: {
@@ -422,6 +435,123 @@ describe('QueryResults', () => {
       }, { timeout: 2000 });
 
       consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('Parallel Execution Metrics', () => {
+    it('shows ParallelDatabaseMetrics when parallel execution metrics are provided', () => {
+      const propsWithParallelMetrics = {
+        ...defaultProps,
+        parallelExecutionMetrics: {
+          total_queries: 3,
+          max_concurrent: 10,
+          actual_concurrent: 3,
+          successful_queries: 3,
+          failed_queries: 0,
+          elapsed_ms: 1050,
+          average_query_time_ms: 350,
+          estimated_sequential_ms: 3150,
+          speedup: 3.0,
+        },
+      };
+      render(<QueryResults {...propsWithParallelMetrics} />);
+
+      expect(screen.getByTestId('parallel-database-metrics')).toBeInTheDocument();
+      expect(screen.getByText(/3 queries, 3x speedup/)).toBeInTheDocument();
+    });
+
+    it('does not show ParallelDatabaseMetrics when no metrics provided', () => {
+      render(<QueryResults {...defaultProps} />);
+
+      expect(screen.queryByTestId('parallel-database-metrics')).not.toBeInTheDocument();
+    });
+
+    it('shows ParallelCorrectionsMetrics when parallel correction metrics are provided', () => {
+      const propsWithCorrectionMetrics = {
+        ...defaultProps,
+        parallelCorrectionMetrics: {
+          strategies_attempted: 3,
+          strategies_succeeded: 1,
+          strategies_failed: 2,
+          strategies_timed_out: 0,
+          winning_strategy: 'quick_fix',
+          elapsed_ms: 125,
+          timed_out: false,
+        },
+      };
+      render(<QueryResults {...propsWithCorrectionMetrics} />);
+
+      expect(screen.getByTestId('parallel-corrections-metrics')).toBeInTheDocument();
+      expect(screen.getByText(/quick_fix in 125ms/)).toBeInTheDocument();
+    });
+
+    it('does not show ParallelCorrectionsMetrics when no metrics provided', () => {
+      render(<QueryResults {...defaultProps} />);
+
+      expect(screen.queryByTestId('parallel-corrections-metrics')).not.toBeInTheDocument();
+    });
+
+    it('can show both parallel metrics together', () => {
+      const propsWithBothMetrics = {
+        ...defaultProps,
+        parallelExecutionMetrics: {
+          total_queries: 3,
+          max_concurrent: 10,
+          actual_concurrent: 3,
+          successful_queries: 3,
+          failed_queries: 0,
+          elapsed_ms: 1050,
+          average_query_time_ms: 350,
+          estimated_sequential_ms: 3150,
+          speedup: 3.0,
+        },
+        parallelCorrectionMetrics: {
+          strategies_attempted: 3,
+          strategies_succeeded: 1,
+          strategies_failed: 2,
+          strategies_timed_out: 0,
+          winning_strategy: 'quick_fix',
+          elapsed_ms: 125,
+          timed_out: false,
+        },
+      };
+      render(<QueryResults {...propsWithBothMetrics} />);
+
+      expect(screen.getByTestId('parallel-database-metrics')).toBeInTheDocument();
+      expect(screen.getByTestId('parallel-corrections-metrics')).toBeInTheDocument();
+    });
+
+    it('shows parallel correction metrics before parallel database metrics', () => {
+      const propsWithBothMetrics = {
+        ...defaultProps,
+        parallelExecutionMetrics: {
+          total_queries: 3,
+          max_concurrent: 10,
+          actual_concurrent: 3,
+          successful_queries: 3,
+          failed_queries: 0,
+          elapsed_ms: 1050,
+          average_query_time_ms: 350,
+        },
+        parallelCorrectionMetrics: {
+          strategies_attempted: 3,
+          strategies_succeeded: 1,
+          strategies_failed: 2,
+          strategies_timed_out: 0,
+          winning_strategy: 'quick_fix',
+          elapsed_ms: 125,
+          timed_out: false,
+        },
+      };
+      const { container } = render(<QueryResults {...propsWithBothMetrics} />);
+
+      const correctionMetrics = screen.getByTestId('parallel-corrections-metrics');
+      const databaseMetrics = screen.getByTestId('parallel-database-metrics');
+
+      // Check that correction metrics appear before database metrics in DOM
+      const allMetrics = container.querySelectorAll('[data-testid^="parallel"]');
+      expect(allMetrics[0]).toBe(correctionMetrics);
+      expect(allMetrics[1]).toBe(databaseMetrics);
     });
   });
 });

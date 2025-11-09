@@ -1,7 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import QueryResults from './QueryResults';
-import ConversationContextPanel from './ConversationContextPanel';
-import StreamingQueryResults from './StreamingQueryResults';
 import { QueryResponse } from '../types/api';
 
 /**
@@ -232,35 +230,38 @@ export const ObservabilityDemo: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+    <div className="min-h-screen bg-gray-100 p-4 md:p-8 overflow-x-hidden">
+      <div className="max-w-7xl mx-auto space-y-4 md:space-y-6 lg:space-y-8">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
             Database Guru - Complete Feature Demo
           </h1>
-          <p className="text-gray-600 mb-3">
+          <p className="text-sm md:text-base text-gray-600 mb-3">
             This page demonstrates all observability and UX enhancement features with mock data.
             Scroll down to see different scenarios including the NEW Phase 1 & 2 features!
           </p>
-          <div className="flex gap-2 flex-wrap">
-            <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+          <div className="flex gap-1.5 md:gap-2 flex-wrap">
+            <span className="px-2 md:px-3 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
               ✨ Phase 1: Conversational Memory
             </span>
-            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+            <span className="px-2 md:px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
               🌊 Phase 2: Streaming Results
             </span>
-            <span className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+            <span className="px-2 md:px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
               🎯 Confidence Scoring
             </span>
-            <span className="px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-medium rounded-full">
+            <span className="px-2 md:px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-medium rounded-full">
               📋 Query Planning
+            </span>
+            <span className="px-2 md:px-3 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
+              ⚡ Parallel Execution
             </span>
           </div>
         </div>
 
         {/* Scenario 1: Auto-corrected query with verification warning */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
             Scenario 1: Auto-Corrected Query with Confidence Scoring
           </h2>
           <p className="text-sm text-gray-600 mb-4">
@@ -287,8 +288,8 @@ export const ObservabilityDemo: React.FC = () => {
         </div>
 
         {/* Scenario 2: Complex query with planning */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
             Scenario 2: Complex Query with Planning
           </h2>
           <p className="text-sm text-gray-600 mb-4">
@@ -319,8 +320,8 @@ export const ObservabilityDemo: React.FC = () => {
         </div>
 
         {/* Scenario 3: Conversational Memory */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
             Scenario 3: Conversational Memory (Phase 1) ✨ NEW!
           </h2>
           <p className="text-sm text-gray-600 mb-4">
@@ -369,8 +370,8 @@ export const ObservabilityDemo: React.FC = () => {
         </div>
 
         {/* Scenario 4: Streaming Results */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
             Scenario 4: Streaming Results (Phase 2) 🌊 NEW!
           </h2>
           <p className="text-sm text-gray-600 mb-4">
@@ -378,10 +379,10 @@ export const ObservabilityDemo: React.FC = () => {
             Results appear in real-time as they're fetched (100 rows per batch by default).
             Watch the progress bar and batch counter update live!
           </p>
-          <div className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
+          <div className="border-2 border-green-200 rounded-lg p-3 md:p-4 bg-green-50 overflow-x-auto">
             <div className="mb-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Performance Comparison:</h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm min-w-fit">
                 <div className="bg-white p-3 rounded">
                   <div className="font-semibold text-red-600 mb-1">❌ Before Streaming:</div>
                   <div className="text-xs space-y-1">
@@ -425,12 +426,190 @@ export const ObservabilityDemo: React.FC = () => {
           </div>
         </div>
 
+        {/* Scenario 5: Parallel Execution */}
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
+            Scenario 5: Parallel Execution (Production-Ready) ⚡ NEW!
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Shows queries executing in parallel for massive performance improvements.
+            Features dual timeout protection, comprehensive metrics, and intelligent throttling.
+          </p>
+          <div className="border-2 border-orange-200 rounded-lg p-3 md:p-4 bg-orange-50 overflow-x-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 min-w-fit">
+              {/* Multi-Database Parallel Execution */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <span>⚡</span>
+                  Multi-Database Parallel Execution
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Sequential:</span>
+                    <span className="font-mono">3.0s</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Parallel:</span>
+                    <span className="font-mono text-green-600 font-bold">1.0s</span>
+                  </div>
+                  <div className="pt-2 border-t border-gray-200">
+                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+                      3.0x faster ⚡
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Parallel Correction Strategies */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <span>🏆</span>
+                  Parallel Correction Strategies
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Sequential:</span>
+                    <span className="font-mono">1.6s</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Parallel:</span>
+                    <span className="font-mono text-green-600 font-bold">1.0s</span>
+                  </div>
+                  <div className="pt-2 border-t border-gray-200">
+                    <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">
+                      Quick Fix wins! ⚡
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Key Features */}
+            <div className="bg-white rounded-lg p-3 md:p-4 mb-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Key Features:</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>3.0x speedup for multi-database queries</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>1.6x speedup for error corrections</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Dual timeout protection (10s + 35s)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Intelligent throttling (max 10 concurrent)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Comprehensive metrics & observability</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Graceful degradation & fault isolation</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Demo */}
+            <QueryResults
+              queryId={789}
+              sql="SELECT category, SUM(sales) FROM sales_us UNION ALL SELECT category, SUM(sales) FROM sales_eu"
+              results={[
+                { category: "Electronics", total_sales: 45000 },
+                { category: "Books", total_sales: 12000 },
+              ]}
+              rowCount={2}
+              executionTime={1050}
+              isValid={true}
+              warnings={["✨ Query executed across 2 databases in parallel"]}
+              selfCorrected={true}
+              totalAttempts={2}
+              attempts={[
+                {
+                  attempt_number: 1,
+                  sql: "SELECT category, SUM(sales) FROM sales UNION ALL...",
+                  success: false,
+                  error: "Table 'sales' does not exist",
+                  error_type: "table_not_found",
+                  execution_time_ms: null,
+                  row_count: null,
+                  fix_method: null,
+                },
+                {
+                  attempt_number: 2,
+                  sql: "SELECT category, SUM(sales) FROM sales_us UNION ALL SELECT category, SUM(sales) FROM sales_eu",
+                  success: true,
+                  error: null,
+                  error_type: null,
+                  execution_time_ms: 1050,
+                  row_count: 2,
+                  fix_method: "quick_fix",
+                  confidence_prediction: {
+                    overall: 0.95,
+                    level: 'HIGH' as const,
+                    factors: {
+                      error_type: 0.27,
+                      schema_match: 0.25,
+                      historical_success: 0.19,
+                      correction_complexity: 0.14,
+                      similarity: 0.10,
+                    },
+                    reasoning: "Table name correction with high schema match",
+                    recommendation: "EXECUTE - Very high confidence",
+                  },
+                  metrics: {
+                    strategies_attempted: 3,
+                    strategies_succeeded: 1,
+                    strategies_failed: 2,
+                    strategies_timed_out: 0,
+                    winning_strategy: "quick_fix",
+                    elapsed_ms: 125,
+                    timed_out: false,
+                  }
+                },
+              ]}
+              parallelExecutionMetrics={{
+                total_queries: 2,
+                max_concurrent: 10,
+                actual_concurrent: 2,
+                successful_queries: 2,
+                failed_queries: 0,
+                elapsed_ms: 1050,
+                average_query_time_ms: 525,
+                estimated_sequential_ms: 3100,
+                speedup: 2.95,
+              }}
+              parallelCorrectionMetrics={{
+                strategies_attempted: 3,
+                strategies_succeeded: 1,
+                strategies_failed: 2,
+                strategies_timed_out: 0,
+                winning_strategy: "quick_fix",
+                elapsed_ms: 125,
+                timed_out: false,
+              }}
+            />
+
+            <div className="bg-gray-100 p-3 rounded mt-4">
+              <p className="text-xs text-gray-500 italic">
+                💡 Tip: Parallel execution is automatically enabled for multi-database queries and error corrections.
+                See the orange ⚡ metrics panels above for detailed performance stats!
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Legend */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
             Component Legend
           </h2>
-          <div className="space-y-3 text-sm">
+          <div className="space-y-3 text-sm overflow-x-auto">
             <div className="flex items-start gap-3">
               <span className="text-xl">✨</span>
               <div>
@@ -485,16 +664,25 @@ export const ObservabilityDemo: React.FC = () => {
                 Works seamlessly with conversational memory!
               </div>
             </div>
+            <div className="flex items-start gap-3">
+              <span className="text-xl">⚡</span>
+              <div>
+                <strong>Parallel Execution (Production-Ready):</strong> NEW! Execute queries and corrections in parallel for massive speedups.
+                Multi-database queries run simultaneously (3.0x faster), correction strategies race to find fastest fix (1.6x faster).
+                Features: Dual timeout protection, intelligent throttling, comprehensive metrics, graceful degradation.
+                See the orange metrics panels for detailed performance stats!
+              </div>
+            </div>
           </div>
         </div>
 
         {/* What's New Section */}
-        <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg shadow p-6 border-2 border-blue-300">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            🎉 What's New - Phases 1 & 2 Complete!
+        <div className="bg-gradient-to-r from-blue-50 via-green-50 to-orange-50 rounded-lg shadow p-4 md:p-6 border-2 border-blue-300 overflow-x-auto">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-3 md:mb-4">
+            🎉 What's New - Phases 1, 2 & Parallel Execution Complete!
           </h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-lg">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 min-w-fit">
+            <div className="bg-white p-3 md:p-4 rounded-lg">
               <h3 className="font-semibold text-blue-600 mb-2">✨ Phase 1: Conversational Memory</h3>
               <ul className="text-sm space-y-1 text-gray-700">
                 <li>• Natural multi-turn dialogue</li>
@@ -505,7 +693,7 @@ export const ObservabilityDemo: React.FC = () => {
                 <li>• &lt;10ms context retrieval</li>
               </ul>
             </div>
-            <div className="bg-white p-4 rounded-lg">
+            <div className="bg-white p-3 md:p-4 rounded-lg">
               <h3 className="font-semibold text-green-600 mb-2">🌊 Phase 2: Streaming Results</h3>
               <ul className="text-sm space-y-1 text-gray-700">
                 <li>• Progressive result delivery</li>
@@ -516,11 +704,22 @@ export const ObservabilityDemo: React.FC = () => {
                 <li>• &lt;50ms first batch latency</li>
               </ul>
             </div>
+            <div className="bg-white p-3 md:p-4 rounded-lg">
+              <h3 className="font-semibold text-orange-600 mb-2">⚡ Parallel Execution</h3>
+              <ul className="text-sm space-y-1 text-gray-700">
+                <li>• 3.0x multi-database speedup</li>
+                <li>• 1.6x correction speedup</li>
+                <li>• Dual timeout protection</li>
+                <li>• Intelligent throttling</li>
+                <li>• Comprehensive metrics</li>
+                <li>• Production-ready resilience</li>
+              </ul>
+            </div>
           </div>
-          <div className="mt-4 bg-white p-3 rounded text-sm">
-            <strong className="text-indigo-600">💡 Combined Power:</strong> Ask natural follow-up questions
-            AND see results stream in real-time! Example: "Show products" → "Filter by electronics" → "Sort by price"
-            - all with instant progressive feedback.
+          <div className="mt-3 md:mt-4 bg-white p-2.5 md:p-3 rounded text-xs md:text-sm">
+            <strong className="text-indigo-600">💡 Combined Power:</strong> Ask natural follow-up questions,
+            see results stream in real-time, AND get 3x faster multi-database execution! Example: "Show all sales" →
+            "Filter by region" → Results appear across all databases simultaneously with live progress updates.
           </div>
         </div>
       </div>

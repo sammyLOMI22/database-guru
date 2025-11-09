@@ -298,6 +298,7 @@ class MultiDatabaseHandler:
                 initial_sql=sql,
                 allow_write=allow_write,
                 schema_dict=db_schema_dict,
+                model=model_used,
             )
 
             # Return result with connection metadata
@@ -335,6 +336,7 @@ class MultiDatabaseHandler:
         timeout_seconds: int = 30,
         max_retries: int = 3,
         schema_dict: Optional[Dict] = None,
+        model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Execute a SQL query on a specific database WITH self-correction
@@ -349,6 +351,8 @@ class MultiDatabaseHandler:
             max_rows: Maximum number of rows to return
             timeout_seconds: Query timeout in seconds
             max_retries: Maximum number of retry attempts
+            schema_dict: Optional schema dict for location normalization
+            model: Optional model name to use for SQL generation
 
         Returns:
             Dict with execution results including correction attempts
@@ -376,6 +380,7 @@ class MultiDatabaseHandler:
                         session=user_db,
                         database_type=connection.database_type,
                         question=question,
+                        model=model,
                     )
                 else:
                     # Generate SQL and execute with retry
@@ -386,6 +391,7 @@ class MultiDatabaseHandler:
                         database_type=connection.database_type,
                         allow_write=allow_write,
                         schema_dict=schema_dict,
+                        model=model,
                     )
 
                 # Add connection metadata
@@ -497,6 +503,11 @@ class MultiDatabaseHandler:
         Returns:
             List of execution results, one per query
         """
+        import time
+
+        # Start timing for metrics
+        start_time = time.time()
+
         # Create connection lookup
         conn_lookup = {conn.id: conn for conn in connections}
 
@@ -505,7 +516,21 @@ class MultiDatabaseHandler:
         max_parallel = settings.MAX_PARALLEL_DATABASES
         semaphore = Semaphore(max_parallel)
 
-        logger.info(f"Parallel execution throttled to {max_parallel} concurrent databases")
+        # FIX #6: Metrics tracking
+        metrics = {
+            "total_queries": len(queries),
+            "max_concurrent": max_parallel,
+            "actual_concurrent": min(len(queries), max_parallel),
+            "successful_queries": 0,
+            "failed_queries": 0,
+            "elapsed_ms": 0,
+            "average_query_time_ms": 0,
+        }
+
+        logger.info(
+            f"Parallel execution throttled to {max_parallel} concurrent databases "
+            f"(executing {len(queries)} queries)"
+        )
 
         # FIX #3: Track metadata for each task (preserves connection context on exceptions)
         tasks = []
@@ -539,12 +564,35 @@ class MultiDatabaseHandler:
                 task_metadata.append({"connection": None, "query_info": query_info})
                 continue
 
-            # FIX #1: Wrap task with semaphore for throttling
+            # FIX #1 & #4: Wrap task with semaphore for throttling + timeout protection
             async def execute_with_semaphore(conn, sql_query, allow_w):
                 async with semaphore:
-                    return await self.execute_query_on_database(
-                        connection=conn, sql=sql_query, allow_write=allow_w
-                    )
+                    try:
+                        # FIX #4: Add timeout wrapper to prevent semaphore slot from being held forever
+                        # Use QUERY_TIMEOUT_SECONDS + 5 second buffer to allow for cleanup
+                        timeout = settings.QUERY_TIMEOUT_SECONDS + 5
+                        return await asyncio.wait_for(
+                            self.execute_query_on_database(
+                                connection=conn, sql=sql_query, allow_write=allow_w
+                            ),
+                            timeout=timeout
+                        )
+                    except asyncio.TimeoutError:
+                        # FIX #4: Handle timeout gracefully - don't hold semaphore
+                        logger.warning(
+                            f"Query timed out after {timeout}s for database '{conn.name}' "
+                            f"(ID: {conn.id})"
+                        )
+                        return {
+                            "success": False,
+                            "error": f"Query execution timed out after {timeout} seconds",
+                            "database_name": conn.name,
+                            "connection_id": conn.id,
+                            "database_type": conn.database_type,
+                            "data": [],
+                            "row_count": 0,
+                            "execution_time_ms": timeout * 1000,
+                        }
 
             # Add query execution task with semaphore throttling
             tasks.append(execute_with_semaphore(connection, sql, allow_write))
@@ -555,13 +603,22 @@ class MultiDatabaseHandler:
         logger.info(f"Executing {len(tasks)} database queries in parallel...")
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
+        # Calculate elapsed time
+        elapsed = time.time() - start_time
+        metrics["elapsed_ms"] = round(elapsed * 1000, 2)
+
         # FIX #3: Handle any exceptions from gather, preserving connection context
         processed_results = []
+        total_query_time_ms = 0
+
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 # Get connection metadata for this task
                 metadata = task_metadata[i]
                 connection = metadata.get("connection")
+
+                # FIX #6: Track failed query
+                metrics["failed_queries"] += 1
 
                 # Build error message with connection context
                 if connection:
@@ -589,7 +646,44 @@ class MultiDatabaseHandler:
                         "data": [],
                     })
             else:
+                # FIX #6: Track successful/failed queries and timing
+                if result.get("success"):
+                    metrics["successful_queries"] += 1
+                else:
+                    metrics["failed_queries"] += 1
+
+                # Track query execution time for average
+                query_time = result.get("execution_time_ms", 0)
+                total_query_time_ms += query_time
+
                 processed_results.append(result)
+
+        # Calculate average query time
+        if processed_results:
+            metrics["average_query_time_ms"] = round(total_query_time_ms / len(processed_results), 2)
+
+        # Calculate estimated sequential time (sum of all query times)
+        estimated_sequential_ms = total_query_time_ms
+        if estimated_sequential_ms > 0 and metrics["elapsed_ms"] > 0:
+            speedup = estimated_sequential_ms / metrics["elapsed_ms"]
+            metrics["estimated_sequential_ms"] = round(estimated_sequential_ms, 2)
+            metrics["speedup"] = round(speedup, 2)
+
+        # FIX #6: Log metrics
+        logger.info(
+            f"✓ Parallel execution complete: {metrics['successful_queries']}/{metrics['total_queries']} succeeded "
+            f"in {metrics['elapsed_ms']}ms (avg: {metrics['average_query_time_ms']}ms/query)"
+        )
+
+        if metrics.get("speedup"):
+            logger.info(
+                f"⚡ Speedup: {metrics['speedup']:.1f}x faster than sequential "
+                f"({metrics['estimated_sequential_ms']}ms → {metrics['elapsed_ms']}ms)"
+            )
+
+        # Store metrics in first result for API consumers (optional)
+        if processed_results:
+            processed_results[0]["_parallel_execution_metrics"] = metrics
 
         return processed_results
 

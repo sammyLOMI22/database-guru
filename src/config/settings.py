@@ -36,6 +36,7 @@ class Settings(BaseSettings):
 
     # Parallel Execution
     MAX_PARALLEL_DATABASES: int = 10  # Max concurrent database queries (prevents resource exhaustion)
+    PARALLEL_CORRECTIONS_TIMEOUT: int = 10  # Max seconds for all parallel correction strategies (prevents hanging)
 
     class Config:
         env_file = ".env"
