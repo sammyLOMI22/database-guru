@@ -1,6 +1,7 @@
 """Multi-database handler for querying across multiple databases"""
 import logging
 import asyncio
+from asyncio import Semaphore
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,7 @@ from src.core.schema_inspector import SchemaInspector
 from src.core.executor import SQLExecutor
 from src.llm.self_correcting_agent import SelfCorrectingSQLAgent
 from src.llm.sql_generator import SQLGenerator
+from src.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +249,81 @@ class MultiDatabaseHandler:
                 "execution_time_ms": 0,
             }
 
+    async def _execute_single_query_task(
+        self,
+        connection: DatabaseConnection,
+        question: str,
+        sql: str,
+        schema: str,
+        sql_generator: SQLGenerator,
+        combined_schema_data: Dict[str, Any],
+        allow_write: bool = False,
+        model_used: str = "unknown",
+    ) -> Dict[str, Any]:
+        """
+        Internal helper method to execute a single database query with self-correction
+        Used for parallel execution in multi-database queries
+
+        Args:
+            connection: Database connection
+            question: Natural language question
+            sql: Pre-generated SQL (can be empty for agent to generate)
+            schema: Schema for this database
+            sql_generator: SQL generator instance
+            combined_schema_data: Full schema data for all databases
+            allow_write: Allow write operations
+            model_used: LLM model name for tracking
+
+        Returns:
+            Dict with execution results and metadata (NOT including QueryHistory record)
+        """
+        try:
+            # Get individual schema for this database
+            db_schema = None
+            db_schema_dict = None
+            for db_info in combined_schema_data.get("databases", []):
+                if db_info.get("connection_id") == connection.id:
+                    # Store schema dict for location normalization
+                    db_schema_dict = {"tables": db_info.get("tables", {})}
+                    # Format schema for this specific database
+                    db_schema = self._format_single_db_schema(db_schema_dict)
+                    break
+
+            # Execute query with self-correction
+            exec_result = await self.execute_query_with_self_correction(
+                connection=connection,
+                question=question,
+                schema=db_schema or schema,
+                sql_generator=sql_generator,
+                initial_sql=sql,
+                allow_write=allow_write,
+                schema_dict=db_schema_dict,
+                model=model_used,
+            )
+
+            # Return result with connection metadata
+            return {
+                **exec_result,
+                "connection": connection,  # Include connection for later QueryHistory creation
+                "model_used": model_used,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to execute query on database '{connection.name}': {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "database_name": connection.name,
+                "connection_id": connection.id,
+                "connection": connection,
+                "model_used": model_used,
+                "data": [],
+                "row_count": 0,
+                "execution_time_ms": 0,
+                "total_attempts": 0,
+                "attempts": [],
+            }
+
     async def execute_query_with_self_correction(
         self,
         connection: DatabaseConnection,
@@ -259,6 +336,7 @@ class MultiDatabaseHandler:
         timeout_seconds: int = 30,
         max_retries: int = 3,
         schema_dict: Optional[Dict] = None,
+        model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Execute a SQL query on a specific database WITH self-correction
@@ -273,6 +351,8 @@ class MultiDatabaseHandler:
             max_rows: Maximum number of rows to return
             timeout_seconds: Query timeout in seconds
             max_retries: Maximum number of retry attempts
+            schema_dict: Optional schema dict for location normalization
+            model: Optional model name to use for SQL generation
 
         Returns:
             Dict with execution results including correction attempts
@@ -300,6 +380,7 @@ class MultiDatabaseHandler:
                         session=user_db,
                         database_type=connection.database_type,
                         question=question,
+                        model=model,
                     )
                 else:
                     # Generate SQL and execute with retry
@@ -310,6 +391,7 @@ class MultiDatabaseHandler:
                         database_type=connection.database_type,
                         allow_write=allow_write,
                         schema_dict=schema_dict,
+                        model=model,
                     )
 
                 # Add connection metadata
@@ -411,7 +493,7 @@ class MultiDatabaseHandler:
         allow_write: bool = False,
     ) -> List[Dict[str, Any]]:
         """
-        Execute multiple queries across different databases
+        Execute multiple queries across different databases IN PARALLEL
 
         Args:
             queries: List of dicts with 'connection_id' and 'sql' keys
@@ -421,42 +503,189 @@ class MultiDatabaseHandler:
         Returns:
             List of execution results, one per query
         """
+        import time
+
+        # Start timing for metrics
+        start_time = time.time()
+
         # Create connection lookup
         conn_lookup = {conn.id: conn for conn in connections}
 
-        results = []
+        # FIX #1: Add semaphore for max concurrent operations (prevents resource exhaustion)
+        settings = Settings()
+        max_parallel = settings.MAX_PARALLEL_DATABASES
+        semaphore = Semaphore(max_parallel)
+
+        # FIX #6: Metrics tracking
+        metrics = {
+            "total_queries": len(queries),
+            "max_concurrent": max_parallel,
+            "actual_concurrent": min(len(queries), max_parallel),
+            "successful_queries": 0,
+            "failed_queries": 0,
+            "elapsed_ms": 0,
+            "average_query_time_ms": 0,
+        }
+
+        logger.info(
+            f"Parallel execution throttled to {max_parallel} concurrent databases "
+            f"(executing {len(queries)} queries)"
+        )
+
+        # FIX #3: Track metadata for each task (preserves connection context on exceptions)
+        tasks = []
+        task_metadata = []  # Store connection info for error handling
+
         for query_info in queries:
             conn_id = query_info.get("connection_id")
             sql = query_info.get("sql")
 
             if not conn_id or not sql:
-                results.append(
-                    {
+                # For missing data, create a resolved future with error
+                async def error_result(msg):
+                    return {
                         "success": False,
-                        "error": "Missing connection_id or sql",
+                        "error": msg,
                         "data": [],
                     }
-                )
+                tasks.append(error_result("Missing connection_id or sql"))
+                task_metadata.append({"connection": None, "query_info": query_info})
                 continue
 
             connection = conn_lookup.get(conn_id)
             if not connection:
-                results.append(
-                    {
+                async def conn_error():
+                    return {
                         "success": False,
                         "error": f"Connection ID {conn_id} not found",
                         "data": [],
                     }
-                )
+                tasks.append(conn_error())
+                task_metadata.append({"connection": None, "query_info": query_info})
                 continue
 
-            # Execute query
-            result = await self.execute_query_on_database(
-                connection=connection, sql=sql, allow_write=allow_write
-            )
-            results.append(result)
+            # FIX #1 & #4: Wrap task with semaphore for throttling + timeout protection
+            async def execute_with_semaphore(conn, sql_query, allow_w):
+                async with semaphore:
+                    try:
+                        # FIX #4: Add timeout wrapper to prevent semaphore slot from being held forever
+                        # Use QUERY_TIMEOUT_SECONDS + 5 second buffer to allow for cleanup
+                        timeout = settings.QUERY_TIMEOUT_SECONDS + 5
+                        return await asyncio.wait_for(
+                            self.execute_query_on_database(
+                                connection=conn, sql=sql_query, allow_write=allow_w
+                            ),
+                            timeout=timeout
+                        )
+                    except asyncio.TimeoutError:
+                        # FIX #4: Handle timeout gracefully - don't hold semaphore
+                        logger.warning(
+                            f"Query timed out after {timeout}s for database '{conn.name}' "
+                            f"(ID: {conn.id})"
+                        )
+                        return {
+                            "success": False,
+                            "error": f"Query execution timed out after {timeout} seconds",
+                            "database_name": conn.name,
+                            "connection_id": conn.id,
+                            "database_type": conn.database_type,
+                            "data": [],
+                            "row_count": 0,
+                            "execution_time_ms": timeout * 1000,
+                        }
 
-        return results
+            # Add query execution task with semaphore throttling
+            tasks.append(execute_with_semaphore(connection, sql, allow_write))
+            task_metadata.append({"connection": connection, "query_info": query_info})
+
+        # Execute all queries in parallel (handles both async and sync/DuckDB via executor)
+        # return_exceptions=True ensures one failure doesn't stop others
+        logger.info(f"Executing {len(tasks)} database queries in parallel...")
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Calculate elapsed time
+        elapsed = time.time() - start_time
+        metrics["elapsed_ms"] = round(elapsed * 1000, 2)
+
+        # FIX #3: Handle any exceptions from gather, preserving connection context
+        processed_results = []
+        total_query_time_ms = 0
+
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                # Get connection metadata for this task
+                metadata = task_metadata[i]
+                connection = metadata.get("connection")
+
+                # FIX #6: Track failed query
+                metrics["failed_queries"] += 1
+
+                # Build error message with connection context
+                if connection:
+                    error_msg = (
+                        f"Exception in query for database '{connection.name}' "
+                        f"(ID: {connection.id}, Type: {connection.database_type}): {result}"
+                    )
+                    logger.error(error_msg)
+                    processed_results.append({
+                        "success": False,
+                        "error": str(result),
+                        "database_name": connection.name,
+                        "connection_id": connection.id,
+                        "database_type": connection.database_type,
+                        "data": [],
+                        "row_count": 0,
+                        "execution_time_ms": 0,
+                    })
+                else:
+                    # No connection info available (validation error)
+                    logger.error(f"Exception in parallel query {i}: {result}")
+                    processed_results.append({
+                        "success": False,
+                        "error": str(result),
+                        "data": [],
+                    })
+            else:
+                # FIX #6: Track successful/failed queries and timing
+                if result.get("success"):
+                    metrics["successful_queries"] += 1
+                else:
+                    metrics["failed_queries"] += 1
+
+                # Track query execution time for average
+                query_time = result.get("execution_time_ms", 0)
+                total_query_time_ms += query_time
+
+                processed_results.append(result)
+
+        # Calculate average query time
+        if processed_results:
+            metrics["average_query_time_ms"] = round(total_query_time_ms / len(processed_results), 2)
+
+        # Calculate estimated sequential time (sum of all query times)
+        estimated_sequential_ms = total_query_time_ms
+        if estimated_sequential_ms > 0 and metrics["elapsed_ms"] > 0:
+            speedup = estimated_sequential_ms / metrics["elapsed_ms"]
+            metrics["estimated_sequential_ms"] = round(estimated_sequential_ms, 2)
+            metrics["speedup"] = round(speedup, 2)
+
+        # FIX #6: Log metrics
+        logger.info(
+            f"✓ Parallel execution complete: {metrics['successful_queries']}/{metrics['total_queries']} succeeded "
+            f"in {metrics['elapsed_ms']}ms (avg: {metrics['average_query_time_ms']}ms/query)"
+        )
+
+        if metrics.get("speedup"):
+            logger.info(
+                f"⚡ Speedup: {metrics['speedup']:.1f}x faster than sequential "
+                f"({metrics['estimated_sequential_ms']}ms → {metrics['elapsed_ms']}ms)"
+            )
+
+        # Store metrics in first result for API consumers (optional)
+        if processed_results:
+            processed_results[0]["_parallel_execution_metrics"] = metrics
+
+        return processed_results
 
     def parse_multi_database_sql(self, llm_output: str) -> List[Dict[str, Any]]:
         """

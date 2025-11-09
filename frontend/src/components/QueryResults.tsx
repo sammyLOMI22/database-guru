@@ -1,11 +1,18 @@
 import { Copy, Check, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
-import { AgentTrace as AgentTraceType, QueryPlan, CorrectionAttempt } from '../types/api';
+import {
+  AgentTrace as AgentTraceType,
+  QueryPlan,
+  CorrectionAttempt,
+  ParallelExecutionMetrics,
+  ParallelCorrectionMetrics
+} from '../types/api';
 import { AgentTrace } from './AgentTrace';
 import { CorrectionHistory } from './CorrectionHistory';
 import { QueryPlanVisualization } from './QueryPlanVisualization';
 import { VerificationWarnings } from './VerificationWarnings';
 import { FeedbackModal, FeedbackData } from './FeedbackModal';
+import { ParallelDatabaseMetrics, ParallelCorrectionsMetrics } from './ParallelExecutionMetrics';
 import { feedbackAPI } from '../services/api';
 
 interface QueryResultsProps {
@@ -24,6 +31,9 @@ interface QueryResultsProps {
   totalAttempts?: number;
   verificationWarnings?: string[];
   usedPlanning?: boolean;
+  // Parallel Execution Metrics
+  parallelExecutionMetrics?: ParallelExecutionMetrics | null;
+  parallelCorrectionMetrics?: ParallelCorrectionMetrics | null;
 }
 
 export default function QueryResults({
@@ -41,6 +51,8 @@ export default function QueryResults({
   totalAttempts = 1,
   verificationWarnings = [],
   usedPlanning = false,
+  parallelExecutionMetrics,
+  parallelCorrectionMetrics,
 }: QueryResultsProps) {
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -119,6 +131,16 @@ export default function QueryResults({
       {/* Correction History */}
       {selfCorrected && attempts && attempts.length > 0 && (
         <CorrectionHistory attempts={attempts} selfCorrected={selfCorrected} />
+      )}
+
+      {/* Parallel Correction Metrics */}
+      {parallelCorrectionMetrics && (
+        <ParallelCorrectionsMetrics metrics={parallelCorrectionMetrics} />
+      )}
+
+      {/* Parallel Execution Metrics */}
+      {parallelExecutionMetrics && (
+        <ParallelDatabaseMetrics metrics={parallelExecutionMetrics} />
       )}
 
       {/* Query Plan */}

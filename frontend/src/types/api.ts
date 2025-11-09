@@ -40,6 +40,29 @@ export interface ConfidencePrediction {
   recommendation: string;
 }
 
+// Parallel Execution Metrics (Phase: Parallel Multi-Database Execution)
+export interface ParallelExecutionMetrics {
+  total_queries: number;
+  max_concurrent: number;
+  actual_concurrent: number;
+  successful_queries: number;
+  failed_queries: number;
+  elapsed_ms: number;
+  average_query_time_ms: number;
+  estimated_sequential_ms?: number;
+  speedup?: number;  // e.g., 3.0x faster
+}
+
+export interface ParallelCorrectionMetrics {
+  strategies_attempted: number;
+  strategies_succeeded: number;
+  strategies_failed: number;
+  strategies_timed_out: number;
+  winning_strategy: string | null;  // "quick_fix" | "learned" | "llm" | "llm_fallback_timeout"
+  elapsed_ms: number;
+  timed_out: boolean;
+}
+
 export interface CorrectionAttempt {
   attempt_number: number;
   sql: string;
@@ -50,6 +73,7 @@ export interface CorrectionAttempt {
   row_count?: number | null;
   fix_method?: string | null;
   confidence_prediction?: ConfidencePrediction | null;
+  metrics?: ParallelCorrectionMetrics | null;  // NEW: Parallel correction metrics
 }
 
 export interface QueryPlan {
@@ -312,6 +336,8 @@ export interface DatabaseQueryResult {
   total_attempts?: number;
   verification_warnings?: string[];
   used_planning?: boolean;
+  // Parallel Execution Metrics
+  _parallel_execution_metrics?: ParallelExecutionMetrics | null;
 }
 
 export interface MultiDatabaseQueryResponse {
