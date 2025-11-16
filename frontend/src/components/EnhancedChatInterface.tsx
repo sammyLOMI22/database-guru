@@ -30,6 +30,7 @@ export default function EnhancedChatInterface() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showContextPanel, setShowContextPanel] = useState(true);
   const [hasContext, setHasContext] = useState(false);
+  const [forceSchemaRefresh, setForceSchemaRefresh] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { loading, executeQuery } = useMultiQuery();
@@ -60,7 +61,11 @@ export default function EnhancedChatInterface() {
     try {
       const response = await executeQuery(question, currentSession, {
         model: selectedModel || undefined,
+        force_schema_refresh: forceSchemaRefresh,
       });
+
+      // Reset force refresh after query
+      setForceSchemaRefresh(false);
 
       // Add assistant response
       const assistantMessage: ChatMessage = {
@@ -167,6 +172,24 @@ export default function EnhancedChatInterface() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Force schema refresh checkbox */}
+              <div className="flex items-center space-x-2 px-3 py-1 rounded border border-gray-200 bg-gray-50">
+                <input
+                  type="checkbox"
+                  id="force-schema-refresh"
+                  checked={forceSchemaRefresh}
+                  onChange={(e) => setForceSchemaRefresh(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <label
+                  htmlFor="force-schema-refresh"
+                  className="text-xs text-gray-700 cursor-pointer select-none"
+                  title="Force re-introspection of database schema on next query (bypasses 30-min cache)"
+                >
+                  Force Schema Refresh
+                </label>
               </div>
 
               {/* Query count */}

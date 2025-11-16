@@ -134,15 +134,23 @@ async def process_query(
         # Connect to user's database for schema and query execution
         async with UserDatabaseConnector.get_user_db_session(active_connection) as user_db:
             # Get actual database schema from USER's database
-            schema_inspector = SchemaInspector()
             if request.schema:
                 # Use provided schema
                 schema = request.schema
             else:
-                # Auto-introspect schema from user's database
-                schema_data = await schema_inspector.get_full_schema(user_db)
+                # Auto-introspect schema from user's database (with caching)
+                from src.core.schema_cache import SchemaCache
+
+                schema_data = await SchemaCache.get_schema(
+                    connection_id=active_connection.id,
+                    connection_name=active_connection.name,
+                    user_db_session=user_db,
+                    force_refresh=request.force_schema_refresh
+                )
+
+                schema_inspector = SchemaInspector()
                 schema = schema_inspector.format_schema_for_llm(schema_data)
-                logger.debug(f"Using introspected schema with {len(schema_data['tables'])} tables")
+                logger.debug(f"Using schema with {len(schema_data['tables'])} tables")
 
             # Use Self-Correcting Agent for automatic error recovery
             self_correcting_agent = SelfCorrectingSQLAgent(

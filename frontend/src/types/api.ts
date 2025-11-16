@@ -8,6 +8,7 @@ export interface QueryRequest {
   allow_write?: boolean;
   use_cache?: boolean;
   session_id?: string;
+  force_schema_refresh?: boolean;
 }
 
 // Option 2: Observability Types
@@ -315,6 +316,7 @@ export interface MultiDatabaseQueryRequest {
   allow_write?: boolean;
   use_cache?: boolean;
   model?: string;
+  force_schema_refresh?: boolean;
 }
 
 export interface DatabaseQueryResult {
