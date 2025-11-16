@@ -557,5 +557,178 @@ class TestAggregationSpec:
         assert agg.column is None
 
 
+class TestMappingIntegration:
+    """Test learned mapping integration with query planning"""
+
+    @pytest.mark.asyncio
+    async def test_apply_learned_mappings_to_generated_sql(self, mock_settings, mock_ollama_client, sample_schema):
+        """Test that learned column and table mappings are applied to generated SQL"""
+        # Mock database session
+        mock_db_session = AsyncMock()
+
+        # Create agent with db_session
+        agent = QueryPlanningAgent(
+            settings=mock_settings,
+            ollama_client=mock_ollama_client,
+            enable_planning=True,
+            db_session=mock_db_session
+        )
+
+        # Mock query plan (complex query to trigger planning)
+        mock_plan_json = {
+            "intent": "Find total revenue by category for high-priced products",
+            "complexity": "complex",
+            "tables": [{"name": "products", "alias": "p", "purpose": "Get products"}],
+            "joins": [],
+            "filters": [
+                {"column": "price", "operator": ">", "value": "100", "purpose": "High price filter"}
+            ],
+            "aggregations": [
+                {"function": "SUM", "column": "price", "alias": "total_revenue", "purpose": "Calculate total"}
+            ],
+            "grouping": {"columns": ["category"], "purpose": "Group by category"},
+            "ordering": {"column": "total_revenue", "direction": "DESC", "purpose": "Highest first"},
+            "limit": None,
+            "reasoning": "Complex query with aggregation and grouping",
+            "confidence": 0.9
+        }
+
+        mock_ollama_client.chat.return_value = json.dumps(mock_plan_json)
+
+        # Mock SQL generator
+        mock_sql_generator = AsyncMock()
+        mock_sql_generator.generate_sql = AsyncMock(return_value={
+            "sql": "SELECT category, SUM(price) as total_revenue FROM products WHERE price > 100 GROUP BY category ORDER BY total_revenue DESC",
+            "confidence": 0.9
+        })
+
+        # Mock ColumnMapper and TableMapper
+        with patch('src.llm.query_planning_agent.ColumnMapper') as MockColumnMapper, \
+             patch('src.llm.query_planning_agent.TableMapper') as MockTableMapper:
+
+            # Mock column mapper
+            mock_column_mapper_instance = AsyncMock()
+            mock_column_mapper_instance.apply_mappings = AsyncMock(return_value=(
+                "SELECT category, SUM(unit_price) as total_revenue FROM products WHERE unit_price > 100 GROUP BY category ORDER BY total_revenue DESC",  # Applied column mapping
+                [{"source": "price", "target": "unit_price", "table": "products"}]
+            ))
+            MockColumnMapper.return_value = mock_column_mapper_instance
+
+            # Mock table mapper
+            mock_table_mapper_instance = AsyncMock()
+            mock_table_mapper_instance.apply_mappings = AsyncMock(return_value=(
+                "SELECT category, SUM(unit_price) as total_revenue FROM product_catalog WHERE unit_price > 100 GROUP BY category ORDER BY total_revenue DESC",  # Applied table mapping
+                [{"source": "products", "target": "product_catalog"}]
+            ))
+            MockTableMapper.return_value = mock_table_mapper_instance
+
+            # Execute plan_and_generate_sql with connection_name (use complex question to trigger planning)
+            # Question contains: "top" (+0.2), "total" (+0.2), "by category" (+0.2) = 0.6 complexity
+            result = await agent.plan_and_generate_sql(
+                question="Show me the top total revenue by category for products",
+                schema=sample_schema,
+                database_type="postgresql",
+                sql_generator=mock_sql_generator,
+                connection_name="test_connection"
+            )
+
+            # Verify planning was used
+            assert result["used_planning"] == True
+            assert result["plan"] is not None
+
+            # Verify SQL was generated
+            assert result["sql"] is not None
+
+            # Verify mappings were applied
+            assert "mappings_applied" in result
+            assert "column_mappings" in result["mappings_applied"]
+            assert "table_mappings" in result["mappings_applied"]
+
+            # Verify column mapper was called
+            mock_column_mapper_instance.apply_mappings.assert_called_once()
+            col_call_args = mock_column_mapper_instance.apply_mappings.call_args
+            assert col_call_args.kwargs["connection_name"] == "test_connection"
+            assert col_call_args.kwargs["database_type"] == "postgresql"
+
+            # Verify table mapper was called
+            mock_table_mapper_instance.apply_mappings.assert_called_once()
+            tbl_call_args = mock_table_mapper_instance.apply_mappings.call_args
+            assert tbl_call_args.kwargs["connection_name"] == "test_connection"
+            assert tbl_call_args.kwargs["database_type"] == "postgresql"
+
+            # Verify final SQL has both mappings applied
+            assert result["sql"] == "SELECT category, SUM(unit_price) as total_revenue FROM product_catalog WHERE unit_price > 100 GROUP BY category ORDER BY total_revenue DESC"
+
+    @pytest.mark.asyncio
+    async def test_no_mappings_without_connection_name(self, mock_settings, mock_ollama_client, sample_schema):
+        """Test that mappings are NOT applied when connection_name is not provided"""
+        # Mock database session
+        mock_db_session = AsyncMock()
+
+        # Create agent with db_session
+        agent = QueryPlanningAgent(
+            settings=mock_settings,
+            ollama_client=mock_ollama_client,
+            enable_planning=True,
+            db_session=mock_db_session
+        )
+
+        # Mock query plan (complex to trigger planning)
+        mock_plan_json = {
+            "intent": "Count products by category",
+            "complexity": "moderate",
+            "tables": [{"name": "products", "alias": "p", "purpose": "Test"}],
+            "joins": [],
+            "filters": [],
+            "aggregations": [
+                {"function": "COUNT", "column": "*", "alias": "total", "purpose": "Count"}
+            ],
+            "grouping": {"columns": ["category"], "purpose": "Group by category"},
+            "ordering": None,
+            "limit": None,
+            "reasoning": "Test aggregation",
+            "confidence": 0.9
+        }
+
+        mock_ollama_client.chat.return_value = json.dumps(mock_plan_json)
+
+        # Mock SQL generator
+        mock_sql_generator = AsyncMock()
+        original_sql = "SELECT category, COUNT(*) as total FROM products GROUP BY category"
+        mock_sql_generator.generate_sql = AsyncMock(return_value={
+            "sql": original_sql,
+            "confidence": 0.9
+        })
+
+        # Mock ColumnMapper and TableMapper
+        with patch('src.llm.query_planning_agent.ColumnMapper') as MockColumnMapper, \
+             patch('src.llm.query_planning_agent.TableMapper') as MockTableMapper:
+
+            mock_column_mapper_instance = AsyncMock()
+            mock_table_mapper_instance = AsyncMock()
+            MockColumnMapper.return_value = mock_column_mapper_instance
+            MockTableMapper.return_value = mock_table_mapper_instance
+
+            # Execute WITHOUT connection_name (use complex question to trigger planning)
+            # Question contains: "top" (+0.2), "count" (+0.2), "by category" (+0.2) = 0.6 complexity
+            result = await agent.plan_and_generate_sql(
+                question="Show me top count by category",
+                schema=sample_schema,
+                database_type="postgresql",
+                sql_generator=mock_sql_generator,
+                connection_name=None  # No connection name
+            )
+
+            # Verify SQL is unchanged (no mappings applied)
+            assert result["sql"] == original_sql
+
+            # Verify mappers were NOT called
+            mock_column_mapper_instance.apply_mappings.assert_not_called()
+            mock_table_mapper_instance.apply_mappings.assert_not_called()
+
+            # Verify no mappings_applied field
+            assert "mappings_applied" not in result
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

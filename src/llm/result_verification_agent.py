@@ -6,6 +6,9 @@ from enum import Enum
 from datetime import datetime
 import re
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.llm.result_pattern_learner import ResultPatternLearner
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,7 +61,8 @@ class ResultVerificationAgent:
         self,
         enable_diagnostics: bool = True,
         enable_auto_fix: bool = True,
-        extreme_value_threshold: float = 1e9
+        extreme_value_threshold: float = 1e9,
+        db_session: Optional[AsyncSession] = None
     ):
         """
         Initialize the result verification agent
@@ -67,10 +71,12 @@ class ResultVerificationAgent:
             enable_diagnostics: Whether to run diagnostic queries
             enable_auto_fix: Whether to attempt automatic fixes
             extreme_value_threshold: Threshold for detecting extreme values
+            db_session: Optional database session for checking learned patterns
         """
         self.enable_diagnostics = enable_diagnostics
         self.enable_auto_fix = enable_auto_fix
         self.extreme_value_threshold = extreme_value_threshold
+        self.db_session = db_session
 
     async def verify_results(
         self,
@@ -78,7 +84,9 @@ class ResultVerificationAgent:
         sql: str,
         result: Dict[str, Any],
         schema: str,
-        database_type: str = "postgresql"
+        database_type: str = "postgresql",
+        connection_name: Optional[str] = None,
+        table_name: Optional[str] = None
     ) -> VerificationResult:
         """
         Verify if query results make sense
@@ -89,6 +97,8 @@ class ResultVerificationAgent:
             result: Query execution result
             schema: Database schema
             database_type: Type of database
+            connection_name: Optional database connection name for pattern matching
+            table_name: Optional primary table name for pattern matching
 
         Returns:
             VerificationResult with details about any issues found
@@ -105,6 +115,34 @@ class ResultVerificationAgent:
         data = result.get("data", [])
         columns = result.get("columns", [])
         row_count = result.get("row_count", 0)
+
+        # Check 0: Learned patterns (if available)
+        if self.db_session and connection_name:
+            try:
+                pattern_learner = ResultPatternLearner(db_session=self.db_session)
+                pattern_result = await pattern_learner.validate_result(
+                    sql=sql,
+                    result_data=data,
+                    row_count=row_count,
+                    table_name=table_name
+                )
+
+                if not pattern_result.is_valid:
+                    logger.warning(
+                        f"⚠️ Learned pattern detected issue: {pattern_result.message}"
+                    )
+
+                    return VerificationResult(
+                        is_suspicious=True,
+                        confidence=0.8,
+                        issue_type=VerificationIssue.EMPTY_RESULT if pattern_result.pattern_type == "empty_result" else VerificationIssue.NO_ISSUE,
+                        description=f"Learned pattern detected: {pattern_result.message}",
+                        suggested_fix=pattern_result.suggestion,
+                        diagnostic_queries=None
+                    )
+            except Exception as e:
+                logger.debug(f"Failed to check learned patterns: {e}")
+                # Continue with other checks if pattern check fails
 
         # Check 1: Empty results
         if row_count == 0:

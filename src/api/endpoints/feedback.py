@@ -17,12 +17,188 @@ from src.database.models import UserFeedback, QueryHistory, DatabaseConnection, 
 from src.llm.correction_learner import CorrectionLearner
 from src.llm.self_correcting_agent import ErrorType, ErrorDiagnostics
 from src.llm.feedback_validator import FeedbackValidator
+from src.llm.column_mapper import ColumnMapper
+from src.llm.table_mapper import TableMapper
+from src.llm.result_pattern_learner import ResultPatternLearner
 from src.core.executor import SQLExecutor
 from src.core.user_db_connector import UserDatabaseConnector
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/feedback", tags=["Feedback"])
+
+
+async def _handle_non_sql_feedback(
+    feedback: FeedbackCreate,
+    feedback_record: UserFeedback,
+    query: QueryHistory,
+    db: AsyncSession
+) -> None:
+    """
+    Handle non-SQL feedback types: column_name, table_name, result_issue
+
+    This function applies the learned patterns from user feedback to the
+    appropriate mapper/learner system.
+    """
+    try:
+        # Get connection_name from query's database connection
+        connection_name = "unknown"
+        if query.database_connection_id:
+            conn_result = await db.execute(
+                select(DatabaseConnection).where(DatabaseConnection.id == query.database_connection_id)
+            )
+            conn = conn_result.scalar_one_or_none()
+            if conn:
+                connection_name = conn.name
+            else:
+                logger.warning(
+                    f"Database connection {query.database_connection_id} not found for query {query.id}"
+                )
+
+        # Extract correction details
+        correction_details = feedback.correction_details or {}
+
+        # Handle column name corrections
+        if feedback.feedback_type == "column_name":
+            source_column = correction_details.get("source_column") or correction_details.get("from")
+            target_column = correction_details.get("target_column") or correction_details.get("to")
+            table_name = correction_details.get("table_name")
+
+            if not source_column or not target_column:
+                logger.warning(
+                    f"Column name feedback missing required fields: {correction_details} "
+                    f"(feedback_id={feedback_record.id})"
+                )
+                return
+
+            logger.info(
+                f"📋 Processing column name feedback: {source_column} → {target_column} "
+                f"in table '{table_name or 'any'}' (connection={connection_name})"
+            )
+
+            column_mapper = ColumnMapper(db_session=db)
+            mapping_id = await column_mapper.learn_from_feedback(
+                source_column=source_column,
+                target_column=target_column,
+                table_name=table_name,
+                connection_name=connection_name,
+                database_type=query.database_type,
+                feedback_id=feedback_record.id,
+                description=feedback.correction_description,
+                confidence_score=feedback.user_confidence
+            )
+
+            # Update feedback record with mapping ID
+            feedback_record.applied_successfully = True
+            feedback_record.applied_at = datetime.utcnow()
+            feedback_record.user_notes = (
+                f"{feedback_record.user_notes or ''}\n\n"
+                f"[AUTO-LEARNED] Column mapping created: id={mapping_id}"
+            ).strip()
+
+            await db.commit()
+
+            logger.info(
+                f"✅ Column mapping learned: {source_column} → {target_column} "
+                f"(mapping_id={mapping_id}, feedback_id={feedback_record.id})"
+            )
+
+        # Handle table name corrections
+        elif feedback.feedback_type == "table_name":
+            source_table = correction_details.get("source_table") or correction_details.get("from")
+            target_table = correction_details.get("target_table") or correction_details.get("to")
+            mapping_type = correction_details.get("mapping_type", "alias")
+
+            if not source_table or not target_table:
+                logger.warning(
+                    f"Table name feedback missing required fields: {correction_details} "
+                    f"(feedback_id={feedback_record.id})"
+                )
+                return
+
+            logger.info(
+                f"📋 Processing table name feedback: {source_table} → {target_table} "
+                f"(connection={connection_name}, type={mapping_type})"
+            )
+
+            table_mapper = TableMapper(db_session=db)
+            mapping_id = await table_mapper.learn_from_feedback(
+                source_table=source_table,
+                target_table=target_table,
+                connection_name=connection_name,
+                database_type=query.database_type,
+                feedback_id=feedback_record.id,
+                description=feedback.correction_description,
+                mapping_type=mapping_type,
+                confidence_score=feedback.user_confidence
+            )
+
+            # Update feedback record with mapping ID
+            feedback_record.applied_successfully = True
+            feedback_record.applied_at = datetime.utcnow()
+            feedback_record.user_notes = (
+                f"{feedback_record.user_notes or ''}\n\n"
+                f"[AUTO-LEARNED] Table mapping created: id={mapping_id}"
+            ).strip()
+
+            await db.commit()
+
+            logger.info(
+                f"✅ Table mapping learned: {source_table} → {target_table} "
+                f"(mapping_id={mapping_id}, feedback_id={feedback_record.id})"
+            )
+
+        # Handle result validation issues
+        elif feedback.feedback_type == "result_issue":
+            pattern_type = correction_details.get("pattern_type", "empty_result")
+            matching_criteria = correction_details.get("matching_criteria", {})
+            action = correction_details.get("action", "warn_user")
+            suggestion = correction_details.get("suggestion")
+
+            if not matching_criteria:
+                logger.warning(
+                    f"Result issue feedback missing matching_criteria: {correction_details} "
+                    f"(feedback_id={feedback_record.id})"
+                )
+                return
+
+            logger.info(
+                f"📋 Processing result issue feedback: type={pattern_type}, "
+                f"criteria={matching_criteria}"
+            )
+
+            pattern_learner = ResultPatternLearner(db_session=db)
+            pattern_id = await pattern_learner.learn_from_feedback(
+                pattern_type=pattern_type,
+                pattern_description=feedback.correction_description or f"User-reported {pattern_type}",
+                matching_criteria=matching_criteria,
+                action=action,
+                feedback_id=feedback_record.id,
+                suggestion=suggestion,
+                confidence_score=feedback.user_confidence
+            )
+
+            # Update feedback record with pattern ID
+            feedback_record.applied_successfully = True
+            feedback_record.applied_at = datetime.utcnow()
+            feedback_record.user_notes = (
+                f"{feedback_record.user_notes or ''}\n\n"
+                f"[AUTO-LEARNED] Validation pattern created: id={pattern_id}"
+            ).strip()
+
+            await db.commit()
+
+            logger.info(
+                f"✅ Result pattern learned: type={pattern_type} "
+                f"(pattern_id={pattern_id}, feedback_id={feedback_record.id})"
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Failed to handle non-SQL feedback (feedback_id={feedback_record.id}): {e}",
+            exc_info=True
+        )
+        # Don't raise - feedback is already saved, just log the error
 
 
 @router.post("/", response_model=FeedbackResponse, status_code=status.HTTP_201_CREATED)
@@ -83,6 +259,15 @@ async def submit_feedback(
             f"type={feedback.feedback_type}, query_id={feedback.query_id}, "
             f"confidence={feedback.user_confidence}"
         )
+
+        # Handle non-SQL feedback types (column_name, table_name, result_issue)
+        if feedback.feedback_type in ["column_name", "table_name", "result_issue"]:
+            await _handle_non_sql_feedback(
+                feedback=feedback,
+                feedback_record=feedback_record,
+                query=query,
+                db=db
+            )
 
         # Get system settings for auto-learning
         settings_stmt = select(SystemSettings).limit(1)

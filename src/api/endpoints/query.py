@@ -148,7 +148,8 @@ async def process_query(
             self_correcting_agent = SelfCorrectingSQLAgent(
                 sql_generator=sql_generator,
                 max_retries=3,
-                enable_diagnostics=True
+                enable_diagnostics=True,
+                planning_session=db  # Pass metadata db session for learned mappings
             )
 
             # Generate and execute with automatic retry
@@ -160,6 +161,7 @@ async def process_query(
                 database_type=database_type,
                 allow_write=request.allow_write,
                 model=request.model,
+                connection_name=active_connection.name  # Pass connection name for learned mappings
             )
 
             # Extract results from agent
