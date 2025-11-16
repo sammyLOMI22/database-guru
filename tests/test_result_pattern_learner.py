@@ -19,6 +19,7 @@ from src.llm.result_pattern_learner import (
     PatternType,
     PatternAction
 )
+from src.llm.mapping_cache import reset_mapping_cache
 
 
 @pytest.fixture
@@ -67,6 +68,8 @@ async def db_session():
 @pytest.fixture
 async def pattern_learner(db_session: AsyncSession) -> ResultPatternLearner:
     """Create a ResultPatternLearner instance for testing"""
+    # Reset cache before each test to ensure clean state
+    reset_mapping_cache()
     return ResultPatternLearner(db_session=db_session)
 
 

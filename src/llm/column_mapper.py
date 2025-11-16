@@ -15,6 +15,8 @@ from difflib import SequenceMatcher
 from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.llm.mapping_cache import get_mapping_cache
+
 logger = logging.getLogger(__name__)
 
 
@@ -499,7 +501,28 @@ class ColumnMapper:
         Priority:
         1. Table-specific mappings for this table in this connection
         2. Global mappings (table_name IS NULL) for this connection
+
+        Uses in-memory cache to avoid repeated database queries.
+        Cache TTL: 5 minutes (300s)
         """
+        # Generate cache key
+        cache_key = f"col_mappings:{connection_name}:{database_type}:{table_name or 'global'}"
+
+        # Try cache first
+        cache = get_mapping_cache()
+        cached_mappings = cache.get(cache_key)
+
+        if cached_mappings is not None:
+            logger.debug(
+                f"✅ Cache HIT for column mappings: {connection_name}/{database_type}/{table_name or 'global'}"
+            )
+            return cached_mappings
+
+        # Cache MISS - query database
+        logger.debug(
+            f"❌ Cache MISS for column mappings: {connection_name}/{database_type}/{table_name or 'global'}"
+        )
+
         result = await self.db_session.execute(
             text("""
                 SELECT
@@ -534,6 +557,9 @@ class ColumnMapper:
                 times_applied=row[7],
                 description=row[8]
             ))
+
+        # Store in cache (5 minute TTL)
+        cache.set(cache_key, mappings, ttl=300)
 
         return mappings
 

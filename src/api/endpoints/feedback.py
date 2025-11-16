@@ -20,6 +20,7 @@ from src.llm.feedback_validator import FeedbackValidator
 from src.llm.column_mapper import ColumnMapper
 from src.llm.table_mapper import TableMapper
 from src.llm.result_pattern_learner import ResultPatternLearner
+from src.llm.mapping_cache import get_mapping_cache
 from src.core.executor import SQLExecutor
 from src.core.user_db_connector import UserDatabaseConnector
 
@@ -98,6 +99,11 @@ async def _handle_non_sql_feedback(
 
             await db.commit()
 
+            # Invalidate cache for this connection/database/table
+            cache = get_mapping_cache()
+            cache.invalidate_pattern(f"col_mappings:{connection_name}:{query.database_type}:*")
+            logger.debug(f"🗑️  Invalidated column mapping cache for {connection_name}/{query.database_type}")
+
             logger.info(
                 f"✅ Column mapping learned: {source_column} → {target_column} "
                 f"(mapping_id={mapping_id}, feedback_id={feedback_record.id})"
@@ -143,6 +149,11 @@ async def _handle_non_sql_feedback(
 
             await db.commit()
 
+            # Invalidate cache for this connection/database
+            cache = get_mapping_cache()
+            cache.invalidate_pattern(f"tbl_mappings:{connection_name}:{query.database_type}")
+            logger.debug(f"🗑️  Invalidated table mapping cache for {connection_name}/{query.database_type}")
+
             logger.info(
                 f"✅ Table mapping learned: {source_table} → {target_table} "
                 f"(mapping_id={mapping_id}, feedback_id={feedback_record.id})"
@@ -187,6 +198,11 @@ async def _handle_non_sql_feedback(
             ).strip()
 
             await db.commit()
+
+            # Invalidate cache for result patterns
+            cache = get_mapping_cache()
+            cache.invalidate_pattern("result_patterns:*")
+            logger.debug(f"🗑️  Invalidated result pattern cache")
 
             logger.info(
                 f"✅ Result pattern learned: type={pattern_type} "

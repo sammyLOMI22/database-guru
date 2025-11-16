@@ -17,6 +17,7 @@ from src.llm.column_mapper import (
     column_similarity,
     find_similar_columns
 )
+from src.llm.mapping_cache import reset_mapping_cache
 
 
 @pytest.fixture
@@ -68,6 +69,8 @@ async def db_session():
 @pytest.fixture
 async def column_mapper(db_session: AsyncSession) -> ColumnMapper:
     """Create a ColumnMapper instance for testing"""
+    # Reset cache before each test to ensure clean state
+    reset_mapping_cache()
     return ColumnMapper(db_session=db_session)
 
 

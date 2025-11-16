@@ -16,6 +16,8 @@ from enum import Enum
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.llm.mapping_cache import get_mapping_cache
+
 logger = logging.getLogger(__name__)
 
 
@@ -473,7 +475,30 @@ class ResultPatternLearner:
         pattern_type: Optional[str],
         min_confidence: float = 0.6
     ) -> List[ResultPattern]:
-        """Get all applicable validation patterns"""
+        """
+        Get all applicable validation patterns
+
+        Uses in-memory cache to avoid repeated database queries.
+        Cache TTL: 5 minutes (300s)
+        """
+        # Generate cache key
+        cache_key = f"result_patterns:{pattern_type or 'all'}:{min_confidence}"
+
+        # Try cache first
+        cache = get_mapping_cache()
+        cached_patterns = cache.get(cache_key)
+
+        if cached_patterns is not None:
+            logger.debug(
+                f"✅ Cache HIT for result patterns: {pattern_type or 'all'}/{min_confidence}"
+            )
+            return cached_patterns
+
+        # Cache MISS - query database
+        logger.debug(
+            f"❌ Cache MISS for result patterns: {pattern_type or 'all'}/{min_confidence}"
+        )
+
         where_clause = ""
         params: Dict[str, Any] = {"min_confidence": min_confidence}
 
@@ -491,6 +516,7 @@ class ResultPatternLearner:
                 FROM result_validation_patterns
                 {where_clause}
                 ORDER BY confidence_score DESC, times_helpful DESC
+                LIMIT 50
             """),
             params
         )
@@ -508,6 +534,9 @@ class ResultPatternLearner:
                 times_triggered=row[7],
                 times_helpful=row[8]
             ))
+
+        # Store in cache (5 minute TTL)
+        cache.set(cache_key, patterns, ttl=300)
 
         return patterns
 

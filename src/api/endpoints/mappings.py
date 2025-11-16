@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
 from src.api.dependencies.common import get_db
+from src.llm.mapping_cache import get_mapping_cache
 
 logger = logging.getLogger(__name__)
 
@@ -218,6 +219,11 @@ async def delete_column_mapping(
         delete_query = text("DELETE FROM column_mappings WHERE id = :id")
         await db.execute(delete_query, {"id": mapping_id})
         await db.commit()
+
+        # Invalidate all column mapping caches (we don't know which connection/db_type was affected)
+        cache = get_mapping_cache()
+        cache.invalidate_pattern("col_mappings:*")
+        logger.debug(f"🗑️  Invalidated all column mapping caches after deletion")
 
         logger.info(f"Deleted column mapping: id={mapping_id}")
 
@@ -462,6 +468,11 @@ async def delete_table_mapping(
         await db.execute(delete_query, {"id": mapping_id})
         await db.commit()
 
+        # Invalidate all table mapping caches (we don't know which connection/db_type was affected)
+        cache = get_mapping_cache()
+        cache.invalidate_pattern("tbl_mappings:*")
+        logger.debug(f"🗑️  Invalidated all table mapping caches after deletion")
+
         logger.info(f"Deleted table mapping: id={mapping_id}")
 
     except HTTPException:
@@ -705,6 +716,11 @@ async def delete_result_pattern(
         delete_query = text("DELETE FROM result_validation_patterns WHERE id = :id")
         await db.execute(delete_query, {"id": pattern_id})
         await db.commit()
+
+        # Invalidate all result pattern caches
+        cache = get_mapping_cache()
+        cache.invalidate_pattern("result_patterns:*")
+        logger.debug(f"🗑️  Invalidated all result pattern caches after deletion")
 
         logger.info(f"Deleted result pattern: id={pattern_id}")
 

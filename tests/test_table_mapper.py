@@ -17,6 +17,7 @@ from src.llm.table_mapper import (
     table_similarity,
     find_similar_tables
 )
+from src.llm.mapping_cache import reset_mapping_cache
 
 
 @pytest.fixture
@@ -68,6 +69,8 @@ async def db_session():
 @pytest.fixture
 async def table_mapper(db_session: AsyncSession) -> TableMapper:
     """Create a TableMapper instance for testing"""
+    # Reset cache before each test to ensure clean state
+    reset_mapping_cache()
     return TableMapper(db_session=db_session)
 
 
