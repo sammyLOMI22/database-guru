@@ -243,7 +243,7 @@ class SystemSettings(Base):
 
     # Auto-Learning Settings
     auto_learning_enabled = Column(Boolean, default=False, nullable=False)
-    confidence_threshold = Column(Float, default=0.80, nullable=False)  # 0.0-1.0
+    confidence_threshold = Column(Float, default=0.75, nullable=False)  # 0.0-1.0 (lowered from 0.80 to increase auto-approval rate)
     apply_mode = Column(String(20), default="immediate", nullable=False)  # "immediate" or "deferred"
     test_before_learning = Column(Boolean, default=True, nullable=False)
     validation_mode = Column(String(20), default="strict", nullable=False)  # "strict", "moderate", "lenient"

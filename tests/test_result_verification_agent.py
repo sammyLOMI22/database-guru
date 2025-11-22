@@ -370,6 +370,164 @@ class TestResultVerificationAgent:
             assert len(diagnostics.sample_data) == 2
 
 
+class TestLearnedPatternIntegration:
+    """Test integration with learned result validation patterns"""
+
+    @pytest.mark.asyncio
+    async def test_learned_pattern_detects_empty_result_issue(self):
+        """Test that learned patterns detect known empty result issues"""
+        # Mock database session
+        mock_db_session = AsyncMock()
+
+        # Create agent with db_session
+        agent = ResultVerificationAgent(
+            enable_diagnostics=True,
+            enable_auto_fix=True,
+            db_session=mock_db_session
+        )
+
+        question = "Show me inactive users"
+        sql = "SELECT * FROM users WHERE status = 'inactive'"
+        result = {
+            "success": True,
+            "data": [],
+            "columns": ["id", "name", "status"],
+            "row_count": 0
+        }
+        schema = '{"tables": [{"name": "users", "columns": ["id", "name", "status"]}]}'
+
+        # Mock ResultPatternLearner
+        with patch('src.llm.result_verification_agent.ResultPatternLearner') as MockPatternLearner:
+            mock_pattern_learner = AsyncMock()
+
+            # Mock pattern validation result indicating an issue was detected
+            mock_validation_result = MagicMock()
+            mock_validation_result.is_valid = False
+            mock_validation_result.message = "Empty result for status='inactive' query - likely no inactive users exist"
+            mock_validation_result.suggestion = "Check if there are any users with status='inactive' in the database"
+            mock_validation_result.pattern_type = "empty_result"
+
+            mock_pattern_learner.validate_result = AsyncMock(return_value=mock_validation_result)
+            MockPatternLearner.return_value = mock_pattern_learner
+
+            # Verify results with connection_name to trigger pattern check
+            verification = await agent.verify_results(
+                question=question,
+                sql=sql,
+                result=result,
+                schema=schema,
+                database_type="postgresql",
+                connection_name="test_connection",
+                table_name="users"
+            )
+
+            # Verify pattern learner was called
+            MockPatternLearner.assert_called_once_with(db_session=mock_db_session)
+            mock_pattern_learner.validate_result.assert_called_once_with(
+                sql=sql,
+                result_data=[],
+                row_count=0,
+                table_name="users"
+            )
+
+            # Verify verification result indicates issue was detected
+            assert verification.is_suspicious is True
+            assert verification.confidence == 0.8
+            assert verification.issue_type == VerificationIssue.EMPTY_RESULT
+            assert "learned pattern detected" in verification.description.lower()
+            assert verification.suggested_fix == "Check if there are any users with status='inactive' in the database"
+
+    @pytest.mark.asyncio
+    async def test_no_pattern_check_without_connection_name(self):
+        """Test that patterns are NOT checked when connection_name is missing"""
+        # Mock database session
+        mock_db_session = AsyncMock()
+
+        # Create agent with db_session
+        agent = ResultVerificationAgent(
+            enable_diagnostics=True,
+            db_session=mock_db_session
+        )
+
+        question = "Show me users"
+        sql = "SELECT * FROM users"
+        result = {
+            "success": True,
+            "data": [{"id": 1, "name": "Test"}],
+            "columns": ["id", "name"],
+            "row_count": 1
+        }
+        schema = '{"tables": [{"name": "users", "columns": ["id", "name"]}]}'
+
+        # Mock ResultPatternLearner
+        with patch('src.llm.result_verification_agent.ResultPatternLearner') as MockPatternLearner:
+            mock_pattern_learner = AsyncMock()
+            MockPatternLearner.return_value = mock_pattern_learner
+
+            # Verify WITHOUT connection_name
+            verification = await agent.verify_results(
+                question=question,
+                sql=sql,
+                result=result,
+                schema=schema,
+                database_type="postgresql",
+                connection_name=None  # No connection name
+            )
+
+            # Verify pattern learner was NOT called
+            MockPatternLearner.assert_not_called()
+            mock_pattern_learner.validate_result.assert_not_called()
+
+            # Verify normal validation continues
+            assert verification.is_suspicious is False
+            assert verification.issue_type == VerificationIssue.NO_ISSUE
+
+    @pytest.mark.asyncio
+    async def test_pattern_check_gracefully_handles_errors(self):
+        """Test that errors in pattern checking don't break verification"""
+        # Mock database session
+        mock_db_session = AsyncMock()
+
+        # Create agent with db_session
+        agent = ResultVerificationAgent(
+            enable_diagnostics=True,
+            db_session=mock_db_session
+        )
+
+        question = "Show me products"
+        sql = "SELECT * FROM products"
+        result = {
+            "success": True,
+            "data": [{"id": 1, "name": "Widget"}],
+            "columns": ["id", "name"],
+            "row_count": 1
+        }
+        schema = '{"tables": [{"name": "products", "columns": ["id", "name"]}]}'
+
+        # Mock ResultPatternLearner to raise an exception
+        with patch('src.llm.result_verification_agent.ResultPatternLearner') as MockPatternLearner:
+            mock_pattern_learner = AsyncMock()
+            mock_pattern_learner.validate_result = AsyncMock(side_effect=Exception("Database error"))
+            MockPatternLearner.return_value = mock_pattern_learner
+
+            # Verify with connection_name (pattern check will fail)
+            verification = await agent.verify_results(
+                question=question,
+                sql=sql,
+                result=result,
+                schema=schema,
+                database_type="postgresql",
+                connection_name="test_connection"
+            )
+
+            # Verify pattern check was attempted
+            MockPatternLearner.assert_called_once()
+
+            # Verify normal validation continues despite error
+            assert verification.is_suspicious is False
+            assert verification.issue_type == VerificationIssue.NO_ISSUE
+
+
 class TestVerificationWithSelfCorrectingAgent:
     """Test integration with SelfCorrectingAgent"""
 

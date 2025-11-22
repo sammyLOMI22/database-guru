@@ -8,7 +8,7 @@ from src.config.settings import Settings
 from src.database.connection import get_db_manager
 from src.cache.redis_client import get_redis_cache
 from src.middleware.rate_limit import RateLimitMiddleware
-from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings
+from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings
 
 # Configure logging
 logging.basicConfig(
@@ -86,6 +86,7 @@ app.include_router(learned_corrections.router)
 app.include_router(result_verification.router, prefix="/api")
 app.include_router(query_planning.router, prefix="/api")
 app.include_router(feedback.router, prefix="/api")
+app.include_router(mappings.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 
 if __name__ == "__main__":

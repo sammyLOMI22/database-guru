@@ -2,6 +2,7 @@
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db, get_cache, get_settings
@@ -163,12 +164,32 @@ async def refresh_schema(
         Updated schema with refresh confirmation
     """
     try:
-        # Clear schema cache
+        # Get active connection
+        from src.database.models import DatabaseConnection
+        result_conn = await db.execute(
+            select(DatabaseConnection).where(DatabaseConnection.is_active == True)
+        )
+        active_connection = result_conn.scalar_one_or_none()
+
+        if not active_connection:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No active database connection"
+            )
+
+        # Invalidate schema cache for active connection
+        from src.core.schema_cache import SchemaCache
+        SchemaCache.invalidate_schema(
+            connection_id=active_connection.id,
+            connection_name=active_connection.name
+        )
+
+        # Clear old Redis schema cache
         if not cache.redis:
             await cache.connect()
 
         await cache.delete("schema:full")
-        logger.info("Schema cache cleared")
+        logger.info(f"Schema cache cleared for connection '{active_connection.name}'")
 
         # Re-introspect
         inspector = SchemaInspector()

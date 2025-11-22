@@ -34,8 +34,15 @@ class MultiDatabaseHandler:
         """
         try:
             async with UserDatabaseConnector.get_user_db_session(conn) as user_db:
-                # Get schema for this database
-                schema_data = await self.schema_inspector.get_full_schema(user_db)
+                # Get schema for this database (with caching)
+                from src.core.schema_cache import SchemaCache
+
+                schema_data = await SchemaCache.get_schema(
+                    connection_id=conn.id,
+                    connection_name=conn.name,
+                    user_db_session=user_db,
+                    force_refresh=False  # Multi-DB queries use cache by default
+                )
 
                 # Convert schema tables from dict to list format
                 tables_dict = schema_data.get("tables", {})

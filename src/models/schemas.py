@@ -42,6 +42,10 @@ class QueryRequest(BaseModel):
         description="Chat session ID for conversational context (optional)",
         example="550e8400-e29b-41d4-a716-446655440000"
     )
+    force_schema_refresh: bool = Field(
+        default=False,
+        description="Force re-introspection of database schema (bypasses cache)",
+    )
 
     @validator('question')
     def question_not_empty(cls, v):

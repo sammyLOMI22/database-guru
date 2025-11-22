@@ -3,8 +3,8 @@ import logging
 import re
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_, or_, desc
 
 from src.database.models import LearnedCorrection
 from src.llm.self_correcting_agent import ErrorType
@@ -22,14 +22,16 @@ class CorrectionLearner:
     3. Stores corrections in a searchable database
     4. Retrieves similar corrections when new errors occur
     5. Applies learned corrections to speed up error recovery
+
+    IMPORTANT: Updated to use AsyncSession for proper async/await support.
     """
 
-    def __init__(self, db_session: Session, enable_learning: bool = True):
+    def __init__(self, db_session: AsyncSession, enable_learning: bool = True):
         """
         Initialize the correction learner
 
         Args:
-            db_session: Database session for storing/retrieving corrections
+            db_session: Async database session for storing/retrieving corrections
             enable_learning: Whether learning is enabled
         """
         self.db_session = db_session
@@ -59,9 +61,18 @@ class CorrectionLearner:
             ID of the learned correction, or None if learning is disabled
         """
         if not self.enable_learning or not was_successful:
+            logger.debug(
+                f"Skipping learning: enable_learning={self.enable_learning}, "
+                f"was_successful={was_successful}"
+            )
             return None
 
         try:
+            logger.info(
+                f"🎓 Learning from correction: error_type={error_type.value}, "
+                f"db_type={database_type}"
+            )
+
             # Extract patterns from the error and correction
             patterns = self._extract_patterns(
                 error_type=error_type,
@@ -69,6 +80,8 @@ class CorrectionLearner:
                 original_error=original_error,
                 corrected_sql=corrected_sql
             )
+
+            logger.debug(f"Extracted patterns: {patterns}")
 
             # Check if we already have a similar correction
             existing = await self._find_similar_correction(
@@ -84,8 +97,14 @@ class CorrectionLearner:
                 existing.times_applied += 1
                 existing.last_applied_at = datetime.utcnow()
                 existing.confidence_score = min(1.0, existing.confidence_score + 0.1)
-                self.db_session.commit()
-                logger.info(f"Updated existing correction {existing.id}, now applied {existing.times_applied} times")
+
+                await self.db_session.commit()
+
+                logger.info(
+                    f"✅ Updated existing learned correction: id={existing.id}, "
+                    f"times_applied={existing.times_applied}, "
+                    f"confidence={existing.confidence_score:.2f}"
+                )
                 return existing.id
 
             # Create new learned correction
@@ -93,9 +112,9 @@ class CorrectionLearner:
                 error_type=error_type.value,
                 error_pattern=patterns["error_pattern"],
                 database_type=database_type,
-                original_sql=original_sql,
-                original_error=original_error,
-                corrected_sql=corrected_sql,
+                original_sql=original_sql[:2000],  # Truncate to avoid DB limits
+                original_error=original_error[:500],  # Truncate error message
+                corrected_sql=corrected_sql[:2000],  # Truncate corrected SQL
                 correction_description=patterns.get("description"),
                 table_pattern=patterns.get("table_pattern"),
                 column_pattern=patterns.get("column_pattern"),
@@ -105,16 +124,25 @@ class CorrectionLearner:
             )
 
             self.db_session.add(correction)
-            self.db_session.commit()
-            self.db_session.refresh(correction)
+            await self.db_session.commit()
+            await self.db_session.refresh(correction)
 
-            logger.info(f"Learned new correction {correction.id} for {error_type.value}")
+            logger.info(
+                f"✨ Created NEW learned correction: id={correction.id}, "
+                f"error_type={error_type.value}, "
+                f"description={patterns.get('description')}"
+            )
+
             return correction.id
 
         except Exception as e:
-            logger.error(f"Failed to learn from correction: {e}")
-            self.db_session.rollback()
-            return None
+            logger.error(
+                f"❌ CRITICAL: Failed to learn from correction: {e}",
+                exc_info=True
+            )
+            await self.db_session.rollback()
+            # Re-raise to prevent silent failures
+            raise
 
     async def find_applicable_corrections(
         self,
@@ -146,7 +174,7 @@ class CorrectionLearner:
             column_match = self._extract_column_name(error_message)
 
             # Build query for similar corrections
-            query = self.db_session.query(LearnedCorrection).filter(
+            stmt = select(LearnedCorrection).where(
                 and_(
                     LearnedCorrection.error_type == error_type.value,
                     LearnedCorrection.database_type == database_type,
@@ -156,7 +184,7 @@ class CorrectionLearner:
 
             # Add table/column pattern matching if available
             if table_match:
-                query = query.filter(
+                stmt = stmt.where(
                     or_(
                         LearnedCorrection.table_pattern == table_match,
                         LearnedCorrection.table_pattern.is_(None)
@@ -164,7 +192,7 @@ class CorrectionLearner:
                 )
 
             if column_match:
-                query = query.filter(
+                stmt = stmt.where(
                     or_(
                         LearnedCorrection.column_pattern == column_match,
                         LearnedCorrection.column_pattern.is_(None)
@@ -172,10 +200,13 @@ class CorrectionLearner:
                 )
 
             # Order by confidence and times applied
-            corrections = query.order_by(
+            stmt = stmt.order_by(
                 desc(LearnedCorrection.confidence_score),
                 desc(LearnedCorrection.times_applied)
-            ).limit(limit).all()
+            ).limit(limit)
+
+            result = await self.db_session.execute(stmt)
+            corrections = result.scalars().all()
 
             # Convert to dictionaries
             results = []
@@ -196,7 +227,7 @@ class CorrectionLearner:
             return results
 
         except Exception as e:
-            logger.error(f"Failed to find applicable corrections: {e}")
+            logger.error(f"Failed to find applicable corrections: {e}", exc_info=True)
             return []
 
     async def apply_learned_correction(
@@ -214,11 +245,14 @@ class CorrectionLearner:
             was_successful: Whether the application was successful
         """
         try:
-            correction = self.db_session.query(LearnedCorrection).filter(
+            stmt = select(LearnedCorrection).where(
                 LearnedCorrection.id == correction_id
-            ).first()
+            )
+            result = await self.db_session.execute(stmt)
+            correction = result.scalar_one_or_none()
 
             if not correction:
+                logger.warning(f"Correction {correction_id} not found")
                 return
 
             correction.last_applied_at = datetime.utcnow()
@@ -238,12 +272,12 @@ class CorrectionLearner:
                     correction.success_rate * (total_applications - 1) + (1.0 if was_successful else 0.0)
                 ) / total_applications
 
-            self.db_session.commit()
+            await self.db_session.commit()
             logger.info(f"Updated correction {correction_id}, success={was_successful}")
 
         except Exception as e:
-            logger.error(f"Failed to update correction: {e}")
-            self.db_session.rollback()
+            logger.error(f"Failed to update correction: {e}", exc_info=True)
+            await self.db_session.rollback()
 
     def _extract_patterns(
         self,
@@ -366,21 +400,22 @@ class CorrectionLearner:
         Returns:
             Existing correction or None
         """
-        query = self.db_session.query(LearnedCorrection).filter(
-            and_(
-                LearnedCorrection.error_type == error_type.value,
-                LearnedCorrection.database_type == database_type,
-                LearnedCorrection.error_pattern == error_pattern
-            )
-        )
+        # Build base query conditions
+        conditions = [
+            LearnedCorrection.error_type == error_type.value,
+            LearnedCorrection.database_type == database_type,
+            LearnedCorrection.error_pattern == error_pattern
+        ]
 
         if table_pattern:
-            query = query.filter(LearnedCorrection.table_pattern == table_pattern)
+            conditions.append(LearnedCorrection.table_pattern == table_pattern)
 
         if column_pattern:
-            query = query.filter(LearnedCorrection.column_pattern == column_pattern)
+            conditions.append(LearnedCorrection.column_pattern == column_pattern)
 
-        return query.first()
+        stmt = select(LearnedCorrection).where(and_(*conditions))
+        result = await self.db_session.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def get_learning_stats(self) -> Dict[str, Any]:
         """
@@ -390,21 +425,28 @@ class CorrectionLearner:
             Dictionary with learning statistics
         """
         try:
-            total_corrections = self.db_session.query(LearnedCorrection).count()
+            # Get total count
+            total_stmt = select(LearnedCorrection)
+            total_result = await self.db_session.execute(total_stmt)
+            total_corrections = len(total_result.scalars().all())
 
             # Count by error type
             by_error_type = {}
             for error_type in ErrorType:
-                count = self.db_session.query(LearnedCorrection).filter(
+                type_stmt = select(LearnedCorrection).where(
                     LearnedCorrection.error_type == error_type.value
-                ).count()
+                )
+                type_result = await self.db_session.execute(type_stmt)
+                count = len(type_result.scalars().all())
                 if count > 0:
                     by_error_type[error_type.value] = count
 
             # Most applied corrections
-            top_corrections = self.db_session.query(LearnedCorrection).order_by(
+            top_stmt = select(LearnedCorrection).order_by(
                 desc(LearnedCorrection.times_applied)
-            ).limit(10).all()
+            ).limit(10)
+            top_result = await self.db_session.execute(top_stmt)
+            top_corrections = top_result.scalars().all()
 
             return {
                 "total_corrections": total_corrections,
@@ -423,7 +465,7 @@ class CorrectionLearner:
             }
 
         except Exception as e:
-            logger.error(f"Failed to get learning stats: {e}")
+            logger.error(f"Failed to get learning stats: {e}", exc_info=True)
             return {
                 "total_corrections": 0,
                 "by_error_type": {},

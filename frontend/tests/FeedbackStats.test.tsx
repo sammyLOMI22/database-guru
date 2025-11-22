@@ -17,6 +17,7 @@ vi.mock('../src/services/api', () => ({
     getStats: vi.fn(),
     getRecentFeedback: vi.fn(),
     applyFeedback: vi.fn(),
+    deleteFeedback: vi.fn(),
   },
 }));
 
@@ -25,6 +26,8 @@ vi.mock('lucide-react', () => ({
   CheckCircle: () => <div data-testid="check-circle-icon" />,
   Clock: () => <div data-testid="clock-icon" />,
   TrendingUp: () => <div data-testid="trending-up-icon" />,
+  ChevronDown: () => <div data-testid="chevron-down-icon" />,
+  ChevronUp: () => <div data-testid="chevron-up-icon" />,
 }));
 
 describe('FeedbackStats', () => {
@@ -45,19 +48,30 @@ describe('FeedbackStats', () => {
       id: 1,
       query_id: 101,
       feedback_type: 'sql_correction',
+      original_sql: 'SELECT * FROM prodcuts',
+      corrected_sql: 'SELECT * FROM products',
       correction_description: 'Fixed table name',
       user_confidence: 0.9,
       applied_successfully: false,
+      learned_correction_id: null,
+      user_notes: null,
       created_at: '2024-01-01T10:00:00Z',
+      applied_at: null,
     },
     {
       id: 2,
       query_id: 102,
       feedback_type: 'column_name',
+      original_sql: 'SELECT pric FROM products',
+      corrected_sql: 'SELECT price FROM products',
       correction_description: 'Wrong column reference',
-      user_confidence: 0.8,
+      correction_details: { from: 'pric', to: 'price' },
+      user_confidence: 0.85,
       applied_successfully: true,
+      learned_correction_id: 42,
+      user_notes: null,
       created_at: '2024-01-01T11:00:00Z',
+      applied_at: '2024-01-01T11:01:00Z',
     },
   ];
 
@@ -165,8 +179,8 @@ describe('FeedbackStats', () => {
       render(<FeedbackStats />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Confidence: 90%/)).toBeInTheDocument(); // 0.9 * 100
-        expect(screen.getByText(/Confidence: 80%/)).toBeInTheDocument(); // 0.8 * 100
+        expect(screen.getByText(/90% conf/)).toBeInTheDocument(); // 0.9 * 100
+        expect(screen.getByText(/85% conf/)).toBeInTheDocument(); // 0.85 * 100
       });
     });
 
@@ -174,7 +188,7 @@ describe('FeedbackStats', () => {
       render(<FeedbackStats />);
 
       await waitFor(() => {
-        const applyButtons = screen.getAllByRole('button', { name: /Apply to Learning/i });
+        const applyButtons = screen.getAllByRole('button', { name: /Apply/i });
         // Should have button for the pending feedback (id: 1)
         expect(applyButtons.length).toBeGreaterThan(0);
       });
@@ -207,7 +221,7 @@ describe('FeedbackStats', () => {
       });
 
       // Click apply button
-      const applyButtons = screen.getAllByRole('button', { name: /Apply to Learning/i });
+      const applyButtons = screen.getAllByRole('button', { name: /Apply/i });
       await user.click(applyButtons[0]);
 
       // Should call apply API with feedback id and test_before_learning=true
@@ -223,7 +237,7 @@ describe('FeedbackStats', () => {
       });
 
       // Apply feedback
-      const applyButtons = screen.getAllByRole('button', { name: /Apply to Learning/i });
+      const applyButtons = screen.getAllByRole('button', { name: /Apply/i });
       await user.click(applyButtons[0]);
 
       // Should reload both stats and recent feedback
@@ -244,7 +258,7 @@ describe('FeedbackStats', () => {
         expect(screen.getByText('Fixed table name')).toBeInTheDocument();
       });
 
-      const applyButtons = screen.getAllByRole('button', { name: /Apply to Learning/i });
+      const applyButtons = screen.getAllByRole('button', { name: /Apply/i });
       await user.click(applyButtons[0]);
 
       await waitFor(() => {
@@ -266,7 +280,7 @@ describe('FeedbackStats', () => {
 
       await waitFor(() => {
         expect(feedbackAPI.getStats).toHaveBeenCalledTimes(1);
-        expect(feedbackAPI.getRecentFeedback).toHaveBeenCalledWith(5, 0); // limit=5, offset=0
+        expect(feedbackAPI.getRecentFeedback).toHaveBeenCalledWith(20, 0, 'pending'); // limit=20, offset=0, filter='pending'
       });
     });
   });

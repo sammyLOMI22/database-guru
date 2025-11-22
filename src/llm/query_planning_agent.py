@@ -23,6 +23,9 @@ from src.llm.ollama_client import OllamaClient, get_ollama_client
 from src.config.settings import Settings
 from src.core.schema_validator import SchemaValidator, SchemaValidationError
 from src.core.location_mapper import LocationMapper
+from src.llm.column_mapper import ColumnMapper
+from src.llm.table_mapper import TableMapper
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +234,8 @@ class QueryPlanningAgent:
         settings: Optional[Settings] = None,
         ollama_client: Optional[OllamaClient] = None,
         enable_planning: bool = True,
-        complexity_threshold: QueryComplexity = QueryComplexity.MODERATE
+        complexity_threshold: QueryComplexity = QueryComplexity.MODERATE,
+        db_session: Optional[AsyncSession] = None
     ):
         """
         Initialize the query planning agent
@@ -241,11 +245,13 @@ class QueryPlanningAgent:
             ollama_client: Optional OllamaClient instance
             enable_planning: Whether to enable query planning (can disable for simple queries)
             complexity_threshold: Minimum complexity level to trigger planning
+            db_session: Optional database session for applying learned mappings
         """
         self.settings = settings or Settings()
         self.ollama = ollama_client or get_ollama_client(self.settings)
         self.enable_planning = enable_planning
         self.complexity_threshold = complexity_threshold
+        self.db_session = db_session
 
     def _calculate_complexity_score(self, question: str, schema_dict: Optional[Dict] = None) -> float:
         """
@@ -505,7 +511,8 @@ class QueryPlanningAgent:
         database_type: str = "postgresql",
         sql_generator = None,
         model: Optional[str] = None,
-        schema_dict: Optional[Dict] = None
+        schema_dict: Optional[Dict] = None,
+        connection_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Create query plan and generate SQL from the plan
@@ -517,6 +524,7 @@ class QueryPlanningAgent:
             sql_generator: SQLGenerator instance to use for SQL generation
             model: Optional model name to use
             schema_dict: Optional parsed schema dictionary (for location normalization)
+            connection_name: Optional database connection name for applying learned mappings
 
         Returns:
             Dictionary with:
@@ -549,6 +557,7 @@ class QueryPlanningAgent:
 
         # Generate SQL from plan
         sql = None
+        mappings_applied = None
         if sql_generator:
             # Use SQL generator with plan context
             sql_result = await self._generate_sql_from_plan(
@@ -557,16 +566,24 @@ class QueryPlanningAgent:
                 database_type=database_type,
                 sql_generator=sql_generator,
                 model=model,
-                schema_dict=schema_dict
+                schema_dict=schema_dict,
+                connection_name=connection_name
             )
             sql = sql_result.get("sql")
+            mappings_applied = sql_result.get("mappings_applied")
 
-        return {
+        result = {
             "plan": plan,
             "sql": sql,
             "used_planning": True,
             "confidence": plan.confidence
         }
+
+        # Include mappings_applied if present
+        if mappings_applied:
+            result["mappings_applied"] = mappings_applied
+
+        return result
 
     async def _generate_sql_from_plan(
         self,
@@ -575,7 +592,8 @@ class QueryPlanningAgent:
         database_type: str,
         sql_generator,
         model: Optional[str] = None,
-        schema_dict: Optional[Dict] = None
+        schema_dict: Optional[Dict] = None,
+        connection_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate SQL query from structured plan
@@ -587,6 +605,7 @@ class QueryPlanningAgent:
             sql_generator: SQLGenerator instance
             model: Optional model name
             schema_dict: Optional parsed schema dictionary
+            connection_name: Optional database connection name for applying learned mappings
 
         Returns:
             SQL generation result
@@ -638,6 +657,46 @@ Reasoning:
             database_type=database_type,
             model=model
         )
+
+        # Apply learned mappings to generated SQL (if db_session and connection_name available)
+        if self.db_session and connection_name:
+            try:
+                generated_sql = result.get("sql", "")
+
+                # Extract primary table from plan for column mappings
+                primary_table = plan.tables[0].name if plan.tables else None
+
+                # Apply column mappings
+                column_mapper = ColumnMapper(db_session=self.db_session)
+                corrected_sql, col_applied = await column_mapper.apply_mappings(
+                    sql=generated_sql,
+                    table_name=primary_table,
+                    connection_name=connection_name,
+                    database_type=database_type
+                )
+
+                # Apply table mappings
+                table_mapper = TableMapper(db_session=self.db_session)
+                corrected_sql, tbl_applied = await table_mapper.apply_mappings(
+                    sql=corrected_sql,
+                    connection_name=connection_name,
+                    database_type=database_type
+                )
+
+                # Update result with corrected SQL if mappings were applied
+                if col_applied or tbl_applied:
+                    logger.info(
+                        f"✨ Applied {len(col_applied)} column and {len(tbl_applied)} table mappings to generated SQL"
+                    )
+                    result["sql"] = corrected_sql
+                    result["mappings_applied"] = {
+                        "column_mappings": col_applied,
+                        "table_mappings": tbl_applied
+                    }
+
+            except Exception as e:
+                logger.warning(f"Failed to apply learned mappings: {e}")
+                # Continue with original SQL if mapping fails
 
         return result
 

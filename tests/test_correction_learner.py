@@ -1,8 +1,9 @@
 """Tests for the correction learning system"""
 import pytest
 from datetime import datetime
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from src.database.models import Base, LearnedCorrection
 from src.llm.correction_learner import CorrectionLearner
@@ -10,17 +11,28 @@ from src.llm.self_correcting_agent import ErrorType
 
 
 @pytest.fixture
-def db_session():
-    """Create a test database session"""
-    # Use in-memory SQLite for testing
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    session = SessionLocal()
+async def db_session():
+    """Create a test async database session"""
+    # Use in-memory SQLite for testing (async version)
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
 
-    yield session
+    # Create tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-    session.close()
+    # Create session factory
+    AsyncSessionLocal = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False
+    )
+
+    # Create and yield session
+    async with AsyncSessionLocal() as session:
+        yield session
+
+    # Cleanup
+    await engine.dispose()
 
 
 @pytest.fixture
@@ -44,9 +56,9 @@ async def test_learn_from_correction(learner, db_session):
     assert correction_id is not None
 
     # Verify it was stored
-    correction = db_session.query(LearnedCorrection).filter(
-        LearnedCorrection.id == correction_id
-    ).first()
+    stmt = select(LearnedCorrection).where(LearnedCorrection.id == correction_id)
+    result = await db_session.execute(stmt)
+    correction = result.scalar_one_or_none()
 
     assert correction is not None
     assert correction.error_type == ErrorType.TABLE_NOT_FOUND.value
@@ -82,9 +94,9 @@ async def test_learn_duplicate_correction(learner, db_session):
     assert correction_id_1 == correction_id_2
 
     # Verify times_applied was incremented
-    correction = db_session.query(LearnedCorrection).filter(
-        LearnedCorrection.id == correction_id_1
-    ).first()
+    stmt = select(LearnedCorrection).where(LearnedCorrection.id == correction_id_1)
+    result = await db_session.execute(stmt)
+    correction = result.scalar_one_or_none()
 
     assert correction.times_applied == 2
     assert correction.confidence_score > 0.7  # Increased confidence
@@ -185,9 +197,9 @@ async def test_apply_learned_correction_success(learner, db_session):
     )
 
     # Verify stats were updated
-    correction = db_session.query(LearnedCorrection).filter(
-        LearnedCorrection.id == correction_id
-    ).first()
+    stmt = select(LearnedCorrection).where(LearnedCorrection.id == correction_id)
+    result = await db_session.execute(stmt)
+    correction = result.scalar_one_or_none()
 
     assert correction.times_applied == 2  # Initial + this application
     assert correction.confidence_score > 0.7  # Increased
@@ -217,9 +229,9 @@ async def test_apply_learned_correction_failure(learner, db_session):
     )
 
     # Verify confidence decreased
-    correction = db_session.query(LearnedCorrection).filter(
-        LearnedCorrection.id == correction_id
-    ).first()
+    stmt = select(LearnedCorrection).where(LearnedCorrection.id == correction_id)
+    result = await db_session.execute(stmt)
+    correction = result.scalar_one_or_none()
 
     assert correction.confidence_score < initial_confidence
 

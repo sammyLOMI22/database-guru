@@ -701,6 +701,127 @@ curl -X POST http://localhost:8000/api/query-planning/plan \
 - [Quick Start Guide](docs/QUERY_PLANNING_QUICKSTART.md)
 - [Implementation Summary](docs/QUERY_PLANNING_IMPLEMENTATION_SUMMARY.md)
 
+## 🔍 Learned Mapping Management (NEW!)
+
+Database Guru now provides **comprehensive visibility and control** over learned patterns! View, filter, and manage all column/table mappings and result validation patterns learned from user feedback.
+
+### Key Features:
+- 📊 **Management Dashboard** - View all learned patterns in one place
+- 🎯 **Advanced Filtering** - Filter by connection, table, database type
+- 📈 **Usage Analytics** - Track which patterns are most effective
+- 🗑️ **Pattern Cleanup** - Delete outdated or incorrect mappings
+- 🏷️ **Helpfulness Tracking** - Mark patterns as helpful or not
+- 📉 **Statistics Dashboard** - Overall effectiveness metrics
+
+### What You Can Manage:
+
+**1. Column Mappings**
+- View source → target column corrections (e.g., "price" → "unit_price")
+- See which tables each mapping applies to
+- Track usage counts and success rates
+- Filter by connection or database type
+
+**2. Table Mappings**
+- View source → target table corrections (e.g., "customer_data" → "customers")
+- See mapping types (alias, rename, etc.)
+- Track application frequency
+- Monitor success rates
+
+**3. Result Validation Patterns**
+- View learned patterns for common result issues
+- See pattern types (empty_result, missing_data, etc.)
+- Track how often patterns are triggered
+- Monitor helpfulness ratings
+
+### How to Access:
+
+**Via UI:**
+1. Navigate to **Settings** or **Admin** section
+2. Click on **"Learned Patterns"** tab
+3. Browse mappings organized by type
+4. Use filters to narrow down results
+5. Delete patterns with the trash icon
+6. View statistics in the Stats tab
+
+**Via API:**
+```bash
+# List column mappings
+curl http://localhost:8000/api/mappings/columns?connection_name=my_db&limit=20
+
+# List table mappings
+curl http://localhost:8000/api/mappings/tables?database_type=postgresql
+
+# List result patterns
+curl http://localhost:8000/api/mappings/patterns?pattern_type=empty_result
+
+# Get column mapping statistics
+curl http://localhost:8000/api/mappings/columns/stats
+
+# Delete a column mapping
+curl -X DELETE http://localhost:8000/api/mappings/columns/123
+
+# Mark result pattern as helpful
+curl -X POST http://localhost:8000/api/mappings/patterns/456/helpful
+```
+
+### Key Benefits:
+- **Visibility** - See exactly what the system has learned
+- **Control** - Remove incorrect or outdated patterns
+- **Analytics** - Understand which patterns are most valuable
+- **Debugging** - Troubleshoot why certain corrections are applied
+- **Auditing** - Track learning progress over time
+- **Quality Assurance** - Review and validate learned patterns
+
+### Example Use Cases:
+
+**Cleanup Stale Mappings:**
+```
+View all column mappings that haven't been used in 30 days
+→ Delete unused patterns to keep the system lean
+```
+
+**Monitor Effectiveness:**
+```
+Check which table mappings have 100% success rate
+→ Identify reliable patterns for documentation
+```
+
+**Debug Corrections:**
+```
+Filter mappings by connection "sales_db"
+→ See why certain columns are being renamed
+```
+
+**Track Learning Progress:**
+```
+View statistics dashboard
+→ See total patterns learned, application counts, success rates
+```
+
+### API Endpoints:
+
+**Column Mappings:**
+- `GET /api/mappings/columns` - List mappings with filters
+- `DELETE /api/mappings/columns/{id}` - Delete mapping
+- `GET /api/mappings/columns/stats` - Statistics
+
+**Table Mappings:**
+- `GET /api/mappings/tables` - List mappings with filters
+- `DELETE /api/mappings/tables/{id}` - Delete mapping
+- `GET /api/mappings/tables/stats` - Statistics
+
+**Result Patterns:**
+- `GET /api/mappings/patterns` - List patterns with filters
+- `DELETE /api/mappings/patterns/{id}` - Delete pattern
+- `POST /api/mappings/patterns/{id}/helpful` - Mark as helpful
+- `GET /api/mappings/patterns/stats` - Statistics
+
+**Documentation:**
+- [Mapping Management Guide](docs/MAPPING_MANAGEMENT.md) - Complete feature guide
+- [Next Steps Guide](docs/NEXT_STEPS_GUIDE.md) - Integration roadmap
+
+---
+
 ## 🎓 User Feedback Integration with Smart Auto-Learning (NEW!)
 
 Database Guru now learns from YOUR corrections with **production-grade validation**! When the system makes a mistake, you can provide feedback to help it improve over time - with built-in security to prevent bad corrections.
