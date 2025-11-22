@@ -425,3 +425,45 @@ export interface PatternStats {
   by_type: Record<string, number>;
   by_action: Record<string, number>;
 }
+
+// Tool-Using Agent Types (Phase 3.1)
+export type ToolCategory = 'schema' | 'data' | 'query' | 'validation';
+
+export interface ToolParameter {
+  type: string;
+  description: string;
+  default?: any;
+}
+
+export interface ToolResponse {
+  name: string;
+  description: string;
+  category: ToolCategory;
+  parameters: Record<string, ToolParameter>;
+  required_params: string[];
+  cacheable: boolean;
+  cache_ttl: number;
+}
+
+export interface ToolStatsResponse {
+  tool_name: string;
+  times_executed: number;
+  successes: number;
+  failures: number;
+  success_rate: number;
+  avg_time_ms: number;
+  cache_hit_rate: number;
+  last_executed: string | null;
+}
+
+export interface AllToolStatsResponse {
+  total_tools: number;
+  total_executions: number;
+  overall_success_rate: number;
+  by_tool: Record<string, ToolStatsResponse>;
+}
+
+export interface ToolsPromptResponse {
+  prompt: string;
+  tool_count: number;
+}
