@@ -231,6 +231,129 @@ class BaseTool:
         """Calculate execution time in milliseconds"""
         return (time.time() - start_time) * 1000
 
+    async def _validate_table_exists(self, table_name: str) -> tuple[bool, Optional[str]]:
+        """
+        Validate that a table exists in the database schema.
+
+        Args:
+            table_name: Name of the table to validate
+
+        Returns:
+            Tuple of (is_valid, suggestion) where suggestion is a similar table name if found
+        """
+        try:
+            schema_data = await self._get_schema()
+            tables = schema_data.get("tables", {})
+
+            # Check for exact match (case-insensitive)
+            table_names = list(tables.keys())
+            table_names_lower = {t.lower(): t for t in table_names}
+
+            if table_name.lower() in table_names_lower:
+                return True, table_names_lower[table_name.lower()]
+
+            # No exact match - find closest suggestion using simple similarity
+            suggestion = self._find_closest_match(table_name, table_names)
+            return False, suggestion
+
+        except Exception as e:
+            logger.warning(f"Schema validation failed, allowing table: {e}")
+            return True, None  # Allow if we can't validate
+
+    async def _validate_column_exists(
+        self, table_name: str, column_name: str
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Validate that a column exists in a table.
+
+        Args:
+            table_name: Name of the table
+            column_name: Name of the column to validate
+
+        Returns:
+            Tuple of (is_valid, suggestion) where suggestion is a similar column name if found
+        """
+        try:
+            schema_data = await self._get_schema()
+            tables = schema_data.get("tables", {})
+
+            # Find the table (case-insensitive)
+            table_data = None
+            for t_name, t_data in tables.items():
+                if t_name.lower() == table_name.lower():
+                    table_data = t_data
+                    break
+
+            if not table_data:
+                return False, None
+
+            # Get column names
+            columns = table_data.get("columns", [])
+            column_names = [c.get("name", "") for c in columns if isinstance(c, dict)]
+
+            # Check for exact match (case-insensitive)
+            column_names_lower = {c.lower(): c for c in column_names}
+
+            if column_name.lower() in column_names_lower:
+                return True, column_names_lower[column_name.lower()]
+
+            # No exact match - find closest suggestion
+            suggestion = self._find_closest_match(column_name, column_names)
+            return False, suggestion
+
+        except Exception as e:
+            logger.warning(f"Column validation failed, allowing column: {e}")
+            return True, None  # Allow if we can't validate
+
+    def _find_closest_match(self, target: str, candidates: List[str], threshold: float = 0.6) -> Optional[str]:
+        """
+        Find the closest matching string from candidates.
+
+        Uses simple character-based similarity (Jaccard-like).
+
+        Args:
+            target: The string to match
+            candidates: List of candidate strings
+            threshold: Minimum similarity threshold (0.0 to 1.0)
+
+        Returns:
+            Best matching candidate or None if no match above threshold
+        """
+        if not candidates:
+            return None
+
+        target_lower = target.lower()
+        best_match = None
+        best_score = 0.0
+
+        for candidate in candidates:
+            candidate_lower = candidate.lower()
+
+            # Calculate character-based similarity
+            target_chars = set(target_lower)
+            candidate_chars = set(candidate_lower)
+
+            if not target_chars or not candidate_chars:
+                continue
+
+            intersection = len(target_chars & candidate_chars)
+            union = len(target_chars | candidate_chars)
+            score = intersection / union if union > 0 else 0
+
+            # Boost score for substring matches
+            if target_lower in candidate_lower or candidate_lower in target_lower:
+                score = max(score, 0.8)
+
+            # Boost score for prefix matches
+            if candidate_lower.startswith(target_lower[:3]) or target_lower.startswith(candidate_lower[:3]):
+                score += 0.1
+
+            if score > best_score:
+                best_score = score
+                best_match = candidate
+
+        return best_match if best_score >= threshold else None
+
     def set_context(
         self,
         session=None,

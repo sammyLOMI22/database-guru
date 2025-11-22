@@ -329,7 +329,7 @@ class CountRowsTool(BaseTool):
         start = time.time()
 
         try:
-            # Sanitize table name - only allow alphanumeric and underscore
+            # Step 1: Syntactic validation - only allow alphanumeric and underscore
             safe_table = self._sanitize_identifier(table_name)
             if not safe_table:
                 return ToolResult(
@@ -338,6 +338,23 @@ class CountRowsTool(BaseTool):
                     tool_name=self.name,
                     execution_time_ms=self._measure_execution(start),
                 )
+
+            # Step 2: Schema validation - verify table exists in database
+            table_exists, table_suggestion = await self._validate_table_exists(safe_table)
+            if not table_exists:
+                error_msg = f"Table '{safe_table}' does not exist in the database"
+                if table_suggestion:
+                    error_msg += f". Did you mean '{table_suggestion}'?"
+                return ToolResult(
+                    success=False,
+                    error=error_msg,
+                    tool_name=self.name,
+                    execution_time_ms=self._measure_execution(start),
+                    data={"suggestion": table_suggestion} if table_suggestion else None,
+                )
+            # Use the canonical table name from schema (correct case)
+            if table_suggestion:
+                safe_table = table_suggestion
 
             # Validate operator
             operator_upper = filter_operator.upper().strip()
@@ -352,6 +369,7 @@ class CountRowsTool(BaseTool):
             # Build query with parameterized filter
             filter_info = None
             if filter_column:
+                # Syntactic validation for column
                 safe_column = self._sanitize_identifier(filter_column)
                 if not safe_column:
                     return ToolResult(
@@ -360,6 +378,23 @@ class CountRowsTool(BaseTool):
                         tool_name=self.name,
                         execution_time_ms=self._measure_execution(start),
                     )
+
+                # Schema validation - verify column exists in table
+                column_exists, column_suggestion = await self._validate_column_exists(safe_table, safe_column)
+                if not column_exists:
+                    error_msg = f"Column '{safe_column}' does not exist in table '{safe_table}'"
+                    if column_suggestion:
+                        error_msg += f". Did you mean '{column_suggestion}'?"
+                    return ToolResult(
+                        success=False,
+                        error=error_msg,
+                        tool_name=self.name,
+                        execution_time_ms=self._measure_execution(start),
+                        data={"suggestion": column_suggestion} if column_suggestion else None,
+                    )
+                # Use the canonical column name from schema (correct case)
+                if column_suggestion:
+                    safe_column = column_suggestion
 
                 # Handle NULL comparisons (no parameter needed)
                 if operator_upper in ("IS NULL", "IS NOT NULL"):

@@ -59,6 +59,8 @@ def mock_schema():
                     {"name": "name", "type": "varchar", "nullable": False},
                     {"name": "email", "type": "varchar", "nullable": True},
                     {"name": "state", "type": "varchar", "nullable": True},
+                    {"name": "status", "type": "varchar", "nullable": True},
+                    {"name": "deleted_at", "type": "timestamp", "nullable": True},
                 ],
                 "primary_key": "id",
             },
@@ -403,6 +405,56 @@ class TestDataTools:
                     filter_operator=op
                 )
             assert result.success is True, f"Operator {op} should be allowed"
+
+    @pytest.mark.asyncio
+    async def test_count_rows_validates_table_against_schema(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test count_rows validates table name against actual schema"""
+        tool = CountRowsTool()
+        tool.set_context(mock_session, mock_schema_inspector, mock_schema_cache, connection_id=1)
+
+        # Try a non-existent table
+        result = await tool.execute(table_name="nonexistent_table")
+
+        assert result.success is False
+        assert "does not exist" in result.error.lower()
+        # Should suggest similar table if available
+        if result.data and result.data.get("suggestion"):
+            assert result.data["suggestion"] in ["customers", "orders", "products"]
+
+    @pytest.mark.asyncio
+    async def test_count_rows_validates_column_against_schema(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test count_rows validates column name against actual schema"""
+        tool = CountRowsTool()
+        tool.set_context(mock_session, mock_schema_inspector, mock_schema_cache, connection_id=1)
+
+        # Mock successful schema fetch but with specific columns
+        # The mock_schema fixture already returns customers with id, name, email, state columns
+
+        # Try a non-existent column
+        result = await tool.execute(
+            table_name="customers",
+            filter_column="nonexistent_column",
+            filter_value="test"
+        )
+
+        assert result.success is False
+        assert "does not exist" in result.error.lower()
+        assert "customers" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_count_rows_suggests_similar_table(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test count_rows suggests similar table names for typos"""
+        tool = CountRowsTool()
+        tool.set_context(mock_session, mock_schema_inspector, mock_schema_cache, connection_id=1)
+
+        # Try a typo in table name
+        result = await tool.execute(table_name="custmers")  # Missing 'o'
+
+        assert result.success is False
+        # Should suggest 'customers' as the closest match
+        if result.data and result.data.get("suggestion"):
+            assert result.data["suggestion"] == "customers"
+        assert "did you mean" in result.error.lower()
 
 
 class TestQueryTools:
