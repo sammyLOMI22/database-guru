@@ -531,6 +531,7 @@ class SelfCorrectingSQLAgent:
                     schema=schema,
                     database_type=database_type,
                     use_tools=True,
+                    trace=trace,  # Pass trace for UI visibility
                 )
 
                 if tool_result.success and tool_result.sql:

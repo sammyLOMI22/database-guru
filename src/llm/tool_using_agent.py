@@ -106,6 +106,7 @@ class ToolUsingAgent:
         schema_cache=None,
         connection_id: Optional[int] = None,
         use_tools: bool = True,
+        trace=None,  # Optional AgentTrace for UI visibility
     ) -> ToolUsingResult:
         """
         Process a question using tools to gather context.
@@ -119,6 +120,7 @@ class ToolUsingAgent:
             schema_cache: SchemaCache instance
             connection_id: Database connection ID
             use_tools: Whether to use tools (can skip for simple queries)
+            trace: Optional AgentTrace to add steps for UI visibility
 
         Returns:
             ToolUsingResult with enriched context and optionally SQL
@@ -134,6 +136,12 @@ class ToolUsingAgent:
 
                 if planned_calls:
                     logger.info(f"Planning {len(planned_calls)} tool calls for: {question[:50]}...")
+                    if trace:
+                        trace.add_step(
+                            "tool_planning",
+                            f"Planning {len(planned_calls)} tool calls to gather schema context",
+                            metadata={"planned_tools": [c[0] for c in planned_calls[:self.max_tool_calls]]}
+                        )
 
                 # Step 2: Execute tools (up to max_tool_calls)
                 context_parts = []
@@ -148,7 +156,7 @@ class ToolUsingAgent:
                     )
 
                     tools_used.append(tool_name)
-                    tool_results.append({
+                    tool_result_info = {
                         "tool": tool_name,
                         "args": kwargs,
                         "success": result.success,
@@ -156,7 +164,23 @@ class ToolUsingAgent:
                         "time_ms": result.execution_time_ms,
                         "data": result.data if result.success else None,
                         "error": result.error,
-                    })
+                    }
+                    tool_results.append(tool_result_info)
+
+                    # Add trace step for each tool execution
+                    if trace:
+                        if result.success:
+                            trace.add_step(
+                                "tool_success",
+                                f"Tool '{tool_name}' executed successfully ({result.execution_time_ms:.1f}ms){' (cached)' if result.cache_hit else ''}",
+                                metadata=tool_result_info
+                            )
+                        else:
+                            trace.add_step(
+                                "tool_error",
+                                f"Tool '{tool_name}' failed: {result.error}",
+                                metadata=tool_result_info
+                            )
 
                     if result.success and result.data:
                         context_part = self._format_tool_result(tool_name, result.data)
@@ -166,6 +190,12 @@ class ToolUsingAgent:
                 # Step 3: Build enriched context
                 if context_parts:
                     enriched_context = self._build_enriched_context(context_parts)
+                    if trace:
+                        trace.add_step(
+                            "tool_context",
+                            f"Built enriched context from {len(tools_used)} tools",
+                            metadata={"tools_used": tools_used, "context_length": len(enriched_context)}
+                        )
 
             # Step 4: Generate SQL if generator is available
             sql = None
