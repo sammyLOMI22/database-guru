@@ -84,6 +84,17 @@ def mock_schema():
                 "primary_key": "id",
             },
         },
+        # Real schema uses "relationships" with from_table/to_table format
+        # (SchemaInspector.get_full_schema() returns this format)
+        "relationships": [
+            {
+                "from_table": "orders",
+                "from_column": "customer_id",
+                "to_table": "customers",
+                "to_column": "id",
+            },
+        ],
+        # Also include legacy format for backwards compatibility testing
         "foreign_keys": [
             {
                 "source_table": "orders",

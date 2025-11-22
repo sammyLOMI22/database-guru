@@ -409,6 +409,10 @@ class SelfCorrectingSQLAgent:
         schema: str,
         database_type: str,
         trace: "AgentTrace",
+        session=None,  # Database session for tool-using agent
+        schema_inspector=None,  # SchemaInspector for tool-using agent
+        schema_cache=None,  # SchemaCache for tool-using agent
+        connection_id: Optional[int] = None,  # Connection ID for tool-using agent
     ) -> Dict[str, Any]:
         """
         Try multiple fix strategies in parallel and return the first successful one
@@ -530,6 +534,10 @@ class SelfCorrectingSQLAgent:
                     question=f"Fix SQL error: {last_error[:200]}",
                     schema=schema,
                     database_type=database_type,
+                    session=session,
+                    schema_inspector=schema_inspector,
+                    schema_cache=schema_cache,
+                    connection_id=connection_id,
                     use_tools=True,
                     trace=trace,  # Pass trace for UI visibility
                 )
@@ -697,7 +705,10 @@ class SelfCorrectingSQLAgent:
         model: Optional[str] = None,
         schema_dict: Optional[Dict] = None,
         use_parallel_corrections: bool = True,  # NEW: Enable/disable parallel fixes
-        connection_name: Optional[str] = None  # NEW: Connection name for learned mappings
+        connection_name: Optional[str] = None,  # NEW: Connection name for learned mappings
+        schema_inspector=None,  # NEW: SchemaInspector for tool-using agent
+        schema_cache=None,  # NEW: SchemaCache for tool-using agent
+        connection_id: Optional[int] = None,  # NEW: Connection ID for tool-using agent
     ) -> Dict[str, Any]:
         """
         Generate SQL with automatic error correction and retry
@@ -843,6 +854,10 @@ class SelfCorrectingSQLAgent:
                             schema=schema,
                             database_type=database_type,
                             trace=trace,
+                            session=session,
+                            schema_inspector=schema_inspector,
+                            schema_cache=schema_cache,
+                            connection_id=connection_id,
                         )
                         sql = fix_result["sql"]
                         self.fix_methods[attempt_num] = fix_result["fix_method"]

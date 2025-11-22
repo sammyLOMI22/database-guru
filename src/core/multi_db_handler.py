@@ -399,6 +399,8 @@ class MultiDatabaseHandler:
                         allow_write=allow_write,
                         schema_dict=schema_dict,
                         model=model,
+                        schema_inspector=self.schema_inspector,  # Pass for tool-using agent
+                        connection_id=connection.id,  # Pass for tool-using agent
                     )
 
                 # Add connection metadata

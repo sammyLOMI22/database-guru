@@ -428,15 +428,31 @@ class GetRelationshipsTool(BaseTool):
 
         try:
             schema = await self._get_schema()
-            all_fks = schema.get("foreign_keys", [])
+
+            # Support both schema formats:
+            # 1. Real schema uses "relationships" with from_table/to_table
+            # 2. Legacy/test uses "foreign_keys" with source_table/target_table
+            all_fks = schema.get("relationships", []) or schema.get("foreign_keys", [])
+
+            # Normalize key names to handle both formats
+            def normalize_fk(fk):
+                """Normalize foreign key to consistent format"""
+                return {
+                    "source_table": fk.get("from_table") or fk.get("source_table", ""),
+                    "source_column": fk.get("from_column") or fk.get("source_column", ""),
+                    "target_table": fk.get("to_table") or fk.get("target_table", ""),
+                    "target_column": fk.get("to_column") or fk.get("target_column", ""),
+                }
+
+            normalized_fks = [normalize_fk(fk) for fk in all_fks]
 
             # If no filters, return all relationships
             if table_name is None and target_table is None:
                 return ToolResult(
                     success=True,
                     data={
-                        "all_relationships": all_fks,
-                        "count": len(all_fks),
+                        "all_relationships": normalized_fks,
+                        "count": len(normalized_fks),
                     },
                     execution_time_ms=self._measure_execution(start),
                     tool_name=self.name,
@@ -444,7 +460,7 @@ class GetRelationshipsTool(BaseTool):
 
             # Filter relationships
             results = []
-            for fk in all_fks:
+            for fk in normalized_fks:
                 source = fk.get("source_table", "").lower()
                 target = fk.get("target_table", "").lower()
 
