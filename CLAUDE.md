@@ -369,6 +369,16 @@ Located in `frontend/src/`:
 - `mappingsApi.ts` (+155 lines) - API service layer for mapping endpoints
 - Total: **1,095 lines** of new UI code for mapping management
 
+**Tool-Using Agent UI Components (NEW - November 22, 2025):**
+- `ToolsPanel.tsx` (~112 lines) - Main tabbed container with 3 views (Overview, Directory, Usage Stats)
+- `ToolsOverview.tsx` (~271 lines) - Summary dashboard with stats cards, category breakdown, quick actions
+- `ToolDirectory.tsx` (~237 lines) - Browsable tool list with filtering and expandable details
+- `ToolUsageStats.tsx` (~277 lines) - Per-tool execution metrics with visual bars and sorting
+- `toolsApi.ts` (~100 lines) - API service layer for tools endpoints (6 methods)
+- **App.tsx** - Updated to include "Tools" as 4th main tab with orange color scheme
+- Total: **~1,000 lines** of new UI code for Tool-Using Agent management
+- Tests: `ToolsPanel.test.tsx` with 30 comprehensive tests
+
 ### LLM Prompts
 
 All prompts in `src/llm/prompts.py`:
@@ -447,6 +457,9 @@ Settings managed via Pydantic in `src/config/settings.py`:
 - **Query Tools (NEW)**: `src/tools/query_tools.py` - 3 tools for query validation (test_query, validate_sql, explain_query)
 - **Tools API (NEW)**: `src/api/endpoints/tools.py` - REST API for tool management (6 endpoints)
 - **Tools Tests (NEW)**: `tests/test_tools.py` - 26 comprehensive tests for tool system
+- **Tools UI Components (NEW)**: `frontend/src/components/ToolsPanel.tsx` - Main tabbed container for Tool-Using Agent
+- **Tools UI Tests (NEW)**: `frontend/tests/ToolsPanel.test.tsx` - 30 comprehensive frontend tests
+- **Tools API Service (NEW)**: `frontend/src/services/toolsApi.ts` - API service for tools endpoints
 
 ## Documentation
 

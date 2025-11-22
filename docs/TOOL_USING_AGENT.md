@@ -1,7 +1,8 @@
 # Tool-Using Agent
 
-**Status**: Production-Ready (November 21, 2025)
+**Status**: Production-Ready with Full UI (November 21-22, 2025)
 **Phase**: 3.1
+**Tests**: 26 backend tests + 30 frontend tests (56 total)
 
 The Tool-Using Agent enhances SQL generation by using specialized tools to explore schema and gather context before query generation, resulting in better first-attempt accuracy.
 
@@ -286,6 +287,135 @@ Potential improvements for future phases:
 2. **Tool Chaining**: Allow tools to call other tools
 3. **Custom Tools**: User-defined tools for domain-specific operations
 4. **Tool Results in UI**: Display tool exploration results to users
+
+---
+
+## Frontend UI Components (NEW - November 22, 2025)
+
+The Tool-Using Agent includes a comprehensive management UI accessible via the **Tools** tab in the main navigation.
+
+### Tab Structure
+
+The Tools panel is added as the **4th main tab** in `App.tsx`, alongside Query Interface, Feedback Dashboard, and Settings. It uses an **orange color scheme** to visually distinguish it.
+
+### Components
+
+| Component | File | Description |
+|-----------|------|-------------|
+| **ToolsPanel** | `frontend/src/components/ToolsPanel.tsx` | Main tabbed container with 3 views |
+| **ToolsOverview** | `frontend/src/components/ToolsOverview.tsx` | Summary dashboard with stats cards |
+| **ToolDirectory** | `frontend/src/components/ToolDirectory.tsx` | Browsable tool list with filtering |
+| **ToolUsageStats** | `frontend/src/components/ToolUsageStats.tsx` | Per-tool execution metrics |
+| **toolsApi** | `frontend/src/services/toolsApi.ts` | API service for tools endpoints |
+
+### ToolsPanel (Main Container)
+
+The main container provides navigation between three views:
+
+- **Overview Tab**: Summary stats and quick actions
+- **Tool Directory Tab**: Browse all 10 tools with descriptions
+- **Usage Stats Tab**: Per-tool execution metrics and charts
+
+### ToolsOverview (Summary Dashboard)
+
+Displays:
+- **Total Tools**: Count of available tools (10)
+- **Total Executions**: Cumulative tool execution count
+- **Success Rate**: Overall tool success percentage
+- **Categories**: Number of tool categories (4)
+- **Tools by Category**: Visual breakdown by SCHEMA/DATA/QUERY/VALIDATION
+- **How It Works**: 3-step explanation of tool-using flow
+- **Quick Actions**: Clear All Tool Cache button, Refresh Stats button
+
+### ToolDirectory (Tool Browser)
+
+Features:
+- **Category Filter**: Filter by schema/data/query/validation or show all
+- **Expandable Tool Cards**: Click to expand and see parameters
+- **Color-Coded Categories**: Blue (schema), Green (data), Purple (query), Orange (validation)
+- **Parameter Details**: Shows type, required status, description, default values
+- **Cache Info**: Displays cache TTL and whether caching is enabled
+
+### ToolUsageStats (Metrics Dashboard)
+
+Shows for each tool:
+- **Executions**: Total execution count with progress bar
+- **Success Rate**: Percentage with color-coded indicator (green >= 80%, yellow >= 50%, red < 50%)
+- **Avg Time**: Average execution time in milliseconds
+- **Cache Hits**: Cache hit rate percentage
+- **Last Executed**: Timestamp of most recent execution
+
+Sorting options: By Executions, Success Rate, or Avg Time
+
+### TypeScript Types
+
+New types added to `frontend/src/types/api.ts`:
+
+```typescript
+type ToolCategory = 'schema' | 'data' | 'query' | 'validation';
+
+interface ToolParameter {
+  type: string;
+  description: string;
+  default?: any;
+}
+
+interface ToolResponse {
+  name: string;
+  description: string;
+  category: ToolCategory;
+  parameters: Record<string, ToolParameter>;
+  required_params: string[];
+  cacheable: boolean;
+  cache_ttl: number;
+}
+
+interface ToolStatsResponse {
+  times_executed: number;
+  successes: number;
+  failures: number;
+  success_rate: number;
+  avg_time_ms: number;
+  cache_hit_rate: number;
+  last_executed?: string;
+}
+
+interface AllToolStatsResponse {
+  total_tools: number;
+  total_executions: number;
+  overall_success_rate: number;
+  by_tool: Record<string, ToolStatsResponse>;
+}
+
+interface ToolsPromptResponse {
+  prompt_text: string;
+  tool_count: number;
+}
+```
+
+### API Service (toolsApi.ts)
+
+Provides 6 methods:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `listTools(filters?)` | `GET /api/tools` | List tools, optionally filtered by category |
+| `getAllStats()` | `GET /api/tools/stats` | Get execution stats for all tools |
+| `getToolStats(name)` | `GET /api/tools/stats/{name}` | Get stats for specific tool |
+| `getToolsPrompt(category?)` | `GET /api/tools/prompt` | Get tools formatted for LLM prompt |
+| `invalidateToolCache(name)` | `POST /api/tools/{name}/invalidate-cache` | Invalidate cache for one tool |
+| `invalidateAllCache()` | `POST /api/tools/invalidate-all-cache` | Invalidate all tool caches |
+
+### Testing
+
+30 comprehensive tests in `frontend/tests/ToolsPanel.test.tsx` covering:
+- Tab navigation and switching
+- Overview stats rendering
+- Tool directory filtering
+- Usage stats sorting
+- Error handling and loading states
+- Cache invalidation actions
+- Responsive layout behavior
 
 ---
 

@@ -132,7 +132,7 @@ export const ToolDirectory: React.FC = () => {
       </div>
 
       {/* Tools List */}
-      {tools.length === 0 ? (
+      {!tools || tools.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
           <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p>No tools found in this category</p>

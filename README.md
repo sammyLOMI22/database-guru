@@ -154,7 +154,7 @@ DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
 - ✅ **Self-correcting SQL** - Automatically fixes errors and retries
 - ✅ **Learning from Corrections** - Remembers successful fixes for 50% faster error recovery
 - ✅ **Schema-Aware Fixes** - 200x faster typo correction without LLM
-- ✅ **Tool-Using Agent** - 10 specialized tools for schema exploration and query validation (NEW!)
+- ✅ **Tool-Using Agent** - 10 specialized tools for schema exploration and query validation with full UI dashboard (NEW!)
 - ✅ **Result Verification** - Catches logical errors and suspicious results
 - ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB)
 - ✅ **Multi-database queries** - Query multiple databases simultaneously with parallel execution
@@ -240,9 +240,23 @@ Both features include comprehensive metrics for monitoring and optimization:
 **Frontend Components:**
 - `ParallelDatabaseMetrics` - Orange-themed speedup badges
 - `ParallelCorrectionsMetrics` - Purple-themed strategy display
+- `ToolsPanel` - Tool-Using Agent management dashboard (NEW!)
 - Real-time performance visualization
 
 **See:** [Parallel Execution Technical Guide](docs/PARALLEL_EXECUTION.md) for implementation details and [Code Review](docs/CODE_REVIEW_PARALLEL_EXECUTION.md) for quality assurance
+
+## Tool-Using Agent Dashboard (NEW!)
+
+Database Guru now includes a comprehensive UI for the Tool-Using Agent, accessible via the **Tools** tab in the main navigation.
+
+**Features:**
+- **Overview Tab**: Summary stats (total tools, executions, success rate), tools by category breakdown, "How it works" explanation, quick actions (clear cache)
+- **Tool Directory Tab**: Browse all 10 tools with descriptions, category filtering, expandable details showing parameters and cache TTL
+- **Usage Stats Tab**: Per-tool execution metrics with visual progress bars, sortable by executions/success rate/avg time, cache hit tracking
+
+**Orange Color Theme**: The Tools tab uses an orange color scheme to visually distinguish it from other tabs.
+
+**See:** [Tool-Using Agent Guide](docs/TOOL_USING_AGENT.md) for complete documentation
 
 ---
 
