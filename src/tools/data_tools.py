@@ -286,65 +286,100 @@ class GetColumnValuesTool(BaseTool):
 @register_tool
 class CountRowsTool(BaseTool):
     """
-    Count rows in a table with optional WHERE filter.
+    Count rows in a table with optional parameterized filter.
 
     Useful for validating query expectations and understanding data volume.
+    Uses parameterized queries to prevent SQL injection.
     """
 
     name = "count_rows"
-    description = "Count rows in a table, optionally with a WHERE condition."
+    description = "Count rows in a table, optionally filtered by a column value (parameterized for security)."
     category = ToolCategory.DATA
     cacheable = True
     cache_ttl = 60  # 1 minute - counts change frequently
 
+    # Valid comparison operators for filtering
+    ALLOWED_OPERATORS = {"=", "!=", "<>", "<", ">", "<=", ">=", "LIKE", "ILIKE", "IS NULL", "IS NOT NULL"}
+
     async def execute(
         self,
         table_name: str,
-        where_clause: Optional[str] = None
+        filter_column: Optional[str] = None,
+        filter_value: Optional[Any] = None,
+        filter_operator: str = "="
     ) -> ToolResult:
         """
-        Count rows in a table.
+        Count rows in a table with optional parameterized filter.
 
         Args:
             table_name: Table to count
-            where_clause: Optional WHERE condition (without WHERE keyword)
+            filter_column: Optional column to filter on
+            filter_value: Optional value to filter by (parameterized, safe from injection)
+            filter_operator: Comparison operator (default: "=").
+                             Allowed: =, !=, <>, <, >, <=, >=, LIKE, ILIKE, IS NULL, IS NOT NULL
 
         Returns:
             ToolResult with count:
             {
                 "table": "orders",
-                "where": "status = 'pending'",
+                "filter": {"column": "status", "operator": "=", "value": "pending"},
                 "count": 42
             }
         """
         start = time.time()
 
         try:
-            safe_table = table_name.replace('"', '').replace("'", "")
+            # Sanitize table name - only allow alphanumeric and underscore
+            safe_table = self._sanitize_identifier(table_name)
+            if not safe_table:
+                return ToolResult(
+                    success=False,
+                    error="Invalid table name: must contain only alphanumeric characters and underscores",
+                    tool_name=self.name,
+                    execution_time_ms=self._measure_execution(start),
+                )
 
-            # Security check for WHERE clause
-            if where_clause:
-                # Block dangerous keywords
-                dangerous = [
-                    "DROP", "DELETE", "UPDATE", "INSERT", "ALTER",
-                    "TRUNCATE", "CREATE", "GRANT", "REVOKE",
-                    ";", "--", "/*", "*/"
-                ]
-                where_upper = where_clause.upper()
-                for keyword in dangerous:
-                    if keyword in where_upper:
-                        return ToolResult(
-                            success=False,
-                            error=f"WHERE clause contains blocked keyword: {keyword}",
-                            tool_name=self.name,
-                            execution_time_ms=self._measure_execution(start),
-                        )
+            # Validate operator
+            operator_upper = filter_operator.upper().strip()
+            if operator_upper not in self.ALLOWED_OPERATORS:
+                return ToolResult(
+                    success=False,
+                    error=f"Invalid operator: {filter_operator}. Allowed: {', '.join(sorted(self.ALLOWED_OPERATORS))}",
+                    tool_name=self.name,
+                    execution_time_ms=self._measure_execution(start),
+                )
 
-                query = text(f'SELECT COUNT(*) as count FROM "{safe_table}" WHERE {where_clause}')
+            # Build query with parameterized filter
+            filter_info = None
+            if filter_column:
+                safe_column = self._sanitize_identifier(filter_column)
+                if not safe_column:
+                    return ToolResult(
+                        success=False,
+                        error="Invalid column name: must contain only alphanumeric characters and underscores",
+                        tool_name=self.name,
+                        execution_time_ms=self._measure_execution(start),
+                    )
+
+                # Handle NULL comparisons (no parameter needed)
+                if operator_upper in ("IS NULL", "IS NOT NULL"):
+                    query = text(f'SELECT COUNT(*) as count FROM "{safe_table}" WHERE "{safe_column}" {operator_upper}')
+                    params = {}
+                else:
+                    # Use parameterized query - value is safely bound, not interpolated
+                    query = text(f'SELECT COUNT(*) as count FROM "{safe_table}" WHERE "{safe_column}" {operator_upper} :filter_value')
+                    params = {"filter_value": filter_value}
+
+                filter_info = {
+                    "column": safe_column,
+                    "operator": operator_upper,
+                    "value": filter_value if operator_upper not in ("IS NULL", "IS NOT NULL") else None
+                }
             else:
                 query = text(f'SELECT COUNT(*) as count FROM "{safe_table}"')
+                params = {}
 
-            result = await self.schema_inspector._execute_query(self.session, query)
+            result = await self.schema_inspector._execute_query(self.session, query, params)
             row = result.fetchone()
             count = row[0] if row else 0
 
@@ -352,7 +387,7 @@ class CountRowsTool(BaseTool):
                 success=True,
                 data={
                     "table": safe_table,
-                    "where": where_clause,
+                    "filter": filter_info,
                     "count": count,
                 },
                 execution_time_ms=self._measure_execution(start),
@@ -363,10 +398,31 @@ class CountRowsTool(BaseTool):
             logger.error(f"count_rows failed: {e}")
             return ToolResult(
                 success=False,
-                error=str(e),
+                error=f"Query execution failed: {type(e).__name__}",
                 tool_name=self.name,
                 execution_time_ms=self._measure_execution(start),
             )
+
+    def _sanitize_identifier(self, identifier: str) -> Optional[str]:
+        """
+        Validate a SQL identifier (table/column name).
+
+        Returns identifier if valid, or None if invalid.
+        Only allows alphanumeric characters and underscores.
+        REJECTS (not sanitizes) any identifier with invalid characters.
+        """
+        import re
+        if not identifier:
+            return None
+        # Strip whitespace
+        identifier = identifier.strip()
+        # REJECT if any invalid characters are present (don't strip them)
+        if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', identifier):
+            return None
+        # Limit length to prevent abuse
+        if len(identifier) > 128:
+            return None
+        return identifier
 
     def get_definition(self) -> ToolDefinition:
         return ToolDefinition(
@@ -378,9 +434,18 @@ class CountRowsTool(BaseTool):
                     "type": "string",
                     "description": "Table to count rows in"
                 },
-                "where_clause": {
+                "filter_column": {
                     "type": "string",
-                    "description": "Optional WHERE condition (without WHERE keyword)"
+                    "description": "Optional: column to filter on"
+                },
+                "filter_value": {
+                    "type": "any",
+                    "description": "Optional: value to filter by (safely parameterized)"
+                },
+                "filter_operator": {
+                    "type": "string",
+                    "description": "Comparison operator (default: '='). Allowed: =, !=, <>, <, >, <=, >=, LIKE, ILIKE, IS NULL, IS NOT NULL",
+                    "default": "="
                 },
             },
             required_params=["table_name"],
@@ -391,8 +456,16 @@ class CountRowsTool(BaseTool):
                 },
                 {
                     "table_name": "orders",
-                    "where_clause": "status = 'pending'",
+                    "filter_column": "status",
+                    "filter_value": "pending",
                     "result": "count: 42"
+                },
+                {
+                    "table_name": "customers",
+                    "filter_column": "state",
+                    "filter_value": "CA",
+                    "filter_operator": "=",
+                    "result": "count: 150"
                 },
             ],
         )

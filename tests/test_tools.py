@@ -299,19 +299,109 @@ class TestDataTools:
     """Test data sampling tools"""
 
     @pytest.mark.asyncio
-    async def test_count_rows_security_check(self, mock_schema_inspector, mock_schema_cache, mock_session):
-        """Test count_rows blocks dangerous SQL in WHERE clause"""
+    async def test_count_rows_parameterized_query(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test count_rows uses parameterized queries (SQL injection safe)"""
         tool = CountRowsTool()
         tool.set_context(mock_session, mock_schema_inspector, mock_schema_cache, connection_id=1)
 
-        # Try to inject DROP command
+        # Mock the query execution - create a proper mock result
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = (42,)
+
+        # Make _execute_query an async function that returns mock_result
+        async def mock_execute(*args, **kwargs):
+            return mock_result
+        mock_schema_inspector._execute_query = mock_execute
+
+        # Test with filter - value is parameterized, not interpolated
         result = await tool.execute(
             table_name="customers",
-            where_clause="1=1; DROP TABLE customers; --"
+            filter_column="status",
+            filter_value="active"
+        )
+
+        assert result.success is True
+        assert result.data["count"] == 42
+        assert result.data["filter"]["column"] == "status"
+        assert result.data["filter"]["value"] == "active"
+
+    @pytest.mark.asyncio
+    async def test_count_rows_rejects_invalid_table_name(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test count_rows rejects table names with injection attempts"""
+        tool = CountRowsTool()
+        tool.set_context(mock_session, mock_schema_inspector, mock_schema_cache, connection_id=1)
+
+        # Try SQL injection via table name - should fail validation before query
+        result = await tool.execute(
+            table_name="customers; DROP TABLE users; --"
         )
 
         assert result.success is False
-        assert "blocked" in result.error.lower()
+        assert "invalid table name" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_count_rows_rejects_invalid_column_name(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test count_rows rejects column names with injection attempts"""
+        tool = CountRowsTool()
+        tool.set_context(mock_session, mock_schema_inspector, mock_schema_cache, connection_id=1)
+
+        # Try SQL injection via column name - should fail validation before query
+        result = await tool.execute(
+            table_name="customers",
+            filter_column="status; DROP TABLE users",
+            filter_value="active"
+        )
+
+        assert result.success is False
+        assert "invalid column name" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_count_rows_rejects_invalid_operator(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test count_rows only allows whitelisted operators"""
+        tool = CountRowsTool()
+        tool.set_context(mock_session, mock_schema_inspector, mock_schema_cache, connection_id=1)
+
+        # Try invalid operator
+        result = await tool.execute(
+            table_name="customers",
+            filter_column="status",
+            filter_value="active",
+            filter_operator="= 'x' OR 1=1; --"
+        )
+
+        assert result.success is False
+        assert "invalid operator" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_count_rows_allows_valid_operators(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test count_rows accepts all valid operators"""
+        tool = CountRowsTool()
+        tool.set_context(mock_session, mock_schema_inspector, mock_schema_cache, connection_id=1)
+
+        # Mock the query execution
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = (10,)
+
+        async def mock_execute(*args, **kwargs):
+            return mock_result
+        mock_schema_inspector._execute_query = mock_execute
+
+        valid_operators = ["=", "!=", "<>", "<", ">", "<=", ">=", "LIKE", "IS NULL"]
+        for op in valid_operators:
+            if op in ("IS NULL", "IS NOT NULL"):
+                result = await tool.execute(
+                    table_name="customers",
+                    filter_column="deleted_at",
+                    filter_operator=op
+                )
+            else:
+                result = await tool.execute(
+                    table_name="customers",
+                    filter_column="status",
+                    filter_value="active",
+                    filter_operator=op
+                )
+            assert result.success is True, f"Operator {op} should be allowed"
 
 
 class TestQueryTools:
