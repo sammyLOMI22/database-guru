@@ -8,6 +8,7 @@ export interface QueryRequest {
   allow_write?: boolean;
   use_cache?: boolean;
   session_id?: string;
+  force_schema_refresh?: boolean;
 }
 
 // Option 2: Observability Types
@@ -315,6 +316,7 @@ export interface MultiDatabaseQueryRequest {
   allow_write?: boolean;
   use_cache?: boolean;
   model?: string;
+  force_schema_refresh?: boolean;
 }
 
 export interface DatabaseQueryResult {
@@ -350,4 +352,76 @@ export interface MultiDatabaseQueryResponse {
   warnings: string[];
   cached: boolean;
   timestamp: string;
+}
+
+// Mapping Management Types (Phase 2: Non-SQL Feedback)
+export interface ColumnMapping {
+  id: number;
+  source_column: string;
+  target_column: string;
+  table_name: string | null;
+  connection_name: string | null;
+  database_type: string;
+  description: string | null;
+  confidence_score: number;
+  times_applied: number;
+  success_rate: number;
+  created_by: string;
+  created_at: string;
+  last_applied_at: string | null;
+}
+
+export interface TableMapping {
+  id: number;
+  source_table: string;
+  target_table: string;
+  connection_name: string | null;
+  database_type: string;
+  mapping_type: string;
+  description: string | null;
+  confidence_score: number;
+  times_applied: number;
+  success_rate: number;
+  created_by: string;
+  created_at: string;
+  last_applied_at: string | null;
+}
+
+export interface ResultPattern {
+  id: number;
+  pattern_type: string;
+  pattern_description: string;
+  matching_criteria: Record<string, any>;
+  action: string;
+  suggestion: string | null;
+  times_triggered: number;
+  times_helpful: number;
+  confidence_score: number;
+  created_at: string;
+  last_triggered_at: string | null;
+}
+
+export interface MappingStats {
+  total_mappings: number;
+  total_applications: number;
+  average_success_rate: number;
+  most_used: Array<{
+    source: string;
+    target: string;
+    table?: string;
+    connection?: string;
+    type?: string;
+    times_applied: number;
+  }>;
+  by_database_type: Record<string, number>;
+  by_connection: Record<string, number>;
+}
+
+export interface PatternStats {
+  total_patterns: number;
+  total_triggers: number;
+  total_helpful: number;
+  helpfulness_rate: number;
+  by_type: Record<string, number>;
+  by_action: Record<string, number>;
 }

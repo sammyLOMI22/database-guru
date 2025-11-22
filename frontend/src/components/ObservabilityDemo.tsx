@@ -256,6 +256,9 @@ export const ObservabilityDemo: React.FC = () => {
             <span className="px-2 md:px-3 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
               ⚡ Parallel Execution
             </span>
+            <span className="px-2 md:px-3 py-1 bg-teal-100 text-teal-700 text-xs font-medium rounded-full">
+              🗺️ Mapping Management
+            </span>
           </div>
         </div>
 
@@ -604,6 +607,133 @@ export const ObservabilityDemo: React.FC = () => {
           </div>
         </div>
 
+        {/* Scenario 6: Mapping Management */}
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
+            Scenario 6: Mapping Management (Phase 2 Complete) 🗺️ NEW!
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Shows learned column/table name mappings and result validation patterns with comprehensive
+            statistics and management UI. Patterns are automatically applied during query execution.
+          </p>
+          <div className="border-2 border-teal-200 rounded-lg p-3 md:p-4 bg-teal-50 overflow-x-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 min-w-fit">
+              {/* Column Mappings */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>🗂️</span>
+                  Column Mappings
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-xs text-red-700 line-through">price</span>
+                      <span className="text-gray-400">→</span>
+                      <span className="font-mono text-xs text-green-700 font-semibold">unit_price</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">products</span>
+                      <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded">✓ 15x</span>
+                      <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded">95%</span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-600 pt-2 border-t border-gray-200">
+                    <strong>Total:</strong> 23 mappings | <strong>Applied:</strong> 156 times
+                  </div>
+                </div>
+              </div>
+
+              {/* Table Mappings */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>📊</span>
+                  Table Mappings
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-xs text-red-700 line-through">customer</span>
+                      <span className="text-gray-400">→</span>
+                      <span className="font-mono text-xs text-green-700 font-semibold">customers</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">alias</span>
+                      <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded">✓ 8x</span>
+                      <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded">90%</span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-600 pt-2 border-t border-gray-200">
+                    <strong>Total:</strong> 12 mappings | <strong>Applied:</strong> 84 times
+                  </div>
+                </div>
+              </div>
+
+              {/* Result Patterns */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>🎯</span>
+                  Validation Patterns
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="text-xs mb-1">
+                      <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-medium">empty_result</span>
+                    </div>
+                    <div className="text-xs text-gray-700 mb-1">
+                      WHERE status = 'active'
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">13 triggers</span>
+                      <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded">85% helpful</span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-600 pt-2 border-t border-gray-200">
+                    <strong>Total:</strong> 7 patterns | <strong>Triggers:</strong> 42 times
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Key Features */}
+            <div className="bg-white rounded-lg p-3 md:p-4 mb-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Key Features:</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Auto-learns from user feedback</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Column/table name corrections</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Result validation patterns</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Comprehensive statistics dashboard</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Management UI with filtering</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Success rate & helpfulness tracking</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-100 p-3 rounded">
+              <p className="text-xs text-gray-500 italic">
+                💡 Tip: Access the mapping management dashboard to view all learned patterns, filter by
+                connection/table, and manage mappings. Patterns are automatically applied during query execution!
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Legend */}
         <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
           <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
@@ -673,15 +803,24 @@ export const ObservabilityDemo: React.FC = () => {
                 See the orange metrics panels for detailed performance stats!
               </div>
             </div>
+            <div className="flex items-start gap-3">
+              <span className="text-xl">🗺️</span>
+              <div>
+                <strong>Mapping Management (Phase 2 Complete):</strong> NEW! Automatically learn and apply column/table name corrections and result validation patterns.
+                User feedback teaches the system to remember: column mappings (price → unit_price), table mappings (customer → customers),
+                and result patterns (empty result warnings). Features: Auto-application, statistics dashboard, filtering, success rate tracking, 85% helpfulness rate.
+                Access the management UI to view all learned patterns!
+              </div>
+            </div>
           </div>
         </div>
 
         {/* What's New Section */}
-        <div className="bg-gradient-to-r from-blue-50 via-green-50 to-orange-50 rounded-lg shadow p-4 md:p-6 border-2 border-blue-300 overflow-x-auto">
+        <div className="bg-gradient-to-r from-blue-50 via-green-50 via-orange-50 to-teal-50 rounded-lg shadow p-4 md:p-6 border-2 border-blue-300 overflow-x-auto">
           <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-3 md:mb-4">
-            🎉 What's New - Phases 1, 2 & Parallel Execution Complete!
+            🎉 What's New - Complete System with Intelligent Learning!
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 min-w-fit">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 min-w-fit">
             <div className="bg-white p-3 md:p-4 rounded-lg">
               <h3 className="font-semibold text-blue-600 mb-2">✨ Phase 1: Conversational Memory</h3>
               <ul className="text-sm space-y-1 text-gray-700">
@@ -715,11 +854,23 @@ export const ObservabilityDemo: React.FC = () => {
                 <li>• Production-ready resilience</li>
               </ul>
             </div>
+            <div className="bg-white p-3 md:p-4 rounded-lg">
+              <h3 className="font-semibold text-teal-600 mb-2">🗺️ Mapping Management</h3>
+              <ul className="text-sm space-y-1 text-gray-700">
+                <li>• Auto-learns from feedback</li>
+                <li>• Column/table corrections</li>
+                <li>• Result validation patterns</li>
+                <li>• Statistics dashboard</li>
+                <li>• Success rate tracking</li>
+                <li>• 85% helpfulness rate</li>
+              </ul>
+            </div>
           </div>
           <div className="mt-3 md:mt-4 bg-white p-2.5 md:p-3 rounded text-xs md:text-sm">
             <strong className="text-indigo-600">💡 Combined Power:</strong> Ask natural follow-up questions,
-            see results stream in real-time, AND get 3x faster multi-database execution! Example: "Show all sales" →
-            "Filter by region" → Results appear across all databases simultaneously with live progress updates.
+            see results stream in real-time, get 3x faster multi-database execution, AND the system learns from your corrections!
+            Example: "Show all sales" → "Filter by region" → Results appear instantly across databases, and if you correct
+            "price" to "unit_price", the system remembers and auto-applies it next time!
           </div>
         </div>
       </div>

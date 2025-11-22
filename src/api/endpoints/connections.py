@@ -214,3 +214,10 @@ async def delete_connection(
 
     await db.delete(connection)
     await db.commit()
+
+    # Invalidate schema cache for this connection
+    from src.core.schema_cache import SchemaCache
+    SchemaCache.invalidate_schema(
+        connection_id=connection_id,
+        connection_name=connection.name
+    )

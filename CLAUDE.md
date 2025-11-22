@@ -221,6 +221,16 @@ Return Results
 - Blocks destructive operations (DELETE, UPDATE, DROP) from auto-learning
 - Comprehensive testing validates corrections actually improve results
 
+**Learned Mapping System (NEW - November 10, 2025):**
+- `ColumnMapper` (`src/llm/column_mapper.py`) - Learns and applies column name corrections
+- `TableMapper` (`src/llm/table_mapper.py`) - Learns and applies table name corrections
+- `ResultPatternLearner` (`src/llm/result_pattern_learner.py`) - Learns result validation patterns
+- **Management API** (`src/api/endpoints/mappings.py`) - View, filter, and manage learned patterns
+- **Filtering** - By connection_name, table_name, database_type, pattern_type, action
+- **Statistics** - Usage counts, success rates, helpfulness ratings
+- **Frontend Dashboard** - 5 components for browsing and managing mappings
+- Auto-learns from non-SQL feedback types (column_name, table_name, result_issue)
+
 **Security System (NEW - November 2, 2025):**
 - `PromptSanitizer` (`src/security/prompt_sanitizer.py`) - Multi-layer prompt injection protection
 - Input sanitization at API boundary (Pydantic validators)
@@ -242,6 +252,9 @@ The system maintains its own metadata database (`database_guru.db`):
 - `confidence_scores` - Historical confidence predictions
 - `user_feedback` - User-submitted corrections and reports
 - `system_settings` - Configuration for auto-learning and validation
+- `column_mappings` - Learned column name corrections (NEW - Nov 10, 2025)
+- `table_mappings` - Learned table name corrections (NEW - Nov 10, 2025)
+- `result_validation_patterns` - Learned result validation patterns (NEW - Nov 10, 2025)
 
 ### API Structure
 
@@ -252,6 +265,11 @@ Endpoints organized by domain (`src/api/endpoints/`):
 - `chat.py` - Chat session management + conversation context endpoints (GET/DELETE /sessions/{id}/context)
 - `feedback.py` - User feedback submission and stats
 - `learned_corrections.py` - View learned patterns
+- `mappings.py` - **Mapping management API (NEW - Nov 10, 2025)** - View/manage column/table/pattern mappings
+  - **10 endpoints total**: GET/DELETE for columns, tables, patterns + stats + helpful tracking
+  - Advanced filtering by connection_name, table_name, database_type, pattern_type, action
+  - Pagination support (limit/offset)
+  - Statistics aggregation and analytics
 - `result_verification.py` - Manual result verification
 - `query_planning.py` - Query plan generation
 - `confidence.py` - Confidence scoring API (if exists)
@@ -296,6 +314,15 @@ Located in `frontend/src/`:
 - `types/` - TypeScript type definitions (includes ConversationContext types)
 - Uses TanStack Query for server state management
 - Zustand for client state (if used)
+
+**Learned Mapping Components (NEW - November 10, 2025):**
+- `LearnedMappingsPanel.tsx` (+95 lines) - Main tabbed interface for browsing mappings
+- `ColumnMappingsList.tsx` (+165 lines) - Column mappings with filtering and delete
+- `TableMappingsList.tsx` (+170 lines) - Table mappings with filtering and delete
+- `ResultPatternsList.tsx` (+195 lines) - Result patterns with helpfulness tracking
+- `MappingStatsDisplay.tsx` (+315 lines) - Statistics dashboard with charts
+- `mappingsApi.ts` (+155 lines) - API service layer for mapping endpoints
+- Total: **1,095 lines** of new UI code for mapping management
 
 ### LLM Prompts
 

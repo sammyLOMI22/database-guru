@@ -272,7 +272,8 @@ class SelfCorrectingSQLAgent:
         enable_schema_fixes: bool = True,
         enable_result_verification: bool = True,
         enable_query_planning: bool = True,
-        learner_session = None
+        learner_session = None,
+        planning_session = None
     ):
         """
         Initialize the self-correcting agent
@@ -286,6 +287,7 @@ class SelfCorrectingSQLAgent:
             enable_result_verification: Whether to enable result verification
             enable_query_planning: Whether to enable query planning for complex queries
             learner_session: Database session for the learner (optional)
+            planning_session: Database session for the query planner (optional, for learned mappings)
         """
         self.generator = sql_generator
         self.max_retries = max_retries
@@ -322,9 +324,10 @@ class SelfCorrectingSQLAgent:
                 from src.llm.result_verification_agent import ResultVerificationAgent
                 self.verification_agent = ResultVerificationAgent(
                     enable_diagnostics=True,
-                    enable_auto_fix=True
+                    enable_auto_fix=True,
+                    db_session=planning_session  # Use same session for pattern validation
                 )
-                logger.info("Result verification enabled")
+                logger.info("Result verification enabled" + (" with learned patterns" if planning_session else ""))
             except ImportError:
                 logger.warning("ResultVerificationAgent not available - verification disabled")
                 self.enable_result_verification = False
@@ -337,9 +340,10 @@ class SelfCorrectingSQLAgent:
                 self.planning_agent = QueryPlanningAgent(
                     settings=sql_generator.settings,
                     ollama_client=sql_generator.ollama,
-                    enable_planning=True
+                    enable_planning=True,
+                    db_session=planning_session
                 )
-                logger.info("Query planning enabled")
+                logger.info("Query planning enabled" + (" with learned mappings" if planning_session else ""))
             except ImportError:
                 logger.warning("QueryPlanningAgent not available - planning disabled")
                 self.enable_query_planning = False
@@ -633,6 +637,7 @@ class SelfCorrectingSQLAgent:
         model: Optional[str] = None,
         schema_dict: Optional[Dict] = None,
         use_parallel_corrections: bool = True,  # NEW: Enable/disable parallel fixes
+        connection_name: Optional[str] = None  # NEW: Connection name for learned mappings
     ) -> Dict[str, Any]:
         """
         Generate SQL with automatic error correction and retry
@@ -644,6 +649,9 @@ class SelfCorrectingSQLAgent:
             database_type: Type of database
             allow_write: Whether to allow write operations
             model: Optional model name to use
+            schema_dict: Optional parsed schema dictionary
+            use_parallel_corrections: Whether to enable parallel correction attempts
+            connection_name: Optional connection name for applying learned mappings
 
         Returns:
             Dictionary with:
@@ -702,7 +710,8 @@ class SelfCorrectingSQLAgent:
                     database_type=database_type,
                     sql_generator=self.generator,
                     model=model,
-                    schema_dict=schema_dict
+                    schema_dict=schema_dict,
+                    connection_name=connection_name
                 )
 
                 if planning_result.get("used_planning"):
@@ -979,12 +988,20 @@ class SelfCorrectingSQLAgent:
                         try:
                             trace.add_step("verification", "Verifying query results for accuracy")
                             logger.info("🔍 Verifying query results...")
+
+                            # Extract primary table from query plan if available
+                            primary_table = None
+                            if query_plan and hasattr(query_plan, 'tables') and query_plan.tables:
+                                primary_table = query_plan.tables[0].name
+
                             verification_result = await self.verification_agent.verify_results(
                                 question=question,
                                 sql=sql,
                                 result=exec_result,
                                 schema=schema,
-                                database_type=database_type
+                                database_type=database_type,
+                                connection_name=connection_name,
+                                table_name=primary_table
                             )
 
                             if verification_result.is_suspicious:
