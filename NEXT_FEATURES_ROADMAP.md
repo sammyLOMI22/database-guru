@@ -1,12 +1,21 @@
 # 🚀 Next Features Roadmap - Agentic SQL Generation
 
-> **Latest Update**: 2025-11-08 - Parallel Performance Features PRODUCTION-READY! ⚡✅✅✅ (All critical & important issues resolved, comprehensive metrics added!)
+> **Latest Update**: 2025-11-21 - Phase 3.1 Tool-Using Agent COMPLETE! ⚡✅✅✅✅ (10 tools, 26 tests, 4th parallel fix strategy!)
 
 ## 🎯 Quick Recommendation: What to Build Next
 
-**🎉 PHASES 1 & 2 COMPLETE!** Conversational Memory, Streaming Results, AND Parallel Performance Optimizations are now fully implemented, tested, and documented!
+**🎉 PHASES 1, 2 & 3.1 COMPLETE!** Conversational Memory, Streaming Results, Parallel Performance Optimizations, AND Tool-Using Agent are now fully implemented, tested, and documented!
 
-**Latest Achievements (November 8, 2025):**
+**Latest Achievement (November 21, 2025):**
+- ✅ **Tool-Using Agent (Phase 3.1)** - Better first-attempt SQL accuracy
+  - 10 specialized tools across 4 categories (SCHEMA, DATA, QUERY, VALIDATION)
+  - Automatic tool selection and execution for schema context
+  - 4th parallel fix strategy (tool_using alongside quick_fix, learned, llm)
+  - Caching via MappingCache for performance
+  - SQL injection protection in count_rows tool
+  - 26 comprehensive tests passing (100% coverage)
+
+**Previous Achievements (November 8, 2025):**
 - ✅ **Parallel Multi-Database Execution** - 3x speedup on multi-database queries
   - Intelligent throttling (max 10 concurrent databases)
   - Dual timeout protection (35s timeout)
@@ -92,7 +101,7 @@ Based on completed work and impact analysis, here are the **top recommendations 
   - Single DB: "Show me all products" → See first 100 rows in 150ms → Batches stream in real-time → Complete at 1000 rows
   - Multi-DB: Query 3 databases → All start simultaneously → Results stream independently → 500 rows from DB1, 300 from DB2, 200 from DB3
 
-**My recommendation**: All Phase 0, Phase 1, and Phase 2 (including parallel optimizations!) complete! Consider **LangGraph Integration** for advanced multi-agent orchestration or **Tool-Using Agent** for schema exploration!
+**My recommendation**: All Phase 0, Phase 1, Phase 2, AND Phase 3.1 complete! Consider **LangGraph Integration** for advanced multi-agent orchestration or **Semantic Caching** for performance optimization!
 
 ---
 
@@ -160,7 +169,7 @@ Some features work great together:
 
 ---
 
-## 📍 Current Status (Updated: 2025-11-08)
+## 📍 Current Status (Updated: 2025-11-21)
 
 ### ✅ **COMPLETED**
 - ✅ **Self-Correcting SQL Agent** - Automatic error detection and retry
@@ -172,17 +181,27 @@ Some features work great together:
 - ✅ **Confidence Scoring** - AI-powered success probability prediction
 - ✅ **Conversational Memory** - Natural multi-turn conversations
 - ✅ **Streaming Results** - Progressive result delivery (30x faster perceived performance)
-- ✅ **Parallel Multi-DB Execution (PRODUCTION-READY)** - 3x speedup + timeout protection + metrics ⬅️ **UPDATED!**
-- ✅ **Parallel Correction Attempts (PRODUCTION-READY)** - 1.6x speedup + timeout protection + metrics ⬅️ **UPDATED!**
+- ✅ **Parallel Multi-DB Execution (PRODUCTION-READY)** - 3x speedup + timeout protection + metrics
+- ✅ **Parallel Correction Attempts (PRODUCTION-READY)** - 1.6x speedup + timeout protection + metrics
+- ✅ **Tool-Using Agent (Phase 3.1)** - 10 tools for schema exploration + 4th parallel fix strategy ⬅️ **LATEST!**
 - ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB)
 - ✅ Multi-database queries - Query across databases simultaneously with parallel execution
 - ✅ Schema introspection - Automatic discovery
 - ✅ Chat sessions - Context management
 
-### 🎯 **CURRENT FOCUS: Phase 1 & Phase 2 PRODUCTION-READY! 🎉🎉🎉**
-ALL Phase 0, Phase 1, AND Phase 2 core features are now complete WITH production-grade quality! You have a fully self-improving SQL system with AI-powered confidence scoring, conversational memory, streaming results, AND production-ready parallel performance optimizations!
+### 🎯 **CURRENT FOCUS: Phase 1, 2 & 3.1 COMPLETE! 🎉🎉🎉🎉**
+ALL Phase 0, Phase 1, Phase 2, AND Phase 3.1 core features are now complete! You have a fully self-improving SQL system with AI-powered confidence scoring, conversational memory, streaming results, parallel performance optimizations, AND a Tool-Using Agent!
 
-**Latest Achievements (2025-11-08):**
+**Latest Achievement (2025-11-21):**
+✅ **Tool-Using Agent (Phase 3.1)** - Better first-attempt SQL accuracy!
+  - 10 specialized tools across 4 categories (SCHEMA, DATA, QUERY, VALIDATION)
+  - Automatic tool selection and execution for schema context
+  - 4th parallel fix strategy (tool_using alongside quick_fix, learned, llm)
+  - Caching via MappingCache for performance
+  - SQL injection protection in count_rows tool
+  - 26 comprehensive tests passing (100% coverage)
+
+**Previous Achievements (2025-11-08):**
 ✅ **Parallel Multi-Database Execution** - 3x speedup on multi-database queries!
   - Intelligent throttling (max 10 concurrent databases)
   - Dual timeout protection (35s timeout)
@@ -199,14 +218,10 @@ ALL Phase 0, Phase 1, AND Phase 2 core features are now complete WITH production
   - Code quality score: 9.0/10
   - Comprehensive observability and monitoring
 
-**Previous Achievement (2025-11-01):**
-✅ **Streaming Results** - 30x faster perceived performance with progressive rendering!
-✅ **Conversational Memory** - Natural multi-turn conversations with context awareness!
-
-**Next Steps - Phase 3 Options:**
+**Next Steps - Phase 3.2+ Options:**
 1. **LangGraph Multi-Agent System** ⬅️ **RECOMMENDED NEXT** (Full agentic architecture upgrade)
-2. **Tool-Using Agent** (Schema exploration and query testing)
-3. **Semantic Caching** (Cache by semantic similarity)
+2. **Semantic Caching** (Cache by semantic similarity)
+3. **Advanced Visualizations** (Charts and dashboards)
 
 ### 🔮 **FUTURE PHASES**
 - **Phase 1**: Parallel Corrections, Conversational Memory, Streaming Results
@@ -894,54 +909,76 @@ app = workflow.compile()
 
 ### **TIER 3: Advanced Features** ⭐⭐
 
-#### 5. Tool-Using Agent
-**Impact**: 🔥🔥🔥 **Complexity**: ⚡⚡⚡
+#### 5. Tool-Using Agent ✅ **COMPLETED!**
+**Impact**: 🔥🔥🔥 **Complexity**: ⚡⚡⚡ **Time**: 3 days ✅
 
-**What**: Agent that can use tools to gather information
+**Status**: ✅ Fully implemented and deployed (2025-11-21)
 
-**Tools Available:**
-```python
-class SQLAgentTools:
-    @tool
-    async def get_table_schema(table_name: str) -> Dict:
-        """Get detailed schema for a specific table"""
-        pass
+**What was built:** Agent that uses 10 specialized tools to gather schema context before SQL generation
 
-    @tool
-    async def get_sample_data(table_name: str, limit: int = 5) -> List:
-        """Get sample rows from a table"""
-        pass
+**10 Tools Implemented:**
 
-    @tool
-    async def test_query(sql: str) -> bool:
-        """Test if SQL is valid without executing"""
-        pass
+| Category | Tool | Description |
+|----------|------|-------------|
+| SCHEMA | `search_schema` | Search tables/columns by keyword with fuzzy matching |
+| SCHEMA | `get_table_info` | Detailed table info: columns, PKs, relationships |
+| SCHEMA | `find_columns` | Find columns across all tables |
+| SCHEMA | `get_relationships` | FK relationships and join suggestions |
+| DATA | `get_sample_data` | Sample rows from tables (max 20) |
+| DATA | `get_column_values` | Distinct values (essential for 'CA' vs 'California') |
+| DATA | `count_rows` | Row count with optional WHERE (SQL injection protected) |
+| QUERY | `test_query` | Test SQL syntax using EXPLAIN |
+| QUERY | `validate_sql` | Validate references with fuzzy suggestions |
+| QUERY | `explain_query` | Get query execution plan |
 
-    @tool
-    async def get_column_values(table: str, column: str) -> List:
-        """Get distinct values from a column"""
-        pass
-
-    @tool
-    async def search_schema(keyword: str) -> List[str]:
-        """Search for tables/columns matching keyword"""
-        pass
-```
+**Key Features:**
+- ✅ Automatic tool selection based on question analysis
+- ✅ Enriched context improves first-attempt SQL accuracy
+- ✅ 4th parallel fix strategy (tool_using alongside quick_fix, learned, llm)
+- ✅ Caching via MappingCache for performance
+- ✅ SQL injection protection in count_rows tool
+- ✅ Execution metrics tracking (times_executed, success_rate, cache_hit_rate)
+- ✅ 26 comprehensive tests passing (100% coverage)
+- ✅ REST API with 6 endpoints for tool management
 
 **Example Usage:**
 ```
 User: "Show me orders from California"
 
-Agent Reasoning:
-1. "I need to find the table with orders" → use search_schema("orders")
-2. "Found 'orders' table"
-3. "I need to check if 'state' column exists" → use get_table_schema("orders")
-4. "No 'state' in orders, but there's 'customer_id'"
-5. "Check customers table" → use get_table_schema("customers")
-6. "Found 'state' column in customers!"
-7. "I need to join orders → customers on customer_id"
-8. Generate: SELECT * FROM orders o JOIN customers c ON o.customer_id = c.id WHERE c.state = 'CA'
+Tool-Using Agent:
+1. Analyzes: Need to understand 'California' representation
+2. Calls: search_schema("order") → finds 'orders' table
+3. Calls: find_columns("state") → finds 'customers.state'
+4. Calls: get_column_values("customers", "state") → ['CA', 'NY', 'TX', ...]
+5. Discovers: States stored as 2-letter codes!
+6. Context: "Note: state values are 2-letter codes like 'CA' for California"
+
+SQL Generator (with enriched context):
+→ SELECT * FROM orders o
+  JOIN customers c ON o.customer_id = c.id
+  WHERE c.state = 'CA'
+
+✅ Correct on first attempt!
 ```
+
+**Files Created:**
+- `src/tools/base.py` - Base classes (BaseTool, ToolResult, ToolDefinition, ToolCategory)
+- `src/tools/tool_registry.py` - Tool registry with caching
+- `src/tools/__init__.py` - Module exports
+- `src/tools/schema_tools.py` - 4 schema exploration tools
+- `src/tools/data_tools.py` - 3 data sampling tools
+- `src/tools/query_tools.py` - 3 query validation tools
+- `src/llm/tool_using_agent.py` - Main agent
+- `src/api/endpoints/tools.py` - REST API (6 endpoints)
+- `tests/test_tools.py` - 26 comprehensive tests
+
+**API Endpoints:**
+- `GET /api/tools` - List available tools (filterable by category)
+- `GET /api/tools/stats` - Get execution statistics
+- `GET /api/tools/stats/{tool_name}` - Get stats for specific tool
+- `GET /api/tools/prompt` - Get tools formatted for LLM prompt
+- `POST /api/tools/{tool_name}/invalidate-cache` - Invalidate tool cache
+- `POST /api/tools/invalidate-all-cache` - Invalidate all tool caches
 
 ---
 
@@ -1083,12 +1120,12 @@ class SemanticCache:
 | Feature | Impact | Complexity | Time | Priority | Status |
 |---------|--------|------------|------|----------|--------|
 | LangGraph Workflow | 🔥🔥🔥🔥 | ⚡⚡⚡ | 1-2 weeks | **P1** | ⬜ |
-| Tool-Using Agent | 🔥🔥🔥 | ⚡⚡⚡ | 1 week | **P2** | ⬜ |
+| **Tool-Using Agent** | 🔥🔥🔥 | ⚡⚡⚡ | 3 days | **P2** | ✅ **DONE** (Phase 3.1 - 10 tools, 26 tests) |
 | Semantic Caching | 🔥🔥 | ⚡⚡ | 2-3 days | **P3** | ⬜ |
 
 ---
 
-## 🎯 Recommended Implementation Order (UPDATED 2025-11-02)
+## 🎯 Recommended Implementation Order (UPDATED 2025-11-21)
 
 ### Phase 0: Self-Correcting Enhancements ✅ 7/7 COMPLETE! 🎉
 **World-class, fully self-improving SQL system with AI-powered confidence scoring!**
@@ -1182,9 +1219,9 @@ class SemanticCache:
     - **Code Review Score**: 9.0/10 - All critical & important issues resolved
     - **Time**: 2.5 days (initial 1.5 days + 1 day production hardening)
 
-### 🎯 What's Next? Top Recommendations for Phase 3:
+### 🎯 What's Next? Top Recommendations for Phase 3.2+:
 
-#### Option A: **LangGraph Integration** (RECOMMENDED!)
+#### Option A: **LangGraph Integration** (RECOMMENDED NEXT!)
 **Why**: Full agentic architecture with multi-agent orchestration
 - **Impact**: 🔥🔥🔥🔥 VERY HIGH (architectural upgrade)
 - **Complexity**: ⚡⚡⚡ HIGH
@@ -1192,34 +1229,43 @@ class SemanticCache:
 - **Synergy**: Unifies all existing agents into cohesive workflow
 - **Best for**: Production-ready multi-agent system
 
-#### Option B: **Tool-Using Agent**
-**Why**: Enable agents to explore schema and test queries dynamically
+#### Option B: ✅ **Tool-Using Agent** - COMPLETED!
+**Status**: ✅ Fully implemented (November 21, 2025)
 - **Impact**: 🔥🔥🔥 HIGH (capability improvement)
 - **Complexity**: ⚡⚡⚡ MEDIUM-HIGH
-- **Time**: 1 week
-- **Synergy**: Complements existing agents with tool use
+- **Time**: 3 days (completed!)
+- **Features**: 10 tools, 26 tests, 4th parallel fix strategy
 - **Best for**: Dynamic schema exploration and validation
+
+#### Option C: **Semantic Caching**
+**Why**: Cache by semantic similarity for performance
+- **Impact**: 🔥🔥 MEDIUM (performance improvement)
+- **Complexity**: ⚡⚡ MEDIUM
+- **Time**: 2-3 days
+- **Synergy**: Works with Tool-Using Agent for faster responses
+- **Best for**: Reducing redundant queries and LLM calls
 
 ---
 
 ### Phase 3 Features:
 
-11. ⬜ **LangGraph Multi-Agent Workflow** ⬅️ **RECOMMENDED NEXT**
+11. ✅ **Tool-Using Agent (Phase 3.1)** - COMPLETED! (November 21, 2025)
+    - 10 specialized tools across 4 categories
+    - Automatic tool selection and execution
+    - 4th parallel fix strategy
+    - Caching via MappingCache
+    - 26 comprehensive tests passing
+    - **Time**: 3 days (completed!)
+    - **Priority**: P2
+
+12. ⬜ **LangGraph Multi-Agent Workflow** ⬅️ **RECOMMENDED NEXT**
     - Refactor existing features into agents
     - Add state management
     - Enable complex workflows
     - **Time**: 1-2 weeks
     - **Priority**: P1
 
-### Phase 3: Advanced Features (Week 6-7)
-11. ⬜ **Tool-Using Agent**
-    - Schema exploration tools
-    - Query testing tools
-    - Data sampling tools
-    - **Time**: 1 week
-    - **Priority**: P2
-
-12. ⬜ **Semantic Caching**
+13. ⬜ **Semantic Caching**
     - Cache by semantic similarity
     - Reduce redundant queries
     - **Time**: 2-3 days

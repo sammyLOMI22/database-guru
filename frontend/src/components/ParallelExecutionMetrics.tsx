@@ -126,6 +126,7 @@ export const ParallelCorrectionsMetrics: React.FC<ParallelCorrectionMetricsProps
       'quick_fix': 'Quick Fix',
       'learned': 'Learned Pattern',
       'llm': 'LLM Correction',
+      'tool_using': 'Tool-Assisted Fix',
       'llm_fallback': 'LLM Fallback',
       'llm_fallback_timeout': 'LLM Fallback (Timeout)'
     };
@@ -138,6 +139,7 @@ export const ParallelCorrectionsMetrics: React.FC<ParallelCorrectionMetricsProps
       'quick_fix': '⚡',
       'learned': '🧠',
       'llm': '🤖',
+      'tool_using': '🔧',
       'llm_fallback': '🔄',
       'llm_fallback_timeout': '⏱️'
     };

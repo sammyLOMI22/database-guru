@@ -1,16 +1,85 @@
 # Phase 3 Implementation Plan: Tool-Using Agent + LangGraph Integration
 
 > **Created**: 2025-11-21
-> **Branch**: `feedback-system-update`
-> **Estimated Time**: 2-3 weeks total
+> **Updated**: 2025-11-21 (Phase 3.1 COMPLETE!)
+> **Branch**: `feedback-system-update` (merged to main)
+> **Status**: Phase 3.1 COMPLETE, Phase 3.2 PENDING
 
 ## Overview
 
 This document provides a detailed implementation plan for Phase 3 features:
-1. **Phase 3.1: Tool-Using Agent** (Week 1) - Schema exploration and query validation tools
+1. **Phase 3.1: Tool-Using Agent** (Week 1) - Schema exploration and query validation tools **COMPLETE!**
 2. **Phase 3.2: LangGraph Integration** (Week 2-3) - Multi-agent orchestration with state management
 
 The key insight: **Build tools first**, so both the current architecture and future LangGraph integration benefit.
+
+---
+
+## Phase 3.1 Status: COMPLETE (November 21, 2025)
+
+All Phase 3.1 deliverables have been implemented and tested:
+
+| Deliverable | Status | Details |
+|-------------|--------|---------|
+| Tool base classes | COMPLETE | `src/tools/base.py` - BaseTool, ToolResult, ToolDefinition, ToolCategory |
+| Tool Registry | COMPLETE | `src/tools/tool_registry.py` - Follows ColumnMapper pattern, uses MappingCache |
+| Schema Tools (4) | COMPLETE | search_schema, get_table_info, find_columns, get_relationships |
+| Data Tools (3) | COMPLETE | get_sample_data, get_column_values, count_rows |
+| Query Tools (3) | COMPLETE | test_query, validate_sql, explain_query |
+| Tool-Using Agent | COMPLETE | `src/llm/tool_using_agent.py` - Question analysis, tool execution, context building |
+| REST API | COMPLETE | `src/api/endpoints/tools.py` - 6 endpoints for tool management |
+| Integration | COMPLETE | 4th parallel fix strategy in self_correcting_agent.py |
+| Tests | COMPLETE | 26 tests passing (100% coverage) |
+| Documentation | COMPLETE | TOOL_USING_AGENT.md, CLAUDE.md updated, README updated |
+
+---
+
+## IMPORTANT: Infrastructure from `feedback-system-update`
+
+The recently merged `feedback-system-update` branch provides infrastructure we **MUST leverage**:
+
+### Available Infrastructure to Reuse
+
+| Component | Location | Reuse For |
+|-----------|----------|-----------|
+| **MappingCache** | `src/llm/mapping_cache.py` | Tool definition & result caching |
+| **SchemaCache** | `src/core/schema_cache.py` | Fast schema access for tools |
+| **ColumnMapper** | `src/llm/column_mapper.py` | Pattern for ToolRegistry design |
+| **ResultPatternLearner** | `src/llm/result_pattern_learner.py` | Tool effectiveness tracking |
+| **Mappings API** | `src/api/endpoints/mappings.py` | API endpoint patterns |
+
+### Key Patterns to Follow
+
+```python
+# 1. Singleton Cache Pattern (from mapping_cache.py)
+from src.llm.mapping_cache import get_mapping_cache
+cache = get_mapping_cache()
+
+# 2. TTL-based caching with metrics
+cached = cache.get("tool_result:search_schema:customer")
+if cached is None:
+    result = await execute_tool(...)
+    cache.set("tool_result:search_schema:customer", result, ttl=300)
+
+# 3. Pattern-based invalidation
+cache.invalidate_pattern("tool_result:*")  # Invalidate all tool results
+
+# 4. Thread-safe with RLock (already handled by MappingCache)
+```
+
+### Cache Key Strategy for Tools
+
+```
+tool_def:{tool_name}                    # Tool definitions (long TTL: 3600s)
+tool_result:{tool_name}:{args_hash}     # Execution results (short TTL: 300s)
+tool_stats:{tool_name}                  # Usage statistics (medium TTL: 600s)
+```
+
+### Database Tables Available
+
+- `column_mappings` - Pattern for tool execution tracking
+- `table_mappings` - Pattern for tool registry
+- `result_validation_patterns` - Pattern for tool effectiveness
 
 ---
 
@@ -19,7 +88,7 @@ The key insight: **Build tools first**, so both the current architecture and fut
 ### Goal
 Enable agents to dynamically explore schemas, test queries, and gather information before generating SQL.
 
-### Architecture
+### Architecture (Updated to Use Existing Infrastructure)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -36,32 +105,54 @@ Enable agents to dynamically explore schemas, test queries, and gather informati
 │  └──────────────┘  └──────────────┘  └──────────────┘          │
 │                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │                   Tool Executor                          │   │
-│  │  - Routes tool calls to implementations                  │   │
-│  │  - Handles errors gracefully                             │   │
-│  │  - Tracks tool usage metrics                             │   │
+│  │        ToolRegistry (follows ColumnMapper pattern)       │   │
+│  │  - Registers tools with @register_tool decorator         │   │
+│  │  - Tracks metrics: times_executed, success_rate          │   │
+│  │  - Uses MappingCache for caching (no new cache!)        │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │        Uses Existing Infrastructure:                     │   │
+│  │  - MappingCache (from mapping_cache.py)                 │   │
+│  │  - SchemaCache (from schema_cache.py)                   │   │
+│  │  - API patterns (from mappings.py)                      │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### File Structure
+### File Structure (Updated)
 
 ```
 src/
 ├── tools/                          # NEW: Tool implementations
-│   ├── __init__.py
-│   ├── base.py                     # BaseTool class, ToolResult dataclass
-│   ├── schema_tools.py             # Schema exploration tools
-│   ├── data_tools.py               # Data sampling tools
-│   ├── query_tools.py              # Query validation tools
-│   └── tool_executor.py            # Tool routing and execution
+│   ├── __init__.py                 # Registry + exports
+│   ├── base.py                     # BaseTool, ToolResult (like ColumnMapping)
+│   ├── schema_tools.py             # 4 schema tools (uses SchemaCache!)
+│   ├── data_tools.py               # 3 data tools
+│   ├── query_tools.py              # 3 query tools
+│   └── tool_registry.py            # NEW: Follows ColumnMapper pattern
 ├── llm/
+│   ├── mapping_cache.py            # EXISTING: Reuse for tool caching
+│   ├── column_mapper.py            # EXISTING: Pattern to follow
 │   └── tool_using_agent.py         # NEW: Main tool-using agent
+├── core/
+│   └── schema_cache.py             # EXISTING: Reuse for schema access
 └── api/
     └── endpoints/
-        └── tools.py                # NEW: Tool API endpoints (optional)
+        ├── mappings.py             # EXISTING: Pattern to follow
+        └── tools.py                # NEW: Tool API (follows mappings.py)
 ```
+
+### What We DON'T Need to Build (Already Exists)
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| Thread-safe cache | DONE | `src/llm/mapping_cache.py` |
+| Schema caching | DONE | `src/core/schema_cache.py` |
+| API patterns | DONE | `src/api/endpoints/mappings.py` |
+| Metrics tracking | DONE | `times_applied`, `success_rate` pattern |
+| Pattern invalidation | DONE | `cache.invalidate_pattern()` |
 
 ### Day 1: Core Tool Infrastructure
 

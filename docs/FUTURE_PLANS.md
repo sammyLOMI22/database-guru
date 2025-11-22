@@ -1,8 +1,8 @@
 # Database Guru - Future Plans & Roadmap
 
-**Last Updated**: November 8, 2025
-**Branch**: main
-**Current Status**: Phase 1 & 2 PRODUCTION-READY + Security Hardening + Parallel Performance Features (9.0/10 Quality Score)
+**Last Updated**: November 21, 2025
+**Branch**: feedback-system-update
+**Current Status**: Phase 1, 2 & 3.1 COMPLETE + Security Hardening + Parallel Performance + Tool-Using Agent
 
 ---
 
@@ -170,6 +170,99 @@ async def _try_parallel_fixes(...):
 **Documentation**:
 - [Parallel Execution Technical Guide](PARALLEL_EXECUTION.md) - Version 1.1 with production features
 - [Code Review](CODE_REVIEW_PARALLEL_EXECUTION.md) - 9.0/10 score, all critical issues resolved
+
+---
+
+### Tool-Using Agent (Phase 3.1) - ✅ COMPLETE
+**Priority**: HIGH
+**Effort**: 3 days
+**Impact**: SQL Generation Accuracy (better first-attempt success)
+**Completed**: November 21, 2025
+
+**Problem**: SQL generation sometimes failed on first attempt due to lack of schema context (e.g., not knowing 'California' is stored as 'CA').
+
+**Solution Implemented**:
+```python
+# src/llm/tool_using_agent.py - Context enrichment before SQL generation
+class ToolUsingAgent:
+    async def analyze_and_prepare_context(self, question: str, schema: dict):
+        # 1. Analyze question to determine needed tools
+        tool_plan = await self.analyze_question(question)
+
+        # 2. Execute tools to gather context
+        results = await self.execute_tools(tool_plan)
+        # Example: get_column_values("customers", "state") → ['CA', 'NY', 'TX', ...]
+
+        # 3. Build enriched context for SQL generator
+        return self.build_context(results)
+```
+
+**10 Tools Implemented** across 4 categories:
+
+| Category | Tool | Description |
+|----------|------|-------------|
+| SCHEMA | `search_schema` | Search tables/columns by keyword with fuzzy matching |
+| SCHEMA | `get_table_info` | Detailed table info: columns, PKs, relationships |
+| SCHEMA | `find_columns` | Find columns across all tables |
+| SCHEMA | `get_relationships` | FK relationships and join suggestions |
+| DATA | `get_sample_data` | Sample rows from tables (max 20) |
+| DATA | `get_column_values` | Distinct values (essential for 'CA' vs 'California') |
+| DATA | `count_rows` | Row count with optional WHERE (SQL injection protected) |
+| QUERY | `test_query` | Test SQL syntax using EXPLAIN |
+| QUERY | `validate_sql` | Validate references with fuzzy suggestions |
+| QUERY | `explain_query` | Get query execution plan |
+
+**Key Features**:
+- **Automatic tool selection** - Agent analyzes question and plans tool calls
+- **Enriched context** - Sample data and column values improve SQL accuracy
+- **4th parallel fix strategy** - tool_using added alongside quick_fix, learned, llm
+- **Caching via MappingCache** - Reuses existing infrastructure for performance
+- **Security** - SQL injection protection in count_rows tool
+- **Observability** - Execution metrics tracking (times_executed, success_rate, cache_hit_rate)
+- **Full test coverage**: 26/26 tests passing
+
+**Files Created**:
+- `src/tools/base.py` - Base classes (BaseTool, ToolResult, ToolDefinition, ToolCategory)
+- `src/tools/tool_registry.py` - Tool registry with caching
+- `src/tools/__init__.py` - Module exports
+- `src/tools/schema_tools.py` - 4 schema exploration tools
+- `src/tools/data_tools.py` - 3 data sampling tools
+- `src/tools/query_tools.py` - 3 query validation tools
+- `src/llm/tool_using_agent.py` - Main agent
+- `src/api/endpoints/tools.py` - REST API (6 endpoints)
+- `tests/test_tools.py` - 26 comprehensive tests
+
+**Files Modified**:
+- `src/main.py` - Added tools router registration
+- `src/llm/self_correcting_agent.py` - Added tool_using as 4th parallel fix strategy
+
+**API Endpoints**:
+- `GET /api/tools` - List available tools (filterable by category)
+- `GET /api/tools/stats` - Get execution statistics
+- `GET /api/tools/stats/{tool_name}` - Get stats for specific tool
+- `GET /api/tools/prompt` - Get tools formatted for LLM prompt
+- `POST /api/tools/{tool_name}/invalidate-cache` - Invalidate tool cache
+- `POST /api/tools/invalidate-all-cache` - Invalidate all tool caches
+
+**Example Flow**:
+```
+Question: "Show me orders from California"
+
+Tool-Using Agent:
+1. Analyzes: Need to understand 'California' representation
+2. Calls: search_schema("order") → finds 'orders' table
+3. Calls: find_columns("state") → finds 'customers.state'
+4. Calls: get_column_values("customers", "state") → ['CA', 'NY', 'TX', ...]
+5. Discovers: States stored as 2-letter codes!
+6. Context: "Note: state values are 2-letter codes like 'CA' for California"
+
+SQL Generator (with enriched context):
+→ SELECT * FROM orders o
+  JOIN customers c ON o.customer_id = c.id
+  WHERE c.state = 'CA'
+
+✅ Correct on first attempt!
+```
 
 ---
 
@@ -520,6 +613,7 @@ async def stream_query_results(query_id: str):
 |------|----------|--------|--------|--------|
 | ~~Parallel Multi-DB~~ | ~~HIGH~~ | ~~2d~~ | ~~High~~ | ✅ **DONE** (3x speedup) |
 | ~~Parallel Corrections~~ | ~~HIGH~~ | ~~1.5d~~ | ~~High~~ | ✅ **DONE** (1.6x speedup) |
+| ~~Tool-Using Agent~~ | ~~HIGH~~ | ~~3d~~ | ~~High~~ | ✅ **DONE** (Phase 3.1 - 10 tools, 26 tests) |
 | **Authorization Fix** | CRITICAL | 3-5d | High | Next Priority |
 | Authorization Tests | HIGH | 2d | High | After auth |
 | Code Deduplication | HIGH | 1d | Medium | Anytime |
@@ -603,6 +697,7 @@ async def stream_query_results(query_id: str):
 ### Milestone 2: Performance & Reliability (Week 2-3)
 - ✅ Parallel multi-DB execution (DONE - 3x speedup!)
 - ✅ Parallel correction attempts (DONE - 1.6x speedup!)
+- ✅ Tool-Using Agent (DONE - Phase 3.1 - 10 tools, 26 tests!)
 - ⬜ Enhanced error handling
 - ⬜ Load testing passed
 - ⬜ Concurrent access tests
@@ -714,7 +809,7 @@ touch src/auth/models.py
 
 ---
 
-**Document Version**: 1.0
+**Document Version**: 1.1
 **Created**: November 2, 2025
-**Last Updated**: November 2, 2025
-**Next Update**: November 9, 2025
+**Last Updated**: November 21, 2025
+**Next Update**: November 28, 2025

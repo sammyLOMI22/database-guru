@@ -154,6 +154,7 @@ DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
 - ✅ **Self-correcting SQL** - Automatically fixes errors and retries
 - ✅ **Learning from Corrections** - Remembers successful fixes for 50% faster error recovery
 - ✅ **Schema-Aware Fixes** - 200x faster typo correction without LLM
+- ✅ **Tool-Using Agent** - 10 specialized tools for schema exploration and query validation (NEW!)
 - ✅ **Result Verification** - Catches logical errors and suspicious results
 - ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB)
 - ✅ **Multi-database queries** - Query multiple databases simultaneously with parallel execution

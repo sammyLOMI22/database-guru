@@ -13,6 +13,7 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
     if (type.includes('error')) return 'text-red-700 bg-red-50';
     if (type.includes('warning')) return 'text-yellow-700 bg-yellow-50';
     if (type.includes('verification')) return 'text-blue-700 bg-blue-50';
+    if (type.includes('tool')) return 'text-orange-700 bg-orange-50';  // Tool-Using Agent
     if (type.includes('fix') || type.includes('learning')) return 'text-purple-700 bg-purple-50';
     return 'text-gray-700 bg-gray-50';
   };
@@ -22,6 +23,7 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
     if (type.includes('error')) return 'border-red-200';
     if (type.includes('warning')) return 'border-yellow-200';
     if (type.includes('verification')) return 'border-blue-200';
+    if (type.includes('tool')) return 'border-orange-200';  // Tool-Using Agent
     if (type.includes('fix') || type.includes('learning')) return 'border-purple-200';
     return 'border-gray-200';
   };

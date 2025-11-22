@@ -59,7 +59,7 @@ export interface ParallelCorrectionMetrics {
   strategies_succeeded: number;
   strategies_failed: number;
   strategies_timed_out: number;
-  winning_strategy: string | null;  // "quick_fix" | "learned" | "llm" | "llm_fallback_timeout"
+  winning_strategy: string | null;  // "quick_fix" | "learned" | "llm" | "tool_using" | "llm_fallback_timeout"
   elapsed_ms: number;
   timed_out: boolean;
 }
