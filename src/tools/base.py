@@ -1,0 +1,387 @@
+"""
+Base classes for the Tool System
+
+This module provides the foundation for all tools in the Tool-Using Agent.
+Follows patterns established in ColumnMapper and MappingCache.
+
+Part of Phase 3.1: Tool-Using Agent Implementation
+"""
+import time
+import hashlib
+import json
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+from enum import Enum
+
+logger = logging.getLogger(__name__)
+
+
+class ToolCategory(Enum):
+    """
+    Tool categories for organization and filtering.
+    Similar to mapping_type in TableMapper.
+    """
+    SCHEMA = "schema"      # Schema exploration tools
+    DATA = "data"          # Data sampling tools
+    QUERY = "query"        # Query validation tools
+    VALIDATION = "validation"  # SQL validation tools
+
+
+@dataclass
+class ToolResult:
+    """
+    Result from tool execution.
+
+    Similar to ValidationResult in ResultPatternLearner.
+    Tracks execution metadata for observability.
+    """
+    success: bool
+    data: Any = None
+    error: Optional[str] = None
+    execution_time_ms: float = 0.0
+    tool_name: str = ""
+    cache_hit: bool = False  # Whether result came from cache
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            "success": self.success,
+            "data": self.data,
+            "error": self.error,
+            "execution_time_ms": self.execution_time_ms,
+            "tool_name": self.tool_name,
+            "cache_hit": self.cache_hit,
+        }
+
+    def __repr__(self) -> str:
+        status = "OK" if self.success else "FAILED"
+        cache = " (cached)" if self.cache_hit else ""
+        return f"<ToolResult {self.tool_name}: {status} in {self.execution_time_ms:.1f}ms{cache}>"
+
+
+@dataclass
+class ToolDefinition:
+    """
+    Definition of a tool for LLM consumption and API documentation.
+
+    Similar to how ColumnMapping stores mapping metadata.
+    Can be cached with MappingCache for performance.
+    """
+    name: str
+    description: str
+    category: ToolCategory
+    parameters: Dict[str, Any]  # JSON Schema format
+    required_params: List[str] = field(default_factory=list)
+    examples: List[Dict[str, Any]] = field(default_factory=list)
+
+    # Metrics (following ColumnMapper pattern)
+    times_executed: int = 0
+    success_rate: float = 1.0
+    avg_execution_time_ms: float = 0.0
+
+    def to_prompt_format(self) -> str:
+        """
+        Format tool definition for inclusion in LLM prompt.
+
+        Example output:
+        - search_schema(keyword: string, fuzzy: boolean): Search for tables and columns matching a keyword.
+        """
+        params_str = ", ".join(
+            f"{k}: {v.get('type', 'any')}"
+            for k, v in self.parameters.items()
+        )
+        return f"- {self.name}({params_str}): {self.description}"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for API response"""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "category": self.category.value,
+            "parameters": self.parameters,
+            "required_params": self.required_params,
+            "examples": self.examples,
+            "times_executed": self.times_executed,
+            "success_rate": self.success_rate,
+            "avg_execution_time_ms": self.avg_execution_time_ms,
+        }
+
+    def get_cache_key(self) -> str:
+        """Cache key for tool definition (long TTL: 1 hour)"""
+        return f"tool_def:{self.name}"
+
+
+class BaseTool:
+    """
+    Base class for all tools.
+
+    Subclasses should:
+    1. Set class attributes: name, description, category
+    2. Override execute() method
+    3. Override get_definition() method
+
+    Example:
+        @register_tool
+        class SearchSchemaTool(BaseTool):
+            name = "search_schema"
+            description = "Search for tables and columns"
+            category = ToolCategory.SCHEMA
+
+            async def execute(self, keyword: str) -> ToolResult:
+                # Implementation
+                pass
+    """
+
+    # Class attributes - override in subclasses
+    name: str = "base_tool"
+    description: str = "Base tool - override in subclass"
+    category: ToolCategory = ToolCategory.SCHEMA
+
+    # Caching configuration
+    cacheable: bool = True      # Whether results can be cached
+    cache_ttl: int = 300        # Default 5 minute TTL for results
+
+    def __init__(
+        self,
+        session=None,
+        schema_inspector=None,
+        schema_cache=None,
+        connection_id: Optional[int] = None,
+    ):
+        """
+        Initialize tool with database access.
+
+        Args:
+            session: Database session (async or sync)
+            schema_inspector: SchemaInspector instance for schema access
+            schema_cache: SchemaCache instance (from feedback-system-update)
+            connection_id: Database connection ID for cache keys
+        """
+        self.session = session
+        self.schema_inspector = schema_inspector
+        self.schema_cache = schema_cache
+        self.connection_id = connection_id
+
+    async def execute(self, **kwargs) -> ToolResult:
+        """
+        Execute the tool with given arguments.
+
+        Override in subclasses to implement tool logic.
+
+        Args:
+            **kwargs: Tool-specific arguments
+
+        Returns:
+            ToolResult with execution outcome
+        """
+        raise NotImplementedError(f"Tool {self.name} must implement execute()")
+
+    def get_definition(self) -> ToolDefinition:
+        """
+        Get tool definition for LLM prompt and API documentation.
+
+        Override in subclasses to provide proper schema.
+        """
+        return ToolDefinition(
+            name=self.name,
+            description=self.description,
+            category=self.category,
+            parameters={},
+            required_params=[],
+        )
+
+    def get_cache_key(self, **kwargs) -> str:
+        """
+        Generate cache key for tool execution with given arguments.
+
+        Uses MD5 hash of sorted arguments for consistent keys.
+        Format: tool_result:{tool_name}:{args_hash}
+        """
+        # Sort and serialize arguments for consistent hashing
+        args_str = json.dumps(kwargs, sort_keys=True, default=str)
+        args_hash = hashlib.md5(args_str.encode()).hexdigest()[:8]
+
+        # Include connection_id if available for isolation
+        if self.connection_id:
+            return f"tool_result:{self.name}:{self.connection_id}:{args_hash}"
+        return f"tool_result:{self.name}:{args_hash}"
+
+    async def _get_schema(self) -> Dict[str, Any]:
+        """
+        Get database schema using SchemaCache if available.
+
+        This leverages the SchemaCache from feedback-system-update
+        for 99% reduction in schema introspection time.
+        """
+        if self.schema_cache and self.connection_id:
+            # Use cached schema (< 1ms vs 50-500ms)
+            return await self.schema_cache.get_schema(
+                connection_id=self.connection_id,
+                session=self.session,
+                schema_inspector=self.schema_inspector,
+            )
+        elif self.schema_inspector and self.session:
+            # Fall back to direct introspection
+            return await self.schema_inspector.get_full_schema(self.session)
+        else:
+            raise ValueError("No schema_cache or schema_inspector available")
+
+    def _measure_execution(self, start_time: float) -> float:
+        """Calculate execution time in milliseconds"""
+        return (time.time() - start_time) * 1000
+
+    async def _validate_table_exists(self, table_name: str) -> tuple[bool, Optional[str]]:
+        """
+        Validate that a table exists in the database schema.
+
+        Args:
+            table_name: Name of the table to validate
+
+        Returns:
+            Tuple of (is_valid, suggestion) where suggestion is a similar table name if found
+        """
+        try:
+            schema_data = await self._get_schema()
+            tables = schema_data.get("tables", {})
+
+            # Check for exact match (case-insensitive)
+            table_names = list(tables.keys())
+            table_names_lower = {t.lower(): t for t in table_names}
+
+            if table_name.lower() in table_names_lower:
+                return True, table_names_lower[table_name.lower()]
+
+            # No exact match - find closest suggestion using simple similarity
+            suggestion = self._find_closest_match(table_name, table_names)
+            return False, suggestion
+
+        except Exception as e:
+            logger.warning(f"Schema validation failed, allowing table: {e}")
+            return True, None  # Allow if we can't validate
+
+    async def _validate_column_exists(
+        self, table_name: str, column_name: str
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Validate that a column exists in a table.
+
+        Args:
+            table_name: Name of the table
+            column_name: Name of the column to validate
+
+        Returns:
+            Tuple of (is_valid, suggestion) where suggestion is a similar column name if found
+        """
+        try:
+            schema_data = await self._get_schema()
+            tables = schema_data.get("tables", {})
+
+            # Find the table (case-insensitive)
+            table_data = None
+            for t_name, t_data in tables.items():
+                if t_name.lower() == table_name.lower():
+                    table_data = t_data
+                    break
+
+            if not table_data:
+                return False, None
+
+            # Get column names
+            columns = table_data.get("columns", [])
+            column_names = [c.get("name", "") for c in columns if isinstance(c, dict)]
+
+            # Check for exact match (case-insensitive)
+            column_names_lower = {c.lower(): c for c in column_names}
+
+            if column_name.lower() in column_names_lower:
+                return True, column_names_lower[column_name.lower()]
+
+            # No exact match - find closest suggestion
+            suggestion = self._find_closest_match(column_name, column_names)
+            return False, suggestion
+
+        except Exception as e:
+            logger.warning(f"Column validation failed, allowing column: {e}")
+            return True, None  # Allow if we can't validate
+
+    def _find_closest_match(self, target: str, candidates: List[str], threshold: float = 0.6) -> Optional[str]:
+        """
+        Find the closest matching string from candidates.
+
+        Uses simple character-based similarity (Jaccard-like).
+
+        Args:
+            target: The string to match
+            candidates: List of candidate strings
+            threshold: Minimum similarity threshold (0.0 to 1.0)
+
+        Returns:
+            Best matching candidate or None if no match above threshold
+        """
+        if not candidates:
+            return None
+
+        target_lower = target.lower()
+        best_match = None
+        best_score = 0.0
+
+        for candidate in candidates:
+            candidate_lower = candidate.lower()
+
+            # Calculate character-based similarity
+            target_chars = set(target_lower)
+            candidate_chars = set(candidate_lower)
+
+            if not target_chars or not candidate_chars:
+                continue
+
+            intersection = len(target_chars & candidate_chars)
+            union = len(target_chars | candidate_chars)
+            score = intersection / union if union > 0 else 0
+
+            # Boost score for substring matches
+            if target_lower in candidate_lower or candidate_lower in target_lower:
+                score = max(score, 0.8)
+
+            # Boost score for prefix matches
+            if candidate_lower.startswith(target_lower[:3]) or target_lower.startswith(candidate_lower[:3]):
+                score += 0.1
+
+            if score > best_score:
+                best_score = score
+                best_match = candidate
+
+        return best_match if best_score >= threshold else None
+
+    def set_context(
+        self,
+        session=None,
+        schema_inspector=None,
+        schema_cache=None,
+        connection_id: Optional[int] = None,
+    ):
+        """
+        Set execution context for the tool.
+
+        This allows tools to be instantiated without context,
+        then have context set before execution.
+        Useful for testing and registry usage.
+
+        Args:
+            session: Database session (async or sync)
+            schema_inspector: SchemaInspector instance
+            schema_cache: SchemaCache instance
+            connection_id: Database connection ID
+        """
+        if session is not None:
+            self.session = session
+        if schema_inspector is not None:
+            self.schema_inspector = schema_inspector
+        if schema_cache is not None:
+            self.schema_cache = schema_cache
+        if connection_id is not None:
+            self.connection_id = connection_id
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}: {self.name}>"

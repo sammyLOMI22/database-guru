@@ -20,6 +20,14 @@ except ImportError:
     LEARNING_AVAILABLE = False
     logger.warning("CorrectionLearner not available - learning disabled")
 
+# Import Tool-Using Agent (optional for enhanced context)
+try:
+    from src.llm.tool_using_agent import ToolUsingAgent
+    TOOL_USING_AVAILABLE = True
+except ImportError:
+    TOOL_USING_AVAILABLE = False
+    logger.warning("ToolUsingAgent not available - tool-using disabled")
+
 # Import Confidence Scorer
 try:
     from src.llm.confidence_scorer import get_confidence_scorer, ConfidenceScore
@@ -83,6 +91,7 @@ class AgentTrace:
             "quick_fix": "⚡",
             "learned_fix": "🧠",
             "llm_fix": "🤖",
+            "tool_fix": "🔧",
             "verification": "🔍",
             "verification_warning": "⚠️",
             "learning": "📚"
@@ -348,6 +357,21 @@ class SelfCorrectingSQLAgent:
                 logger.warning("QueryPlanningAgent not available - planning disabled")
                 self.enable_query_planning = False
 
+        # Initialize tool-using agent for enhanced error correction
+        self.tool_using_agent = None
+        self.enable_tool_using = TOOL_USING_AVAILABLE
+        if self.enable_tool_using:
+            try:
+                self.tool_using_agent = ToolUsingAgent(
+                    sql_generator=sql_generator,
+                    max_tool_calls=3,  # Limit calls during error fixing
+                    enable_auto_explore=True,
+                )
+                logger.info("Tool-using agent enabled for enhanced error correction")
+            except Exception as e:
+                logger.warning(f"Failed to initialize ToolUsingAgent: {e}")
+                self.enable_tool_using = False
+
     def format_attempts_for_ui(
         self,
         attempts: List[CorrectionAttempt]
@@ -385,6 +409,10 @@ class SelfCorrectingSQLAgent:
         schema: str,
         database_type: str,
         trace: "AgentTrace",
+        session=None,  # Database session for tool-using agent
+        schema_inspector=None,  # SchemaInspector for tool-using agent
+        schema_cache=None,  # SchemaCache for tool-using agent
+        connection_id: Optional[int] = None,  # Connection ID for tool-using agent
     ) -> Dict[str, Any]:
         """
         Try multiple fix strategies in parallel and return the first successful one
@@ -494,8 +522,42 @@ class SelfCorrectingSQLAgent:
                 logger.warning(f"LLM fix failed: {e}")
                 return None
 
+        async def try_tool_fix():
+            """Try tool-using agent to gather context and fix"""
+            if not self.enable_tool_using or not self.tool_using_agent:
+                return None
+
+            try:
+                # Use tools to explore schema and gather context about the error
+                # This helps find correct table/column names
+                tool_result = await self.tool_using_agent.process(
+                    question=f"Fix SQL error: {last_error[:200]}",
+                    schema=schema,
+                    database_type=database_type,
+                    session=session,
+                    schema_inspector=schema_inspector,
+                    schema_cache=schema_cache,
+                    connection_id=connection_id,
+                    use_tools=True,
+                    trace=trace,  # Pass trace for UI visibility
+                )
+
+                if tool_result.success and tool_result.sql:
+                    return {
+                        "sql": tool_result.sql,
+                        "fix_method": "tool_using",
+                        "confidence": tool_result.confidence,
+                        "explanation": f"Tool-assisted fix using {len(tool_result.tools_used)} tools: {', '.join(tool_result.tools_used[:3])}",
+                        "tools_used": tool_result.tools_used,
+                        "enriched_context": tool_result.enriched_context[:200] if tool_result.enriched_context else None,
+                    }
+                return None
+            except Exception as e:
+                logger.warning(f"Tool-using fix failed: {e}")
+                return None
+
         # Execute all fix strategies in parallel with timeout protection
-        tasks = [try_quick_fix(), try_learned_fix(), try_llm_fix()]
+        tasks = [try_quick_fix(), try_learned_fix(), try_llm_fix(), try_tool_fix()]
         start_time = asyncio.get_event_loop().time()
 
         # FIX #5: Add timeout wrapper to prevent indefinite hangs
@@ -576,8 +638,14 @@ class SelfCorrectingSQLAgent:
                 if metrics["winning_strategy"] is None:
                     metrics["winning_strategy"] = method
 
+                step_type_map = {
+                    "quick_fix": "quick_fix",
+                    "learned": "learned_fix",
+                    "llm": "llm_fix",
+                    "tool_using": "tool_fix",
+                }
                 trace.add_step(
-                    "quick_fix" if method == "quick_fix" else "learned_fix" if method == "learned" else "llm_fix",
+                    step_type_map.get(method, "fix_attempt"),
                     f"{method.replace('_', ' ').title()} succeeded: {result['explanation']}",
                     metadata={"confidence": conf, "elapsed_ms": metrics["elapsed_ms"]}
                 )
@@ -637,7 +705,10 @@ class SelfCorrectingSQLAgent:
         model: Optional[str] = None,
         schema_dict: Optional[Dict] = None,
         use_parallel_corrections: bool = True,  # NEW: Enable/disable parallel fixes
-        connection_name: Optional[str] = None  # NEW: Connection name for learned mappings
+        connection_name: Optional[str] = None,  # NEW: Connection name for learned mappings
+        schema_inspector=None,  # NEW: SchemaInspector for tool-using agent
+        schema_cache=None,  # NEW: SchemaCache for tool-using agent
+        connection_id: Optional[int] = None,  # NEW: Connection ID for tool-using agent
     ) -> Dict[str, Any]:
         """
         Generate SQL with automatic error correction and retry
@@ -783,6 +854,10 @@ class SelfCorrectingSQLAgent:
                             schema=schema,
                             database_type=database_type,
                             trace=trace,
+                            session=session,
+                            schema_inspector=schema_inspector,
+                            schema_cache=schema_cache,
+                            connection_id=connection_id,
                         )
                         sql = fix_result["sql"]
                         self.fix_methods[attempt_num] = fix_result["fix_method"]

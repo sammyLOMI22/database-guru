@@ -5,6 +5,7 @@ import Header from './components/Header';
 import { ObservabilityDemo } from './components/ObservabilityDemo';
 import { FeedbackStats } from './components/FeedbackStats';
 import { SettingsPanel } from './components/SettingsPanel';
+import { ToolsPanel } from './components/ToolsPanel';
 import { healthAPI } from './services/api';
 
 const queryClient = new QueryClient({
@@ -19,7 +20,7 @@ const queryClient = new QueryClient({
 function App() {
   const [isHealthy, setIsHealthy] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'feedback' | 'settings'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'feedback' | 'tools' | 'settings'>('chat');
 
   useEffect(() => {
     // Check health on mount
@@ -72,6 +73,16 @@ function App() {
               📊 Feedback Dashboard
             </button>
             <button
+              onClick={() => setActiveTab('tools')}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'tools'
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              🔧 Tools
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'settings'
@@ -92,6 +103,10 @@ function App() {
             ) : activeTab === 'feedback' ? (
               <div className="flex-1 overflow-auto p-6">
                 <FeedbackStats />
+              </div>
+            ) : activeTab === 'tools' ? (
+              <div className="flex-1 overflow-auto p-6">
+                <ToolsPanel />
               </div>
             ) : (
               <div className="flex-1 overflow-auto">

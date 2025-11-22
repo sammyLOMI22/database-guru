@@ -259,6 +259,9 @@ export const ObservabilityDemo: React.FC = () => {
             <span className="px-2 md:px-3 py-1 bg-teal-100 text-teal-700 text-xs font-medium rounded-full">
               🗺️ Mapping Management
             </span>
+            <span className="px-2 md:px-3 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+              🔧 Tool-Using Agent
+            </span>
           </div>
         </div>
 
@@ -734,6 +737,244 @@ export const ObservabilityDemo: React.FC = () => {
           </div>
         </div>
 
+        {/* Scenario 7: Tool-Using Agent */}
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
+            Scenario 7: Tool-Using Agent (Phase 3.1) 🔧 NEW!
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Shows the Tool-Using Agent automatically exploring database schema before generating SQL.
+            Tools gather context about tables, columns, and sample values for better first-attempt accuracy.
+            Tool execution steps are visible in the Agent Trace (orange highlights).
+          </p>
+          <div className="border-2 border-amber-200 rounded-lg p-3 md:p-4 bg-amber-50 overflow-x-auto">
+            {/* Tool Categories */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 min-w-fit">
+              {/* Schema Tools */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>📋</span>
+                  Schema Tools
+                </h3>
+                <div className="space-y-2 text-xs">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-mono text-amber-700 font-semibold">search_schema</div>
+                    <div className="text-gray-600">Find tables/columns by keyword</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-mono text-amber-700 font-semibold">get_table_info</div>
+                    <div className="text-gray-600">Get columns, PKs, relationships</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-mono text-amber-700 font-semibold">find_columns</div>
+                    <div className="text-gray-600">Search columns across tables</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-mono text-amber-700 font-semibold">get_relationships</div>
+                    <div className="text-gray-600">Foreign key & join suggestions</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Data Tools */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>📊</span>
+                  Data Tools
+                </h3>
+                <div className="space-y-2 text-xs">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-mono text-amber-700 font-semibold">get_sample_data</div>
+                    <div className="text-gray-600">Sample rows from tables</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-mono text-amber-700 font-semibold">get_column_values</div>
+                    <div className="text-gray-600">Distinct values (CA vs California)</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-mono text-amber-700 font-semibold">count_rows</div>
+                    <div className="text-gray-600">Row counts with filters</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Query Tools */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>✅</span>
+                  Query Tools
+                </h3>
+                <div className="space-y-2 text-xs">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-mono text-amber-700 font-semibold">test_query</div>
+                    <div className="text-gray-600">Test SQL syntax (EXPLAIN)</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-mono text-amber-700 font-semibold">validate_sql</div>
+                    <div className="text-gray-600">Validate schema references</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-mono text-amber-700 font-semibold">explain_query</div>
+                    <div className="text-gray-600">Get execution plan</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Demo with Tool Trace */}
+            <QueryResults
+              queryId={1001}
+              sql="SELECT * FROM customers WHERE state = 'CA'"
+              results={[
+                { id: 1, name: "Alice Johnson", email: "alice@example.com", state: "CA" },
+                { id: 2, name: "Bob Smith", email: "bob@example.com", state: "CA" },
+              ]}
+              rowCount={2}
+              executionTime={85}
+              isValid={true}
+              warnings={["🔧 Used 3 tools to gather schema context before SQL generation"]}
+              selfCorrected={false}
+              totalAttempts={1}
+              agentTrace={{
+                steps: [
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 0.0,
+                    type: "analysis",
+                    message: "Analyzing question: Show me customers from California",
+                    metadata: { database_type: "postgresql" },
+                    icon: "🔍"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 5.0,
+                    type: "tool_planning",
+                    message: "Planning 3 tool calls to gather schema context",
+                    metadata: { planned_tools: ["search_schema", "get_table_info", "get_column_values"] },
+                    icon: "🔧"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 15.0,
+                    type: "tool_success",
+                    message: "Tool 'search_schema' executed successfully (8.2ms)",
+                    metadata: { tool: "search_schema", args: { keyword: "customer" }, success: true, time_ms: 8.2 },
+                    icon: "✅"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 25.0,
+                    type: "tool_success",
+                    message: "Tool 'get_table_info' executed successfully (6.5ms)",
+                    metadata: { tool: "get_table_info", args: { table_name: "customers" }, success: true, time_ms: 6.5 },
+                    icon: "✅"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 35.0,
+                    type: "tool_success",
+                    message: "Tool 'get_column_values' executed successfully (5.1ms) (cached)",
+                    metadata: { tool: "get_column_values", args: { table_name: "customers", column_name: "state" }, success: true, cache_hit: true, time_ms: 5.1 },
+                    icon: "✅"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 40.0,
+                    type: "tool_context",
+                    message: "Built enriched context from 3 tools",
+                    metadata: { tools_used: ["search_schema", "get_table_info", "get_column_values"], context_length: 450 },
+                    icon: "📝"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 65.0,
+                    type: "generation",
+                    message: "Generated SQL: SELECT * FROM customers WHERE state = 'CA'",
+                    metadata: { sql: "SELECT * FROM customers WHERE state = 'CA'" },
+                    icon: "✨"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 70.0,
+                    type: "execution",
+                    message: "Executing SQL query",
+                    metadata: {},
+                    icon: "⚡"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 85.0,
+                    type: "success",
+                    message: "Query executed successfully (rows: 2, time: 15ms)",
+                    metadata: { row_count: 2, execution_time_ms: 15 },
+                    icon: "✅"
+                  }
+                ],
+                total_elapsed_ms: 85.0,
+                start_time: new Date().toISOString()
+              }}
+              attempts={[
+                {
+                  attempt_number: 1,
+                  sql: "SELECT * FROM customers WHERE state = 'CA'",
+                  success: true,
+                  error: null,
+                  error_type: null,
+                  execution_time_ms: 15,
+                  row_count: 2,
+                  fix_method: null,
+                }
+              ]}
+            />
+
+            {/* Key Features */}
+            <div className="bg-white rounded-lg p-3 md:p-4 mt-4 mb-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Key Features:</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>10 specialized tools across 4 categories</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Automatic schema exploration before SQL</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Sample value discovery (CA vs California)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Tool execution visible in Agent Trace</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>10-second timeout protection per tool</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Schema validation with "Did you mean?" suggestions</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Result caching for performance (5min TTL)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>SQL injection prevention (parameterized queries)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-100 p-3 rounded">
+              <p className="text-xs text-gray-500 italic">
+                💡 Tip: Expand the Agent Trace above to see tool execution steps (orange highlights).
+                Tools help discover correct table/column names and actual data values before generating SQL!
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Legend */}
         <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
           <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
@@ -812,35 +1053,41 @@ export const ObservabilityDemo: React.FC = () => {
                 Access the management UI to view all learned patterns!
               </div>
             </div>
+            <div className="flex items-start gap-3">
+              <span className="text-xl">🔧</span>
+              <div>
+                <strong>Tool-Using Agent (Phase 3.1):</strong> NEW! Automatically explores database schema before generating SQL using 10 specialized tools.
+                Tools discover: table/column names (search_schema), relationships (get_relationships), and actual data values (get_column_values - essential for 'CA' vs 'California').
+                Features: 4 tool categories, visible in Agent Trace (orange), 10s timeout protection, schema validation with suggestions, result caching, SQL injection prevention.
+              </div>
+            </div>
           </div>
         </div>
 
         {/* What's New Section */}
-        <div className="bg-gradient-to-r from-blue-50 via-green-50 via-orange-50 to-teal-50 rounded-lg shadow p-4 md:p-6 border-2 border-blue-300 overflow-x-auto">
+        <div className="bg-gradient-to-r from-blue-50 via-green-50 via-orange-50 via-teal-50 to-amber-50 rounded-lg shadow p-4 md:p-6 border-2 border-blue-300 overflow-x-auto">
           <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-3 md:mb-4">
-            🎉 What's New - Complete System with Intelligent Learning!
+            🎉 What's New - Complete System with Intelligent Learning & Tools!
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 min-w-fit">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 min-w-fit">
             <div className="bg-white p-3 md:p-4 rounded-lg">
-              <h3 className="font-semibold text-blue-600 mb-2">✨ Phase 1: Conversational Memory</h3>
+              <h3 className="font-semibold text-blue-600 mb-2">✨ Conversational Memory</h3>
               <ul className="text-sm space-y-1 text-gray-700">
                 <li>• Natural multi-turn dialogue</li>
                 <li>• Context-aware follow-ups</li>
                 <li>• Smart question detection</li>
                 <li>• Session-based isolation</li>
-                <li>• Visual context panel</li>
                 <li>• &lt;10ms context retrieval</li>
               </ul>
             </div>
             <div className="bg-white p-3 md:p-4 rounded-lg">
-              <h3 className="font-semibold text-green-600 mb-2">🌊 Phase 2: Streaming Results</h3>
+              <h3 className="font-semibold text-green-600 mb-2">🌊 Streaming Results</h3>
               <ul className="text-sm space-y-1 text-gray-700">
                 <li>• Progressive result delivery</li>
                 <li>• Real-time batch streaming</li>
                 <li>• Server-Sent Events (SSE)</li>
                 <li>• Progress indicators</li>
                 <li>• 30x faster perceived speed</li>
-                <li>• &lt;50ms first batch latency</li>
               </ul>
             </div>
             <div className="bg-white p-3 md:p-4 rounded-lg">
@@ -850,7 +1097,6 @@ export const ObservabilityDemo: React.FC = () => {
                 <li>• 1.6x correction speedup</li>
                 <li>• Dual timeout protection</li>
                 <li>• Intelligent throttling</li>
-                <li>• Comprehensive metrics</li>
                 <li>• Production-ready resilience</li>
               </ul>
             </div>
@@ -861,16 +1107,24 @@ export const ObservabilityDemo: React.FC = () => {
                 <li>• Column/table corrections</li>
                 <li>• Result validation patterns</li>
                 <li>• Statistics dashboard</li>
-                <li>• Success rate tracking</li>
                 <li>• 85% helpfulness rate</li>
+              </ul>
+            </div>
+            <div className="bg-white p-3 md:p-4 rounded-lg">
+              <h3 className="font-semibold text-amber-600 mb-2">🔧 Tool-Using Agent</h3>
+              <ul className="text-sm space-y-1 text-gray-700">
+                <li>• 10 specialized tools</li>
+                <li>• Auto schema exploration</li>
+                <li>• Value discovery (CA vs CA)</li>
+                <li>• Visible in Agent Trace</li>
+                <li>• SQL injection prevention</li>
               </ul>
             </div>
           </div>
           <div className="mt-3 md:mt-4 bg-white p-2.5 md:p-3 rounded text-xs md:text-sm">
-            <strong className="text-indigo-600">💡 Combined Power:</strong> Ask natural follow-up questions,
+            <strong className="text-indigo-600">💡 Combined Power:</strong> Tools explore schema automatically,
             see results stream in real-time, get 3x faster multi-database execution, AND the system learns from your corrections!
-            Example: "Show all sales" → "Filter by region" → Results appear instantly across databases, and if you correct
-            "price" to "unit_price", the system remembers and auto-applies it next time!
+            Example: "Show customers from California" → Tools discover 'CA' is the correct value → SQL uses WHERE state = 'CA' → First-attempt success!
           </div>
         </div>
       </div>

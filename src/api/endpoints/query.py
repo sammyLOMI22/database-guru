@@ -133,6 +133,9 @@ async def process_query(
 
         # Connect to user's database for schema and query execution
         async with UserDatabaseConnector.get_user_db_session(active_connection) as user_db:
+            # Initialize schema inspector (needed for tool-using agent)
+            schema_inspector = SchemaInspector()
+
             # Get actual database schema from USER's database
             if request.schema:
                 # Use provided schema
@@ -148,7 +151,6 @@ async def process_query(
                     force_refresh=request.force_schema_refresh
                 )
 
-                schema_inspector = SchemaInspector()
                 schema = schema_inspector.format_schema_for_llm(schema_data)
                 logger.debug(f"Using schema with {len(schema_data['tables'])} tables")
 
@@ -169,7 +171,9 @@ async def process_query(
                 database_type=database_type,
                 allow_write=request.allow_write,
                 model=request.model,
-                connection_name=active_connection.name  # Pass connection name for learned mappings
+                connection_name=active_connection.name,  # Pass connection name for learned mappings
+                schema_inspector=schema_inspector,  # Pass for tool-using agent
+                connection_id=active_connection.id,  # Pass for tool-using agent
             )
 
             # Extract results from agent

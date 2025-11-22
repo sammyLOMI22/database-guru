@@ -153,21 +153,59 @@ The system uses a multi-agent architecture with specialized agents that work tog
    - Graceful degradation: one database failure doesn't stop others
    - Key methods: `build_combined_schema()`, `execute_multi_database_query()`, `execute_with_semaphore()`
 
+10. **Tool-Using Agent** (`src/llm/tool_using_agent.py`) **NEW - November 21, 2025**
+    - Enhances SQL generation by gathering schema context before query generation
+    - Analyzes user questions and automatically plans tool calls
+    - Executes tools to explore schema and sample data
+    - Builds enriched context for better first-attempt accuracy
+    - Calculates confidence scores based on tool results
+    - Key methods: `analyze_question()`, `execute_tools()`, `build_context()`
+
+11. **Tool Registry** (`src/tools/tool_registry.py`)
+    - Central registry for all available tools with caching support
+    - Follows ColumnMapper pattern, uses MappingCache for performance
+    - Manages tool definitions, categories, and execution metrics
+    - Tracks execution statistics (times_executed, success_rate, cache_hit_rate)
+    - Key methods: `register_tool()`, `get_tool()`, `get_tools_by_category()`, `invalidate_cache()`
+
+### Tool System (`src/tools/`)
+
+The tool system provides 10 specialized tools across 4 categories for schema exploration and query validation:
+
+**Schema Tools** (`src/tools/schema_tools.py`):
+- `search_schema` - Search tables/columns by keyword with fuzzy matching
+- `get_table_info` - Get detailed table information including columns, PKs, relationships
+- `find_columns` - Find columns across all tables
+- `get_relationships` - Get foreign key relationships and join suggestions
+
+**Data Tools** (`src/tools/data_tools.py`):
+- `get_sample_data` - Sample rows from tables (max 20 rows)
+- `get_column_values` - Get distinct column values (essential for 'CA' vs 'California')
+- `count_rows` - Count rows with optional WHERE filter (has SQL injection protection)
+
+**Query Tools** (`src/tools/query_tools.py`):
+- `test_query` - Test SQL syntax validity using EXPLAIN
+- `validate_sql` - Validate SQL references against schema with fuzzy suggestions
+- `explain_query` - Get query execution plan
+
 ### Data Flow
 
 ```
 Natural Language Query (with optional session_id)
   ↓
-Input Sanitization (Prompt Sanitizer) → Removes control chars, checks token limits **NEW**
+Input Sanitization (Prompt Sanitizer) → Removes control chars, checks token limits
   ↓
-Injection Detection → Blocks 15+ attack patterns **NEW**
+Injection Detection → Blocks 15+ attack patterns
   ↓
 Conversational Memory Agent → Retrieves conversation history (if session_id provided)
-  ↓                          → Builds secure context-aware prompt with safe delimiters **UPDATED**
+  ↓                          → Builds secure context-aware prompt with safe delimiters
+  ↓
+Tool-Using Agent → Analyzes question, executes schema/data tools **NEW - Nov 21, 2025**
+  ↓              → Builds enriched context (table info, sample data, column values)
   ↓
 Query Planning Agent → Creates structured plan with schema validation
   ↓
-SQL Generator → Generates SQL from validated plan (with context if applicable)
+SQL Generator → Generates SQL from validated plan (with enriched context)
   ↓
 Confidence Scorer → Predicts success probability
   ↓
@@ -175,7 +213,7 @@ SQL Executor → Executes with timeout/safety limits
   ↓
 Result Verification Agent → Validates logical correctness
   ↓
-[If Error] → **Parallel Correction Attempts** (quick fix + learned + LLM simultaneously, 1.6x faster)
+[If Error] → **Parallel Correction Attempts** (quick fix + learned + LLM + tool_using, 4 strategies)
   ↓
 [If Success] → Learn correction pattern for future
   ↓                          → Save to chat history (if session_id provided)
@@ -276,6 +314,13 @@ Endpoints organized by domain (`src/api/endpoints/`):
 - `settings.py` - System settings and configuration
 - `schema.py` - Schema introspection
 - `models.py` - Available Ollama models
+- `tools.py` - **Tool management API (NEW - Nov 21, 2025)** - Tool registry and execution
+  - `GET /api/tools` - List available tools (filterable by category)
+  - `GET /api/tools/stats` - Get execution statistics
+  - `GET /api/tools/stats/{tool_name}` - Get stats for specific tool
+  - `GET /api/tools/prompt` - Get tools formatted for LLM prompt
+  - `POST /api/tools/{tool_name}/invalidate-cache` - Invalidate tool cache
+  - `POST /api/tools/invalidate-all-cache` - Invalidate all tool caches
 
 ## Important Implementation Details
 
@@ -323,6 +368,16 @@ Located in `frontend/src/`:
 - `MappingStatsDisplay.tsx` (+315 lines) - Statistics dashboard with charts
 - `mappingsApi.ts` (+155 lines) - API service layer for mapping endpoints
 - Total: **1,095 lines** of new UI code for mapping management
+
+**Tool-Using Agent UI Components (NEW - November 22, 2025):**
+- `ToolsPanel.tsx` (~112 lines) - Main tabbed container with 3 views (Overview, Directory, Usage Stats)
+- `ToolsOverview.tsx` (~271 lines) - Summary dashboard with stats cards, category breakdown, quick actions
+- `ToolDirectory.tsx` (~237 lines) - Browsable tool list with filtering and expandable details
+- `ToolUsageStats.tsx` (~277 lines) - Per-tool execution metrics with visual bars and sorting
+- `toolsApi.ts` (~100 lines) - API service layer for tools endpoints (6 methods)
+- **App.tsx** - Updated to include "Tools" as 4th main tab with orange color scheme
+- Total: **~1,000 lines** of new UI code for Tool-Using Agent management
+- Tests: `ToolsPanel.test.tsx` with 30 comprehensive tests
 
 ### LLM Prompts
 
@@ -395,6 +450,16 @@ Settings managed via Pydantic in `src/config/settings.py`:
 - **Parallel Multi-DB Tests (PRODUCTION-READY)**: `tests/test_parallel_multi_db.py` - 6 tests (3x speedup + timeout verification)
 - **Parallel Corrections Tests (PRODUCTION-READY)**: `tests/test_parallel_corrections.py` - 7 tests (1.6x speedup + timeout + metrics verification)
 - **Frontend Parallel Metrics**: `frontend/src/components/ParallelExecutionMetrics.tsx` - Real-time visualization (42 tests total)
+- **Tool-Using Agent (NEW)**: `src/llm/tool_using_agent.py` - Schema exploration and context building for SQL generation
+- **Tool Registry (NEW)**: `src/tools/tool_registry.py` - Central registry with caching (follows ColumnMapper pattern)
+- **Schema Tools (NEW)**: `src/tools/schema_tools.py` - 4 tools for schema exploration (search_schema, get_table_info, find_columns, get_relationships)
+- **Data Tools (NEW)**: `src/tools/data_tools.py` - 3 tools for data sampling (get_sample_data, get_column_values, count_rows)
+- **Query Tools (NEW)**: `src/tools/query_tools.py` - 3 tools for query validation (test_query, validate_sql, explain_query)
+- **Tools API (NEW)**: `src/api/endpoints/tools.py` - REST API for tool management (6 endpoints)
+- **Tools Tests (NEW)**: `tests/test_tools.py` - 26 comprehensive tests for tool system
+- **Tools UI Components (NEW)**: `frontend/src/components/ToolsPanel.tsx` - Main tabbed container for Tool-Using Agent
+- **Tools UI Tests (NEW)**: `frontend/tests/ToolsPanel.test.tsx` - 30 comprehensive frontend tests
+- **Tools API Service (NEW)**: `frontend/src/services/toolsApi.ts` - API service for tools endpoints
 
 ## Documentation
 
@@ -417,3 +482,4 @@ Key docs in `docs/`:
 - `SECURITY_POLICY.md` - Security controls and validation
 - `tests/TESTING.md` - Testing guide
 - `DEMO_PAGE_UPDATED.md` - Demo page with Scenario 5 (Parallel Execution) showcase
+- `TOOL_USING_AGENT.md` - **Tool-Using Agent guide (NEW - Nov 21, 2025)** - Phase 3.1 implementation
