@@ -69,6 +69,12 @@ class ToolRegistry:
     - ColumnMapper: For metrics tracking (times_executed, success_rate)
     - ResultPatternLearner: For effectiveness tracking
 
+    Features:
+    - Timeout protection for individual tool calls (default: 10 seconds)
+    - Concurrency control via semaphore
+    - Result caching with configurable TTL
+    - Execution metrics tracking
+
     Usage:
         registry = ToolRegistry()
         result = await registry.execute_tool(
@@ -79,18 +85,27 @@ class ToolRegistry:
         )
     """
 
-    def __init__(self, max_concurrent: int = 5):
+    # Default timeout for tool execution (seconds)
+    DEFAULT_TIMEOUT = 10.0
+
+    def __init__(self, max_concurrent: int = 5, default_timeout: float = 10.0):
         """
         Initialize the tool registry.
 
         Args:
             max_concurrent: Maximum concurrent tool executions
+            default_timeout: Default timeout for tool execution in seconds (default: 10s)
         """
         self._cache = get_mapping_cache()  # Reuse existing cache!
         self._tool_instances: Dict[str, BaseTool] = {}
         self._semaphore = asyncio.Semaphore(max_concurrent)
+        self._default_timeout = default_timeout
+        self._timeout_count = 0  # Track timeouts for metrics
 
-        logger.info(f"ToolRegistry initialized with max_concurrent={max_concurrent}")
+        logger.info(
+            f"ToolRegistry initialized with max_concurrent={max_concurrent}, "
+            f"default_timeout={default_timeout}s"
+        )
 
     def _get_tool_instance(
         self,
@@ -130,14 +145,15 @@ class ToolRegistry:
         schema_cache=None,
         connection_id: Optional[int] = None,
         use_cache: bool = True,
+        timeout: Optional[float] = None,
         **kwargs
     ) -> ToolResult:
         """
-        Execute a tool with caching and metrics tracking.
+        Execute a tool with caching, timeout protection, and metrics tracking.
 
         Follows ColumnMapper.apply_mappings() pattern:
         1. Check cache first
-        2. Execute if cache miss
+        2. Execute if cache miss (with timeout protection)
         3. Cache successful results
         4. Record metrics
 
@@ -148,6 +164,7 @@ class ToolRegistry:
             schema_cache: SchemaCache instance (from feedback-system-update)
             connection_id: Database connection ID
             use_cache: Whether to use caching
+            timeout: Timeout in seconds (uses default_timeout if not specified)
             **kwargs: Tool-specific arguments
 
         Returns:
@@ -155,6 +172,7 @@ class ToolRegistry:
         """
         import time
         start_time = time.time()
+        effective_timeout = timeout if timeout is not None else self._default_timeout
 
         # Get tool instance
         tool = self._get_tool_instance(
@@ -186,11 +204,17 @@ class ToolRegistry:
                 cached_result.execution_time_ms = (time.time() - start_time) * 1000
                 return cached_result
 
-        # Execute tool with semaphore for concurrency control
+        # Execute tool with semaphore for concurrency control and timeout protection
         async with self._semaphore:
             try:
-                logger.info(f"Executing tool: {tool_name} with args: {kwargs}")
-                result = await tool.execute(**kwargs)
+                logger.info(f"Executing tool: {tool_name} with args: {kwargs} (timeout: {effective_timeout}s)")
+
+                # Wrap execution with timeout protection
+                result = await asyncio.wait_for(
+                    tool.execute(**kwargs),
+                    timeout=effective_timeout
+                )
+
                 result.execution_time_ms = (time.time() - start_time) * 1000
                 result.tool_name = tool_name
 
@@ -209,11 +233,28 @@ class ToolRegistry:
                 )
                 return result
 
+            except asyncio.TimeoutError:
+                self._timeout_count += 1
+                elapsed_ms = (time.time() - start_time) * 1000
+                logger.warning(
+                    f"Tool {tool_name} timed out after {effective_timeout}s "
+                    f"(total timeouts: {self._timeout_count})"
+                )
+                timeout_result = ToolResult(
+                    success=False,
+                    error=f"Tool execution timed out after {effective_timeout} seconds",
+                    tool_name=tool_name,
+                    execution_time_ms=elapsed_ms,
+                    data={"timeout": True, "timeout_seconds": effective_timeout},
+                )
+                await self._record_execution(tool_name, timeout_result, kwargs, timed_out=True)
+                return timeout_result
+
             except Exception as e:
                 logger.error(f"Tool {tool_name} failed with exception: {e}")
                 error_result = ToolResult(
                     success=False,
-                    error=str(e),
+                    error=f"Tool execution failed: {type(e).__name__}",
                     tool_name=tool_name,
                     execution_time_ms=(time.time() - start_time) * 1000,
                 )
@@ -227,9 +268,10 @@ class ToolRegistry:
         schema_inspector=None,
         schema_cache=None,
         connection_id: Optional[int] = None,
+        timeout: Optional[float] = None,
     ) -> List[ToolResult]:
         """
-        Execute multiple tools in parallel.
+        Execute multiple tools in parallel with timeout protection.
 
         Args:
             tool_calls: List of {"tool_name": str, "kwargs": dict}
@@ -237,6 +279,7 @@ class ToolRegistry:
             schema_inspector: SchemaInspector instance
             schema_cache: SchemaCache instance
             connection_id: Database connection ID
+            timeout: Timeout in seconds for each tool (uses default if not specified)
 
         Returns:
             List of ToolResults in same order as tool_calls
@@ -248,6 +291,7 @@ class ToolRegistry:
                 schema_inspector=schema_inspector,
                 schema_cache=schema_cache,
                 connection_id=connection_id,
+                timeout=timeout,
                 **call.get("kwargs", {})
             )
             for call in tool_calls
@@ -259,14 +303,15 @@ class ToolRegistry:
         self,
         tool_name: str,
         result: ToolResult,
-        args: Dict[str, Any]
+        args: Dict[str, Any],
+        timed_out: bool = False
     ):
         """
         Record tool execution for metrics tracking.
 
         Follows ColumnMapper._record_mapping_usage() pattern:
         - Update in-memory stats (cached)
-        - Track success rate, execution time
+        - Track success rate, execution time, timeouts
         """
         stats_key = f"tool_stats:{tool_name}"
         stats = self._cache.get(stats_key) or {
@@ -274,6 +319,7 @@ class ToolRegistry:
             "times_executed": 0,
             "successes": 0,
             "failures": 0,
+            "timeouts": 0,
             "total_time_ms": 0.0,
             "cache_hits": 0,
             "last_executed": None,
@@ -285,12 +331,15 @@ class ToolRegistry:
             stats["successes"] += 1
         else:
             stats["failures"] += 1
+        if timed_out:
+            stats["timeouts"] = stats.get("timeouts", 0) + 1
         if result.cache_hit:
             stats["cache_hits"] += 1
         stats["total_time_ms"] += result.execution_time_ms
         stats["success_rate"] = stats["successes"] / stats["times_executed"]
         stats["avg_time_ms"] = stats["total_time_ms"] / stats["times_executed"]
         stats["cache_hit_rate"] = stats["cache_hits"] / stats["times_executed"]
+        stats["timeout_rate"] = stats.get("timeouts", 0) / stats["times_executed"]
         stats["last_executed"] = datetime.utcnow().isoformat()
 
         # Cache stats with longer TTL (1 hour)

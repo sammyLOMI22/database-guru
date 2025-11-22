@@ -12,6 +12,7 @@ Part of Phase 3.1: Tool-Using Agent Implementation
 """
 import pytest
 import json
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
@@ -569,6 +570,140 @@ class TestToolRegistryMetrics:
 
         assert "search_schema" in stats
         assert stats["search_schema"]["times_executed"] >= 1
+
+
+class TestToolRegistryTimeout:
+    """Test tool registry timeout protection"""
+
+    def setup_method(self):
+        """Reset registry before each test"""
+        reset_tool_registry()
+        reset_mapping_cache()
+
+    @pytest.mark.asyncio
+    async def test_timeout_protection(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test that slow tools are timed out"""
+        from src.tools.tool_registry import ToolRegistry
+
+        # Create registry with short timeout
+        registry = ToolRegistry(default_timeout=0.1)  # 100ms timeout
+
+        # Mock a slow tool execution
+        async def slow_execute(*args, **kwargs):
+            await asyncio.sleep(1.0)  # Sleep for 1 second
+            return ToolResult(success=True, data={}, tool_name="test")
+
+        # Patch the search_schema tool to be slow
+        from src.tools.schema_tools import SearchSchemaTool
+        original_execute = SearchSchemaTool.execute
+        SearchSchemaTool.execute = slow_execute
+
+        try:
+            result = await registry.execute_tool(
+                tool_name="search_schema",
+                session=mock_session,
+                schema_inspector=mock_schema_inspector,
+                schema_cache=mock_schema_cache,
+                keyword="test",
+                use_cache=False  # Disable cache to ensure execution
+            )
+
+            # Should timeout
+            assert result.success is False
+            assert "timed out" in result.error.lower()
+            assert result.data.get("timeout") is True
+        finally:
+            # Restore original method
+            SearchSchemaTool.execute = original_execute
+
+    @pytest.mark.asyncio
+    async def test_custom_timeout_override(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test that timeout can be overridden per-call"""
+        from src.tools.tool_registry import ToolRegistry
+
+        # Create registry with long default timeout
+        registry = ToolRegistry(default_timeout=10.0)
+
+        # Mock a slow tool execution
+        async def slow_execute(*args, **kwargs):
+            await asyncio.sleep(0.5)  # Sleep for 500ms
+            return ToolResult(success=True, data={}, tool_name="test")
+
+        from src.tools.schema_tools import SearchSchemaTool
+        original_execute = SearchSchemaTool.execute
+        SearchSchemaTool.execute = slow_execute
+
+        try:
+            # Override with short timeout
+            result = await registry.execute_tool(
+                tool_name="search_schema",
+                session=mock_session,
+                schema_inspector=mock_schema_inspector,
+                schema_cache=mock_schema_cache,
+                keyword="test",
+                timeout=0.1,  # 100ms override
+                use_cache=False
+            )
+
+            # Should timeout with the short override
+            assert result.success is False
+            assert "timed out" in result.error.lower()
+        finally:
+            SearchSchemaTool.execute = original_execute
+
+    @pytest.mark.asyncio
+    async def test_timeout_tracked_in_metrics(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test that timeouts are tracked in metrics"""
+        from src.tools.tool_registry import ToolRegistry
+
+        registry = ToolRegistry(default_timeout=0.1)
+
+        # Mock a slow tool
+        async def slow_execute(*args, **kwargs):
+            await asyncio.sleep(1.0)
+            return ToolResult(success=True, data={}, tool_name="test")
+
+        from src.tools.schema_tools import SearchSchemaTool
+        original_execute = SearchSchemaTool.execute
+        SearchSchemaTool.execute = slow_execute
+
+        try:
+            # Execute and expect timeout
+            await registry.execute_tool(
+                tool_name="search_schema",
+                session=mock_session,
+                schema_inspector=mock_schema_inspector,
+                schema_cache=mock_schema_cache,
+                keyword="test",
+                use_cache=False
+            )
+
+            # Check metrics
+            stats = await registry.get_tool_stats("search_schema")
+            assert stats["timeouts"] >= 1
+            assert stats["timeout_rate"] > 0
+        finally:
+            SearchSchemaTool.execute = original_execute
+
+    @pytest.mark.asyncio
+    async def test_fast_tool_completes_within_timeout(self, mock_schema_inspector, mock_schema_cache, mock_session):
+        """Test that fast tools complete successfully"""
+        from src.tools.tool_registry import ToolRegistry
+
+        registry = ToolRegistry(default_timeout=10.0)  # Long timeout
+
+        # Execute a normal tool (should be fast)
+        result = await registry.execute_tool(
+            tool_name="search_schema",
+            session=mock_session,
+            schema_inspector=mock_schema_inspector,
+            schema_cache=mock_schema_cache,
+            keyword="customer",
+            use_cache=False
+        )
+
+        # Should complete without timeout
+        assert result.data.get("timeout") is not True
 
 
 class TestSelfCorrectingAgentIntegration:
