@@ -78,6 +78,8 @@ The demo showcases:
 - 📋 **Query Planning** - Complex query orchestration
 - 🔧 **Auto-Correction** - Self-healing SQL generation
 - ⚠️ **Result Verification** - Suspicious result detection
+- 🛠️ **Tool-Using Agent** - Schema exploration tools
+- 📊 **Semantic Cache Dashboard** - Cache monitoring and management
 
 All with mock data - no database connection needed!
 
@@ -155,7 +157,8 @@ DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
 - ✅ **Learning from Corrections** - Remembers successful fixes for 50% faster error recovery
 - ✅ **Schema-Aware Fixes** - 200x faster typo correction without LLM
 - ✅ **Tool-Using Agent** - 10 specialized tools for schema exploration and query validation with full UI dashboard
-- ✅ **Semantic Caching (NEW!)** - Intelligent query similarity matching for 30-50% higher cache hit rates
+- ✅ **Semantic Caching** - Intelligent query similarity matching for 30-50% higher cache hit rates
+- ✅ **Semantic Cache Dashboard (NEW!)** - Full UI for monitoring cache stats, viewing cached queries, and managing caches
 - ✅ **Result Verification** - Catches logical errors and suspicious results
 - ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB)
 - ✅ **Multi-database queries** - Query multiple databases simultaneously with parallel execution
@@ -312,7 +315,67 @@ Return cached result instantly!
 - **Schema Fingerprinting**: Ensures cache invalidation on schema changes
 - **Conditional Verification**: Skips expensive verification for high-confidence results
 
-**See:** [Semantic Caching Guide](docs/SEMANTIC_CACHING.md) for complete documentation
+**See:** [Semantic Caching Guide](docs/SEMANTIC_CACHING.md) for complete backend documentation
+
+## 📊 Semantic Cache Dashboard (NEW!)
+
+Database Guru now includes a comprehensive UI for monitoring and managing semantic caching, accessible via the **Cache** tab in the main navigation.
+
+### Features:
+
+**Overview Tab:**
+- 4 stat cards: Total Lookups, Hit Rate %, Semantic Hits, Cached Entries
+- Semantic Cache breakdown (exact vs semantic hits, misses, threshold, TTL)
+- LLM Response Cache stats
+- Embedding Service status (Online/TF-IDF fallback)
+- "How Semantic Caching Works" explanation
+- Quick actions: Clear Semantic Cache, Clear LLM Cache, Clear All Caches
+
+**Statistics Tab:**
+- Hit Type Distribution (exact hits, semantic hits, misses with progress bars)
+- LLM Response Cache metrics
+- Embedding Service Efficiency
+- Estimated Performance Impact
+
+**Recent Queries Tab:**
+- Browsable list of cached queries
+- Expandable SQL view for each query
+- Database type badges (PostgreSQL, MySQL, SQLite, DuckDB)
+- Hit counts and timestamps
+- Page size selector (10/25/50 per page)
+
+### Inline Cache Indicators:
+
+Query results now show cache hit badges:
+- **Green badge**: "Exact Cache Hit - Instant Response"
+- **Amber badge**: "Semantic Cache Hit (X% match) - Instant Response"
+- Shows matched question for semantic hits
+
+### API Endpoints:
+
+```bash
+# Get combined cache statistics
+curl http://localhost:8000/api/cache/stats
+
+# Get recent cached queries
+curl http://localhost:8000/api/cache/recent?limit=20
+
+# Clear semantic cache
+curl -X DELETE http://localhost:8000/api/cache/semantic
+
+# Clear LLM cache
+curl -X DELETE http://localhost:8000/api/cache/llm
+
+# Clear all caches
+curl -X DELETE http://localhost:8000/api/cache/all
+
+# Clear cache for specific connection
+curl -X DELETE http://localhost:8000/api/cache/connection/1
+```
+
+**Amber Color Theme**: The Cache tab uses an amber/gold color scheme to visually distinguish it from other tabs.
+
+**See:** [Semantic Cache UI Guide](docs/SEMANTIC_CACHE_UI.md) for complete frontend documentation
 
 ---
 
@@ -1034,9 +1097,9 @@ These require manual admin review for safety.
 Database Guru has comprehensive test coverage with automated testing for all major components.
 
 ### Quick Test Status
-![Tests](https://img.shields.io/badge/tests-140%2B%20passing-brightgreen)
-![Backend Tests](https://img.shields.io/badge/backend-71%20tests-brightgreen)
-![Frontend Tests](https://img.shields.io/badge/frontend-69%20parallel%20tests-brightgreen)
+![Tests](https://img.shields.io/badge/tests-180%2B%20passing-brightgreen)
+![Backend Tests](https://img.shields.io/badge/backend-80%20tests-brightgreen)
+![Frontend Tests](https://img.shields.io/badge/frontend-103%20tests-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-55%25-yellow)
 ![Components](https://img.shields.io/badge/components-fully%20tested-brightgreen)
 
@@ -1063,10 +1126,13 @@ open htmlcov/index.html
 - ✅ **Parallel Execution**: 13/13 tests (100% coverage) - PRODUCTION-READY!
   - Backend: 6 multi-DB + 7 corrections tests
   - Speedup verification, timeout protection, metrics tracking
-- ✅ **Frontend Parallel Metrics**: 42/42 tests (100% coverage) - NEW!
+- ✅ **Frontend Parallel Metrics**: 42/42 tests (100% coverage)
   - ParallelDatabaseMetrics: 20 tests
   - ParallelCorrectionsMetrics: 16 tests
   - QueryResults integration: 6 tests
+- ✅ **Semantic Cache UI**: 43/43 tests (100% coverage) - NEW!
+  - Backend cache endpoints: 9 tests
+  - Frontend cache components: 34 tests (SemanticCachePanel, CacheOverview, CacheStatistics, RecentCachedQueries, QueryResults badge)
 - ✅ Confidence Scoring: 31/31 tests (100% coverage)
 - ✅ Result Verification Agent: 14/14 tests (89% coverage)
 - ✅ Correction Learner: 13/13 tests (87% coverage)
