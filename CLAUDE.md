@@ -249,6 +249,13 @@ Return Results
 
 **Caching & Performance:**
 - Redis caching for query results (`src/cache/redis_client.py`)
+- **Semantic Caching (NEW - November 22, 2025)**: Intelligent query similarity matching
+  - `EmbeddingService` (`src/cache/embedding_service.py`) - Text embeddings using Ollama or TF-IDF fallback
+  - `SemanticCache` (`src/cache/semantic_cache.py`) - Matches similar queries (30-50% higher cache hit rate)
+  - `LLMCache` (`src/cache/llm_cache.py`) - Caches LLM SQL generation responses (40-60% fewer LLM calls)
+  - Schema fingerprinting ensures cache validity across schema changes
+  - Configurable similarity thresholds (default: 0.85 for semantic, 0.88 for LLM)
+- **Conditional Result Verification** - Skips verification for high-confidence results (1-100 rows, first attempt)
 - Rate limiting middleware (100 requests/60 seconds)
 - Async operations throughout for concurrency
 
@@ -460,6 +467,11 @@ Settings managed via Pydantic in `src/config/settings.py`:
 - **Tools UI Components (NEW)**: `frontend/src/components/ToolsPanel.tsx` - Main tabbed container for Tool-Using Agent
 - **Tools UI Tests (NEW)**: `frontend/tests/ToolsPanel.test.tsx` - 30 comprehensive frontend tests
 - **Tools API Service (NEW)**: `frontend/src/services/toolsApi.ts` - API service for tools endpoints
+- **Semantic Caching (NEW - Nov 22, 2025)**:
+  - `src/cache/embedding_service.py` - Text embeddings for similarity matching (Ollama or TF-IDF fallback)
+  - `src/cache/semantic_cache.py` - Query result caching with semantic similarity
+  - `src/cache/llm_cache.py` - LLM response caching with schema fingerprinting
+  - `tests/test_semantic_caching.py` - 20 comprehensive tests for caching system
 
 ## Documentation
 

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config.settings import Settings
 from src.database.connection import get_db_manager as _get_db_manager, DatabaseManager
 from src.cache.redis_client import get_redis_cache, RedisCache
+from src.cache.semantic_cache import get_semantic_cache, SemanticCache
 from src.llm.sql_generator import SQLGenerator
 
 
@@ -35,6 +36,11 @@ async def get_db(
 def get_cache(settings: Settings = Depends(get_settings)) -> RedisCache:
     """Get Redis cache instance"""
     return get_redis_cache(settings)
+
+
+def get_semantic_cache_dep() -> SemanticCache:
+    """Get semantic cache instance for dependency injection"""
+    return get_semantic_cache()
 
 
 def get_sql_generator(settings: Settings = Depends(get_settings)) -> SQLGenerator:

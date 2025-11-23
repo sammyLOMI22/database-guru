@@ -1056,10 +1056,31 @@ class SelfCorrectingSQLAgent:
                     )
                     logger.info(f"✅ Query succeeded on attempt {attempt_num}/{self.max_retries}")
 
-                    # Verify results if enabled
+                    # Verify results if enabled (with conditional skip for high-confidence results)
                     verification_result = None
                     verification_warnings = []
+                    skip_verification = False
+
+                    # Quick confidence check to skip expensive verification
                     if self.enable_result_verification and self.verification_agent:
+                        row_count = exec_result.get("row_count", 0)
+                        # Skip verification for "obviously correct" results:
+                        # - Simple SELECT queries that return reasonable data (1-100 rows)
+                        # - Queries that didn't need any correction (first attempt success)
+                        # - Not empty results (0 rows still gets verified)
+                        if (
+                            attempt_num == 1 and  # First attempt success
+                            row_count > 0 and row_count <= 100 and  # Reasonable row count
+                            not any(kw in sql.upper() for kw in ['JOIN', 'UNION', 'SUBQUERY', 'HAVING'])
+                        ):
+                            skip_verification = True
+                            trace.add_step(
+                                "verification_skip",
+                                f"Skipping verification for high-confidence result ({row_count} rows, first attempt)"
+                            )
+                            logger.info(f"⏭️ Skipping verification for high-confidence result ({row_count} rows)")
+
+                    if self.enable_result_verification and self.verification_agent and not skip_verification:
                         try:
                             trace.add_step("verification", "Verifying query results for accuracy")
                             logger.info("🔍 Verifying query results...")

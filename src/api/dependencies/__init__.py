@@ -4,6 +4,7 @@ from src.api.dependencies.common import (
     get_db_manager,
     get_db,
     get_cache,
+    get_semantic_cache_dep,
     get_sql_generator,
 )
 
@@ -12,5 +13,6 @@ __all__ = [
     "get_db_manager",
     "get_db",
     "get_cache",
+    "get_semantic_cache_dep",
     "get_sql_generator",
 ]
