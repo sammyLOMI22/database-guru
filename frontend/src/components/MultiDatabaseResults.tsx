@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { MessageSquare, Copy, Check } from 'lucide-react';
-import type { DatabaseQueryResult } from '../types/api';
+import { MessageSquare, Copy, Check, Zap, Database } from 'lucide-react';
+import type { DatabaseQueryResult, CacheInfo } from '../types/api';
 import { AgentTrace } from './AgentTrace';
 import { CorrectionHistory } from './CorrectionHistory';
 import { QueryPlanVisualization } from './QueryPlanVisualization';
@@ -13,12 +13,14 @@ interface MultiDatabaseResultsProps {
   totalRows: number;
   totalExecutionTime: number;
   question: string;
+  cacheInfo?: CacheInfo | null;
 }
 
 export default function MultiDatabaseResults({
   results,
   totalRows,
   totalExecutionTime,
+  cacheInfo,
 }: MultiDatabaseResultsProps) {
   const [expandedDatabases, setExpandedDatabases] = useState<Set<number>>(
     new Set(results.map((r) => r.connection_id))
@@ -85,6 +87,40 @@ export default function MultiDatabaseResults({
             </p>
           </div>
         </div>
+
+        {/* Cache Info Banner */}
+        {cacheInfo && (cacheInfo.semantic_hits > 0 || cacheInfo.results_stored > 0) && (
+          <div className="mt-3 pt-3 border-t border-blue-200">
+            <div className="flex items-center gap-4 text-sm">
+              {cacheInfo.semantic_hits > 0 && (
+                <div className="flex items-center gap-1.5 text-amber-700 bg-amber-50 px-2 py-1 rounded-full">
+                  <Zap className="w-3.5 h-3.5" />
+                  <span className="font-medium">
+                    {cacheInfo.semantic_hits} cache hit{cacheInfo.semantic_hits !== 1 ? 's' : ''}
+                  </span>
+                  {cacheInfo.hit_databases.length > 0 && (
+                    <span className="text-amber-600 text-xs">
+                      ({cacheInfo.hit_databases.join(', ')})
+                    </span>
+                  )}
+                </div>
+              )}
+              {cacheInfo.semantic_misses > 0 && (
+                <div className="flex items-center gap-1.5 text-slate-600 bg-slate-50 px-2 py-1 rounded-full">
+                  <Database className="w-3.5 h-3.5" />
+                  <span className="font-medium">
+                    {cacheInfo.semantic_misses} fresh quer{cacheInfo.semantic_misses !== 1 ? 'ies' : 'y'}
+                  </span>
+                </div>
+              )}
+              {cacheInfo.results_stored > 0 && (
+                <div className="flex items-center gap-1.5 text-teal-700 bg-teal-50 px-2 py-1 rounded-full text-xs">
+                  <span>+{cacheInfo.results_stored} cached</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Individual database results */}

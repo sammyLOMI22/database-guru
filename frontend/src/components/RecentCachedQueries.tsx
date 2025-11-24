@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Database, Eye, Code, RefreshCw } from 'lucide-react';
 import { cacheAPI, type RecentQueriesResponse } from '../services/cacheApi';
+import axios from 'axios';
+
+/** Extract error message from unknown error type */
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (axios.isAxiosError(err)) {
+    return err.response?.data?.detail || err.message || fallback;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return fallback;
+};
 
 /**
  * Recent cached queries browser.
@@ -20,17 +32,26 @@ export const RecentCachedQueries: React.FC = () => {
   const [limit, setLimit] = useState(10);
 
   useEffect(() => {
-    loadData();
+    loadData(true);
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [limit]);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isInitial = false) => {
+    if (isInitial) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const response = await cacheAPI.getRecentQueries({ limit });
       setData(response);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || 'Failed to load data');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to load data'));
     } finally {
       setLoading(false);
     }
@@ -86,7 +107,7 @@ export const RecentCachedQueries: React.FC = () => {
       <div className="text-center py-12">
         <div className="text-red-500 mb-4">Error: {error}</div>
         <button
-          onClick={loadData}
+          onClick={() => loadData(true)}
           className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
         >
           Retry
@@ -115,7 +136,7 @@ export const RecentCachedQueries: React.FC = () => {
             <option value={50}>50 per page</option>
           </select>
           <button
-            onClick={loadData}
+            onClick={() => loadData(false)}
             className="flex items-center gap-2 px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
           >
             <RefreshCw className="w-4 h-4" />

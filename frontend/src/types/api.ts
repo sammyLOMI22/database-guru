@@ -24,7 +24,9 @@ export interface AgentTraceStep {
 export interface AgentTrace {
   steps: AgentTraceStep[];
   total_elapsed_ms: number;
-  start_time: string;
+  total_duration_ms?: number;  // Alternative name used by some traces
+  start_time?: string;
+  from_cache?: boolean;  // For cache hit traces
 }
 
 export interface ConfidencePrediction {
@@ -342,6 +344,16 @@ export interface DatabaseQueryResult {
   _parallel_execution_metrics?: ParallelExecutionMetrics | null;
 }
 
+// Cache Info for Multi-Database Queries (Phase 3.2: Semantic Caching)
+export interface CacheInfo {
+  semantic_hits: number;
+  semantic_misses: number;
+  results_stored: number;
+  results_skipped: number;
+  hit_databases: string[];
+  miss_databases: string[];
+}
+
 export interface MultiDatabaseQueryResponse {
   query_id: number;
   question: string;
@@ -352,6 +364,7 @@ export interface MultiDatabaseQueryResponse {
   warnings: string[];
   cached: boolean;
   timestamp: string;
+  cache_info?: CacheInfo | null;  // Cache operation summary
 }
 
 // Mapping Management Types (Phase 2: Non-SQL Feedback)

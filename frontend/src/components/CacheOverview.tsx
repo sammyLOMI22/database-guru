@@ -9,6 +9,18 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { cacheAPI, type CacheStatsResponse } from '../services/cacheApi';
+import axios from 'axios';
+
+/** Extract error message from unknown error type */
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (axios.isAxiosError(err)) {
+    return err.response?.data?.detail || err.message || fallback;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return fallback;
+};
 
 /**
  * Overview dashboard for Semantic Cache.
@@ -27,21 +39,34 @@ export const CacheOverview: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [clearing, setClearing] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadData();
+    loadData(true);
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isInitial = false) => {
+    if (isInitial) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     setError(null);
     try {
       const data = await cacheAPI.getStats();
       setStats(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || 'Failed to load data');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to load data'));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -66,8 +91,8 @@ export const CacheOverview: React.FC = () => {
         await cacheAPI.clearAllCaches();
       }
       await loadData();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to clear cache');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to clear cache'));
     } finally {
       setClearing(null);
     }
@@ -91,7 +116,7 @@ export const CacheOverview: React.FC = () => {
       <div className="text-center py-12">
         <div className="text-red-500 mb-4">Error: {error}</div>
         <button
-          onClick={loadData}
+          onClick={() => loadData(true)}
           className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
         >
           Retry
@@ -358,11 +383,12 @@ export const CacheOverview: React.FC = () => {
             {clearing === 'all' ? 'Clearing...' : 'Clear All Caches'}
           </button>
           <button
-            onClick={loadData}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            onClick={() => loadData(false)}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
           >
-            <RefreshCw className="w-4 h-4" />
-            Refresh Stats
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh Stats'}
           </button>
         </div>
       </div>

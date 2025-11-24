@@ -171,22 +171,21 @@ async def get_recent_cached_queries(
     Get recent cached queries from the semantic cache.
 
     Returns a list of cached queries with metadata (excluding embeddings and full results).
+    Retrieves from both Redis (via sorted set) and in-memory fallback.
     """
     try:
         semantic_cache = get_semantic_cache()
 
-        # Get entries from memory cache
-        # Note: In production with Redis, this would need to scan Redis keys
-        entries: List[CachedQueryResponse] = []
+        # Get entries from cache (Redis + memory fallback)
+        cache_entries, total = await semantic_cache.get_recent_entries(
+            limit=limit,
+            connection_id=connection_id,
+            database_type=database_type,
+        )
 
-        for entry_hash, entry in semantic_cache._memory_entries.items():
-            # Apply filters
-            if connection_id is not None and entry.connection_id != connection_id:
-                continue
-            if database_type is not None and entry.database_type != database_type:
-                continue
-
-            entries.append(CachedQueryResponse(
+        # Convert to response format
+        entries = [
+            CachedQueryResponse(
                 question=entry.question,
                 sql=entry.sql,
                 connection_id=entry.connection_id,
@@ -194,12 +193,9 @@ async def get_recent_cached_queries(
                 created_at=entry.created_at,
                 hits=entry.hits,
                 last_hit_at=entry.last_hit_at,
-            ))
-
-        # Sort by created_at (newest first) and limit
-        entries.sort(key=lambda x: x.created_at, reverse=True)
-        total = len(entries)
-        entries = entries[:limit]
+            )
+            for entry in cache_entries
+        ]
 
         return RecentQueriesResponse(
             queries=entries,

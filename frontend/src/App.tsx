@@ -106,28 +106,33 @@ function App() {
           </div>
         </div>
 
-        {/* Content Area */}
+        {/* Content Area - Keep all components mounted to preserve state */}
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 flex">
-            {activeTab === 'chat' ? (
+            {/* Chat - always mounted to preserve history */}
+            <div className={`flex-1 flex ${activeTab === 'chat' ? '' : 'hidden'}`}>
               <EnhancedChatInterface />
-            ) : activeTab === 'feedback' ? (
-              <div className="flex-1 overflow-auto p-6">
-                <FeedbackStats />
-              </div>
-            ) : activeTab === 'tools' ? (
-              <div className="flex-1 overflow-auto p-6">
-                <ToolsPanel />
-              </div>
-            ) : activeTab === 'cache' ? (
-              <div className="flex-1 overflow-auto p-6">
-                <SemanticCachePanel />
-              </div>
-            ) : (
-              <div className="flex-1 overflow-auto">
-                <SettingsPanel />
-              </div>
-            )}
+            </div>
+
+            {/* Feedback */}
+            <div className={`flex-1 overflow-auto p-6 ${activeTab === 'feedback' ? '' : 'hidden'}`}>
+              <FeedbackStats />
+            </div>
+
+            {/* Tools */}
+            <div className={`flex-1 overflow-auto p-6 ${activeTab === 'tools' ? '' : 'hidden'}`}>
+              <ToolsPanel />
+            </div>
+
+            {/* Cache */}
+            <div className={`flex-1 overflow-auto p-6 ${activeTab === 'cache' ? '' : 'hidden'}`}>
+              <SemanticCachePanel />
+            </div>
+
+            {/* Settings */}
+            <div className={`flex-1 overflow-auto ${activeTab === 'settings' ? '' : 'hidden'}`}>
+              <SettingsPanel />
+            </div>
           </main>
         </div>
       </div>

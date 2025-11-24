@@ -20,7 +20,7 @@ from src.models.schemas import (
 from src.api.dependencies import get_db, get_cache, get_semantic_cache_dep, get_sql_generator, get_settings
 from src.database.models import QueryHistory, ChatSession, ChatMessage
 from src.llm.sql_generator import SQLGenerator
-from src.llm.self_correcting_agent import SelfCorrectingSQLAgent
+from src.llm.self_correcting_agent import SelfCorrectingSQLAgent, AgentTrace
 from src.llm.conversational_memory_agent import get_memory_agent
 from src.cache.redis_client import RedisCache
 from src.cache.semantic_cache import SemanticCache
@@ -53,6 +53,14 @@ async def process_query(
     5. Returns results (cached for future use)
     """
     try:
+        # Initialize trace for cache operations (will be merged with agent trace later)
+        cache_trace = AgentTrace()
+        cache_trace.add_step(
+            "cache_lookup",
+            f"Checking cache for: {request.question[:50]}{'...' if len(request.question) > 50 else ''}",
+            metadata={"question_length": len(request.question), "use_cache": request.use_cache}
+        )
+
         # Generate cache key for exact matching
         cache_key_data = f"{request.question}:{request.database_type}"
         cache_key_hash = hashlib.sha256(cache_key_data.encode()).hexdigest()[:16]
@@ -69,8 +77,18 @@ async def process_query(
             cached_result = await cache.get(cache_key)
             if cached_result:
                 logger.info(f"Exact cache hit for query: {request.question[:50]}...")
+                cache_trace.add_step(
+                    "cache_hit",
+                    "Exact cache hit - returning cached result",
+                    metadata={
+                        "cache_type": "exact",
+                        "cache_key": cache_key,
+                        "cached_sql": cached_result.get("sql", "")[:100],
+                    }
+                )
                 cached_result["cached"] = True
                 cached_result["cache_type"] = "exact"
+                cached_result["agent_trace"] = cache_trace.to_dict()
                 return QueryResponse(**cached_result)
 
             # 2. Try semantic cache (similarity-based matching)
@@ -84,6 +102,17 @@ async def process_query(
             if active_conn_early:
                 # Initialize semantic cache if needed
                 await semantic_cache.initialize()
+                cache_stats = semantic_cache.get_stats()
+
+                cache_trace.add_step(
+                    "semantic_lookup",
+                    f"Searching semantic cache (threshold: {cache_stats.get('similarity_threshold', 0.85)}, entries: {cache_stats.get('memory_entries', 0)})",
+                    metadata={
+                        "connection_id": active_conn_early.id,
+                        "database_type": active_conn_early.database_type,
+                        "total_lookups": cache_stats.get("total_lookups", 0),
+                    }
+                )
 
                 semantic_cache_hit = await semantic_cache.get_similar(
                     question=request.question,
@@ -97,15 +126,31 @@ async def process_query(
                         f"Semantic cache hit (similarity={semantic_cache_hit.similarity:.3f}): "
                         f"'{request.question[:30]}...' matched '{semantic_cache_hit.original_question[:30]}...'"
                     )
+                    cache_trace.add_step(
+                        "cache_hit",
+                        f"Semantic cache hit (similarity: {semantic_cache_hit.similarity:.2%})",
+                        metadata={
+                            "cache_type": "semantic",
+                            "similarity": round(semantic_cache_hit.similarity, 3),
+                            "matched_question": semantic_cache_hit.original_question,
+                            "cached_sql": semantic_cache_hit.cached_sql[:100] if semantic_cache_hit.cached_sql else "",
+                        }
+                    )
                     cached_data = semantic_cache_hit.cached_result
                     cached_data["cached"] = True
                     cached_data["cache_type"] = "semantic"
                     cached_data["semantic_similarity"] = round(semantic_cache_hit.similarity, 3)
                     cached_data["matched_question"] = semantic_cache_hit.original_question
                     cached_data["sql"] = semantic_cache_hit.cached_sql
+                    cached_data["agent_trace"] = cache_trace.to_dict()
                     return QueryResponse(**cached_data)
 
         # Cache miss - generate SQL
+        cache_trace.add_step(
+            "cache_miss",
+            "No cache hit - proceeding with SQL generation",
+            metadata={"checked_exact": request.use_cache, "checked_semantic": request.use_cache and active_conn_early is not None}
+        )
         logger.info(f"Processing query: {request.question}")
 
         # Initialize SQL generator
@@ -316,6 +361,17 @@ async def process_query(
             await db.commit()
             logger.info(f"Saved conversation to session {request.session_id}")
 
+        # Merge cache trace steps with agent trace (prepend cache steps)
+        agent_trace_dict = agent_result.get("agent_trace")
+        if agent_trace_dict and cache_trace.steps:
+            # Prepend cache trace steps to agent trace
+            cache_steps = cache_trace.to_dict().get("steps", [])
+            if isinstance(agent_trace_dict, dict) and "steps" in agent_trace_dict:
+                agent_trace_dict["steps"] = cache_steps + agent_trace_dict["steps"]
+        elif cache_trace.steps:
+            # No agent trace, use cache trace only
+            agent_trace_dict = cache_trace.to_dict()
+
         # Build response
         response_data = {
             "query_id": query_record.id,
@@ -330,7 +386,7 @@ async def process_query(
             "cached": False,
             "timestamp": datetime.utcnow().isoformat(),
             # Option 2 Enhancement: Observability fields
-            "agent_trace": agent_result.get("agent_trace"),
+            "agent_trace": agent_trace_dict,
             "query_plan": agent_result.get("query_plan"),
             "attempts": formatted_attempts,
             "self_corrected": agent_result.get("self_corrected", False),
@@ -347,6 +403,7 @@ async def process_query(
             await cache.set(cache_key, response_data, ttl=settings.CACHE_TTL)
 
             # 2. Store in semantic cache (for similarity-based matches)
+            cache_store_success = False
             try:
                 await semantic_cache.set(
                     question=request.question,
@@ -355,10 +412,30 @@ async def process_query(
                     connection_id=active_connection.id,
                     database_type=database_type,
                 )
+                cache_store_success = True
                 logger.debug(f"Stored query in semantic cache: {request.question[:50]}...")
             except Exception as e:
                 # Don't fail the request if semantic caching fails
                 logger.warning(f"Failed to store in semantic cache: {e}")
+
+            # Add cache store step to trace
+            cache_store_step = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "elapsed_ms": 0,
+                "type": "cache_store",
+                "message": f"Stored result in cache (exact + semantic)" if cache_store_success else "Stored in exact cache only",
+                "metadata": {
+                    "exact_cache": True,
+                    "semantic_cache": cache_store_success,
+                    "cache_key": cache_key,
+                    "connection_id": active_connection.id,
+                    "ttl_seconds": settings.CACHE_TTL,
+                },
+                "icon": "💾"
+            }
+            if agent_trace_dict and "steps" in agent_trace_dict:
+                agent_trace_dict["steps"].append(cache_store_step)
+                response_data["agent_trace"] = agent_trace_dict
 
         return QueryResponse(**response_data)
 

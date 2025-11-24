@@ -36,7 +36,7 @@ import logging
 import json
 import time
 import hashlib
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Set
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
@@ -247,15 +247,15 @@ class SemanticCache:
         # Find most similar entry
         best_match: Optional[SemanticCacheEntry] = None
         best_similarity = 0.0
+        best_hash = ""
 
         # Limit comparisons for performance
         hashes_to_check = entry_hashes[: self.max_comparisons]
 
-        for entry_hash in hashes_to_check:
-            entry = await self._get_entry(entry_hash)
-            if not entry:
-                continue
+        # Batch fetch all entries at once (avoids N+1 query pattern)
+        entries_batch = await self._get_entries_batch(hashes_to_check)
 
+        for entry_hash, entry in entries_batch.items():
             # Calculate similarity
             similarity = self.embedding_service.cosine_similarity(
                 query_embedding, entry.embedding
@@ -392,7 +392,7 @@ class SemanticCache:
         """Clear all semantic cache entries"""
         count = 0
 
-        # Clear Redis
+        # Clear Redis (includes semantic:result:*, semantic:index:*, and semantic:recent)
         if self.redis_cache and self.redis_cache.redis:
             count = await self.redis_cache.clear_pattern("semantic:*")
 
@@ -462,6 +462,57 @@ class SemanticCache:
         # Fallback to memory
         return self._memory_entries.get(entry_hash)
 
+    async def _get_entries_batch(
+        self,
+        entry_hashes: List[str],
+    ) -> Dict[str, SemanticCacheEntry]:
+        """
+        Get multiple cache entries in a single batch operation.
+
+        This avoids N+1 query patterns by fetching all entries at once
+        using Redis MGET instead of individual GET calls.
+
+        Args:
+            entry_hashes: List of entry hashes to retrieve
+
+        Returns:
+            Dictionary mapping entry_hash -> SemanticCacheEntry (only valid entries)
+        """
+        if not entry_hashes:
+            return {}
+
+        result: Dict[str, SemanticCacheEntry] = {}
+
+        # Try Redis batch fetch first
+        if self.redis_cache and self.redis_cache.redis:
+            try:
+                # Build Redis keys
+                redis_keys = [f"semantic:result:{h}" for h in entry_hashes]
+
+                # Fetch all at once using mget
+                batch_data = await self.redis_cache.mget(redis_keys)
+
+                # Map results back to entry hashes
+                for entry_hash, redis_key in zip(entry_hashes, redis_keys):
+                    data = batch_data.get(redis_key)
+                    if data:
+                        try:
+                            result[entry_hash] = SemanticCacheEntry.from_dict(data)
+                        except Exception as e:
+                            logger.debug(f"Failed to parse entry {entry_hash}: {e}")
+
+            except Exception as e:
+                logger.debug(f"Redis batch get failed: {e}")
+
+        # Fallback: fetch any missing entries from memory
+        for entry_hash in entry_hashes:
+            if entry_hash not in result:
+                memory_entry = self._memory_entries.get(entry_hash)
+                if memory_entry:
+                    result[entry_hash] = memory_entry
+
+        return result
+
     async def _set_entry(
         self,
         entry_hash: str,
@@ -479,6 +530,8 @@ class SemanticCache:
                     entry_dict,
                     ttl=ttl,
                 )
+                # Also track in recent entries sorted set (score = timestamp)
+                await self._add_to_recent(entry_hash, entry.created_at)
                 return True
             except Exception as e:
                 logger.debug(f"Redis set failed: {e}")
@@ -494,6 +547,8 @@ class SemanticCache:
         if self.redis_cache and self.redis_cache.redis:
             try:
                 deleted = await self.redis_cache.delete(f"semantic:result:{entry_hash}")
+                # Also remove from recent entries sorted set
+                await self._remove_from_recent(entry_hash)
             except Exception:
                 pass
 
@@ -566,6 +621,107 @@ class SemanticCache:
 
         # Re-store with updated stats
         await self._set_entry(entry_hash, entry, self.ttl)
+
+    async def _add_to_recent(self, entry_hash: str, created_at: str):
+        """Add entry to the recent entries sorted set in Redis"""
+        if not self.redis_cache or not self.redis_cache.redis:
+            return
+
+        try:
+            # Parse timestamp to float for Redis score
+            from datetime import datetime as dt
+            timestamp = dt.fromisoformat(created_at.replace("Z", "+00:00")).timestamp()
+
+            # Add to sorted set with timestamp as score
+            await self.redis_cache.redis.zadd(
+                "semantic:recent",
+                {entry_hash: timestamp}
+            )
+
+            # Trim to keep only most recent 1000 entries
+            await self.redis_cache.redis.zremrangebyrank("semantic:recent", 0, -1001)
+        except Exception as e:
+            logger.debug(f"Failed to add to recent set: {e}")
+
+    async def _remove_from_recent(self, entry_hash: str):
+        """Remove entry from the recent entries sorted set"""
+        if not self.redis_cache or not self.redis_cache.redis:
+            return
+
+        try:
+            await self.redis_cache.redis.zrem("semantic:recent", entry_hash)
+        except Exception as e:
+            logger.debug(f"Failed to remove from recent set: {e}")
+
+    async def get_recent_entries(
+        self,
+        limit: int = 10,
+        connection_id: Optional[int] = None,
+        database_type: Optional[str] = None,
+    ) -> Tuple[List[SemanticCacheEntry], int]:
+        """
+        Get recent cached entries from Redis and/or memory.
+
+        Args:
+            limit: Maximum number of entries to return
+            connection_id: Optional filter by connection ID
+            database_type: Optional filter by database type
+
+        Returns:
+            Tuple of (list of entries, total count before limit)
+        """
+        entries: List[SemanticCacheEntry] = []
+        seen_hashes: set = set()
+
+        # Try Redis first - get recent entry hashes from sorted set
+        if self.redis_cache and self.redis_cache.redis:
+            try:
+                # Get recent hashes (newest first, get more than limit for filtering)
+                recent_hashes = await self.redis_cache.redis.zrevrange(
+                    "semantic:recent",
+                    0,
+                    limit * 3  # Get extra for filtering
+                )
+
+                if recent_hashes:
+                    # Batch fetch entries
+                    batch_entries = await self._get_entries_batch(recent_hashes)
+
+                    for entry_hash in recent_hashes:
+                        entry = batch_entries.get(entry_hash)
+                        if not entry:
+                            continue
+
+                        # Apply filters
+                        if connection_id is not None and entry.connection_id != connection_id:
+                            continue
+                        if database_type is not None and entry.database_type != database_type:
+                            continue
+
+                        entries.append(entry)
+                        seen_hashes.add(entry_hash)
+
+            except Exception as e:
+                logger.debug(f"Failed to get recent from Redis: {e}")
+
+        # Also check memory entries (for fallback mode or entries not in Redis)
+        for entry_hash, entry in self._memory_entries.items():
+            if entry_hash in seen_hashes:
+                continue
+
+            # Apply filters
+            if connection_id is not None and entry.connection_id != connection_id:
+                continue
+            if database_type is not None and entry.database_type != database_type:
+                continue
+
+            entries.append(entry)
+
+        # Sort by created_at (newest first)
+        entries.sort(key=lambda x: x.created_at, reverse=True)
+
+        total = len(entries)
+        return entries[:limit], total
 
 
 # Global singleton instance

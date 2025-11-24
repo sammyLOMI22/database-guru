@@ -17,8 +17,9 @@ export default function Header({ isHealthy }: HeaderProps) {
         </div>
 
         <div className="flex items-center space-x-4">
-          {/* Health Status */}
-          <div className="flex items-center space-x-2">
+          {/* Database Status */}
+          <div className="flex items-center space-x-2 px-3 py-1.5 bg-gray-50 rounded-lg">
+            <Database className={`w-4 h-4 ${isHealthy ? 'text-primary-600' : 'text-gray-400'}`} />
             <div className={`w-2 h-2 rounded-full ${isHealthy ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></div>
             <span className="text-sm text-gray-600">
               {isHealthy ? 'Connected' : 'Disconnected'}

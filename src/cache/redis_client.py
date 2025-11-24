@@ -250,6 +250,45 @@ class RedisCache:
             logger.error(f"Redis increment error for key {key}: {e}")
             return None
 
+    async def mget(self, keys: list[str]) -> dict[str, Any]:
+        """
+        Get multiple values from cache in a single request (batch operation).
+
+        Args:
+            keys: List of cache keys
+
+        Returns:
+            Dictionary mapping keys to their values (None for missing keys)
+        """
+        if not keys:
+            return {}
+
+        try:
+            if not self.redis:
+                logger.warning("Redis not connected")
+                return {}
+
+            # Fetch all values in single request
+            values = await self.redis.mget(keys)
+
+            result = {}
+            for key, value in zip(keys, values):
+                if value:
+                    try:
+                        result[key] = json.loads(value)
+                        logger.debug(f"Cache batch hit: {key}")
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to deserialize cache value for key {key}: {e}")
+                        result[key] = None
+                else:
+                    result[key] = None
+
+            return result
+
+        except RedisError as e:
+            logger.error(f"Redis mget error: {e}")
+            return {}
+
     @staticmethod
     def generate_cache_key(*args, prefix: str = "cache") -> str:
         """

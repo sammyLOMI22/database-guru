@@ -40,6 +40,8 @@ class TestCacheEndpoints:
         mock_cache.clear = AsyncMock(return_value=25)
         mock_cache.invalidate_connection = AsyncMock(return_value=10)
         mock_cache._memory_entries = {}
+        # Default empty response for get_recent_entries
+        mock_cache.get_recent_entries = AsyncMock(return_value=([], 0))
         return mock_cache
 
     @pytest.fixture
@@ -126,9 +128,9 @@ class TestCacheEndpoints:
         """Test GET /api/cache/semantic/recent with cached entries"""
         from src.cache.semantic_cache import SemanticCacheEntry
 
-        # Add mock entries
-        mock_semantic_cache._memory_entries = {
-            "hash1": SemanticCacheEntry(
+        # Create mock entries (returned by get_recent_entries, already sorted)
+        mock_entries = [
+            SemanticCacheEntry(
                 question="Show me customers",
                 sql="SELECT * FROM customers",
                 result={"data": []},
@@ -139,7 +141,7 @@ class TestCacheEndpoints:
                 hits=5,
                 last_hit_at="2025-11-22T11:00:00",
             ),
-            "hash2": SemanticCacheEntry(
+            SemanticCacheEntry(
                 question="List all orders",
                 sql="SELECT * FROM orders",
                 result={"data": []},
@@ -150,7 +152,10 @@ class TestCacheEndpoints:
                 hits=2,
                 last_hit_at=None,
             ),
-        }
+        ]
+
+        # Mock get_recent_entries to return the entries
+        mock_semantic_cache.get_recent_entries = AsyncMock(return_value=(mock_entries, 2))
 
         with patch('src.api.endpoints.cache.get_semantic_cache', return_value=mock_semantic_cache):
 
@@ -175,28 +180,20 @@ class TestCacheEndpoints:
         """Test GET /api/cache/semantic/recent with connection_id filter"""
         from src.cache.semantic_cache import SemanticCacheEntry
 
-        mock_semantic_cache._memory_entries = {
-            "hash1": SemanticCacheEntry(
-                question="Query 1",
-                sql="SELECT 1",
-                result={},
-                connection_id=1,
-                database_type="postgresql",
-                embedding=[],
-                created_at="2025-11-22T10:00:00",
-                hits=0,
-            ),
-            "hash2": SemanticCacheEntry(
-                question="Query 2",
-                sql="SELECT 2",
-                result={},
-                connection_id=2,
-                database_type="mysql",
-                embedding=[],
-                created_at="2025-11-22T09:00:00",
-                hits=0,
-            ),
-        }
+        # Mock entry that matches the filter (connection_id=1)
+        filtered_entry = SemanticCacheEntry(
+            question="Query 1",
+            sql="SELECT 1",
+            result={},
+            connection_id=1,
+            database_type="postgresql",
+            embedding=[],
+            created_at="2025-11-22T10:00:00",
+            hits=0,
+        )
+
+        # Mock get_recent_entries to return only filtered result
+        mock_semantic_cache.get_recent_entries = AsyncMock(return_value=([filtered_entry], 1))
 
         with patch('src.api.endpoints.cache.get_semantic_cache', return_value=mock_semantic_cache):
 
@@ -212,6 +209,13 @@ class TestCacheEndpoints:
             data = response.json()
             assert len(data["queries"]) == 1
             assert data["queries"][0]["connection_id"] == 1
+
+            # Verify get_recent_entries was called with correct filter
+            mock_semantic_cache.get_recent_entries.assert_called_once_with(
+                limit=10,
+                connection_id=1,
+                database_type=None,
+            )
 
     @pytest.mark.asyncio
     async def test_clear_semantic_cache(self, mock_semantic_cache):
@@ -303,6 +307,7 @@ class TestCacheEndpointValidation:
         """Test limit parameter validation"""
         mock_cache = MagicMock()
         mock_cache._memory_entries = {}
+        mock_cache.get_recent_entries = AsyncMock(return_value=([], 0))
 
         with patch('src.api.endpoints.cache.get_semantic_cache', return_value=mock_cache):
 

@@ -10,6 +10,18 @@ import {
 } from 'lucide-react';
 import { toolsAPI } from '../services/toolsApi';
 import type { AllToolStatsResponse, ToolStatsResponse } from '../types/api';
+import axios from 'axios';
+
+/** Extract error message from unknown error type */
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (axios.isAxiosError(err)) {
+    return err.response?.data?.detail || err.message || fallback;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return fallback;
+};
 
 /**
  * Detailed usage statistics for each tool.
@@ -28,17 +40,26 @@ export const ToolUsageStats: React.FC = () => {
   const [sortBy, setSortBy] = useState<'executions' | 'success_rate' | 'avg_time'>('executions');
 
   useEffect(() => {
-    loadStats();
+    loadStats(true);
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      loadStats(false);
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const loadStats = async () => {
-    setLoading(true);
+  const loadStats = async (isInitial = false) => {
+    if (isInitial) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const data = await toolsAPI.getAllStats();
       setStats(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || 'Failed to load stats');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to load stats'));
     } finally {
       setLoading(false);
     }
@@ -88,7 +109,7 @@ export const ToolUsageStats: React.FC = () => {
       <div className="text-center py-12">
         <div className="text-red-500 mb-4">Error: {error}</div>
         <button
-          onClick={loadStats}
+          onClick={() => loadStats(true)}
           className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
         >
           Retry
@@ -139,7 +160,7 @@ export const ToolUsageStats: React.FC = () => {
           </div>
         </div>
         <button
-          onClick={loadStats}
+          onClick={() => loadStats(true)}
           className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
         >
           <RefreshCw className="w-3.5 h-3.5" />

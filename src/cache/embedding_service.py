@@ -28,7 +28,7 @@ import hashlib
 import math
 from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass
-from collections import Counter
+from collections import Counter, OrderedDict
 import re
 
 logger = logging.getLogger(__name__)
@@ -90,8 +90,8 @@ class EmbeddingService:
         self._ollama_client = None
         self._ollama_available = False
 
-        # Embedding cache: hash(text) -> embedding
-        self._embedding_cache: Dict[str, List[float]] = {}
+        # Embedding cache: hash(text) -> embedding (OrderedDict for LRU eviction)
+        self._embedding_cache: OrderedDict[str, List[float]] = OrderedDict()
 
         # TF-IDF vocabulary for fallback
         self._tfidf_vocab: Dict[str, int] = {}
@@ -204,6 +204,8 @@ class EmbeddingService:
         if use_cache and self.cache_embeddings and text_hash in self._embedding_cache:
             self._cache_hits += 1
             embedding = self._embedding_cache[text_hash]
+            # Move to end to mark as recently used (LRU)
+            self._embedding_cache.move_to_end(text_hash)
             elapsed_ms = (time.time() - start_time) * 1000
 
             return EmbeddingResult(
@@ -360,14 +362,16 @@ class EmbeddingService:
         return [x / magnitude for x in vec]
 
     def _cache_embedding(self, text_hash: str, embedding: List[float]):
-        """Cache embedding with LRU-style eviction"""
+        """Cache embedding with true LRU eviction.
+
+        Uses OrderedDict where entries are moved to end on access.
+        Eviction removes from the beginning (least recently used).
+        """
         if len(self._embedding_cache) >= self.max_cache_size:
-            # Simple eviction: remove oldest 10%
-            keys_to_remove = list(self._embedding_cache.keys())[
-                : self.max_cache_size // 10
-            ]
-            for key in keys_to_remove:
-                del self._embedding_cache[key]
+            # LRU eviction: remove least recently used 10% (from beginning)
+            num_to_remove = max(1, self.max_cache_size // 10)
+            for _ in range(num_to_remove):
+                self._embedding_cache.popitem(last=False)
 
         self._embedding_cache[text_hash] = embedding
 

@@ -1,7 +1,7 @@
 # Semantic Caching Guide
 
 **Status**: Production-Ready (November 22, 2025)
-**Tests**: 20/20 passing
+**Tests**: 29/29 passing (20 unit + 9 endpoint tests)
 
 ## Overview
 
@@ -58,7 +58,7 @@ Generates text embeddings for semantic similarity matching.
 **Features:**
 - Primary: Ollama embeddings (nomic-embed-text model)
 - Fallback: TF-IDF vectorization (when Ollama unavailable)
-- In-memory embedding cache (10,000 entries max)
+- In-memory embedding cache (10,000 entries max) with **true LRU eviction**
 - Thread-safe operations
 
 **Usage:**
@@ -92,6 +92,8 @@ Caches query results with semantic similarity matching.
 - Cosine similarity matching (threshold: 0.85)
 - Per-connection/database indexing
 - Redis primary, memory fallback
+- **Batch retrieval** using Redis MGET (avoids N+1 query patterns)
+- **Recent queries tracking** via Redis sorted set
 - Hit/miss metrics tracking
 
 **Usage:**
@@ -123,8 +125,9 @@ if hit:
 ```
 
 **Cache Keys:**
-- Entry: `semantic:result:{hash}`
-- Index: `semantic:index:{connection_id}:{database_type}`
+- Entry: `semantic:result:{hash}` - Full cached entry (JSON)
+- Index: `semantic:index:{connection_id}:{database_type}` - Hashes per connection
+- Recent: `semantic:recent` - Sorted set (hash → timestamp) for recent queries API
 
 ### 3. LLM Cache (`src/cache/llm_cache.py`)
 
@@ -313,6 +316,27 @@ stats = llm_cache.get_stats()
 ```
 
 ## Performance Optimization
+
+### LRU Cache Eviction (Embedding Service)
+
+The embedding cache uses true LRU (Least Recently Used) eviction:
+- Uses `OrderedDict` with `move_to_end()` on access
+- Evicts oldest 10% when capacity reached via `popitem(last=False)`
+- Ensures frequently-used embeddings stay cached
+
+### Batch Retrieval (N+1 Fix)
+
+Semantic cache lookups use batch retrieval to avoid N+1 query patterns:
+- `get_similar()` fetches all candidate entries in one Redis MGET call
+- `get_recent_entries()` uses batch fetch after getting hashes from sorted set
+- Reduces Redis round-trips from O(N) to O(1)
+
+### Recent Queries Sorted Set
+
+The `/api/cache/semantic/recent` endpoint uses a Redis sorted set for efficient retrieval:
+- Entries tracked in `semantic:recent` with timestamp as score
+- `ZREVRANGE` retrieves newest entries first
+- Automatic trimming keeps only most recent 1000 entries
 
 ### Conditional Result Verification
 
