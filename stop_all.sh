@@ -52,7 +52,7 @@ if [ -f ".services.pid" ]; then
     source .services.pid
 fi
 
-if [ "$OLLAMA_MANAGED_BY_SCRIPT" = "false" ]; then
+if [ "$OLLAMA_MANAGED_BY_SCRIPT" = "true" ]; then
     # We started it, so we stop it
     if [ -f ".ollama.pid" ]; then
         OLLAMA_PID=$(cat .ollama.pid)
@@ -90,7 +90,7 @@ if [ -f ".services.pid" ]; then
     source .services.pid
 fi
 
-if [ "$REDIS_MANAGED_BY_SCRIPT" = "false" ]; then
+if [ "$REDIS_MANAGED_BY_SCRIPT" = "true" ]; then
     # We started it, so we stop it
     if redis-cli ping &> /dev/null; then
         redis-cli shutdown

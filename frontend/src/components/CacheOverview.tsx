@@ -7,6 +7,8 @@ import {
   RefreshCw,
   Trash2,
   AlertCircle,
+  Server,
+  XCircle,
 } from 'lucide-react';
 import { cacheAPI, type CacheStatsResponse } from '../services/cacheApi';
 import axios from 'axios';
@@ -128,9 +130,95 @@ export const CacheOverview: React.FC = () => {
   const semantic = stats?.semantic_cache;
   const llm = stats?.llm_cache;
   const embedding = stats?.embedding_service;
+  const redisConnected = stats?.redis_connected ?? false;
 
   return (
     <div className="space-y-6">
+      {/* Service Status Banner */}
+      <div className="bg-gradient-to-r from-gray-50 via-white to-gray-50 rounded-lg border-2 border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <Server className="w-4 h-4" />
+            Service Status
+          </h3>
+          {refreshing && (
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              Refreshing...
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+          {/* Redis Status */}
+          <div className={`flex items-center gap-3 p-3 rounded-lg border-2 ${
+            redisConnected
+              ? 'bg-green-50 border-green-300'
+              : 'bg-yellow-50 border-yellow-300'
+          }`}>
+            <div className={`p-2 rounded-full ${
+              redisConnected ? 'bg-green-200' : 'bg-yellow-200'
+            }`}>
+              {redisConnected ? (
+                <CheckCircle className="w-5 h-5 text-green-700" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-yellow-700" />
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-gray-900">Redis</span>
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                  redisConnected
+                    ? 'bg-green-200 text-green-800'
+                    : 'bg-yellow-200 text-yellow-800'
+                }`}>
+                  {redisConnected ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 mt-0.5">
+                {redisConnected
+                  ? 'Persistent caching enabled'
+                  : 'Using in-memory fallback (data lost on restart)'}
+              </p>
+            </div>
+          </div>
+
+          {/* Ollama Embeddings Status */}
+          <div className={`flex items-center gap-3 p-3 rounded-lg border-2 ${
+            embedding?.ollama_available
+              ? 'bg-green-50 border-green-300'
+              : 'bg-yellow-50 border-yellow-300'
+          }`}>
+            <div className={`p-2 rounded-full ${
+              embedding?.ollama_available ? 'bg-green-200' : 'bg-yellow-200'
+            }`}>
+              {embedding?.ollama_available ? (
+                <CheckCircle className="w-5 h-5 text-green-700" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-yellow-700" />
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-gray-900">Ollama Embeddings</span>
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                  embedding?.ollama_available
+                    ? 'bg-green-200 text-green-800'
+                    : 'bg-yellow-200 text-yellow-800'
+                }`}>
+                  {embedding?.ollama_available ? 'Online' : 'Offline'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 mt-0.5">
+                {embedding?.ollama_available
+                  ? `Model: nomic-embed-text`
+                  : 'Using TF-IDF fallback (lower accuracy)'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Total Lookups */}

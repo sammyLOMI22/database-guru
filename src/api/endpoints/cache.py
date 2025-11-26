@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from src.cache.semantic_cache import get_semantic_cache, SemanticCacheEntry
 from src.cache.llm_cache import get_llm_cache
 from src.cache.embedding_service import get_embedding_service
+from src.cache.redis_client import get_redis_cache
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,7 @@ class CacheStatsResponse(BaseModel):
     semantic_cache: SemanticCacheStats
     llm_cache: LLMCacheStats
     embedding_service: EmbeddingServiceStats
+    redis_connected: bool = False
 
 
 class CachedQueryResponse(BaseModel):
@@ -123,6 +125,10 @@ async def get_cache_stats():
         embedding_service = get_embedding_service()
         embedding_stats = embedding_service.get_stats()
 
+        # Check Redis connection
+        redis_cache = get_redis_cache()
+        redis_connected = await redis_cache.health_check()
+
         return CacheStatsResponse(
             semantic_cache=SemanticCacheStats(
                 total_lookups=semantic_stats.get("total_lookups", 0),
@@ -154,6 +160,7 @@ async def get_cache_stats():
                 tfidf_fallbacks=embedding_stats.get("tfidf_fallbacks", 0),
                 ollama_available=embedding_stats.get("ollama_available", False),
             ),
+            redis_connected=redis_connected,
         )
 
     except Exception as e:

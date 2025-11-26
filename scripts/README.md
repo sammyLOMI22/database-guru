@@ -94,6 +94,11 @@ Start everything: Redis, Ollama, backend, and frontend in one command.
 - Only stops services it started (leaves pre-running services active)
 - Tracks which services were started by the script
 - Shows clear status for each service
+- Proper cleanup on Ctrl+C or exit
+
+**Status messages:**
+- `"✅ Redis started successfully (will stop on exit)"` - We started it
+- `"✅ Redis is already running (will not manage)"` - Pre-existing service
 
 **When to use:**
 - First-time development setup
@@ -117,9 +122,13 @@ Stop everything: Redis, Ollama, backend, and frontend.
 4. Cleans up PID files and logs
 
 **Smart behavior:**
-- Won't stop Redis/Ollama if they were already running
+- Won't stop Redis/Ollama if they were already running before start_all.sh
 - Graceful shutdown with proper cleanup
-- Clear feedback on what was stopped
+- Clear feedback on what was stopped vs left running
+
+**Example output:**
+- `"✅ Redis stopped"` - We started it and stopped it
+- `"⏭️  Redis was already running - leaving it active"` - Pre-existing service
 
 ---
 
@@ -256,12 +265,82 @@ ollama serve
 
 ---
 
+## Complete Stack Usage Examples
+
+### Scenario 1: Clean Start (No Services Running)
+```bash
+# Start everything
+./start_all.sh
+# Output:
+# ✅ Redis started successfully (will stop on exit)
+# ✅ Ollama started successfully (will stop on exit)
+# ✅ Backend is ready!
+# ✅ Frontend is ready!
+
+# Later, stop everything
+./stop_all.sh
+# Output:
+# ✅ Backend server stopped
+# ✅ Frontend server stopped
+# ✅ Ollama stopped
+# ✅ Redis stopped
+```
+
+### Scenario 2: Services Already Running
+```bash
+# Redis and Ollama are already running as services
+brew services start redis
+brew services start ollama
+
+# Start the application
+./start_all.sh
+# Output:
+# ✅ Redis is already running (will not manage)
+# ✅ Ollama is already running (will not manage)
+# ✅ Backend is ready!
+# ✅ Frontend is ready!
+
+# Stop only the app (leaves Redis/Ollama running)
+./stop_all.sh
+# Output:
+# ✅ Backend server stopped
+# ✅ Frontend server stopped
+# ⏭️  Ollama was already running - leaving it active
+# ⏭️  Redis was already running - leaving it active
+```
+
+### Scenario 3: Using Ctrl+C
+```bash
+./start_all.sh
+# Press Ctrl+C
+# The cleanup trap runs automatically:
+# 🧹 Cleaning up services started by this script...
+# 🤖 Stopping Ollama...
+# ✅ Ollama stopped
+# 💾 Stopping Redis...
+# ✅ Redis stopped
+# ✨ Cleanup complete
+```
+
+---
+
 ## Troubleshooting
 
 **Script not executable:**
 ```bash
-chmod +x scripts/*.sh
+chmod +x scripts/*.sh start_all.sh stop_all.sh
 ```
+
+**start_all.sh not starting Redis:**
+- Check if Redis is already running: `redis-cli ping`
+- Check the startup messages - look for "(will stop on exit)" vs "(will not manage)"
+- If Redis fails to start, check: `redis-server --daemonize yes`
+- View the script's service tracking: `cat .services.pid`
+
+**stop_all.sh not stopping services:**
+- Only stops services that start_all.sh started
+- Check `.services.pid` to see which services are managed
+- If services won't stop: `./stop.sh && brew services stop redis && pkill -f "ollama serve"`
 
 **Homebrew not installed:**
 ```bash

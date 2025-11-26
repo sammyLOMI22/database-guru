@@ -67,6 +67,7 @@ export interface CacheStatsResponse {
   semantic_cache: SemanticCacheStats;
   llm_cache: LLMCacheStats;
   embedding_service: EmbeddingServiceStats;
+  redis_connected: boolean;
 }
 
 export interface CachedQueryResponse {

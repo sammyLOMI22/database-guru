@@ -38,7 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `./start_all.sh` - Start Redis + Ollama + Backend + Frontend with one command
   - `./stop_all.sh` - Stop all services gracefully
   - Smart service tracking (only stops services started by script)
+  - Proper Ctrl+C handling with cleanup trap
+  - Clear status messages indicating which services will be managed
   - Existing `./start.sh` remains for application-only startup
+- **Cache Service Status Indicators** - Enhanced visibility in Cache Overview UI
+  - Redis connection status with green/yellow color coding
+  - Ollama embeddings status with model information
+  - Clear descriptions for connected vs fallback modes
+  - Service status banner at top of Cache tab
+  - Auto-refresh every 30 seconds
 
 ### Fixed
 - **Agent Execution Trace Crashes** - Added defensive rendering to prevent blank pages
@@ -54,6 +62,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `elapsed_ms` to all cache trace steps
   - Standardized on `total_elapsed_ms` property name
   - Fixed cache miss step metadata
+- **Startup Script Logic Bugs** - Fixed service management in start_all.sh and stop_all.sh
+  - Corrected inverted logic for REDIS_MANAGED_BY_SCRIPT tracking
+  - Corrected inverted logic for OLLAMA_MANAGED_BY_SCRIPT tracking
+  - Fixed Redis not starting properly when not already running
+  - Fixed cleanup trap to properly stop managed services
+  - Services now correctly identified as "managed" or "pre-existing"
 
 ### Changed
 - **Multi-Database Query Results** - Enhanced cache visibility
