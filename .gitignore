@@ -72,3 +72,4 @@ frontend/node_modules/.vite/deps/_metadata.json
 frontend/node_modules/.vite/deps/_metadata.json
 frontend/node_modules/.vite/deps/@tanstack_react-query.js
 frontend/node_modules/.vite/deps/@tanstack_react-query.js
+scripts/dump.rdb
