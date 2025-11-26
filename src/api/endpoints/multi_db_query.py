@@ -12,16 +12,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
 from src.models.schemas import QueryRequest, QueryResponse
-from src.api.dependencies import get_db, get_cache, get_sql_generator, get_settings
+from src.api.dependencies import get_db, get_cache, get_sql_generator, get_settings, get_semantic_cache_dep
 from src.database.models import QueryHistory, DatabaseConnection, ChatSession, ChatMessage
 from src.llm.sql_generator import SQLGenerator
 from src.llm.conversational_memory_agent import get_memory_agent
 from src.cache.redis_client import RedisCache
+from src.cache.semantic_cache import SemanticCache
 from src.config.settings import Settings
 from src.core.multi_db_handler import MultiDatabaseHandler
 from src.core.user_db_connector import UserDatabaseConnector
 from src.core.schema_inspector import SchemaInspector
 from src.core.executor import SQLExecutor
+from src.llm.self_correcting_agent import AgentTrace
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,16 @@ class DatabaseQueryResult(BaseModel):
     used_planning: Optional[bool] = False
 
 
+class CacheInfo(BaseModel):
+    """Cache operation summary for observability"""
+    semantic_hits: int = 0
+    semantic_misses: int = 0
+    results_stored: int = 0
+    results_skipped: int = 0  # Already in cache
+    hit_databases: List[str] = []
+    miss_databases: List[str] = []
+
+
 class MultiDatabaseQueryResponse(BaseModel):
     """Response model for multi-database queries"""
     query_id: int
@@ -73,6 +85,7 @@ class MultiDatabaseQueryResponse(BaseModel):
     warnings: List[str]
     cached: bool
     timestamp: str
+    cache_info: Optional[CacheInfo] = None  # Cache operation summary
 
 
 @router.post("/", response_model=MultiDatabaseQueryResponse)
@@ -80,6 +93,7 @@ async def process_multi_database_query(
     request: MultiDatabaseQueryRequest,
     db: AsyncSession = Depends(get_db),
     cache: RedisCache = Depends(get_cache),
+    semantic_cache: SemanticCache = Depends(get_semantic_cache_dep),
     sql_generator: SQLGenerator = Depends(get_sql_generator),
     settings: Settings = Depends(get_settings),
 ):
@@ -206,6 +220,68 @@ async def process_multi_database_query(
                         logger.warning("Cached result missing query_id in some database results, regenerating")
                         cached_result = None
 
+        # Initialize cache trace for observability
+        cache_trace = AgentTrace()
+        cache_trace.add_step(
+            "multi_db_cache_lookup",
+            f"Checking cache for multi-database query: {request.question[:50]}...",
+            metadata={
+                "database_count": len(connections),
+                "databases": [c.name for c in connections],
+            }
+        )
+
+        # Try semantic cache lookup for each database (can serve partial results from cache)
+        semantic_cache_hits = {}  # connection_id -> cached result
+        try:
+            await semantic_cache.initialize()
+
+            for conn in connections:
+                hit = await semantic_cache.get(
+                    question=request.question,
+                    connection_id=conn.id,
+                    database_type=conn.database_type,
+                )
+                if hit:
+                    semantic_cache_hits[conn.id] = hit
+                    cache_trace.add_step(
+                        "semantic_cache_hit",
+                        f"Cache hit for {conn.name} (similarity: {hit.similarity:.2%})",
+                        metadata={
+                            "connection_id": conn.id,
+                            "connection_name": conn.name,
+                            "similarity": round(hit.similarity, 3),
+                            "cached_sql": hit.sql[:100] + "..." if len(hit.sql) > 100 else hit.sql,
+                            "cached_question": hit.original_question[:50] + "..." if len(hit.original_question) > 50 else hit.original_question,
+                        }
+                    )
+                    logger.info(f"Semantic cache hit for {conn.name}: similarity={hit.similarity:.2%}")
+
+            if semantic_cache_hits:
+                cache_trace.add_step(
+                    "cache_summary",
+                    f"Found {len(semantic_cache_hits)}/{len(connections)} results in semantic cache",
+                    metadata={
+                        "hits": len(semantic_cache_hits),
+                        "total_databases": len(connections),
+                        "cached_databases": [c.name for c in connections if c.id in semantic_cache_hits],
+                        "uncached_databases": [c.name for c in connections if c.id not in semantic_cache_hits],
+                    }
+                )
+            else:
+                cache_trace.add_step(
+                    "cache_miss",
+                    "No semantic cache hits - all databases will execute fresh queries",
+                    metadata={"total_databases": len(connections)}
+                )
+        except Exception as e:
+            logger.warning(f"Semantic cache lookup failed: {e}")
+            cache_trace.add_step(
+                "cache_error",
+                f"Semantic cache lookup failed: {str(e)}",
+                metadata={"error": str(e)}
+            )
+
         # OPTIMIZATION: Don't pre-generate SQL for multi-DB queries
         # Let each database's self-correcting agent generate SQL against its own schema
         # This prevents schema mismatch errors (e.g., column exists in DB1 but not DB2)
@@ -276,20 +352,44 @@ async def process_multi_database_query(
                 task_metadata.append({"has_error": True})
                 continue
 
-            # Create parallel task for this database
-            parallel_tasks.append(
-                multi_db_handler._execute_single_query_task(
-                    connection=connection,
-                    question=request.question,
-                    sql=sql,
-                    schema=combined_schema_text,  # Will be refined in helper
-                    sql_generator=sql_generator,
-                    combined_schema_data=combined_schema_data,
-                    allow_write=request.allow_write,
-                    model_used=model_used,
+            # Check if we have a semantic cache hit for this database
+            cached_hit = semantic_cache_hits.get(conn_id)
+            if cached_hit:
+                # Use cached result instead of executing a new query
+                async def cached_result_task(hit=cached_hit, conn=connection):
+                    return {
+                        "success": True,
+                        "sql": hit.sql,
+                        "data": hit.result.get("results", []) if hit.result else [],
+                        "row_count": hit.result.get("row_count", 0) if hit.result else 0,
+                        "execution_time_ms": hit.result.get("execution_time_ms", 0) if hit.result else 0,
+                        "connection": conn,
+                        "from_cache": True,
+                        "cache_similarity": hit.similarity,
+                        "original_cached_question": hit.original_question,
+                    }
+                parallel_tasks.append(cached_result_task())
+                task_metadata.append({
+                    "has_error": False,
+                    "connection": connection,
+                    "from_cache": True,
+                    "cache_similarity": cached_hit.similarity,
+                })
+            else:
+                # Create parallel task for this database (fresh execution)
+                parallel_tasks.append(
+                    multi_db_handler._execute_single_query_task(
+                        connection=connection,
+                        question=request.question,
+                        sql=sql,
+                        schema=combined_schema_text,  # Will be refined in helper
+                        sql_generator=sql_generator,
+                        combined_schema_data=combined_schema_data,
+                        allow_write=request.allow_write,
+                        model_used=model_used,
+                    )
                 )
-            )
-            task_metadata.append({"has_error": False, "connection": connection})
+                task_metadata.append({"has_error": False, "connection": connection, "from_cache": False})
 
         # Execute all queries in parallel!
         logger.info(f"⚡ Executing {len(parallel_tasks)} database queries IN PARALLEL...")
@@ -407,6 +507,43 @@ async def process_multi_database_query(
                 logger.error(f"Failed to create QueryHistory record for {connection.name}: {e}", exc_info=True)
                 individual_query_record = None
 
+            # Build combined agent_trace with cache info
+            combined_agent_trace = exec_result.get("agent_trace") or {}
+
+            # Check if this result came from cache
+            is_from_cache = metadata.get("from_cache", False) or exec_result.get("from_cache", False)
+
+            if is_from_cache:
+                # For cached results, create a trace showing cache hit
+                cache_hit_trace = {
+                    "steps": [
+                        {
+                            "type": "semantic_cache_hit",
+                            "message": f"Result served from semantic cache (similarity: {exec_result.get('cache_similarity', 0):.2%})",
+                            "elapsed_ms": 0,  # Instant from cache
+                            "metadata": {
+                                "cache_type": "semantic",
+                                "similarity": round(exec_result.get("cache_similarity", 0), 3),
+                                "original_cached_question": exec_result.get("original_cached_question", ""),
+                                "cached_sql": exec_result.get("sql", "")[:100] + "..." if len(exec_result.get("sql", "")) > 100 else exec_result.get("sql", ""),
+                            }
+                        }
+                    ],
+                    "total_elapsed_ms": exec_result.get("execution_time_ms", 0),
+                    "from_cache": True,
+                }
+                combined_agent_trace = cache_hit_trace
+            elif combined_agent_trace:
+                # Prepend cache lookup step to existing trace
+                if "steps" in combined_agent_trace:
+                    cache_miss_step = {
+                        "type": "cache_miss",
+                        "message": f"No cache hit for {connection.name} - executed fresh query",
+                        "elapsed_ms": 0,
+                        "metadata": {"connection_name": connection.name}
+                    }
+                    combined_agent_trace["steps"] = [cache_miss_step] + combined_agent_trace.get("steps", [])
+
             database_results.append(
                 DatabaseQueryResult(
                     connection_id=connection.id,
@@ -422,7 +559,7 @@ async def process_multi_database_query(
                     corrections=corrections_dicts if corrections_dicts else None,
                     query_id=individual_query_record.id if individual_query_record else None,  # Add query_id for feedback
                     # Option 2: Observability fields
-                    agent_trace=exec_result.get("agent_trace"),
+                    agent_trace=combined_agent_trace if combined_agent_trace else None,
                     query_plan=exec_result.get("query_plan"),
                     attempts=formatted_attempts,
                     self_corrected=exec_result.get("self_corrected", False),
@@ -493,6 +630,14 @@ async def process_multi_database_query(
 
             await db.commit()
 
+        # Build cache info summary
+        cache_info_data = CacheInfo(
+            semantic_hits=len(semantic_cache_hits),
+            semantic_misses=len(connections) - len(semantic_cache_hits),
+            hit_databases=[c.name for c in connections if c.id in semantic_cache_hits],
+            miss_databases=[c.name for c in connections if c.id not in semantic_cache_hits],
+        )
+
         # Build response
         response_data = {
             "query_id": query_record.id,
@@ -504,11 +649,63 @@ async def process_multi_database_query(
             "warnings": warnings,
             "cached": False,
             "timestamp": datetime.utcnow().isoformat(),
+            "cache_info": cache_info_data.model_dump(),
         }
 
         # Cache the result
         if request.use_cache:
             await cache.set(cache_key, response_data, ttl=settings.CACHE_TTL)
+
+            # Store each successful result in semantic cache (for per-database similarity matching)
+            # Skip results that were already from cache (no need to re-store them)
+            try:
+                await semantic_cache.initialize()
+                stored_count = 0
+                skipped_count = 0
+
+                for i, db_result in enumerate(database_results):
+                    # Check if this result was from cache (don't re-store)
+                    was_from_cache = (
+                        db_result.agent_trace
+                        and isinstance(db_result.agent_trace, dict)
+                        and db_result.agent_trace.get("from_cache", False)
+                    )
+
+                    if db_result.success and db_result.sql and not was_from_cache:
+                        await semantic_cache.set(
+                            question=request.question,
+                            sql=db_result.sql,
+                            result={
+                                "results": db_result.results,
+                                "row_count": db_result.row_count,
+                                "execution_time_ms": db_result.execution_time_ms,
+                            },
+                            connection_id=db_result.connection_id,
+                            database_type=db_result.database_type,
+                        )
+                        stored_count += 1
+                        logger.debug(f"Stored in semantic cache: {request.question[:50]}... for {db_result.connection_name}")
+                    elif was_from_cache:
+                        skipped_count += 1
+                        logger.debug(f"Skipped cache store for {db_result.connection_name} (already from cache)")
+
+                # Add cache store summary to trace
+                cache_trace.add_step(
+                    "cache_store",
+                    f"Stored {stored_count} result(s) in semantic cache" + (f", skipped {skipped_count} (already cached)" if skipped_count > 0 else ""),
+                    metadata={
+                        "stored_count": stored_count,
+                        "skipped_count": skipped_count,
+                        "total_databases": len(database_results),
+                    }
+                )
+
+                # Update cache_info in response with store counts
+                response_data["cache_info"]["results_stored"] = stored_count
+                response_data["cache_info"]["results_skipped"] = skipped_count
+            except Exception as e:
+                # Don't fail the request if semantic caching fails
+                logger.warning(f"Failed to store in semantic cache: {e}")
 
         return MultiDatabaseQueryResponse(**response_data)
 

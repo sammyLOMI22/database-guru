@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Database,
   FileText,
@@ -12,6 +12,18 @@ import {
 } from 'lucide-react';
 import { toolsAPI } from '../services/toolsApi';
 import type { ToolResponse, ToolCategory } from '../types/api';
+import axios from 'axios';
+
+/** Extract error message from unknown error type */
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (axios.isAxiosError(err)) {
+    return err.response?.data?.detail || err.message || fallback;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return fallback;
+};
 
 /**
  * Browsable directory of all available tools.
@@ -29,20 +41,36 @@ export const ToolDirectory: React.FC = () => {
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [categoryFilter, setCategoryFilter] = useState<ToolCategory | 'all'>('all');
 
+  // Track if this is the initial load for the current filter
+  const isInitialLoadRef = useRef(true);
+
   useEffect(() => {
-    loadTools();
+    // Always show loading for filter changes
+    loadTools(isInitialLoadRef.current);
+    isInitialLoadRef.current = false;
   }, [categoryFilter]);
 
-  const loadTools = async () => {
-    setLoading(true);
+  useEffect(() => {
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      loadTools(false);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [categoryFilter]);
+
+  const loadTools = async (isInitial = false) => {
+    if (isInitial) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const data = await toolsAPI.listTools(
         categoryFilter !== 'all' ? { category: categoryFilter } : undefined
       );
       setTools(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || 'Failed to load tools');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to load tools'));
     } finally {
       setLoading(false);
     }
@@ -97,7 +125,7 @@ export const ToolDirectory: React.FC = () => {
       <div className="text-center py-12">
         <div className="text-red-500 mb-4">Error: {error}</div>
         <button
-          onClick={loadTools}
+          onClick={() => loadTools(true)}
           className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
         >
           Retry

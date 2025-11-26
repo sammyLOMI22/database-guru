@@ -1,4 +1,4 @@
-import { Copy, Check, MessageSquare } from 'lucide-react';
+import { Copy, Check, MessageSquare, Zap, Database } from 'lucide-react';
 import { useState } from 'react';
 import {
   AgentTrace as AgentTraceType,
@@ -34,6 +34,10 @@ interface QueryResultsProps {
   // Parallel Execution Metrics
   parallelExecutionMetrics?: ParallelExecutionMetrics | null;
   parallelCorrectionMetrics?: ParallelCorrectionMetrics | null;
+  // Cache Information
+  cacheType?: 'exact' | 'semantic' | null;
+  semanticSimilarity?: number | null;
+  matchedQuestion?: string | null;
 }
 
 export default function QueryResults({
@@ -48,11 +52,14 @@ export default function QueryResults({
   queryPlan,
   attempts,
   selfCorrected = false,
-  totalAttempts = 1,
+  totalAttempts: _totalAttempts = 1,
   verificationWarnings = [],
   usedPlanning = false,
   parallelExecutionMetrics,
   parallelCorrectionMetrics,
+  cacheType,
+  semanticSimilarity,
+  matchedQuestion,
 }: QueryResultsProps) {
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -76,6 +83,49 @@ export default function QueryResults({
 
   return (
     <div className="space-y-4">
+      {/* Cache Badge */}
+      {cacheType && (
+        <div className={`rounded-lg p-3 border ${
+          cacheType === 'exact'
+            ? 'bg-green-50 border-green-200'
+            : 'bg-amber-50 border-amber-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {cacheType === 'exact' ? (
+                <Database className="w-5 h-5 text-green-600" />
+              ) : (
+                <Zap className="w-5 h-5 text-amber-600" />
+              )}
+              <div>
+                <span className={`font-medium ${
+                  cacheType === 'exact' ? 'text-green-800' : 'text-amber-800'
+                }`}>
+                  {cacheType === 'exact' ? 'Exact Cache Hit' : 'Semantic Cache Hit'}
+                </span>
+                {semanticSimilarity && cacheType === 'semantic' && (
+                  <span className="ml-2 text-sm text-amber-600">
+                    ({(semanticSimilarity * 100).toFixed(0)}% match)
+                  </span>
+                )}
+              </div>
+            </div>
+            <span className={`text-xs px-2 py-1 rounded-full ${
+              cacheType === 'exact'
+                ? 'bg-green-100 text-green-700'
+                : 'bg-amber-100 text-amber-700'
+            }`}>
+              Instant Response
+            </span>
+          </div>
+          {matchedQuestion && cacheType === 'semantic' && (
+            <p className="text-sm text-amber-600 mt-2">
+              <span className="font-medium">Matched:</span> "{matchedQuestion}"
+            </p>
+          )}
+        </div>
+      )}
+
       {/* SQL Display */}
       <div className="bg-gray-900 rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">

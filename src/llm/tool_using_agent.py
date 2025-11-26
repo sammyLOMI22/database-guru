@@ -354,7 +354,13 @@ class ToolUsingAgent:
         """
         Analyze question and plan which tools to call.
 
-        Uses heuristics to determine useful tools. Can be enhanced with LLM planning.
+        Enhanced heuristics to use more tools proactively:
+        - search_schema: Find relevant tables/columns
+        - get_table_info: Get detailed table structure
+        - get_column_values: Discover actual values for filtering (CA vs California)
+        - get_sample_data: Understand data patterns
+        - get_relationships: Find foreign keys for joins
+        - find_columns: Locate specific column types
         """
         calls = []
         question_lower = question.lower()
@@ -362,40 +368,71 @@ class ToolUsingAgent:
         # Extract keywords for searching
         keywords = self._extract_keywords(question)
 
-        # Pattern 1: Search for relevant tables/columns
+        # Track tables found for follow-up tool calls
+        potential_tables = set()
+
+        # Pattern 1: Search for relevant tables/columns (always do this first)
         if keywords:
             # Search for the most relevant keyword
             calls.append(("search_schema", {"keyword": keywords[0]}))
+            potential_tables.add(keywords[0])
 
             # If multiple keywords, search for a second one
             if len(keywords) > 1:
                 calls.append(("search_schema", {"keyword": keywords[1]}))
+                potential_tables.add(keywords[1])
 
-        # Pattern 2: Location-based queries (states, cities, countries)
+        # Pattern 2: Location-based queries - get actual column values!
         location_words = [
-            "california", "new york", "texas", "florida",
+            "california", "new york", "texas", "florida", "ny", "ca", "tx",
             "state", "city", "country", "region", "location"
         ]
-        if any(loc in question_lower for loc in location_words):
+        location_match = any(loc in question_lower for loc in location_words)
+        if location_match:
             calls.append(("find_columns", {"column_name": "state"}))
-            calls.append(("find_columns", {"column_name": "country"}))
+            # CRITICAL: Get actual values to know if it's "CA" or "California"
+            calls.append(("get_column_values", {"table_name": "customers", "column_name": "state", "limit": 10}))
+            calls.append(("get_column_values", {"table_name": "orders", "column_name": "state", "limit": 10}))
 
-        # Pattern 3: Status/category queries
-        status_words = ["status", "pending", "active", "completed", "type", "category"]
-        if any(sw in question_lower for sw in status_words):
+        # Pattern 3: Status/category queries - get actual values!
+        status_words = ["status", "pending", "active", "completed", "shipped", "type", "category"]
+        status_match = any(sw in question_lower for sw in status_words)
+        if status_match:
             calls.append(("find_columns", {"column_name": "status"}))
-            calls.append(("find_columns", {"column_name": "type"}))
+            # Get actual status values to know exact enum values
+            calls.append(("get_column_values", {"table_name": "orders", "column_name": "status", "limit": 10}))
 
-        # Pattern 4: Count/aggregate queries - verify table exists
-        if any(w in question_lower for w in ["how many", "count", "total", "sum", "average"]):
-            # Already covered by keyword search above
-            pass
+        # Pattern 4: Get table info for main keywords (detailed structure)
+        if keywords and len(keywords) >= 1:
+            # Get detailed info for the primary table mentioned
+            calls.append(("get_table_info", {"table_name": keywords[0]}))
 
-        # Pattern 5: Join queries - get relationships
-        join_indicators = ["with", "along with", "and their", "related", "join"]
+        # Pattern 5: Get sample data to understand data patterns
+        # Useful for understanding date formats, naming conventions, etc.
+        if keywords and len(keywords) >= 1:
+            calls.append(("get_sample_data", {"table_name": keywords[0], "limit": 5}))
+
+        # Pattern 6: Join queries - get relationships
+        join_indicators = ["with", "along with", "and their", "related", "join", "between"]
         if any(ji in question_lower for ji in join_indicators):
             if keywords:
                 calls.append(("get_relationships", {"table_name": keywords[0]}))
+                # Also get info on the second table if present
+                if len(keywords) > 1:
+                    calls.append(("get_table_info", {"table_name": keywords[1]}))
+                    calls.append(("get_relationships", {"table_name": keywords[1]}))
+
+        # Pattern 7: Count/aggregate queries - sample data helps understand scale
+        if any(w in question_lower for w in ["how many", "count", "total", "sum", "average", "max", "min"]):
+            if keywords:
+                calls.append(("count_rows", {"table_name": keywords[0]}))
+
+        # Pattern 8: Date/time queries - sample data shows date format
+        date_words = ["date", "time", "year", "month", "day", "recent", "latest", "oldest", "last"]
+        if any(dw in question_lower for dw in date_words):
+            if keywords:
+                calls.append(("find_columns", {"column_name": "date"}))
+                calls.append(("find_columns", {"column_name": "created"}))
 
         return calls
 

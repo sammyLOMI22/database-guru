@@ -249,6 +249,13 @@ Return Results
 
 **Caching & Performance:**
 - Redis caching for query results (`src/cache/redis_client.py`)
+- **Semantic Caching (NEW - November 22, 2025)**: Intelligent query similarity matching
+  - `EmbeddingService` (`src/cache/embedding_service.py`) - Text embeddings using Ollama or TF-IDF fallback
+  - `SemanticCache` (`src/cache/semantic_cache.py`) - Matches similar queries (30-50% higher cache hit rate)
+  - `LLMCache` (`src/cache/llm_cache.py`) - Caches LLM SQL generation responses (40-60% fewer LLM calls)
+  - Schema fingerprinting ensures cache validity across schema changes
+  - Configurable similarity thresholds (default: 0.85 for semantic, 0.88 for LLM)
+- **Conditional Result Verification** - Skips verification for high-confidence results (1-100 rows, first attempt)
 - Rate limiting middleware (100 requests/60 seconds)
 - Async operations throughout for concurrency
 
@@ -321,6 +328,13 @@ Endpoints organized by domain (`src/api/endpoints/`):
   - `GET /api/tools/prompt` - Get tools formatted for LLM prompt
   - `POST /api/tools/{tool_name}/invalidate-cache` - Invalidate tool cache
   - `POST /api/tools/invalidate-all-cache` - Invalidate all tool caches
+- `cache.py` - **Cache management API (NEW - Nov 22, 2025)** - Semantic cache monitoring and control
+  - `GET /api/cache/stats` - Get combined cache statistics (semantic + LLM + embedding)
+  - `GET /api/cache/semantic/recent` - Get recent cached queries with filtering
+  - `DELETE /api/cache/semantic` - Clear semantic query cache
+  - `DELETE /api/cache/llm` - Clear LLM response cache
+  - `DELETE /api/cache/all` - Clear all caches
+  - `DELETE /api/cache/semantic/connection/{id}` - Clear cache for specific connection
 
 ## Important Implementation Details
 
@@ -378,6 +392,18 @@ Located in `frontend/src/`:
 - **App.tsx** - Updated to include "Tools" as 4th main tab with orange color scheme
 - Total: **~1,000 lines** of new UI code for Tool-Using Agent management
 - Tests: `ToolsPanel.test.tsx` with 30 comprehensive tests
+
+**Semantic Cache UI Components (NEW - November 22, 2025):**
+- `SemanticCachePanel.tsx` (~110 lines) - Main tabbed container with 3 views (Overview, Statistics, Recent)
+- `CacheOverview.tsx` (~370 lines) - Summary dashboard with stats cards, cache breakdown, quick actions
+- `CacheStatistics.tsx` (~270 lines) - Hit rate distribution charts, performance metrics
+- `RecentCachedQueries.tsx` (~230 lines) - Browsable cached query list with expandable SQL
+- `QueryResults.tsx` - Updated with inline cache badge (exact/semantic hit indicators)
+- `cacheApi.ts` (~150 lines) - API service layer for cache endpoints (6 methods)
+- **App.tsx** - Updated to include "Cache" as 5th main tab with amber color scheme
+- Total: **~2,100 lines** of new UI code for Semantic Cache management
+- Backend Tests: `test_cache_endpoints.py` with 9 tests
+- Frontend Tests: `SemanticCachePanel.test.tsx` with 34 tests
 
 ### LLM Prompts
 
@@ -460,6 +486,21 @@ Settings managed via Pydantic in `src/config/settings.py`:
 - **Tools UI Components (NEW)**: `frontend/src/components/ToolsPanel.tsx` - Main tabbed container for Tool-Using Agent
 - **Tools UI Tests (NEW)**: `frontend/tests/ToolsPanel.test.tsx` - 30 comprehensive frontend tests
 - **Tools API Service (NEW)**: `frontend/src/services/toolsApi.ts` - API service for tools endpoints
+- **Semantic Caching (NEW - Nov 22, 2025)**:
+  - `src/cache/embedding_service.py` - Text embeddings for similarity matching (Ollama or TF-IDF fallback)
+  - `src/cache/semantic_cache.py` - Query result caching with semantic similarity
+  - `src/cache/llm_cache.py` - LLM response caching with schema fingerprinting
+  - `tests/test_semantic_caching.py` - 20 comprehensive tests for caching system
+- **Semantic Cache UI (NEW - Nov 22, 2025)**:
+  - `src/api/endpoints/cache.py` - REST API for cache management (6 endpoints)
+  - `frontend/src/components/SemanticCachePanel.tsx` - Main tabbed container (Overview, Statistics, Recent)
+  - `frontend/src/components/CacheOverview.tsx` - Stats dashboard with clear actions
+  - `frontend/src/components/CacheStatistics.tsx` - Hit distribution and performance metrics
+  - `frontend/src/components/RecentCachedQueries.tsx` - Cached query browser with SQL expand
+  - `frontend/src/components/QueryResults.tsx` - Updated with inline cache badge
+  - `frontend/src/services/cacheApi.ts` - API service for cache endpoints
+  - `tests/test_cache_endpoints.py` - 9 backend tests
+  - `frontend/tests/SemanticCachePanel.test.tsx` - 34 frontend tests
 
 ## Documentation
 
@@ -483,3 +524,5 @@ Key docs in `docs/`:
 - `tests/TESTING.md` - Testing guide
 - `DEMO_PAGE_UPDATED.md` - Demo page with Scenario 5 (Parallel Execution) showcase
 - `TOOL_USING_AGENT.md` - **Tool-Using Agent guide (NEW - Nov 21, 2025)** - Phase 3.1 implementation
+- `SEMANTIC_CACHING.md` - **Semantic Caching guide (NEW - Nov 22, 2025)** - Phase 3.2 backend implementation
+- `SEMANTIC_CACHE_UI.md` - **Semantic Cache UI guide (NEW - Nov 22, 2025)** - Phase 3.3 frontend components

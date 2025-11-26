@@ -175,6 +175,19 @@ class QueryResponse(BaseModel):
         default=False,
         description="Whether conversational memory was used"
     )
+    # Semantic caching fields
+    cache_type: Optional[str] = Field(
+        default=None,
+        description="Type of cache hit: 'exact' or 'semantic'"
+    )
+    semantic_similarity: Optional[float] = Field(
+        default=None,
+        description="Similarity score for semantic cache hits (0.0-1.0)"
+    )
+    matched_question: Optional[str] = Field(
+        default=None,
+        description="Original question that matched in semantic cache"
+    )
 
     class Config:
         json_schema_extra = {

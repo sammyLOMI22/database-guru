@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Database, Plus, Trash2, Check, Circle } from 'lucide-react';
+import { Database, Plus, Trash2, Check, Circle, Pencil, Loader2 } from 'lucide-react';
 import DatabaseConnectionModal from './DatabaseConnectionModal';
 
 interface DatabaseConnection {
@@ -105,7 +105,7 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
         <h3 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -136,63 +136,90 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
           </div>
         ) : (
           <div className="p-2 space-y-1">
-            {connections.map((conn) => (
-              <div
-                key={conn.id}
-                onClick={() => handleSelectConnection(conn.id)}
-                className={`group p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                  conn.is_active
-                    ? 'border-primary-500 bg-primary-50'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      {conn.is_active ? (
-                        <Check className="w-4 h-4 text-primary-600 flex-shrink-0" />
-                      ) : (
-                        <Circle className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                      )}
-                      <span className="font-medium text-gray-900 truncate">{conn.name}</span>
-                    </div>
-                    <div className="ml-6 space-y-1">
-                      <p className="text-xs text-gray-600">
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                          {conn.database_type.toUpperCase()}
-                        </span>
-                      </p>
-                      {conn.host && (
-                        <p className="text-xs text-gray-600 font-mono">
-                          {conn.host}:{conn.port}
+            {connections.map((conn) => {
+              const isSelected = selectedConnectionId === conn.id;
+              return (
+                <div
+                  key={conn.id}
+                  onClick={() => handleSelectConnection(conn.id)}
+                  className={`group p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    conn.is_active
+                      ? 'border-primary-500 bg-primary-50'
+                      : isSelected
+                      ? 'border-blue-400 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {conn.is_active ? (
+                          <Check className="w-4 h-4 text-primary-600 flex-shrink-0" />
+                        ) : (
+                          <Circle className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        )}
+                        <span className="font-medium text-gray-900 truncate">{conn.name}</span>
+                      </div>
+                      <div className="ml-6 space-y-1">
+                        <p className="text-xs text-gray-600">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                            {conn.database_type.toUpperCase()}
+                          </span>
                         </p>
-                      )}
-                      <p className="text-xs text-gray-700 font-medium truncate" title={conn.database_name}>
-                        {conn.database_name}
-                      </p>
+                        {conn.host && (
+                          <p className="text-xs text-gray-600 font-mono">
+                            {conn.host}:{conn.port}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-700 font-medium truncate" title={conn.database_name}>
+                          {conn.database_name}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditConnection(conn);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-50 rounded transition-all"
+                        title="Edit"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteConnection(conn.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 rounded transition-all"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteConnection(conn.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 rounded transition-all"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
+          <div className="flex items-center gap-2 text-primary-600">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm font-medium">Saving...</span>
+          </div>
+        </div>
+      )}
+
       {/* Modal */}
       <DatabaseConnectionModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => !loading && setIsModalOpen(false)}
         onSave={handleSaveConnection}
         connection={editingConnection}
       />

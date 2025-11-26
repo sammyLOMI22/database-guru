@@ -12,6 +12,18 @@ import {
 } from 'lucide-react';
 import { toolsAPI } from '../services/toolsApi';
 import type { AllToolStatsResponse, ToolResponse } from '../types/api';
+import axios from 'axios';
+
+/** Extract error message from unknown error type */
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (axios.isAxiosError(err)) {
+    return err.response?.data?.detail || err.message || fallback;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return fallback;
+};
 
 /**
  * Overview dashboard for Tool-Using Agent.
@@ -31,11 +43,20 @@ export const ToolsOverview: React.FC = () => {
   const [invalidating, setInvalidating] = useState(false);
 
   useEffect(() => {
-    loadData();
+    loadData(true);
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isInitial = false) => {
+    if (isInitial) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const [statsData, toolsData] = await Promise.all([
@@ -44,8 +65,8 @@ export const ToolsOverview: React.FC = () => {
       ]);
       setStats(statsData);
       setTools(toolsData);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || 'Failed to load data');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to load data'));
     } finally {
       setLoading(false);
     }
@@ -58,9 +79,9 @@ export const ToolsOverview: React.FC = () => {
     setInvalidating(true);
     try {
       await toolsAPI.invalidateAllCache();
-      await loadData();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to invalidate cache');
+      await loadData(true);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to invalidate cache'));
     } finally {
       setInvalidating(false);
     }
@@ -107,7 +128,7 @@ export const ToolsOverview: React.FC = () => {
       <div className="text-center py-12">
         <div className="text-red-500 mb-4">Error: {error}</div>
         <button
-          onClick={loadData}
+          onClick={() => loadData(true)}
           className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
         >
           Retry
@@ -255,7 +276,7 @@ export const ToolsOverview: React.FC = () => {
             {invalidating ? 'Invalidating...' : 'Clear All Tool Cache'}
           </button>
           <button
-            onClick={loadData}
+            onClick={() => loadData(true)}
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
           >
             <Clock className="w-4 h-4" />

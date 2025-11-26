@@ -12,6 +12,7 @@ from src.llm.prompts import (
     MULTI_DATABASE_QUERY_TEMPLATE,
 )
 from src.config.settings import Settings
+from src.cache.llm_cache import get_llm_cache, LLMCache
 
 logger = logging.getLogger(__name__)
 
@@ -137,10 +138,15 @@ class SQLGenerator:
         self,
         settings: Optional[Settings] = None,
         ollama_client: Optional[OllamaClient] = None,
+        llm_cache: Optional[LLMCache] = None,
+        use_llm_cache: bool = True,
     ):
         self.settings = settings or Settings()
         self.ollama = ollama_client or get_ollama_client(self.settings)
         self.validator = SQLValidator()
+        self.llm_cache = llm_cache
+        self.use_llm_cache = use_llm_cache
+        self._cache_initialized = False
 
     async def initialize(self):
         """Initialize the SQL generator"""
@@ -152,6 +158,12 @@ class SQLGenerator:
             logger.warning(f"Model {self.settings.OLLAMA_MODEL} not found. Attempting to pull...")
             await self.ollama.pull_model(self.settings.OLLAMA_MODEL)
 
+        # Initialize LLM cache
+        if self.use_llm_cache and self.llm_cache is None:
+            self.llm_cache = get_llm_cache()
+            await self.llm_cache.initialize()
+            self._cache_initialized = True
+
     async def generate_sql(
         self,
         question: str,
@@ -160,6 +172,7 @@ class SQLGenerator:
         allow_write: bool = False,
         use_few_shot: bool = True,
         model: Optional[str] = None,
+        skip_cache: bool = False,
     ) -> Dict[str, Any]:
         """
         Generate SQL query from natural language question
@@ -171,6 +184,7 @@ class SQLGenerator:
             allow_write: Whether to allow write operations (INSERT, UPDATE, DELETE)
             use_few_shot: Whether to include few-shot examples
             model: Optional model name to use (overrides default)
+            skip_cache: Skip LLM cache lookup (useful for retries)
 
         Returns:
             Dictionary with:
@@ -180,10 +194,55 @@ class SQLGenerator:
                 - warnings: List of warnings
                 - raw_output: Raw LLM output
                 - model_used: Name of model used
+                - llm_cache_hit: Whether result came from LLM cache
         """
         try:
             # Use specified model or default
             model_to_use = model or self.settings.OLLAMA_MODEL
+            llm_cache_hit = False
+
+            # Check LLM cache first (if enabled and not skipped)
+            if self.use_llm_cache and self.llm_cache and not skip_cache:
+                try:
+                    cached = await self.llm_cache.get_cached_sql(
+                        question=question,
+                        schema=schema,
+                        database_type=database_type,
+                    )
+                    if cached:
+                        logger.info(
+                            f"LLM cache hit (similarity={cached.similarity:.3f}): "
+                            f"Returning cached SQL"
+                        )
+                        llm_cache_hit = True
+
+                        # Validate cached SQL (in case schema changed subtly)
+                        sql = cached.sql
+                        is_valid, error = self.validator.validate_sql_syntax(sql)
+                        is_read_only = self.validator.is_read_only(sql)
+                        dangerous_ops = self.validator.contains_dangerous_operations(sql)
+
+                        warnings = []
+                        if not is_valid:
+                            warnings.append(f"Validation error: {error}")
+                        if not allow_write and not is_read_only:
+                            warnings.append("Write operations not allowed.")
+                        if dangerous_ops:
+                            warnings.append(f"Dangerous operations: {', '.join(dangerous_ops)}")
+
+                        return {
+                            "sql": sql,
+                            "is_valid": is_valid,
+                            "is_read_only": is_read_only,
+                            "warnings": warnings,
+                            "raw_output": cached.raw_output,
+                            "question": question,
+                            "model_used": cached.entry.model_used,
+                            "llm_cache_hit": True,
+                            "llm_cache_similarity": cached.similarity,
+                        }
+                except Exception as e:
+                    logger.warning(f"LLM cache lookup failed: {e}")
 
             # Build prompt
             examples = FEW_SHOT_EXAMPLES if use_few_shot else ""
@@ -228,11 +287,27 @@ class SQLGenerator:
                 "raw_output": raw_output,
                 "question": question,
                 "model_used": model_to_use,
+                "llm_cache_hit": False,
             }
 
             logger.info(f"Generated SQL: {sql[:100]}... (model: {model_to_use})")
             if warnings:
                 logger.warning(f"Warnings: {warnings}")
+
+            # Cache the successful result (only for valid SQL)
+            if self.use_llm_cache and self.llm_cache and is_valid:
+                try:
+                    await self.llm_cache.cache_sql(
+                        question=question,
+                        schema=schema,
+                        database_type=database_type,
+                        sql=sql,
+                        raw_output=raw_output,
+                        model_used=model_to_use,
+                    )
+                    logger.debug(f"Cached LLM response for: {question[:50]}...")
+                except Exception as e:
+                    logger.warning(f"Failed to cache LLM response: {e}")
 
             return result
 
