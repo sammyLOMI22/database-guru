@@ -108,8 +108,12 @@ echo ""
 # Cleanup
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-rm -f .services.pid
+if [ -f ".services.pid" ]; then
+    rm -f .services.pid
+    echo "🧹 Cleaned up service tracking file"
+fi
 
+echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "👋 Database Guru Complete Stack stopped!"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

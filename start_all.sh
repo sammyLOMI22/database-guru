@@ -5,6 +5,14 @@
 
 set -e  # Exit on error
 
+# Cleanup on exit
+cleanup_on_exit() {
+    if [ -f ".services.pid" ]; then
+        rm -f .services.pid
+    fi
+}
+trap cleanup_on_exit EXIT
+
 echo "🚀 Starting Database Guru Complete Stack..."
 echo ""
 
