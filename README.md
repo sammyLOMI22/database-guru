@@ -13,21 +13,32 @@ AI-powered natural language to SQL query assistant. Ask questions about your dat
 - Python 3.11+
 - Node.js 18+
 - Ollama (for local LLM)
+- Redis (optional, for persistent caching - uses in-memory fallback if not available)
 
 ### One-Command Startup
 
+**Option 1: Application Only** (assumes Redis/Ollama already running)
 ```bash
 chmod +x start.sh
 ./start.sh
 ```
 
+**Option 2: Complete Stack** (starts Redis + Ollama + Application)
+```bash
+chmod +x start_all.sh
+./start_all.sh
+```
+
 This will:
-1. ✅ Create Python virtual environment
-2. ✅ Install all dependencies
-3. ✅ Create sample database
-4. ✅ Start backend (http://localhost:8000)
-5. ✅ Start frontend (http://localhost:3000)
-6. ✅ Check Ollama status
+1. ✅ Start Redis (if not already running)
+2. ✅ Start Ollama (if not already running)
+3. ✅ Create Python virtual environment
+4. ✅ Install all dependencies
+5. ✅ Create sample database
+6. ✅ Start backend (http://localhost:8000)
+7. ✅ Start frontend (http://localhost:3000)
+
+**Note:** `start_all.sh` intelligently tracks which services it started and only stops those when you run `./stop_all.sh`.
 
 ### Manual Setup
 
@@ -63,6 +74,18 @@ ollama serve
 # Or: brew services start ollama
 ```
 
+#### 4. (Optional) Setup Redis & Ollama Models for Better Caching
+```bash
+# Automated setup for Redis + Ollama + Models
+./scripts/setup_cache.sh
+
+# Or individually:
+./scripts/setup_redis.sh    # Setup Redis
+./scripts/setup_ollama.sh   # Pull embedding models
+```
+
+See [Cache Setup Guide](docs/CACHE_SETUP.md) for details.
+
 ## 🎨 Feature Demo Page
 
 Want to see all features in action? Check out the **interactive demo page**!
@@ -72,14 +95,16 @@ http://localhost:3000?demo=true
 ```
 
 The demo showcases:
-- ✨ **Phase 1: Conversational Memory** - Natural multi-turn dialogue
+- ✨ **Phase 1: Conversational Memory** - Natural multi-turn dialogue with context panel toggle
 - 🌊 **Phase 2: Streaming Results** - Progressive result delivery
 - 🎯 **Confidence Scoring** - Success probability predictions
 - 📋 **Query Planning** - Complex query orchestration
-- 🔧 **Auto-Correction** - Self-healing SQL generation
+- 🔧 **Auto-Correction** - Self-healing SQL generation with parallel strategies
 - ⚠️ **Result Verification** - Suspicious result detection
-- 🛠️ **Tool-Using Agent** - Schema exploration tools
-- 📊 **Semantic Cache Dashboard** - Cache monitoring and management
+- 🛠️ **Tool-Using Agent** - Schema exploration tools with 10 specialized tools
+- 📊 **Semantic Cache Dashboard** - Cache monitoring, stats, and management
+- ⚡ **Cache Trace Integration** - Cache hit/miss visible in execution trace
+- 🔌 **Enhanced Connections** - Edit, delete, and manage database connections
 
 All with mock data - no database connection needed!
 
@@ -121,9 +146,13 @@ The sample e-commerce database includes:
 ## 🛑 Stopping the App
 
 ```bash
-# If using start.sh (press Ctrl+C in terminal)
-# Or run:
+# If using start.sh (application only)
 ./stop.sh
+
+# If using start_all.sh (complete stack)
+./stop_all.sh
+
+# Or press Ctrl+C in terminal
 ```
 
 ## 🔧 Configuration
@@ -135,13 +164,23 @@ Edit `.env` file to customize:
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5-coder:32b
 
+# Redis (for caching)
+REDIS_URL=redis://localhost:6379
+CACHE_TTL=3600
+
 # Query limits
 MAX_QUERY_ROWS=1000
 QUERY_TIMEOUT_SECONDS=30
 
 # Database (for app metadata, not your data)
 DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
+
+# Parallel execution
+MAX_PARALLEL_DATABASES=10
+PARALLEL_CORRECTIONS_TIMEOUT=10
 ```
+
+**See:** [Cache Setup Guide](docs/CACHE_SETUP.md) for Redis and Ollama installation instructions
 
 ## 🎯 Features
 
@@ -159,6 +198,9 @@ DATABASE_URL=sqlite+aiosqlite:///./database_guru.db
 - ✅ **Tool-Using Agent** - 10 specialized tools for schema exploration and query validation with full UI dashboard
 - ✅ **Semantic Caching** - Intelligent query similarity matching for 30-50% higher cache hit rates
 - ✅ **Semantic Cache Dashboard (NEW!)** - Full UI for monitoring cache stats, viewing cached queries, and managing caches
+- ✅ **Cache Trace Integration (NEW!)** - Cache operations visible in Agent Execution Trace with hit/miss indicators
+- ✅ **Enhanced Connection Management** - Edit connections, loading states, selected connection highlighting
+- ✅ **Context Panel Toggle** - Show/hide conversational memory panel with one click
 - ✅ **Result Verification** - Catches logical errors and suspicious results
 - ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB)
 - ✅ **Multi-database queries** - Query multiple databases simultaneously with parallel execution
@@ -300,6 +342,20 @@ Return cached result instantly!
 - Schema fingerprinting ensures cache validity
 - 12-hour TTL
 
+### Cache Trace Integration (NEW!)
+
+Cache operations are now fully integrated into the **Agent Execution Trace** for complete observability:
+
+- **Cache lookup steps** - See when cache is checked
+- **Cache hit/miss indicators** - Know if result came from cache
+- **Similarity scores** - See how closely queries matched
+- **Cache store confirmation** - Track when results are cached
+
+In multi-database queries, you'll see:
+- Per-database cache hit/miss status
+- Summary banner showing cached vs fresh queries
+- Cache info in each database result's trace
+
 ### Performance Improvements:
 
 | Metric | Before | After |
@@ -315,7 +371,16 @@ Return cached result instantly!
 - **Schema Fingerprinting**: Ensures cache invalidation on schema changes
 - **Conditional Verification**: Skips expensive verification for high-confidence results
 
-**See:** [Semantic Caching Guide](docs/SEMANTIC_CACHING.md) for complete backend documentation
+**Setup & Configuration:**
+- **[Cache Setup Guide](docs/CACHE_SETUP.md)** - Complete Redis & Ollama setup instructions
+  - Local installation (Homebrew)
+  - Docker setup
+  - Docker Compose configuration
+  - Troubleshooting guide
+
+**Documentation:**
+- **[Semantic Caching Guide](docs/SEMANTIC_CACHING.md)** - Complete backend documentation
+- **[Semantic Cache UI Guide](docs/SEMANTIC_CACHE_UI.md)** - Frontend components documentation
 
 ## 📊 Semantic Cache Dashboard (NEW!)
 
@@ -1091,6 +1156,39 @@ These require manual admin review for safety.
 - **[Security Enhancements Summary](docs/SECURITY_ENHANCEMENTS_SUMMARY.md)** - What changed and why
 - [User Feedback System Guide](USER_FEEDBACK_SYSTEM.md)
 - [Multi-Database Feedback Integration](MULTI_DB_FEEDBACK_INTEGRATION.md)
+
+## 🎨 Recent UI Improvements (NEW!)
+
+Database Guru's interface has been enhanced with several quality-of-life improvements:
+
+### Connection Management
+- **Edit Button** - Edit existing database connections without recreating them
+- **Loading States** - Visual feedback during connection save operations
+- **Selected Highlighting** - Blue border shows which connection is currently selected
+- **Database Icon** - Connection status indicator in header with database icon
+
+### Agent Execution Trace
+- **Defensive Rendering** - No more blank pages when expanding traces
+- **Cache Indicators** - Visual badges for cache hits/misses with icons:
+  - ⚡ Semantic cache hit (amber)
+  - 🔍 Cache miss (slate)
+  - 💾 Cache store (teal)
+  - 🗄️ Cache lookup (amber)
+- **Robust Data Handling** - Graceful fallbacks for missing trace properties
+
+### Conversational Memory
+- **Context Toggle** - Show/hide conversation history panel with one click
+- **Visual Feedback** - Active context indicator with toggle button
+- **Improved UX** - Cleaner interface for multi-turn conversations
+
+### Multi-Database Results
+- **Cache Info Banner** - Summary of cached vs fresh database queries
+- **Per-Database Badges** - See which databases used cache at a glance
+- **Cache Metrics** - Real-time cache hit/miss tracking
+
+All improvements maintain the existing color scheme and design language for consistency.
+
+---
 
 ## 🧪 Testing
 
