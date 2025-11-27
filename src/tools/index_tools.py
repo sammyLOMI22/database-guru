@@ -87,7 +87,7 @@ class AnalyzeSlowQueryTool(BaseTool):
                 # Parse EXPLAIN output based on database type
                 analysis = self._parse_explain_output(result, database_type, query_sql)
 
-                return ToolResult.success(
+                return ToolResult.success_result(
                     tool_name=self.name,
                     data=analysis,
                     execution_time_ms=(time.time() - start) * 1000
@@ -97,7 +97,7 @@ class AnalyzeSlowQueryTool(BaseTool):
                 logger.error(f"Failed to execute EXPLAIN: {str(e)}")
                 # Fallback to SQL parsing without EXPLAIN
                 analysis = self._analyze_sql_statically(query_sql)
-                return ToolResult.success(
+                return ToolResult.success_result(
                     tool_name=self.name,
                     data=analysis,
                     metadata={"fallback": True, "reason": str(e)},
@@ -309,7 +309,7 @@ class CheckExistingIndexesTool(BaseTool):
             # Parse results
             indexes = self._parse_index_results(result, database_type)
 
-            return ToolResult.success(
+            return ToolResult.success_result(
                 tool_name=self.name,
                 data={"indexes": indexes, "table": table_name},
                 execution_time_ms=(time.time() - start) * 1000
@@ -414,7 +414,7 @@ class RecommendIndexTool(BaseTool):
             columns = self._extract_index_columns(query_sql, table_name)
 
             if not columns:
-                return ToolResult.success(
+                return ToolResult.success_result(
                     tool_name=self.name,
                     data={
                         "recommendation": None,
@@ -431,7 +431,7 @@ class RecommendIndexTool(BaseTool):
                 index_name, table_name, columns, database_type
             )
 
-            return ToolResult.success(
+            return ToolResult.success_result(
                 tool_name=self.name,
                 data={
                     "index_name": index_name,
@@ -563,7 +563,7 @@ class ValidateIndexImpactTool(BaseTool):
                 "confidence": 0.8
             }
 
-            return ToolResult.success(
+            return ToolResult.success_result(
                 tool_name=self.name,
                 data=estimated_impact,
                 metadata={"estimated": True},

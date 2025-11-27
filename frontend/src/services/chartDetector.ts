@@ -57,13 +57,16 @@ export function detectChartType(data: any[]): ChartDetectionResult {
     };
   }
 
-  // Rule 2: Pie chart for small categorical sets
+  // Rule 2: Pie chart ONLY for 3-5 categories with exactly matching row count
+  // Very restrictive: only when data.length == distinctCount (one row per category)
+  // This ensures pie charts are only for summary data, not detailed listings
   if (
     stringColumns.length === 1 &&
     numericColumns.length === 1 &&
-    stringColumns[0].distinctCount >= 2 &&
-    stringColumns[0].distinctCount <= 12 &&
-    data.length <= 20
+    stringColumns[0].distinctCount >= 3 &&
+    stringColumns[0].distinctCount <= 5 &&
+    data.length === stringColumns[0].distinctCount &&
+    data.length <= 8
   ) {
     return {
       type: 'pie',

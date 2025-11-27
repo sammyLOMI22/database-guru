@@ -54,6 +54,9 @@ describe('AutoChart', () => {
         { product: 'Laptop', units_sold: 50 },
         { product: 'Phone', units_sold: 120 },
         { product: 'Tablet', units_sold: 80 },
+        { product: 'Monitor', units_sold: 45 },
+        { product: 'Keyboard', units_sold: 95 },
+        { product: 'Mouse', units_sold: 110 },
       ];
 
       render(<AutoChart data={data} />);

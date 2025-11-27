@@ -122,19 +122,22 @@ class TestAnalyzeQuery:
         advisor = IndexAdvisor(mock_session)
 
         # Mock tool results
-        advisor.analyze_tool.execute = AsyncMock(return_value=ToolResult.success(
+        advisor.analyze_tool.execute = AsyncMock(return_value=ToolResult(
+            success=True,
             tool_name="analyze_slow_query",
             data={"is_slow": True, "recommendations": []},
             execution_time_ms=10.0
         ))
 
-        advisor.check_indexes_tool.execute = AsyncMock(return_value=ToolResult.success(
+        advisor.check_indexes_tool.execute = AsyncMock(return_value=ToolResult(
+            success=True,
             tool_name="check_existing_indexes",
             data={"indexes": []},
             execution_time_ms=10.0
         ))
 
-        advisor.recommend_tool.execute = AsyncMock(return_value=ToolResult.success(
+        advisor.recommend_tool.execute = AsyncMock(return_value=ToolResult(
+            success=True,
             tool_name="recommend_index",
             data={
                 "index_name": "idx_users_email",
@@ -145,7 +148,8 @@ class TestAnalyzeQuery:
             execution_time_ms=10.0
         ))
 
-        advisor.validate_tool.execute = AsyncMock(return_value=ToolResult.success(
+        advisor.validate_tool.execute = AsyncMock(return_value=ToolResult(
+            success=True,
             tool_name="validate_index_impact",
             data={
                 "current_cost": 1000.0,
@@ -163,7 +167,14 @@ class TestAnalyzeQuery:
             query_id=1
         )
 
-        assert result is None  # Returns None due to mock limitations
+        # Should successfully create a recommendation
+        assert result is not None
+        assert isinstance(result, IndexRecommendation)
+        assert result.table_name == "users"
+        assert result.column_names == ["email"]
+        assert result.index_name == "idx_users_email"
+        assert result.priority in ["high", "medium", "low"]
+        assert result.execution_time_ms == 1500.0
 
 
 class TestExtractPrimaryTable:

@@ -14,7 +14,7 @@ Tests all 8 API routes:
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from fastapi import FastAPI
 
 from src.api.endpoints.index_recommendations import router
@@ -81,7 +81,7 @@ class TestListRecommendations:
             mock_session.execute = AsyncMock(return_value=mock_result)
             mock_db.return_value = mock_session
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.get("/index-recommendations/")
 
             assert response.status_code == 200
@@ -99,7 +99,7 @@ class TestListRecommendations:
             mock_session.execute = AsyncMock(return_value=mock_result)
             mock_db.return_value = mock_session
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.get("/index-recommendations/?connection_id=1")
 
             assert response.status_code == 200
@@ -114,7 +114,7 @@ class TestListRecommendations:
             mock_session.execute = AsyncMock(return_value=mock_result)
             mock_db.return_value = mock_session
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.get("/index-recommendations/?status=pending")
 
             assert response.status_code == 200
@@ -129,7 +129,7 @@ class TestListRecommendations:
             mock_session.execute = AsyncMock(return_value=mock_result)
             mock_db.return_value = mock_session
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.get(
                     "/index-recommendations/?limit=10&offset=20"
                 )
@@ -150,7 +150,7 @@ class TestGetRecommendation:
             mock_session.execute = AsyncMock(return_value=mock_result)
             mock_db.return_value = mock_session
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.get("/index-recommendations/1")
 
             assert response.status_code == 200
@@ -168,7 +168,7 @@ class TestGetRecommendation:
             mock_session.execute = AsyncMock(return_value=mock_result)
             mock_db.return_value = mock_session
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.get("/index-recommendations/999")
 
             assert response.status_code == 404
@@ -198,7 +198,7 @@ class TestGetStats:
                 })
                 mock_advisor.return_value = mock_advisor_instance
 
-                async with AsyncClient(app=app, base_url="http://test") as client:
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                     response = await client.get("/index-recommendations/stats")
 
                 assert response.status_code == 200
@@ -231,7 +231,7 @@ class TestAnalyzeSlowQuery:
                     "auto_save": True
                 }
 
-                async with AsyncClient(app=app, base_url="http://test") as client:
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                     response = await client.post(
                         "/index-recommendations/analyze",
                         json=request_data
@@ -259,7 +259,7 @@ class TestAnalyzeSlowQuery:
                     "execution_time_ms": 100.0
                 }
 
-                async with AsyncClient(app=app, base_url="http://test") as client:
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                     response = await client.post(
                         "/index-recommendations/analyze",
                         json=request_data
@@ -288,7 +288,7 @@ class TestUpdateRecommendation:
                 "applied_by": "admin"
             }
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.put(
                     "/index-recommendations/1",
                     json=update_data
@@ -310,7 +310,7 @@ class TestUpdateRecommendation:
 
             update_data = {"status": "applied"}
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.put(
                     "/index-recommendations/999",
                     json=update_data
@@ -333,7 +333,7 @@ class TestDeleteRecommendation:
             mock_session.commit = AsyncMock()
             mock_db.return_value = mock_session
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.delete("/index-recommendations/1")
 
             assert response.status_code == 204
@@ -348,7 +348,7 @@ class TestDeleteRecommendation:
             mock_session.execute = AsyncMock(return_value=mock_result)
             mock_db.return_value = mock_session
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.delete("/index-recommendations/999")
 
             assert response.status_code == 404
@@ -377,7 +377,7 @@ class TestBulkOperations:
                 "status": "rejected"
             }
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
                     "/index-recommendations/bulk-update",
                     json=bulk_data
@@ -398,7 +398,7 @@ class TestBulkOperations:
             mock_session.commit = AsyncMock()
             mock_db.return_value = mock_session
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.delete(
                     "/index-recommendations/connection/1"
                 )

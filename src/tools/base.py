@@ -43,6 +43,29 @@ class ToolResult:
     tool_name: str = ""
     cache_hit: bool = False  # Whether result came from cache
 
+    @classmethod
+    def success_result(cls, tool_name: str, data: Any, execution_time_ms: float = 0.0,
+                      metadata: Optional[Dict[str, Any]] = None, cache_hit: bool = False) -> "ToolResult":
+        """Helper classmethod to create a successful result"""
+        return cls(
+            success=True,
+            tool_name=tool_name,
+            data=data,
+            execution_time_ms=execution_time_ms,
+            cache_hit=cache_hit
+        )
+
+    @classmethod
+    def error(cls, tool_name: str, error_type: str, error_message: str,
+             execution_time_ms: float = 0.0) -> "ToolResult":
+        """Helper classmethod to create an error result"""
+        return cls(
+            success=False,
+            tool_name=tool_name,
+            error=f"{error_type}: {error_message}",
+            execution_time_ms=execution_time_ms
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         return {

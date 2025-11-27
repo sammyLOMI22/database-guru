@@ -528,8 +528,8 @@ class IndexAdvisor:
         for idx in existing_indexes:
             idx_columns = idx.get("columns", [])
 
-            # Exact match
-            if set(proposed_columns) == set(idx_columns):
+            # Exact match (order matters - different order = different performance!)
+            if proposed_columns == idx_columns:
                 conflicting.append(idx["name"])
 
             # Subset match (proposed columns are prefix of existing)

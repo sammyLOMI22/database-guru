@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageSquare, Copy, Check, Zap, Database } from 'lucide-react';
+import { MessageSquare, Copy, Check, Zap, Database, BarChart3, Table as TableIcon } from 'lucide-react';
 import type { DatabaseQueryResult, CacheInfo } from '../types/api';
 import { AgentTrace } from './AgentTrace';
 import { CorrectionHistory } from './CorrectionHistory';
@@ -7,6 +7,7 @@ import { QueryPlanVisualization } from './QueryPlanVisualization';
 import { VerificationWarnings } from './VerificationWarnings';
 import { FeedbackModal, FeedbackData } from './FeedbackModal';
 import { feedbackAPI } from '../services/api';
+import AutoChart from './AutoChart';
 
 interface MultiDatabaseResultsProps {
   results: DatabaseQueryResult[];
@@ -27,6 +28,7 @@ export default function MultiDatabaseResults({
   );
   const [feedbackModal, setFeedbackModal] = useState<{ queryId: number; sql: string } | null>(null);
   const [copiedStates, setCopiedStates] = useState<Record<number, boolean>>({});
+  const [viewModes, setViewModes] = useState<Record<number, 'table' | 'chart'>>({});
 
   const toggleDatabase = (connectionId: number) => {
     setExpandedDatabases((prev) => {
@@ -247,45 +249,83 @@ export default function MultiDatabaseResults({
                 {result.success ? (
                   result.results && result.results.length > 0 ? (
                     <div>
-                      <h5 className="text-xs font-semibold text-gray-700 mb-2">
-                        Results ({result.row_count} row{result.row_count !== 1 ? 's' : ''})
-                      </h5>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              {Object.keys(result.results[0]).map((key) => (
-                                <th
-                                  key={key}
-                                  className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
-                                >
-                                  {key}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {result.results.slice(0, 10).map((row, idx) => (
-                              <tr key={idx} className="hover:bg-gray-50">
-                                {Object.values(row).map((value, vidx) => (
-                                  <td key={vidx} className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                                    {value === null ? (
-                                      <span className="text-gray-400 italic">null</span>
-                                    ) : (
-                                      String(value)
-                                    )}
-                                  </td>
+                      <div className="flex items-center justify-between mb-2">
+                        <h5 className="text-xs font-semibold text-gray-700">
+                          Results ({result.row_count} row{result.row_count !== 1 ? 's' : ''})
+                        </h5>
+                        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+                          <button
+                            onClick={() => setViewModes(prev => ({ ...prev, [result.connection_id]: 'table' }))}
+                            className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                              (viewModes[result.connection_id] || 'table') === 'table'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                            title="Table View"
+                          >
+                            <TableIcon className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setViewModes(prev => ({ ...prev, [result.connection_id]: 'chart' }))}
+                            className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                              viewModes[result.connection_id] === 'chart'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                            title="Chart View"
+                          >
+                            <BarChart3 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {(viewModes[result.connection_id] || 'table') === 'table' ? (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                {Object.keys(result.results[0]).map((key) => (
+                                  <th
+                                    key={key}
+                                    className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
+                                  >
+                                    {key}
+                                  </th>
                                 ))}
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {result.row_count && result.row_count > 10 && (
-                          <p className="mt-2 text-xs text-gray-500 text-center">
-                            Showing 10 of {result.row_count} rows
-                          </p>
-                        )}
-                      </div>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {result.results.slice(0, 10).map((row, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                  {Object.values(row).map((value, vidx) => (
+                                    <td key={vidx} className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                                      {value === null ? (
+                                        <span className="text-gray-400 italic">null</span>
+                                      ) : (
+                                        String(value)
+                                      )}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {result.row_count && result.row_count > 10 && (
+                            <p className="mt-2 text-xs text-gray-500 text-center">
+                              Showing 10 of {result.row_count} rows
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-2">
+                          <AutoChart
+                            data={result.results}
+                            title={`${result.connection_name} Results Visualization`}
+                            allowManualOverride={true}
+                            showExporter={true}
+                          />
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 italic">No results returned</p>
