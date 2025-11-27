@@ -411,3 +411,113 @@ class SystemSettingsUpdateRequest(BaseModel):
     require_result_comparison: Optional[bool] = None
     enable_audit_log: Optional[bool] = None
     max_audit_log_days: Optional[int] = Field(None, ge=1, le=365)
+
+
+# ============================================================================
+# Index Recommendation Schemas
+# ============================================================================
+
+class IndexRecommendationBase(BaseModel):
+    """Base schema for index recommendations"""
+    connection_id: int = Field(..., description="Database connection ID")
+    database_name: str = Field(..., description="Database name")
+    database_type: str = Field(..., description="Database type (postgres, mysql, sqlite)")
+    slow_query_sql: str = Field(..., description="Slow query SQL")
+    execution_time_ms: float = Field(..., description="Query execution time in milliseconds")
+    table_name: str = Field(..., description="Table name for index")
+    column_names: List[str] = Field(..., description="Column names for index")
+    index_type: str = Field(default="btree", description="Index type (btree, hash, gin, gist)")
+    index_name: str = Field(..., description="Suggested index name")
+    reason: str = Field(..., description="Explanation for recommendation")
+    priority: str = Field(default="medium", description="Priority level (high, medium, low)")
+
+
+class IndexRecommendationCreate(IndexRecommendationBase):
+    """Schema for creating a new index recommendation"""
+    query_id: Optional[int] = Field(None, description="Query history ID if available")
+    query_frequency: int = Field(default=1, description="Query execution frequency")
+    estimated_improvement_pct: Optional[float] = Field(None, description="Estimated performance improvement %")
+    estimated_rows_scanned: Optional[int] = Field(None, description="Estimated rows scanned")
+    current_cost: Optional[float] = Field(None, description="Current query cost from EXPLAIN")
+    projected_cost: Optional[float] = Field(None, description="Projected cost with index")
+    similar_indexes_exist: bool = Field(default=False, description="Similar indexes already exist")
+    conflicting_indexes: Optional[List[str]] = Field(None, description="List of conflicting indexes")
+    confidence_score: float = Field(default=0.8, ge=0.0, le=1.0, description="Confidence score")
+    create_index_sql: str = Field(..., description="CREATE INDEX SQL statement")
+    drop_index_sql: Optional[str] = Field(None, description="DROP INDEX SQL statement")
+    analysis_method: str = Field(default="explain_plan", description="Analysis method used")
+
+
+class IndexRecommendationResponse(BaseModel):
+    """Schema for index recommendation responses"""
+    id: int
+    connection_id: int
+    database_name: str
+    database_type: str
+    query_id: Optional[int]
+    slow_query_sql: str
+    execution_time_ms: float
+    query_frequency: int
+    table_name: str
+    column_names: List[str]
+    index_type: str
+    index_name: str
+    estimated_improvement_pct: Optional[float]
+    estimated_rows_scanned: Optional[int]
+    current_cost: Optional[float]
+    projected_cost: Optional[float]
+    similar_indexes_exist: bool
+    conflicting_indexes: Optional[List[str]]
+    confidence_score: float
+    priority: str
+    reason: str
+    status: str
+    applied_at: Optional[datetime]
+    applied_by: Optional[str]
+    create_index_sql: str
+    drop_index_sql: Optional[str]
+    analysis_method: str
+    validated: bool
+    validation_notes: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class IndexRecommendationUpdate(BaseModel):
+    """Schema for updating index recommendation status"""
+    status: Optional[str] = Field(
+        None,
+        description="Status (pending, accepted, rejected, applied, failed)",
+        pattern="^(pending|accepted|rejected|applied|failed)$"
+    )
+    applied_by: Optional[str] = Field(None, description="User who applied the recommendation")
+    validated: Optional[bool] = Field(None, description="Whether recommendation was validated")
+    validation_notes: Optional[str] = Field(None, description="Validation notes")
+    priority: Optional[str] = Field(
+        None,
+        description="Priority (high, medium, low)",
+        pattern="^(high|medium|low)$"
+    )
+
+
+class IndexRecommendationStats(BaseModel):
+    """Statistics for index recommendations"""
+    total_recommendations: int = Field(..., description="Total recommendations")
+    by_status: Dict[str, int] = Field(..., description="Count by status")
+    by_priority: Dict[str, int] = Field(..., description="Count by priority")
+    by_database_type: Dict[str, int] = Field(..., description="Count by database type")
+    avg_execution_time_ms: float = Field(..., description="Average slow query execution time")
+    avg_improvement_pct: Optional[float] = Field(None, description="Average estimated improvement %")
+    total_applied: int = Field(..., description="Total applied recommendations")
+    total_pending: int = Field(..., description="Total pending recommendations")
+
+
+class AnalyzeSlowQueryRequest(BaseModel):
+    """Request to analyze a slow query for index recommendations"""
+    connection_id: int = Field(..., description="Database connection ID")
+    query_sql: str = Field(..., description="SQL query to analyze")
+    execution_time_ms: Optional[float] = Field(None, description="Actual execution time if available")
+    auto_save: bool = Field(default=True, description="Automatically save recommendation to database")

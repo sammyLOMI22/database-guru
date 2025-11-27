@@ -1,5 +1,6 @@
 """Self-Correcting SQL Agent with automatic error recovery"""
 import logging
+import asyncio
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
@@ -1089,6 +1090,20 @@ class SelfCorrectingSQLAgent:
                     )
                     logger.info(f"✅ Query succeeded on attempt {attempt_num}/{self.max_retries}")
 
+                    # Analyze slow queries for index recommendations (background task)
+                    execution_time_ms = exec_result.get('execution_time_ms', 0)
+                    if execution_time_ms > 500 and connection_id:
+                        # Launch index analysis as background task (don't block main flow)
+                        asyncio.create_task(
+                            self._analyze_slow_query_for_index(
+                                connection_id=connection_id,
+                                sql=sql,
+                                execution_time_ms=execution_time_ms,
+                                trace=trace
+                            )
+                        )
+                        logger.info(f"🔍 Slow query detected ({execution_time_ms:.0f}ms), analyzing for index recommendations...")
+
                     # Verify results if enabled (with conditional skip for high-confidence results)
                     verification_result = None
                     verification_warnings = []
@@ -1432,6 +1447,68 @@ class SelfCorrectingSQLAgent:
                 f"❌ Query failed after {result['total_attempts']} attempts\n"
                 f"Final error: {result['error'][:200]}"
             )
+
+    async def _analyze_slow_query_for_index(
+        self,
+        connection_id: int,
+        sql: str,
+        execution_time_ms: float,
+        trace: 'AgentTrace'
+    ) -> None:
+        """
+        Analyze a slow query and generate index recommendations (background task)
+
+        Args:
+            connection_id: Database connection ID
+            sql: SQL query that was slow
+            execution_time_ms: Execution time in milliseconds
+            trace: AgentTrace for logging
+        """
+        try:
+            # Import here to avoid circular dependencies
+            from src.services.index_advisor import IndexAdvisor
+            from src.database.session import get_db
+
+            # Get database session
+            async for db in get_db():
+                try:
+                    advisor = IndexAdvisor(db)
+
+                    # Analyze query and generate recommendation
+                    recommendation = await advisor.analyze_query(
+                        connection_id=connection_id,
+                        query_sql=sql,
+                        execution_time_ms=execution_time_ms,
+                        query_id=None  # We don't have query_id here
+                    )
+
+                    if recommendation:
+                        trace.add_step(
+                            "index_recommendation",
+                            f"Index recommendation generated: {recommendation.index_name} on {recommendation.table_name}",
+                            metadata={
+                                "table": recommendation.table_name,
+                                "columns": recommendation.column_names,
+                                "estimated_improvement": recommendation.estimated_improvement_pct,
+                                "priority": recommendation.priority,
+                                "confidence": recommendation.confidence_score
+                            }
+                        )
+                        logger.info(
+                            f"📊 Index recommendation created: {recommendation.index_name} "
+                            f"(priority: {recommendation.priority}, "
+                            f"estimated improvement: {recommendation.estimated_improvement_pct or 0:.0f}%)"
+                        )
+                    else:
+                        logger.debug(f"No index recommendation needed for query (execution time: {execution_time_ms:.0f}ms)")
+
+                except Exception as e:
+                    logger.warning(f"Failed to analyze slow query for index recommendation: {e}")
+                finally:
+                    break  # Exit after first iteration
+
+        except Exception as e:
+            logger.error(f"Error in slow query analysis background task: {e}", exc_info=True)
 
     def get_detailed_report(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """

@@ -247,12 +247,6 @@ export const ObservabilityDemo: React.FC = () => {
             <span className="px-2 md:px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
               🌊 Phase 2: Streaming Results
             </span>
-            <span className="px-2 md:px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
-              🎯 Confidence Scoring
-            </span>
-            <span className="px-2 md:px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-medium rounded-full">
-              📋 Query Planning
-            </span>
             <span className="px-2 md:px-3 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
               ⚡ Parallel Execution
             </span>
@@ -261,6 +255,12 @@ export const ObservabilityDemo: React.FC = () => {
             </span>
             <span className="px-2 md:px-3 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
               🔧 Tool-Using Agent
+            </span>
+            <span className="px-2 md:px-3 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+              📊 Phase 4.1: Chart Viz
+            </span>
+            <span className="px-2 md:px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+              🗂️ Phase 4.2: Index Recommendations
             </span>
           </div>
         </div>
@@ -975,6 +975,352 @@ export const ObservabilityDemo: React.FC = () => {
           </div>
         </div>
 
+        {/* Scenario 8: Chart Visualizations */}
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
+            Scenario 8: Chart Visualizations (Phase 4.1) 📊 NEW!
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Shows automatic chart detection and visualization with Table/Chart toggle.
+            AutoChart intelligently selects the best chart type based on data structure with confidence scoring.
+            Supports time-series line charts, categorical bar charts, and pie/donut charts with PNG/SVG/CSV export.
+          </p>
+          <div className="border-2 border-blue-200 rounded-lg p-3 md:p-4 bg-blue-50 overflow-x-auto">
+            {/* Chart Detection Rules */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 min-w-fit">
+              {/* Detection Algorithm */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>🧠</span>
+                  Chart Detection Algorithm
+                </h3>
+                <div className="space-y-2 text-xs">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-semibold text-blue-700 mb-1">Time-Series (0.85-0.95)</div>
+                    <div className="text-gray-600">Date/time column + 1-5 numeric values</div>
+                    <div className="text-gray-500 text-[10px]">Higher confidence if data is ordered</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-semibold text-purple-700 mb-1">Pie Chart (0.85)</div>
+                    <div className="text-gray-600">2-12 categories, ≤20 rows, 1 value</div>
+                    <div className="text-gray-500 text-[10px]">Perfect for small categorical sets</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-semibold text-green-700 mb-1">Bar Chart (0.80)</div>
+                    <div className="text-gray-600">Categorical + 1-3 numeric (2-50 rows)</div>
+                    <div className="text-gray-500 text-[10px]">Vertical or horizontal bars</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-semibold text-gray-700 mb-1">Table Fallback (0.50)</div>
+                    <div className="text-gray-600">Complex/large datasets (&gt;50 rows)</div>
+                    <div className="text-gray-500 text-[10px]">Always available as option</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Features */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>✨</span>
+                  Visualization Features
+                </h3>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600">✓</span>
+                    <span>Auto-detection with confidence badges</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600">✓</span>
+                    <span>Manual chart type override</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600">✓</span>
+                    <span>Table/Chart toggle in QueryResults</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600">✓</span>
+                    <span>Export to PNG, SVG, or CSV</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600">✓</span>
+                    <span>Responsive Recharts components</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600">✓</span>
+                    <span>Interactive tooltips & legends</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600">✓</span>
+                    <span>Color-coded confidence levels</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600">✓</span>
+                    <span>Lightweight (~30KB Recharts)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sample Charts */}
+            <div className="bg-white rounded-lg p-3 md:p-4 mb-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Sample Visualizations:</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded">
+                  <div className="font-semibold text-blue-800 mb-1">📈 Time-Series</div>
+                  <div className="text-blue-700">Monthly sales over time</div>
+                  <div className="text-blue-600 text-[10px] mt-1">Multi-line support</div>
+                </div>
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded">
+                  <div className="font-semibold text-purple-800 mb-1">🥧 Pie Chart</div>
+                  <div className="text-purple-700">Market share by category</div>
+                  <div className="text-purple-600 text-[10px] mt-1">Donut variant available</div>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-green-100 p-3 rounded">
+                  <div className="font-semibold text-green-800 mb-1">📊 Bar Chart</div>
+                  <div className="text-green-700">Sales by region</div>
+                  <div className="text-green-600 text-[10px] mt-1">Grouped bars for multiple values</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-100 p-3 rounded">
+              <p className="text-xs text-gray-500 italic">
+                💡 Tip: In QueryResults, toggle between Table and Chart views using the buttons above the results.
+                Charts auto-detect the best visualization type, but you can manually override. Try asking for
+                "monthly sales trends" or "category breakdown" to see different chart types!
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Scenario 9: Index Recommendations */}
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
+            Scenario 9: Index Recommendations (Phase 4.2) 🗂️ NEW!
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Shows automatic slow query detection and index recommendations.
+            When queries take &gt;500ms, the system analyzes them with EXPLAIN and suggests optimal indexes
+            with estimated performance improvements. All recommendations are passive - you manually apply them.
+          </p>
+          <div className="border-2 border-purple-200 rounded-lg p-3 md:p-4 bg-purple-50 overflow-x-auto">
+            {/* Recommendation Flow */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 min-w-fit">
+              {/* Detection */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>🔍</span>
+                  Automatic Detection
+                </h3>
+                <div className="space-y-2 text-xs">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-semibold text-purple-700 mb-1">Trigger: &gt;500ms queries</div>
+                    <div className="text-gray-600">Background task launched</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-semibold text-purple-700 mb-1">EXPLAIN Analysis</div>
+                    <div className="text-gray-600">PostgreSQL, MySQL, SQLite</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-semibold text-purple-700 mb-1">AgentTrace Logging</div>
+                    <div className="text-gray-600">Full metadata tracking</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recommendation */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>📊</span>
+                  Index Analysis
+                </h3>
+                <div className="space-y-2 text-xs">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-semibold text-purple-700 mb-1">Column Extraction</div>
+                    <div className="text-gray-600">WHERE + ORDER BY columns</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-semibold text-purple-700 mb-1">Conflict Detection</div>
+                    <div className="text-gray-600">Check existing indexes</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="font-semibold text-purple-700 mb-1">Impact Estimation</div>
+                    <div className="text-gray-600">% improvement prediction</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Priority Calculation */}
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>🎯</span>
+                  Priority Levels
+                </h3>
+                <div className="space-y-2 text-xs">
+                  <div className="bg-red-50 rounded p-2 border border-red-200">
+                    <div className="font-semibold text-red-700 mb-1">HIGH Priority</div>
+                    <div className="text-red-600">&gt;2000ms OR &gt;60% improvement</div>
+                  </div>
+                  <div className="bg-amber-50 rounded p-2 border border-amber-200">
+                    <div className="font-semibold text-amber-700 mb-1">MEDIUM Priority</div>
+                    <div className="text-amber-600">&gt;1000ms OR &gt;70% confidence</div>
+                  </div>
+                  <div className="bg-green-50 rounded p-2 border border-green-200">
+                    <div className="font-semibold text-green-700 mb-1">LOW Priority</div>
+                    <div className="text-green-600">Everything else</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Demo with Slow Query */}
+            <QueryResults
+              queryId={2001}
+              sql="SELECT * FROM orders WHERE customer_id = 123 AND status = 'pending' ORDER BY created_at DESC"
+              results={[
+                { id: 501, customer_id: 123, status: "pending", total: 89.99, created_at: "2024-11-25" },
+                { id: 502, customer_id: 123, status: "pending", total: 129.50, created_at: "2024-11-24" },
+              ]}
+              rowCount={2}
+              executionTime={750}
+              isValid={true}
+              warnings={[]}
+              selfCorrected={false}
+              totalAttempts={1}
+              agentTrace={{
+                steps: [
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 0.0,
+                    type: "analysis",
+                    message: "Analyzing question: Show pending orders for customer 123",
+                    metadata: {},
+                    icon: "🔍"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 50.0,
+                    type: "generation",
+                    message: "Generated SQL query",
+                    metadata: {},
+                    icon: "✨"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 55.0,
+                    type: "execution",
+                    message: "Executing SQL query",
+                    metadata: {},
+                    icon: "⚡"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 805.0,
+                    type: "success",
+                    message: "Query executed successfully (rows: 2, time: 750ms)",
+                    metadata: { row_count: 2, execution_time_ms: 750 },
+                    icon: "✅"
+                  },
+                  {
+                    timestamp: new Date().toISOString(),
+                    elapsed_ms: 810.0,
+                    type: "index_recommendation",
+                    message: "Index recommendation generated: idx_orders_customer_status on orders",
+                    metadata: {
+                      table: "orders",
+                      columns: ["customer_id", "status", "created_at"],
+                      estimated_improvement: 65,
+                      priority: "medium",
+                      confidence: 0.82
+                    },
+                    icon: "🗂️"
+                  }
+                ],
+                total_elapsed_ms: 810.0,
+                start_time: new Date().toISOString()
+              }}
+              attempts={[
+                {
+                  attempt_number: 1,
+                  sql: "SELECT * FROM orders WHERE customer_id = 123 AND status = 'pending' ORDER BY created_at DESC",
+                  success: true,
+                  error: null,
+                  error_type: null,
+                  execution_time_ms: 750,
+                  row_count: 2,
+                  fix_method: null,
+                }
+              ]}
+            />
+
+            {/* Key Features */}
+            <div className="bg-white rounded-lg p-3 md:p-4 mt-4 mb-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Key Features:</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Auto-detect slow queries (&gt;500ms)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>EXPLAIN plan analysis (PostgreSQL, MySQL, SQLite)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Smart column extraction (WHERE + ORDER BY)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Conflict detection (existing indexes)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Performance improvement estimation</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Priority calculation (high/medium/low)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Passive system (manual apply only)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span>Full UI with filters & charts</span>
+                </div>
+              </div>
+            </div>
+
+            {/* UI Tour */}
+            <div className="bg-white rounded-lg p-3 md:p-4 mb-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Indexes Tab UI:</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="bg-purple-50 p-3 rounded border border-purple-200">
+                  <div className="font-semibold text-purple-800 mb-1">📊 Overview</div>
+                  <div className="text-purple-700">Stats cards, priority bars, status badges, quick actions</div>
+                </div>
+                <div className="bg-purple-50 p-3 rounded border border-purple-200">
+                  <div className="font-semibold text-purple-800 mb-1">💡 Recommendations</div>
+                  <div className="text-purple-700">Filterable list, expandable details, Accept/Reject/Delete</div>
+                </div>
+                <div className="bg-purple-50 p-3 rounded border border-purple-200">
+                  <div className="font-semibold text-purple-800 mb-1">📈 Statistics</div>
+                  <div className="text-purple-700">5 AutoChart visualizations (priority, status, improvement, etc.)</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-100 p-3 rounded">
+              <p className="text-xs text-gray-500 italic">
+                💡 Tip: Notice the purple "Slow Query Detected" banner above in the QueryResults? That appears for
+                queries taking &gt;500ms and directs you to the Indexes tab. Navigate to the 🗂️ Indexes tab to see
+                all recommendations with CREATE INDEX SQL, estimated improvements, and management tools!
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Legend */}
         <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
           <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
@@ -1061,15 +1407,33 @@ export const ObservabilityDemo: React.FC = () => {
                 Features: 4 tool categories, visible in Agent Trace (orange), 10s timeout protection, schema validation with suggestions, result caching, SQL injection prevention.
               </div>
             </div>
+            <div className="flex items-start gap-3">
+              <span className="text-xl">📊</span>
+              <div>
+                <strong>Chart Visualizations (Phase 4.1):</strong> NEW! Automatic chart detection and visualization with Table/Chart toggle.
+                AutoChart intelligently selects the best chart type (time-series, bar, pie) based on data structure with confidence scoring (0.80-0.95).
+                Features: 4 detection rules, manual override, PNG/SVG/CSV export, interactive tooltips, Recharts components (~30KB), color-coded confidence badges.
+                Toggle between Table and Chart views in QueryResults for instant visualizations!
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-xl">🗂️</span>
+              <div>
+                <strong>Index Recommendations (Phase 4.2):</strong> NEW! Automatic slow query detection (&gt;500ms) with database index recommendations.
+                System analyzes queries with EXPLAIN, extracts WHERE/ORDER BY columns, estimates performance improvements, and calculates priority (high/medium/low).
+                Features: Background analysis, EXPLAIN plan parsing (PostgreSQL/MySQL/SQLite), conflict detection, passive recommendations (manual apply), full UI with 3 tabs (Overview, Recommendations, Statistics).
+                See the purple "Slow Query Detected" banner and navigate to the 🗂️ Indexes tab for CREATE INDEX SQL and management tools!
+              </div>
+            </div>
           </div>
         </div>
 
         {/* What's New Section */}
-        <div className="bg-gradient-to-r from-blue-50 via-green-50 via-orange-50 via-teal-50 to-amber-50 rounded-lg shadow p-4 md:p-6 border-2 border-blue-300 overflow-x-auto">
+        <div className="bg-gradient-to-r from-blue-50 via-green-50 via-orange-50 via-teal-50 via-amber-50 to-purple-50 rounded-lg shadow p-4 md:p-6 border-2 border-blue-300 overflow-x-auto">
           <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-3 md:mb-4">
-            🎉 What's New - Complete System with Intelligent Learning & Tools!
+            🎉 What's New - Complete System with Visualizations, Recommendations & More!
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 min-w-fit">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-3 md:gap-4 min-w-fit">
             <div className="bg-white p-3 md:p-4 rounded-lg">
               <h3 className="font-semibold text-blue-600 mb-2">✨ Conversational Memory</h3>
               <ul className="text-sm space-y-1 text-gray-700">
@@ -1120,11 +1484,31 @@ export const ObservabilityDemo: React.FC = () => {
                 <li>• SQL injection prevention</li>
               </ul>
             </div>
+            <div className="bg-white p-3 md:p-4 rounded-lg">
+              <h3 className="font-semibold text-blue-600 mb-2">📊 Chart Visualizations</h3>
+              <ul className="text-sm space-y-1 text-gray-700">
+                <li>• Auto chart detection</li>
+                <li>• Table/Chart toggle</li>
+                <li>• Time-series, bar, pie charts</li>
+                <li>• PNG/SVG/CSV export</li>
+                <li>• Confidence scoring (0.80-0.95)</li>
+              </ul>
+            </div>
+            <div className="bg-white p-3 md:p-4 rounded-lg">
+              <h3 className="font-semibold text-purple-600 mb-2">🗂️ Index Recommendations</h3>
+              <ul className="text-sm space-y-1 text-gray-700">
+                <li>• Auto slow query detection (&gt;500ms)</li>
+                <li>• EXPLAIN plan analysis</li>
+                <li>• Performance improvement estimates</li>
+                <li>• Priority calculation</li>
+                <li>• Full management UI</li>
+              </ul>
+            </div>
           </div>
           <div className="mt-3 md:mt-4 bg-white p-2.5 md:p-3 rounded text-xs md:text-sm">
             <strong className="text-indigo-600">💡 Combined Power:</strong> Tools explore schema automatically,
-            see results stream in real-time, get 3x faster multi-database execution, AND the system learns from your corrections!
-            Example: "Show customers from California" → Tools discover 'CA' is the correct value → SQL uses WHERE state = 'CA' → First-attempt success!
+            see results stream in real-time as interactive charts, get 3x faster multi-database execution, AND receive intelligent index recommendations!
+            Example: "Show monthly sales trends" → Tools find data → Auto-detects time-series → Displays line chart → If slow (&gt;500ms) → Suggests indexes → All automated!
           </div>
         </div>
       </div>

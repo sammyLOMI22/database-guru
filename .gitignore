@@ -27,6 +27,11 @@ pnpm-lock.yaml
 # Build outputs
 frontend/dist/
 frontend/build/
+# Vite cache and build artifacts
+frontend/node_modules/.vite/
+**/node_modules/.vite/
+*.chunk.js
+*.chunk.css
 
 # Environment
 .env
@@ -68,9 +73,7 @@ build/
 *.tfstate
 *.tfstate.*
 .terraform/
-frontend/node_modules/.vite/deps/_metadata.json
-frontend/node_modules/.vite/deps/_metadata.json
-frontend/node_modules/.vite/deps/@tanstack_react-query.js
-frontend/node_modules/.vite/deps/@tanstack_react-query.js
+
+# Service tracking
 scripts/dump.rdb
 .services.pid

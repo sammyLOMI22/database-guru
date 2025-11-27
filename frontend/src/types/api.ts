@@ -166,6 +166,13 @@ export interface QueryResponse {
   // Conversational Memory fields
   conversation_context?: ConversationContext | null;
   used_context?: boolean;
+  // Parallel Execution fields (Phase 3)
+  parallel_execution_metrics?: ParallelExecutionMetrics | null;
+  parallel_correction_metrics?: ParallelCorrectionMetrics | null;
+  // Cache fields (Phase 3.2)
+  cache_type?: 'exact' | 'semantic' | null;
+  semantic_similarity?: number | null;
+  matched_question?: string | null;
 }
 
 export interface Model {

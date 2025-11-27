@@ -266,3 +266,87 @@ class SystemSettings(Base):
             f"<SystemSettings(auto_learning={self.auto_learning_enabled}, "
             f"threshold={self.confidence_threshold}, mode={self.apply_mode})>"
         )
+
+
+class IndexRecommendation(Base):
+    """Store database index recommendations for query optimization
+
+    Tracks slow queries and suggests indexes to improve performance.
+    Recommendations are passive - users must manually apply them.
+    """
+    __tablename__ = "index_recommendations"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Connection information
+    connection_id = Column(Integer, ForeignKey("database_connections.id"), nullable=False, index=True)
+    database_name = Column(String(255), nullable=False)
+    database_type = Column(String(50), nullable=False, index=True)  # postgres, mysql, sqlite
+
+    # Query information
+    query_id = Column(Integer, ForeignKey("query_history.id"), nullable=True, index=True)
+    slow_query_sql = Column(Text, nullable=False)
+    execution_time_ms = Column(Float, nullable=False)  # Slow query execution time
+    query_frequency = Column(Integer, default=1)  # How many times this query pattern occurred
+
+    # Index recommendation
+    table_name = Column(String(255), nullable=False, index=True)
+    column_names = Column(JSON, nullable=False)  # ["column1", "column2"]
+    index_type = Column(String(50), default="btree")  # btree, hash, gin, gist (for PostgreSQL)
+    index_name = Column(String(255), nullable=False)  # Suggested index name
+
+    # Impact analysis
+    estimated_improvement_pct = Column(Float, nullable=True)  # % improvement estimate
+    estimated_rows_scanned = Column(Integer, nullable=True)  # From EXPLAIN
+    current_cost = Column(Float, nullable=True)  # Query planner cost before index
+    projected_cost = Column(Float, nullable=True)  # Estimated cost with index
+
+    # Existing indexes check
+    similar_indexes_exist = Column(Boolean, default=False)
+    conflicting_indexes = Column(JSON, nullable=True)  # ["existing_index_1", "existing_index_2"]
+
+    # Recommendation metadata
+    confidence_score = Column(Float, default=0.8)  # 0.0-1.0 confidence in recommendation
+    priority = Column(String(20), default="medium", index=True)  # high, medium, low
+    reason = Column(Text, nullable=False)  # Human-readable explanation
+
+    # Status tracking
+    status = Column(String(20), default="pending", index=True)
+    # Status: pending, accepted, rejected, applied, failed
+
+    applied_at = Column(DateTime, nullable=True)
+    applied_by = Column(String(255), nullable=True)  # User who applied it
+
+    # SQL generation
+    create_index_sql = Column(Text, nullable=False)  # Ready-to-execute CREATE INDEX statement
+    drop_index_sql = Column(Text, nullable=True)  # DROP INDEX if needed to rollback
+
+    # Analysis source
+    analysis_method = Column(String(50), default="explain_plan")
+    # Methods: explain_plan, slow_query_log, manual_request
+
+    # Validation
+    validated = Column(Boolean, default=False)
+    validation_notes = Column(Text, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    connection = relationship("DatabaseConnection")
+    query = relationship("QueryHistory")
+
+    # Indexes for efficient queries
+    __table_args__ = (
+        Index('idx_conn_status', 'connection_id', 'status'),
+        Index('idx_table_priority', 'table_name', 'priority'),
+        Index('idx_created_priority', 'created_at', 'priority'),
+        Index('idx_db_type_status', 'database_type', 'status'),
+    )
+
+    def __repr__(self):
+        return (
+            f"<IndexRecommendation(id={self.id}, table={self.table_name}, "
+            f"columns={self.column_names}, priority={self.priority})>"
+        )

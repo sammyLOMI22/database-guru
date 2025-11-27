@@ -1,4 +1,4 @@
-import { Copy, Check, MessageSquare, Zap, Database } from 'lucide-react';
+import { Copy, Check, MessageSquare, Zap, Database, BarChart3, Table as TableIcon } from 'lucide-react';
 import { useState } from 'react';
 import {
   AgentTrace as AgentTraceType,
@@ -14,6 +14,7 @@ import { VerificationWarnings } from './VerificationWarnings';
 import { FeedbackModal, FeedbackData } from './FeedbackModal';
 import { ParallelDatabaseMetrics, ParallelCorrectionsMetrics } from './ParallelExecutionMetrics';
 import { feedbackAPI } from '../services/api';
+import AutoChart from './AutoChart';
 
 interface QueryResultsProps {
   sql: string;
@@ -63,6 +64,7 @@ export default function QueryResults({
 }: QueryResultsProps) {
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(sql);
@@ -123,6 +125,28 @@ export default function QueryResults({
               <span className="font-medium">Matched:</span> "{matchedQuestion}"
             </p>
           )}
+        </div>
+      )}
+
+      {/* Slow Query Notification - Index Recommendations */}
+      {executionTime && executionTime > 500 && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Database className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-purple-800">
+                  Slow Query Detected ({executionTime.toFixed(0)}ms)
+                </p>
+                <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                  Analyzing for indexes
+                </span>
+              </div>
+              <p className="text-sm text-purple-700 mt-1">
+                This query may benefit from database indexes. Check the <strong>Indexes</strong> tab to view recommendations and performance improvement estimates.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -206,7 +230,7 @@ export default function QueryResults({
       {/* Results */}
       {results && results.length > 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          {/* Header with stats */}
+          {/* Header with stats and view toggle */}
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center space-x-4 text-sm text-gray-600">
               <span>
@@ -218,48 +242,87 @@ export default function QueryResults({
                 </span>
               )}
             </div>
+
+            {/* View mode toggle */}
+            <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                  viewMode === 'table'
+                    ? 'bg-blue-500 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Table view"
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+                Table
+              </button>
+              <button
+                onClick={() => setViewMode('chart')}
+                className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                  viewMode === 'chart'
+                    ? 'bg-blue-500 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Chart view"
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                Chart
+              </button>
+            </div>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  {Object.keys(results[0]).map((column) => (
-                    <th
-                      key={column}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
-                    >
-                      {column}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {results.map((row, rowIndex) => (
-                  <tr
-                    key={rowIndex}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    {Object.values(row).map((value, colIndex) => (
-                      <td
-                        key={colIndex}
-                        className="px-4 py-3 text-sm text-gray-900 font-mono"
+          {/* Table or Chart view */}
+          {viewMode === 'table' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {Object.keys(results[0]).map((column) => (
+                      <th
+                        key={column}
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
                       >
-                        {value === null ? (
-                          <span className="text-gray-400 italic">null</span>
-                        ) : typeof value === 'object' ? (
-                          JSON.stringify(value)
-                        ) : (
-                          String(value)
-                        )}
-                      </td>
+                        {column}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {results.map((row, rowIndex) => (
+                    <tr
+                      key={rowIndex}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      {Object.values(row).map((value, colIndex) => (
+                        <td
+                          key={colIndex}
+                          className="px-4 py-3 text-sm text-gray-900 font-mono"
+                        >
+                          {value === null ? (
+                            <span className="text-gray-400 italic">null</span>
+                          ) : typeof value === 'object' ? (
+                            JSON.stringify(value)
+                          ) : (
+                            String(value)
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-4">
+              <AutoChart
+                data={results}
+                title="Query Results Visualization"
+                allowManualOverride={true}
+                showExporter={true}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-gray-50 rounded-lg p-8 text-center">

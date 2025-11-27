@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Database,
   Activity,
@@ -8,7 +8,6 @@ import {
   Trash2,
   AlertCircle,
   Server,
-  XCircle,
 } from 'lucide-react';
 import { cacheAPI, type CacheStatsResponse } from '../services/cacheApi';
 import axios from 'axios';

@@ -7,6 +7,7 @@ import { FeedbackStats } from './components/FeedbackStats';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ToolsPanel } from './components/ToolsPanel';
 import { SemanticCachePanel } from './components/SemanticCachePanel';
+import IndexRecommendationsPanel from './components/IndexRecommendationsPanel';
 import { healthAPI } from './services/api';
 
 const queryClient = new QueryClient({
@@ -21,7 +22,7 @@ const queryClient = new QueryClient({
 function App() {
   const [isHealthy, setIsHealthy] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'feedback' | 'tools' | 'cache' | 'settings'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'feedback' | 'tools' | 'cache' | 'indexes' | 'settings'>('chat');
 
   useEffect(() => {
     // Check health on mount
@@ -94,6 +95,16 @@ function App() {
               💾 Cache
             </button>
             <button
+              onClick={() => setActiveTab('indexes')}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'indexes'
+                  ? 'border-purple-500 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              🗂️ Indexes
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'settings'
@@ -107,7 +118,7 @@ function App() {
         </div>
 
         {/* Content Area - Keep all components mounted to preserve state */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-y-auto">
           <main className="flex-1 flex">
             {/* Chat - always mounted to preserve history */}
             <div className={`flex-1 flex ${activeTab === 'chat' ? '' : 'hidden'}`}>
@@ -127,6 +138,11 @@ function App() {
             {/* Cache */}
             <div className={`flex-1 overflow-auto p-6 ${activeTab === 'cache' ? '' : 'hidden'}`}>
               <SemanticCachePanel />
+            </div>
+
+            {/* Indexes */}
+            <div className={`flex-1 overflow-auto ${activeTab === 'indexes' ? '' : 'hidden'}`}>
+              <IndexRecommendationsPanel />
             </div>
 
             {/* Settings */}

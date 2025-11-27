@@ -48,6 +48,7 @@ export default function Message({ type, content, queryResponse }: MessageProps) 
                 executionTime={queryResponse.execution_time_ms}
                 isValid={queryResponse.is_valid}
                 warnings={queryResponse.warnings}
+                queryId={queryResponse.query_id}
                 // Option 2: Observability props
                 agentTrace={queryResponse.agent_trace}
                 queryPlan={queryResponse.query_plan}
@@ -56,6 +57,13 @@ export default function Message({ type, content, queryResponse }: MessageProps) 
                 totalAttempts={queryResponse.total_attempts}
                 verificationWarnings={queryResponse.verification_warnings}
                 usedPlanning={queryResponse.used_planning}
+                // Parallel Execution props (Phase 3)
+                parallelExecutionMetrics={queryResponse.parallel_execution_metrics}
+                parallelCorrectionMetrics={queryResponse.parallel_correction_metrics}
+                // Cache props (Phase 3.2)
+                cacheType={queryResponse.cache_type}
+                semanticSimilarity={queryResponse.semantic_similarity}
+                matchedQuestion={queryResponse.matched_question}
               />
             </div>
           )}
