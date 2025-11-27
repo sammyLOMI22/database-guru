@@ -449,14 +449,54 @@ class IndexAdvisor:
 
     async def _create_db_handler(self, connection: DatabaseConnection):
         """Create database handler for executing queries"""
-        # This would create actual database connection
-        # For now, return a mock handler
         from src.core.multi_db_handler import MultiDatabaseHandler
 
         connector = UserDatabaseConnector()
-        # Create session for the connection
-        # This is simplified - real implementation would use actual credentials
-        return None  # Would return actual DB handler
+
+        # Create database session for the specific connection
+        session = await connector.create_session(
+            database_type=connection.database_type,
+            host=connection.host,
+            port=connection.port,
+            database_name=connection.database_name,
+            username=connection.username,
+            password=connection.password,
+        )
+
+        if not session:
+            logger.warning(f"Failed to create session for connection {connection.id}")
+            return None
+
+        # Create a minimal handler wrapper for tool execution
+        class ToolDatabaseHandler:
+            """Minimal database handler for index analysis tools"""
+            def __init__(self, session, database_type):
+                self.session = session
+                self.database_type = database_type
+                self.is_sync = database_type == "duckdb"
+
+            async def execute_raw_sql(self, sql: str):
+                """Execute raw SQL and return results (required by index_tools)"""
+                from sqlalchemy import text
+
+                try:
+                    if self.is_sync:
+                        # DuckDB uses sync session
+                        result = self.session.execute(text(sql))
+                        rows = result.fetchall() if hasattr(result, 'fetchall') else []
+                        # Convert Row objects to dicts for tool compatibility
+                        return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in rows]
+                    else:
+                        # Async databases
+                        result = await self.session.execute(text(sql))
+                        rows = result.fetchall() if hasattr(result, 'fetchall') else []
+                        # Convert Row objects to dicts for tool compatibility
+                        return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in rows]
+                except Exception as e:
+                    logger.error(f"Query execution failed in index analysis: {e}")
+                    raise  # Re-raise so tools can handle it
+
+        return ToolDatabaseHandler(session, connection.database_type)
 
     def _extract_primary_table(self, query_sql: str) -> Optional[str]:
         """Extract the primary table from SQL query"""
