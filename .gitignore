@@ -27,11 +27,15 @@ pnpm-lock.yaml
 # Build outputs
 frontend/dist/
 frontend/build/
-# Vite cache and build artifacts
+# Vite cache and build artifacts (comprehensive coverage)
 frontend/node_modules/.vite/
 **/node_modules/.vite/
+**/.vite/**
+**/deps_temp_*
 *.chunk.js
 *.chunk.css
+# Vite HMR files
+**/.vite-inspect/
 
 # Environment
 .env
@@ -53,12 +57,21 @@ configs/*/
 # Logs
 logs/
 *.log
+*_restart.log
+server_*.log
+backend.log
+frontend.log
 
 # Data
 data/
 !data/sample/
 *.db
 *.sqlite
+*.db-shm
+*.db-wal
+database_guru.db
+database_guru.db-shm
+database_guru.db-wal
 
 # Build
 dist/
@@ -77,3 +90,22 @@ build/
 # Service tracking
 scripts/dump.rdb
 .services.pid
+*.pid
+dump.rdb
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Test artifacts
+.pytest_cache/
+*.cover
+.hypothesis/
