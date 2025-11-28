@@ -103,130 +103,143 @@ class IndexAdvisor:
 
             # Setup database context for tools
             db_handler = await self._create_db_handler(connection)
-            context = {"db_handler": db_handler}
-
-            # Set context for all tools
-            self.analyze_tool.context = context
-            self.check_indexes_tool.context = context
-            self.recommend_tool.context = context
-
-            # Step 1: Analyze query with EXPLAIN
-            analysis_result = await self.analyze_tool.execute(
-                query_sql=query_sql,
-                database_type=connection.database_type
-            )
-
-            if not analysis_result.success:
-                logger.warning(f"Query analysis failed: {analysis_result.error_message}")
-                # Continue with recommendation anyway using static analysis
-                analysis_data = {"is_slow": True, "recommendations": []}
-            else:
-                analysis_data = analysis_result.data
-
-            # Step 2: Check existing indexes
-            existing_indexes_result = await self.check_indexes_tool.execute(
-                table_name=table_name,
-                database_type=connection.database_type
-            )
-
-            existing_indexes = []
-            if existing_indexes_result.success:
-                existing_indexes = existing_indexes_result.data.get("indexes", [])
-
-            # Step 3: Generate index recommendation
-            recommendation_result = await self.recommend_tool.execute(
-                query_sql=query_sql,
-                table_name=table_name,
-                database_type=connection.database_type
-            )
-
-            if not recommendation_result.success or not recommendation_result.data.get("index_name"):
-                logger.info("No suitable index recommendation found")
+            if not db_handler:
+                logger.error("Failed to create database handler")
                 return None
 
-            recommendation_data = recommendation_result.data
+            try:
+                context = {"db_handler": db_handler}
 
-            # Step 4: Check for conflicts with existing indexes
-            similar_exists, conflicting = self._check_index_conflicts(
-                recommendation_data["columns"],
-                existing_indexes
-            )
+                # Set context for all tools
+                self.analyze_tool.context = context
+                self.check_indexes_tool.context = context
+                self.recommend_tool.context = context
 
-            # Step 5: Validate impact
-            validation_result = await self.validate_tool.execute(
-                query_sql=query_sql,
-                proposed_index_sql=recommendation_data["create_sql"],
-                database_type=connection.database_type
-            )
+                # Step 1: Analyze query with EXPLAIN
+                analysis_result = await self.analyze_tool.execute(
+                    query_sql=query_sql,
+                    database_type=connection.database_type
+                )
 
-            estimated_improvement_pct = None
-            current_cost = None
-            projected_cost = None
-            confidence_score = 0.8  # Default
+                if not analysis_result.success:
+                    logger.warning(f"Query analysis failed: {analysis_result.error_message}")
+                    # Continue with recommendation anyway using static analysis
+                    analysis_data = {"is_slow": True, "recommendations": []}
+                else:
+                    analysis_data = analysis_result.data
 
-            if validation_result.success:
-                validation_data = validation_result.data
-                estimated_improvement_pct = validation_data.get("improvement_pct")
-                current_cost = validation_data.get("current_cost")
-                projected_cost = validation_data.get("projected_cost")
-                confidence_score = validation_data.get("confidence", 0.8)
+                # Step 2: Check existing indexes
+                existing_indexes_result = await self.check_indexes_tool.execute(
+                    table_name=table_name,
+                    database_type=connection.database_type
+                )
 
-            # Calculate priority based on execution time and confidence
-            priority = self._calculate_priority(
-                execution_time_ms,
-                confidence_score,
-                estimated_improvement_pct
-            )
+                existing_indexes = []
+                if existing_indexes_result.success:
+                    existing_indexes = existing_indexes_result.data.get("indexes", [])
 
-            # Generate reason
-            reason = self._generate_reason(
-                execution_time_ms,
-                table_name,
-                recommendation_data["columns"],
-                estimated_improvement_pct,
-                similar_exists
-            )
+                # Step 3: Generate index recommendation
+                recommendation_result = await self.recommend_tool.execute(
+                    query_sql=query_sql,
+                    table_name=table_name,
+                    database_type=connection.database_type
+                )
 
-            # Create recommendation record
-            index_recommendation = IndexRecommendation(
-                connection_id=connection_id,
-                database_name=connection.database_name,
-                database_type=connection.database_type,
-                query_id=query_id,
-                slow_query_sql=query_sql,
-                execution_time_ms=execution_time_ms,
-                query_frequency=1,
-                table_name=table_name,
-                column_names=recommendation_data["columns"],
-                index_type="btree",
-                index_name=recommendation_data["index_name"],
-                estimated_improvement_pct=estimated_improvement_pct,
-                estimated_rows_scanned=analysis_data.get("estimated_rows_scanned"),
-                current_cost=current_cost,
-                projected_cost=projected_cost,
-                similar_indexes_exist=similar_exists,
-                conflicting_indexes=conflicting if conflicting else None,
-                confidence_score=confidence_score,
-                priority=priority,
-                reason=reason,
-                status="pending",
-                create_index_sql=recommendation_data["create_sql"],
-                drop_index_sql=recommendation_data.get("drop_sql"),
-                analysis_method="explain_plan",
-                validated=validation_result.success
-            )
+                if not recommendation_result.success or not recommendation_result.data.get("index_name"):
+                    logger.info("No suitable index recommendation found")
+                    return None
 
-            # Save to database
-            self.db_session.add(index_recommendation)
-            await self.db_session.commit()
-            await self.db_session.refresh(index_recommendation)
+                recommendation_data = recommendation_result.data
 
-            logger.info(
-                f"Generated index recommendation {index_recommendation.id} "
-                f"for table {table_name} with priority {priority}"
-            )
+                # Step 4: Check for conflicts with existing indexes
+                similar_exists, conflicting = self._check_index_conflicts(
+                    recommendation_data["columns"],
+                    existing_indexes
+                )
 
-            return index_recommendation
+                # Step 5: Validate impact
+                validation_result = await self.validate_tool.execute(
+                    query_sql=query_sql,
+                    proposed_index_sql=recommendation_data["create_sql"],
+                    database_type=connection.database_type
+                )
+
+                estimated_improvement_pct = None
+                current_cost = None
+                projected_cost = None
+                confidence_score = 0.8  # Default
+
+                if validation_result.success:
+                    validation_data = validation_result.data
+                    estimated_improvement_pct = validation_data.get("improvement_pct")
+                    current_cost = validation_data.get("current_cost")
+                    projected_cost = validation_data.get("projected_cost")
+                    confidence_score = validation_data.get("confidence", 0.8)
+
+                # Calculate priority based on execution time and confidence
+                priority = self._calculate_priority(
+                    execution_time_ms,
+                    confidence_score,
+                    estimated_improvement_pct
+                )
+
+                # Generate reason
+                reason = self._generate_reason(
+                    execution_time_ms,
+                    table_name,
+                    recommendation_data["columns"],
+                    estimated_improvement_pct,
+                    similar_exists
+                )
+
+                # Create recommendation record
+                index_recommendation = IndexRecommendation(
+                    connection_id=connection_id,
+                    database_name=connection.database_name,
+                    database_type=connection.database_type,
+                    query_id=query_id,
+                    slow_query_sql=query_sql,
+                    execution_time_ms=execution_time_ms,
+                    query_frequency=1,
+                    table_name=table_name,
+                    column_names=recommendation_data["columns"],
+                    index_type="btree",
+                    index_name=recommendation_data["index_name"],
+                    estimated_improvement_pct=estimated_improvement_pct,
+                    estimated_rows_scanned=analysis_data.get("estimated_rows_scanned"),
+                    current_cost=current_cost,
+                    projected_cost=projected_cost,
+                    similar_indexes_exist=similar_exists,
+                    conflicting_indexes=conflicting if conflicting else None,
+                    confidence_score=confidence_score,
+                    priority=priority,
+                    reason=reason,
+                    status="pending",
+                    create_index_sql=recommendation_data["create_sql"],
+                    drop_index_sql=recommendation_data.get("drop_sql"),
+                    analysis_method="explain_plan",
+                    validated=validation_result.success
+                )
+
+                # Save to database
+                self.db_session.add(index_recommendation)
+                await self.db_session.commit()
+                await self.db_session.refresh(index_recommendation)
+
+                logger.info(
+                    f"Generated index recommendation {index_recommendation.id} "
+                    f"for table {table_name} with priority {priority}"
+                )
+
+                return index_recommendation
+
+            finally:
+                # Clean up database handler resources
+                if db_handler and hasattr(db_handler, 'cleanup'):
+                    try:
+                        db_handler.cleanup()
+                    except Exception as cleanup_error:
+                        logger.warning(f"Error cleaning up database handler: {cleanup_error}")
 
         except Exception as e:
             logger.error(f"Error analyzing query for index recommendation: {str(e)}")
@@ -454,14 +467,18 @@ class IndexAdvisor:
         connector = UserDatabaseConnector()
 
         # Create database session for the specific connection
-        session = await connector.create_session(
-            database_type=connection.database_type,
-            host=connection.host,
-            port=connection.port,
-            database_name=connection.database_name,
-            username=connection.username,
-            password=connection.password,
-        )
+        try:
+            session, engine, is_sync = await connector.create_session(
+                database_type=connection.database_type,
+                host=connection.host,
+                port=connection.port,
+                database_name=connection.database_name,
+                username=connection.username,
+                password=connection.password,
+            )
+        except Exception as e:
+            logger.error(f"Failed to create session for connection {connection.id}: {e}")
+            return None
 
         if not session:
             logger.warning(f"Failed to create session for connection {connection.id}")
@@ -470,10 +487,10 @@ class IndexAdvisor:
         # Create a minimal handler wrapper for tool execution
         class ToolDatabaseHandler:
             """Minimal database handler for index analysis tools"""
-            def __init__(self, session, database_type):
+            def __init__(self, session, engine, is_sync):
                 self.session = session
-                self.database_type = database_type
-                self.is_sync = database_type == "duckdb"
+                self.engine = engine
+                self.is_sync = is_sync
 
             async def execute_raw_sql(self, sql: str):
                 """Execute raw SQL and return results (required by index_tools)"""
@@ -496,7 +513,37 @@ class IndexAdvisor:
                     logger.error(f"Query execution failed in index analysis: {e}")
                     raise  # Re-raise so tools can handle it
 
-        return ToolDatabaseHandler(session, connection.database_type)
+            def cleanup(self):
+                """Clean up database resources"""
+                try:
+                    if self.is_sync:
+                        self.session.close()
+                        self.engine.dispose()
+                    else:
+                        # Note: async cleanup should be awaited, but this is called from sync context
+                        # For now, just close the session - engine disposal happens in garbage collection
+                        import asyncio
+                        if asyncio.iscoroutinefunction(self.session.close):
+                            # Schedule async cleanup
+                            loop = asyncio.get_event_loop()
+                            if loop.is_running():
+                                loop.create_task(self._async_cleanup())
+                            else:
+                                asyncio.run(self._async_cleanup())
+                        else:
+                            self.session.close()
+                except Exception as e:
+                    logger.error(f"Error during database handler cleanup: {e}")
+
+            async def _async_cleanup(self):
+                """Async cleanup for async sessions"""
+                try:
+                    await self.session.close()
+                    await self.engine.dispose()
+                except Exception as e:
+                    logger.error(f"Error during async cleanup: {e}")
+
+        return ToolDatabaseHandler(session, engine, is_sync)
 
     def _extract_primary_table(self, query_sql: str) -> Optional[str]:
         """Extract the primary table from SQL query"""

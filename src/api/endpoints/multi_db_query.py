@@ -107,6 +107,7 @@ async def process_multi_database_query(
     4. Returns combined results
     """
     try:
+        logger.info(f"🔍 ENTERING process_multi_database_query - question: {request.question[:50]}, connection_ids: {request.connection_ids}")
         # Determine which connections to use
         connections = []
 
@@ -438,6 +439,11 @@ async def process_multi_database_query(
             # Get connection for this result
             connection = exec_result.get("connection") or metadata.get("connection")
 
+            # FIX: Remove non-serializable 'connection' object from both dicts
+            # This SQLAlchemy model has methods that can't be serialized by Pydantic
+            exec_result.pop("connection", None)
+            metadata.pop("connection", None)
+
             # Convert agent result to DatabaseQueryResult format
             # Agent can return attempts as either:
             # - int (from execute_with_retry)
@@ -462,27 +468,25 @@ async def process_multi_database_query(
                 attempts_list = corrections_data if corrections_data else []
 
             # Convert CorrectionAttempt objects to dicts if needed
+            # FIX: Convert enums and other non-serializable objects to strings
             corrections_dicts = []
             if attempts_list and isinstance(attempts_list, list):
                 for attempt in attempts_list:
                     if hasattr(attempt, '__dict__'):
-                        corrections_dicts.append(attempt.__dict__)
+                        attempt_dict = {}
+                        for key, val in attempt.__dict__.items():
+                            # Convert enums to their string value
+                            if hasattr(val, 'value'):  # It's an enum
+                                attempt_dict[key] = val.value
+                            else:
+                                attempt_dict[key] = val
+                        corrections_dicts.append(attempt_dict)
                     elif isinstance(attempt, dict):
                         corrections_dicts.append(attempt)
 
             # Format attempts for UI if present
-            formatted_attempts = None
-            if attempts_list and isinstance(attempts_list, list):
-                # Use the self_correcting_agent's formatter if available
-                try:
-                    from src.llm.self_correcting_agent import SelfCorrectingSQLAgent
-                    # Create temporary agent to use formatter
-                    temp_agent = SelfCorrectingSQLAgent(sql_generator=sql_generator, max_retries=3)
-                    temp_agent.fix_methods = exec_result.get("fix_methods", {})
-                    formatted_attempts = temp_agent.format_attempts_for_ui(attempts_list)
-                except Exception as e:
-                    logger.warning(f"Could not format attempts: {e}")
-                    formatted_attempts = corrections_dicts if corrections_dicts else None
+            # Since attempts are now already formatted properly, just use corrections_dicts
+            formatted_attempts = corrections_dicts if corrections_dicts else None
 
             # Create individual QueryHistory record for this database
             # This enables user feedback per database in multi-database queries
@@ -508,7 +512,12 @@ async def process_multi_database_query(
                 individual_query_record = None
 
             # Build combined agent_trace with cache info
-            combined_agent_trace = exec_result.get("agent_trace") or {}
+            # FIX: Convert AgentTrace object to dict to avoid serialization error
+            agent_trace_raw = exec_result.get("agent_trace")
+            if isinstance(agent_trace_raw, AgentTrace):
+                combined_agent_trace = agent_trace_raw.to_dict()
+            else:
+                combined_agent_trace = agent_trace_raw or {}
 
             # Check if this result came from cache
             is_from_cache = metadata.get("from_cache", False) or exec_result.get("from_cache", False)
@@ -544,6 +553,43 @@ async def process_multi_database_query(
                     }
                     combined_agent_trace["steps"] = [cache_miss_step] + combined_agent_trace.get("steps", [])
 
+            # DEBUG: Check each field before creating DatabaseQueryResult
+            try:
+                import json
+                test_data = {
+                    "connection_id": connection.id,
+                    "connection_name": connection.name,
+                    "database_type": connection.database_type,
+                    "sql": exec_result.get("sql", sql),
+                    "success": exec_result.get("success", False),
+                    "results": exec_result.get("data"),
+                    "row_count": exec_result.get("row_count", 0),
+                    "execution_time_ms": exec_result.get("execution_time_ms", 0),
+                    "error": exec_result.get("error"),
+                    "correction_attempts": total_attempts,
+                    "corrections": formatted_attempts if formatted_attempts else None,
+                    "query_id": individual_query_record.id if individual_query_record else None,
+                    "agent_trace": combined_agent_trace if combined_agent_trace else None,
+                    "query_plan": exec_result.get("query_plan"),
+                    "attempts": formatted_attempts,
+                    "self_corrected": exec_result.get("self_corrected", False),
+                    "total_attempts": exec_result.get("total_attempts", 1),
+                    "verification_warnings": exec_result.get("verification_warnings", []),
+                    "used_planning": exec_result.get("used_planning", False),
+                }
+
+                # Test each field for serializability
+                for field_name, field_value in test_data.items():
+                    try:
+                        json.dumps(field_value, default=str)
+                    except Exception as ex:
+                        logger.error(f"Field '{field_name}' is not JSON-serializable: {ex}")
+                        logger.error(f"  Type: {type(field_value)}")
+                        logger.error(f"  Value preview: {str(field_value)[:200]}")
+
+            except Exception as e:
+                logger.error(f"Error during field validation: {e}")
+
             database_results.append(
                 DatabaseQueryResult(
                     connection_id=connection.id,
@@ -556,7 +602,7 @@ async def process_multi_database_query(
                     execution_time_ms=exec_result.get("execution_time_ms", 0),
                     error=exec_result.get("error"),
                     correction_attempts=total_attempts,  # Use total_attempts (int)
-                    corrections=corrections_dicts if corrections_dicts else None,
+                    corrections=formatted_attempts if formatted_attempts else None,
                     query_id=individual_query_record.id if individual_query_record else None,  # Add query_id for feedback
                     # Option 2: Observability fields
                     agent_trace=combined_agent_trace if combined_agent_trace else None,
@@ -639,10 +685,12 @@ async def process_multi_database_query(
         )
 
         # Build response
+        # FIX: Pass DatabaseQueryResult objects directly (don't call .model_dump())
+        # This avoids issues with Pydantic reconstructing objects from dicts
         response_data = {
             "query_id": query_record.id,
             "question": request.question,
-            "database_results": [r.model_dump() for r in database_results],
+            "database_results": database_results,  # Pass objects directly, not dicts
             "total_databases_queried": len(database_results),
             "total_rows": total_rows,
             "total_execution_time_ms": total_execution_time,
@@ -707,7 +755,57 @@ async def process_multi_database_query(
                 # Don't fail the request if semantic caching fails
                 logger.warning(f"Failed to store in semantic cache: {e}")
 
-        return MultiDatabaseQueryResponse(**response_data)
+        # DEBUG: Check for method objects in response
+        def check_for_methods(obj, path=""):
+            """Recursively check for method objects"""
+            if callable(obj) and not isinstance(obj, type):
+                logger.error(f"Found callable at {path}: {type(obj)} = {obj}")
+            elif isinstance(obj, dict):
+                for k, v in obj.items():
+                    check_for_methods(v, f"{path}.{k}")
+            elif isinstance(obj, list):
+                for i, v in enumerate(obj):
+                    check_for_methods(v, f"{path}[{i}]")
+
+        check_for_methods(response_data, "response_data")
+
+        logger.info(f"✅ ABOUT TO RETURN MultiDatabaseQueryResponse - database_results count: {len(database_results)}")
+
+        # FIX: Convert DatabaseQueryResult objects to dicts to avoid serialization issues
+        logger.info(f"Converting {len(database_results)} DatabaseQueryResult objects to dicts...")
+        converted_results = []
+        for i, result in enumerate(database_results):
+            logger.info(f"  Converting result {i}: type={type(result)}")
+            if hasattr(result, 'model_dump'):
+                converted = result.model_dump()
+            elif hasattr(result, 'dict'):
+                converted = result.dict()
+            else:
+                converted = result
+            logger.info(f"  Converted result {i} type: {type(converted)}")
+            converted_results.append(converted)
+
+        response_data["database_results"] = converted_results
+        logger.info(f"All results converted. response_data['database_results'] type: {type(response_data['database_results'])}")
+
+        # DEBUG: Try to create response and catch validation errors
+        try:
+            logger.info("Creating MultiDatabaseQueryResponse object...")
+            return MultiDatabaseQueryResponse(**response_data)
+        except Exception as e:
+            logger.error(f"Failed to create MultiDatabaseQueryResponse: {e}")
+            logger.error(f"response_data keys: {response_data.keys()}")
+            for key, value in response_data.items():
+                try:
+                    import json
+                    json.dumps(value, default=str)
+                    logger.info(f"✓ {key} is JSON-serializable")
+                except Exception as ex:
+                    logger.error(f"✗ {key} is NOT JSON-serializable: {ex}")
+                    logger.error(f"  Type: {type(value)}")
+                    if isinstance(value, list) and value:
+                        logger.error(f"  First item type: {type(value[0])}")
+            raise
 
     except HTTPException:
         raise

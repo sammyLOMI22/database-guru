@@ -386,8 +386,19 @@ class SelfCorrectingSQLAgent:
         Returns:
             List of UI-friendly attempt dictionaries
         """
-        return [
-            {
+        formatted_attempts = []
+        for a in attempts:
+            # FIX: Convert fix_method to string name instead of function object
+            fix_method_val = self.fix_methods.get(a.attempt_number)
+            if fix_method_val:
+                if callable(fix_method_val):
+                    fix_method_str = getattr(fix_method_val, '__name__', str(fix_method_val))
+                else:
+                    fix_method_str = str(fix_method_val)
+            else:
+                fix_method_str = None
+
+            formatted_attempts.append({
                 "attempt_number": a.attempt_number,
                 "sql": a.sql,
                 "success": a.success,
@@ -395,10 +406,10 @@ class SelfCorrectingSQLAgent:
                 "error_type": a.error_type.value if a.error_type else None,
                 "execution_time_ms": a.execution_time_ms,
                 "row_count": a.row_count,
-                "fix_method": self.fix_methods.get(a.attempt_number),
-                "confidence_prediction": a.confidence_score  # Include confidence score
-            } for a in attempts
-        ]
+                "fix_method": fix_method_str,
+                "confidence_prediction": a.confidence_score
+            })
+        return formatted_attempts
 
     async def _try_parallel_fixes(
         self,

@@ -115,3 +115,76 @@ class UserDatabaseConnector:
             # Dispose engine
             await engine.dispose()
             logger.info(f"Disconnected from user database: {connection.name}")
+
+    @staticmethod
+    async def create_session(
+        database_type: str,
+        database_name: str,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+    ):
+        """
+        Create a database session without context manager
+        Caller is responsible for closing the session and disposing the engine
+
+        Args:
+            database_type: Type of database (postgresql, mysql, sqlite, duckdb)
+            database_name: Database name or file path
+            host: Database host (not needed for sqlite/duckdb)
+            port: Database port (not needed for sqlite/duckdb)
+            username: Database username (not needed for sqlite/duckdb)
+            password: Database password (not needed for sqlite/duckdb)
+
+        Returns:
+            Tuple of (session, engine, is_sync) - caller must close session and dispose engine
+        """
+        # Build connection URL
+        if database_type == 'sqlite':
+            connection_url = f"sqlite+aiosqlite:///{database_name}"
+        elif database_type == 'postgresql':
+            connection_url = f"postgresql+asyncpg://{username}:{password}@{host}:{port}/{database_name}"
+        elif database_type == 'mysql':
+            connection_url = f"mysql+aiomysql://{username}:{password}@{host}:{port}/{database_name}"
+        elif database_type == 'duckdb':
+            connection_url = f"duckdb:///{database_name}"
+        elif database_type == 'mongodb':
+            raise NotImplementedError("MongoDB queries not yet supported")
+        else:
+            raise ValueError(f"Unsupported database type: {database_type}")
+
+        logger.info(f"Creating session for {database_type} database: {database_name}")
+
+        # DuckDB uses sync engine
+        if database_type == 'duckdb':
+            engine = create_engine(
+                connection_url,
+                echo=False,
+                pool_pre_ping=True,
+                pool_size=5,
+                max_overflow=10,
+            )
+            session_factory = sessionmaker(
+                engine,
+                class_=Session,
+                expire_on_commit=False,
+            )
+            session = session_factory()
+            return (session, engine, True)  # is_sync=True
+        else:
+            # Async databases
+            engine = create_async_engine(
+                connection_url,
+                echo=False,
+                pool_pre_ping=True,
+                pool_size=5,
+                max_overflow=10,
+            )
+            async_session_factory = async_sessionmaker(
+                engine,
+                class_=AsyncSession,
+                expire_on_commit=False,
+            )
+            session = async_session_factory()
+            return (session, engine, False)  # is_sync=False
