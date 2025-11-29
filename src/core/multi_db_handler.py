@@ -311,7 +311,9 @@ class MultiDatabaseHandler:
             # Return result with connection metadata
             return {
                 **exec_result,
-                "connection": connection,  # Include connection for later QueryHistory creation
+                "connection_id": connection.id,
+                "connection_name": connection.name,
+                "database_type": connection.database_type,
                 "model_used": model_used,
             }
 
@@ -322,7 +324,7 @@ class MultiDatabaseHandler:
                 "error": str(e),
                 "database_name": connection.name,
                 "connection_id": connection.id,
-                "connection": connection,
+                "database_type": connection.database_type,
                 "model_used": model_used,
                 "data": [],
                 "row_count": 0,

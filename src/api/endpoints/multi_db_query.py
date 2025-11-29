@@ -107,7 +107,6 @@ async def process_multi_database_query(
     4. Returns combined results
     """
     try:
-        logger.info(f"🔍 ENTERING process_multi_database_query - question: {request.question[:50]}, connection_ids: {request.connection_ids}")
         # Determine which connections to use
         connections = []
 
@@ -364,7 +363,9 @@ async def process_multi_database_query(
                         "data": hit.result.get("results", []) if hit.result else [],
                         "row_count": hit.result.get("row_count", 0) if hit.result else 0,
                         "execution_time_ms": hit.result.get("execution_time_ms", 0) if hit.result else 0,
-                        "connection": conn,
+                        "connection_id": conn.id,
+                        "connection_name": conn.name,
+                        "database_type": conn.database_type,
                         "from_cache": True,
                         "cache_similarity": hit.similarity,
                         "original_cached_question": hit.original_question,
@@ -439,10 +440,22 @@ async def process_multi_database_query(
             # Get connection for this result
             connection = exec_result.get("connection") or metadata.get("connection")
 
-            # FIX: Remove non-serializable 'connection' object from both dicts
+            # FIX: Remove non-serializable 'connection' object from all dicts
             # This SQLAlchemy model has methods that can't be serialized by Pydantic
-            exec_result.pop("connection", None)
-            metadata.pop("connection", None)
+            def remove_connection_objects(obj):
+                """Recursively remove connection objects from dicts and lists"""
+                if isinstance(obj, dict):
+                    obj.pop("connection", None)
+                    for key, value in list(obj.items()):
+                        if isinstance(value, (dict, list)):
+                            remove_connection_objects(value)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        if isinstance(item, (dict, list)):
+                            remove_connection_objects(item)
+
+            remove_connection_objects(exec_result)
+            remove_connection_objects(metadata)
 
             # Convert agent result to DatabaseQueryResult format
             # Agent can return attempts as either:
@@ -553,43 +566,6 @@ async def process_multi_database_query(
                     }
                     combined_agent_trace["steps"] = [cache_miss_step] + combined_agent_trace.get("steps", [])
 
-            # DEBUG: Check each field before creating DatabaseQueryResult
-            try:
-                import json
-                test_data = {
-                    "connection_id": connection.id,
-                    "connection_name": connection.name,
-                    "database_type": connection.database_type,
-                    "sql": exec_result.get("sql", sql),
-                    "success": exec_result.get("success", False),
-                    "results": exec_result.get("data"),
-                    "row_count": exec_result.get("row_count", 0),
-                    "execution_time_ms": exec_result.get("execution_time_ms", 0),
-                    "error": exec_result.get("error"),
-                    "correction_attempts": total_attempts,
-                    "corrections": formatted_attempts if formatted_attempts else None,
-                    "query_id": individual_query_record.id if individual_query_record else None,
-                    "agent_trace": combined_agent_trace if combined_agent_trace else None,
-                    "query_plan": exec_result.get("query_plan"),
-                    "attempts": formatted_attempts,
-                    "self_corrected": exec_result.get("self_corrected", False),
-                    "total_attempts": exec_result.get("total_attempts", 1),
-                    "verification_warnings": exec_result.get("verification_warnings", []),
-                    "used_planning": exec_result.get("used_planning", False),
-                }
-
-                # Test each field for serializability
-                for field_name, field_value in test_data.items():
-                    try:
-                        json.dumps(field_value, default=str)
-                    except Exception as ex:
-                        logger.error(f"Field '{field_name}' is not JSON-serializable: {ex}")
-                        logger.error(f"  Type: {type(field_value)}")
-                        logger.error(f"  Value preview: {str(field_value)[:200]}")
-
-            except Exception as e:
-                logger.error(f"Error during field validation: {e}")
-
             database_results.append(
                 DatabaseQueryResult(
                     connection_id=connection.id,
@@ -684,13 +660,38 @@ async def process_multi_database_query(
             miss_databases=[c.name for c in connections if c.id not in semantic_cache_hits],
         )
 
-        # Build response
-        # FIX: Pass DatabaseQueryResult objects directly (don't call .model_dump())
-        # This avoids issues with Pydantic reconstructing objects from dicts
+        # Build response with deep serialization cleanup
+        import json
+
+        def make_serializable(obj):
+            """Recursively convert any non-serializable objects to JSON-safe types"""
+            if obj is None or isinstance(obj, (str, int, float, bool)):
+                return obj
+            elif isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [make_serializable(item) for item in obj]
+            elif hasattr(obj, 'model_dump'):  # Pydantic model
+                return make_serializable(obj.model_dump())
+            elif hasattr(obj, '__dict__'):  # Has __dict__ attribute
+                return make_serializable(obj.__dict__)
+            elif callable(obj):  # Function or method
+                return f"<callable:{getattr(obj, '__name__', str(obj))}>"
+            else:
+                # Last resort - convert to string
+                try:
+                    json.dumps(obj)
+                    return obj
+                except:
+                    return str(obj)
+
+        # Convert database_results to fully serializable dicts
+        serializable_results = make_serializable([r.model_dump() for r in database_results])
+
         response_data = {
             "query_id": query_record.id,
             "question": request.question,
-            "database_results": database_results,  # Pass objects directly, not dicts
+            "database_results": serializable_results,
             "total_databases_queried": len(database_results),
             "total_rows": total_rows,
             "total_execution_time_ms": total_execution_time,
@@ -755,57 +756,7 @@ async def process_multi_database_query(
                 # Don't fail the request if semantic caching fails
                 logger.warning(f"Failed to store in semantic cache: {e}")
 
-        # DEBUG: Check for method objects in response
-        def check_for_methods(obj, path=""):
-            """Recursively check for method objects"""
-            if callable(obj) and not isinstance(obj, type):
-                logger.error(f"Found callable at {path}: {type(obj)} = {obj}")
-            elif isinstance(obj, dict):
-                for k, v in obj.items():
-                    check_for_methods(v, f"{path}.{k}")
-            elif isinstance(obj, list):
-                for i, v in enumerate(obj):
-                    check_for_methods(v, f"{path}[{i}]")
-
-        check_for_methods(response_data, "response_data")
-
-        logger.info(f"✅ ABOUT TO RETURN MultiDatabaseQueryResponse - database_results count: {len(database_results)}")
-
-        # FIX: Convert DatabaseQueryResult objects to dicts to avoid serialization issues
-        logger.info(f"Converting {len(database_results)} DatabaseQueryResult objects to dicts...")
-        converted_results = []
-        for i, result in enumerate(database_results):
-            logger.info(f"  Converting result {i}: type={type(result)}")
-            if hasattr(result, 'model_dump'):
-                converted = result.model_dump()
-            elif hasattr(result, 'dict'):
-                converted = result.dict()
-            else:
-                converted = result
-            logger.info(f"  Converted result {i} type: {type(converted)}")
-            converted_results.append(converted)
-
-        response_data["database_results"] = converted_results
-        logger.info(f"All results converted. response_data['database_results'] type: {type(response_data['database_results'])}")
-
-        # DEBUG: Try to create response and catch validation errors
-        try:
-            logger.info("Creating MultiDatabaseQueryResponse object...")
-            return MultiDatabaseQueryResponse(**response_data)
-        except Exception as e:
-            logger.error(f"Failed to create MultiDatabaseQueryResponse: {e}")
-            logger.error(f"response_data keys: {response_data.keys()}")
-            for key, value in response_data.items():
-                try:
-                    import json
-                    json.dumps(value, default=str)
-                    logger.info(f"✓ {key} is JSON-serializable")
-                except Exception as ex:
-                    logger.error(f"✗ {key} is NOT JSON-serializable: {ex}")
-                    logger.error(f"  Type: {type(value)}")
-                    if isinstance(value, list) and value:
-                        logger.error(f"  First item type: {type(value[0])}")
-            raise
+        return MultiDatabaseQueryResponse(**response_data)
 
     except HTTPException:
         raise
