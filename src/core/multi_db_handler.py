@@ -424,7 +424,7 @@ class MultiDatabaseHandler:
                         "self_corrected": result.get("self_corrected", False),
                         "verification_warnings": result.get("verification_warnings", []),
                         "used_planning": result.get("used_planning", False),
-                        # fix_methods removed - not needed in response, causes serialization errors
+                        "fix_methods": result.get("fix_methods", {}),  # For converting to fix_method strings
                     }
                 else:
                     return {
@@ -444,7 +444,7 @@ class MultiDatabaseHandler:
                         "self_corrected": result.get("self_corrected", False),
                         "verification_warnings": result.get("verification_warnings", []),
                         "used_planning": result.get("used_planning", False),
-                        # fix_methods removed - not needed in response, causes serialization errors
+                        "fix_methods": result.get("fix_methods", {}),  # For converting to fix_method strings
                     }
 
         except Exception as e:

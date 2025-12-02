@@ -437,25 +437,27 @@ async def process_multi_database_query(
                 )
                 continue
 
-            # Get connection for this result
+            # Get connection and fix_methods for this result BEFORE cleaning
             connection = exec_result.get("connection") or metadata.get("connection")
+            fix_methods_dict = exec_result.get("fix_methods", {})
 
-            # FIX: Remove non-serializable 'connection' object from all dicts
-            # This SQLAlchemy model has methods that can't be serialized by Pydantic
-            def remove_connection_objects(obj):
-                """Recursively remove connection objects from dicts and lists"""
+            # FIX: Remove non-serializable objects from all dicts
+            # This includes SQLAlchemy models and fix_methods dict (which has callables)
+            def remove_non_serializable_objects(obj):
+                """Recursively remove connection objects and fix_methods from dicts and lists"""
                 if isinstance(obj, dict):
                     obj.pop("connection", None)
+                    obj.pop("fix_methods", None)  # Remove after we've extracted it
                     for key, value in list(obj.items()):
                         if isinstance(value, (dict, list)):
-                            remove_connection_objects(value)
+                            remove_non_serializable_objects(value)
                 elif isinstance(obj, list):
                     for item in obj:
                         if isinstance(item, (dict, list)):
-                            remove_connection_objects(item)
+                            remove_non_serializable_objects(item)
 
-            remove_connection_objects(exec_result)
-            remove_connection_objects(metadata)
+            remove_non_serializable_objects(exec_result)
+            remove_non_serializable_objects(metadata)
 
             # Convert agent result to DatabaseQueryResult format
             # Agent can return attempts as either:
@@ -497,9 +499,29 @@ async def process_multi_database_query(
                     elif isinstance(attempt, dict):
                         corrections_dicts.append(attempt)
 
-            # Format attempts for UI if present
-            # Since attempts are now already formatted properly, just use corrections_dicts
-            formatted_attempts = corrections_dicts if corrections_dicts else None
+            # Format attempts for UI - add fix_method field from agent's fix_methods dict
+            formatted_attempts = []
+            if corrections_dicts:
+                # Use fix_methods_dict we extracted earlier (maps attempt_number -> fix method)
+                for attempt in corrections_dicts:
+                    attempt_copy = dict(attempt)
+
+                    # Add fix_method field (convert callable to string)
+                    attempt_num = attempt.get("attempt_number")
+                    fix_method_val = fix_methods_dict.get(attempt_num)
+
+                    if fix_method_val:
+                        if callable(fix_method_val):
+                            # Extract function name from callable
+                            attempt_copy["fix_method"] = getattr(fix_method_val, '__name__', str(fix_method_val))
+                        else:
+                            attempt_copy["fix_method"] = str(fix_method_val)
+                    else:
+                        attempt_copy["fix_method"] = None
+
+                    formatted_attempts.append(attempt_copy)
+            else:
+                formatted_attempts = None
 
             # Create individual QueryHistory record for this database
             # This enables user feedback per database in multi-database queries

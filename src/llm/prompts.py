@@ -90,6 +90,13 @@ Schema:
 
 Database type: {database_type}
 
+CRITICAL INSTRUCTIONS:
+1. ONLY use tables and columns that ACTUALLY EXIST in the schema above
+2. If the error mentions a missing table/column, check the schema carefully
+3. If hints are provided in the error message, follow them EXACTLY
+4. If a column doesn't exist in ANY table, do NOT try to use it - the query may be impossible
+5. If you cannot answer the question with the available schema, return a query that returns empty results rather than using non-existent columns
+
 Provide the corrected SQL query ONLY, no explanation."""
 
 

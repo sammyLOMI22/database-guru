@@ -107,6 +107,7 @@ class ToolUsingAgent:
         connection_id: Optional[int] = None,
         use_tools: bool = True,
         trace=None,  # Optional AgentTrace for UI visibility
+        context_only: bool = False,  # If True, skip SQL generation and only return enriched context
     ) -> ToolUsingResult:
         """
         Process a question using tools to gather context.
@@ -121,6 +122,7 @@ class ToolUsingAgent:
             connection_id: Database connection ID
             use_tools: Whether to use tools (can skip for simple queries)
             trace: Optional AgentTrace to add steps for UI visibility
+            context_only: If True, skip SQL generation and only return enriched context (faster for error correction)
 
         Returns:
             ToolUsingResult with enriched context and optionally SQL
@@ -197,11 +199,11 @@ class ToolUsingAgent:
                             metadata={"tools_used": tools_used, "context_length": len(enriched_context)}
                         )
 
-            # Step 4: Generate SQL if generator is available
+            # Step 4: Generate SQL if generator is available (skip if context_only=True)
             sql = None
             explanation = ""
 
-            if self.generator:
+            if self.generator and not context_only:
                 # Combine original schema with enriched context
                 enhanced_schema = schema
                 if enriched_context:
@@ -509,21 +511,44 @@ class ToolUsingAgent:
         return ""
 
     def _build_enriched_context(self, context_parts: List[str]) -> str:
-        """Build the enriched context string for the SQL generator."""
+        """Build the enriched context string for the SQL generator with explicit constraints."""
         if not context_parts:
             return ""
 
+        # Separate positive findings from negative findings
+        available = []
+        not_available = []
+
+        for part in context_parts:
+            if not part:
+                continue
+            # Check for "not found" or "doesn't exist" patterns
+            if any(phrase in part.lower() for phrase in ["not found", "no ", "doesn't exist", "found in: []"]):
+                not_available.append(part)
+            else:
+                available.append(part)
+
         lines = [
-            "--- Schema Exploration Results ---",
-            "The following information was discovered about the database:",
+            "=== IMPORTANT: Tool-Discovered Schema Constraints ===",
             "",
         ]
-        for part in context_parts:
-            if part:
-                lines.append(f"- {part}")
 
-        lines.append("")
-        lines.append("Use this information to generate accurate SQL.")
+        # List what DOESN'T exist first (critical to avoid errors)
+        if not_available:
+            lines.append("⚠️  DO NOT USE (these don't exist in the schema):")
+            for item in not_available:
+                lines.append(f"   ✗ {item}")
+            lines.append("")
+
+        # Then list what DOES exist
+        if available:
+            lines.append("✓  AVAILABLE (use these for your query):")
+            for item in available:
+                lines.append(f"   • {item}")
+            lines.append("")
+
+        lines.append("IMPORTANT: Only use columns/tables marked as AVAILABLE above.")
+        lines.append("Attempting to use items marked with ✗ will cause errors.")
 
         return "\n".join(lines)
 
