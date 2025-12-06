@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     QUERY_TIMEOUT_SECONDS: int = 30
     ALLOW_WRITE_OPERATIONS: bool = False  # Safety: disable writes by default
 
+    # Connection Pooling (User Databases)
+    ENABLE_CONNECTION_POOLING: bool = True  # Feature flag for connection pooling
+    USER_DB_POOL_SIZE: int = 10  # Base pool size per user database connection
+    USER_DB_MAX_OVERFLOW: int = 20  # Burst capacity (additional connections beyond pool_size)
+    USER_DB_POOL_RECYCLE: int = 3600  # Recycle connections after 1 hour (seconds)
+    USER_DB_POOL_TIMEOUT: int = 30  # Wait timeout for getting connection from pool (seconds)
+    POOL_PRE_PING: bool = True  # Verify connections are alive before using
+    POOL_IDLE_CLEANUP_INTERVAL: int = 300  # Run cleanup task every 5 minutes (seconds)
+    POOL_MAX_IDLE_TIME: int = 1800  # Evict idle pools after 30 minutes (seconds)
+    POOL_MAX_AGE: int = 7200  # Force refresh pools after 2 hours (seconds)
+    POOL_HEALTH_CHECK_INTERVAL: int = 60  # Health check interval (seconds)
+
     # Parallel Execution
     MAX_PARALLEL_DATABASES: int = 10  # Max concurrent database queries (prevents resource exhaustion)
     PARALLEL_CORRECTIONS_TIMEOUT: int = 10  # Max seconds for all parallel correction strategies (prevents hanging)

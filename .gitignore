@@ -54,6 +54,12 @@ data/
 !data/sample/
 *.db
 *.sqlite
+*.duckdb
+
+# Test databases (from connection pooling tests)
+tests/fixtures/*.db
+tests/fixtures/*.sqlite
+tests/fixtures/*.duckdb
 
 # Build
 dist/
@@ -74,3 +80,4 @@ frontend/node_modules/.vite/deps/@tanstack_react-query.js
 frontend/node_modules/.vite/deps/@tanstack_react-query.js
 scripts/dump.rdb
 .services.pid
+dump.rdb

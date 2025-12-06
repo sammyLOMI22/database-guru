@@ -7,8 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import Settings
 from src.database.connection import get_db_manager
 from src.cache.redis_client import get_redis_cache
+from src.core.connection_pool_manager import get_pool_manager_async
 from src.middleware.rate_limit import RateLimitMiddleware
-from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache
+from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools
 
 # Configure logging
 logging.basicConfig(
@@ -39,6 +40,31 @@ async def lifespan(app: FastAPI):
     await cache.connect()
     logger.info("✅ Cache ready")
 
+    # Initialize connection pool manager
+    if settings.ENABLE_CONNECTION_POOLING:
+        logger.info("🏊 Initializing connection pool manager...")
+        pool_manager = await get_pool_manager_async(settings)
+        logger.info("✅ Connection pooling enabled")
+
+        # Optional: Pre-warm pools for active connections
+        # This can be enabled later if needed for production optimization
+        # from sqlalchemy import select
+        # from src.database.models import DatabaseConnection
+        # async with db_manager.get_async_session() as db:
+        #     result = await db.execute(
+        #         select(DatabaseConnection).where(DatabaseConnection.is_active == True)
+        #     )
+        #     active_connections = result.scalars().all()
+        #     for conn in active_connections:
+        #         try:
+        #             await pool_manager.warm_pool(conn)
+        #             logger.info(f"Pre-warmed pool for {conn.name}")
+        #         except Exception as e:
+        #             logger.warning(f"Failed to pre-warm pool for {conn.name}: {e}")
+    else:
+        logger.warning("⚠️  Connection pooling is DISABLED")
+        pool_manager = None
+
     logger.info("🧙‍♂️ Database Guru is ready!")
 
     yield
@@ -47,6 +73,13 @@ async def lifespan(app: FastAPI):
     logger.info("🛑 Shutting down Database Guru...")
     await cache.disconnect()
     await db_manager.close_async()
+
+    # Close all connection pools
+    if pool_manager:
+        logger.info("Closing connection pools...")
+        await pool_manager.close_all_pools()
+        logger.info("✅ Connection pools closed")
+
     logger.info("👋 Goodbye!")
 
 
@@ -90,6 +123,7 @@ app.include_router(mappings.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 app.include_router(tools.router, prefix="/api")
 app.include_router(cache.router, prefix="/api")
+app.include_router(pools.router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn

@@ -3,11 +3,13 @@ import logging
 import asyncio
 from typing import Optional
 from contextlib import asynccontextmanager
+from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import sessionmaker, Session
 
 from src.database.models import DatabaseConnection
+from src.core.connection_pool_manager import get_pool_manager_async
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,7 @@ class UserDatabaseConnector:
     @asynccontextmanager
     async def get_user_db_session(connection: DatabaseConnection):
         """
-        Get a session to the user's database
+        Get a session to the user's database using connection pooling.
 
         Args:
             connection: DatabaseConnection object with connection details
@@ -57,61 +59,30 @@ class UserDatabaseConnector:
         Yields:
             AsyncSession or Session connected to user's database
         """
-        connection_url = UserDatabaseConnector.build_connection_url(connection)
+        logger.info(f"Getting pooled session for database: {connection.name} ({connection.database_type})")
 
-        logger.info(f"Connecting to user database: {connection.name} ({connection.database_type})")
+        # Get pool manager instance
+        pool_manager = await get_pool_manager_async()
 
-        # DuckDB doesn't have an async driver, use sync connection wrapped
+        # Get or create pool for this connection (metrics updated in get_pool())
+        pool_entry = await pool_manager.get_pool(connection)
+
+        # DuckDB uses sync sessions
         if connection.database_type == 'duckdb':
-            # Create sync engine for DuckDB
-            engine = create_engine(
-                connection_url,
-                echo=False,
-                pool_pre_ping=True,
-                pool_size=5,
-                max_overflow=10,
-            )
-
-            # Create session factory
-            session_factory = sessionmaker(
-                engine,
-                class_=Session,
-                expire_on_commit=False,
-            )
-
-            # Create sync session
-            session = session_factory()
+            # Create sync session from pool
+            session = pool_entry.session_factory()
             try:
                 # Wrap sync session to make it work with async context
                 yield session
             finally:
                 session.close()
-                engine.dispose()
-                logger.info(f"Disconnected from user database: {connection.name}")
+                pool_entry.metrics.total_checkins += 1
+                logger.debug(f"Returned session to pool: {connection.name}")
         else:
-            # Use async engine for other databases
-            engine = create_async_engine(
-                connection_url,
-                echo=False,
-                pool_pre_ping=True,
-                pool_size=5,
-                max_overflow=10,
-            )
-
-            # Create session factory
-            async_session_factory = async_sessionmaker(
-                engine,
-                class_=AsyncSession,
-                expire_on_commit=False,
-            )
-
-            # Create and yield session
-            async with async_session_factory() as session:
+            # Use async session for other databases
+            async with pool_entry.session_factory() as session:
                 try:
                     yield session
                 finally:
-                    await session.close()
-
-            # Dispose engine
-            await engine.dispose()
-            logger.info(f"Disconnected from user database: {connection.name}")
+                    pool_entry.metrics.total_checkins += 1
+                    logger.debug(f"Returned session to pool: {connection.name}")
