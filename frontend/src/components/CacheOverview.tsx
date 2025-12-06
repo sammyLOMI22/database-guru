@@ -8,7 +8,6 @@ import {
   Trash2,
   AlertCircle,
   Server,
-  XCircle,
 } from 'lucide-react';
 import { cacheAPI, type CacheStatsResponse } from '../services/cacheApi';
 import axios from 'axios';
