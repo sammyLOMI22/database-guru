@@ -1,5 +1,6 @@
 """Database schema introspection"""
 import logging
+import hashlib
 from typing import Dict, List, Any, Optional
 from sqlalchemy import text, inspect
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -547,3 +548,67 @@ class SchemaInspector:
                 )
 
         return "\n".join(lines)
+
+    async def create_schema_fingerprint(
+        self,
+        session: AsyncSession,
+        schema_name: Optional[str] = None,
+    ) -> str:
+        """
+        Create stable hash fingerprint of schema for cache invalidation.
+
+        Fingerprint components (in order):
+        - Sorted table names
+        - For each table (sorted): column names, primary keys, foreign keys
+
+        Two databases with identical schema structure get identical fingerprint,
+        enabling cache invalidation detection when schema changes.
+
+        Args:
+            session: Database session
+            schema_name: Schema name (None for default)
+
+        Returns:
+            16-character hex hash string for schema fingerprint
+        """
+        try:
+            # Get tables
+            tables = sorted(await self.get_tables(session, schema_name))
+
+            # Build fingerprint components
+            fingerprint_parts = []
+
+            for table_name in tables:
+                # Get table metadata
+                columns = sorted([col["name"] for col in await self.get_columns(session, table_name, schema_name)])
+                primary_keys = sorted(await self.get_primary_keys(session, table_name, schema_name))
+                foreign_keys = await self.get_foreign_keys(session, table_name, schema_name)
+
+                # Build FK string: "col→table.ref_col"
+                fk_strings = []
+                for fk in sorted(foreign_keys, key=lambda x: x["column"]):
+                    fk_str = f"{fk['column']}→{fk['referred_table']}.{fk['referred_column']}"
+                    fk_strings.append(fk_str)
+
+                # Add to fingerprint
+                fingerprint_parts.append(f"T:{table_name}")
+                fingerprint_parts.append(f"C:{','.join(columns)}")
+                fingerprint_parts.append(f"PK:{','.join(primary_keys)}")
+                if fk_strings:
+                    fingerprint_parts.append(f"FK:{','.join(fk_strings)}")
+
+            # Create hash
+            fingerprint_str = "|".join(fingerprint_parts)
+            hash_obj = hashlib.sha256(fingerprint_str.encode())
+            fingerprint = hash_obj.hexdigest()[:16]
+
+            logger.debug(
+                f"Created schema fingerprint: {fingerprint} "
+                f"({len(tables)} tables, {len(fingerprint_parts)} parts)"
+            )
+
+            return fingerprint
+
+        except Exception as e:
+            logger.error(f"Error creating schema fingerprint: {e}", exc_info=True)
+            raise

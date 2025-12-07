@@ -1,4 +1,10 @@
-"""SQL Execution Engine with safety checks"""
+"""SQL Execution Engine with Query Compilation (Phase 4.2)
+
+Integrates three compilation layers:
+1. SQL Normalization: Converts literals to parameters for caching
+2. EXPLAIN Plan Caching: Caches database execution plans
+3. Prepared Statement Management: Reuses prepared statements across executions
+"""
 import logging
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple, Union
@@ -9,6 +15,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, DBAPIError, OperationalError
 
 from src.core.sql_normalizer import SQLNormalizer, get_normalizer
+from src.cache.plan_cache import PlanCache, get_plan_cache
+from src.core.prepared_statement_manager import (
+    PreparedStatementManager,
+    get_prepared_statement_manager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +42,7 @@ class SQLExecutor:
         enable_compilation: bool = False,
     ):
         """
-        Initialize SQL executor
+        Initialize SQL executor with query compilation support
 
         Args:
             max_rows: Maximum number of rows to return
@@ -46,6 +57,8 @@ class SQLExecutor:
 
         # Compilation components (initialized lazily)
         self._normalizer: Optional[SQLNormalizer] = None
+        self._plan_cache: Optional[PlanCache] = None
+        self._statement_manager: Optional[PreparedStatementManager] = None
 
     def _get_normalizer(self) -> SQLNormalizer:
         """Get or create SQL normalizer (lazy initialization)"""
@@ -53,19 +66,42 @@ class SQLExecutor:
             self._normalizer = get_normalizer()
         return self._normalizer
 
+    def _get_plan_cache(self) -> PlanCache:
+        """Get or create plan cache (lazy initialization)"""
+        if self._plan_cache is None:
+            self._plan_cache = get_plan_cache()
+        return self._plan_cache
+
+    def _get_statement_manager(self) -> PreparedStatementManager:
+        """Get or create prepared statement manager (lazy initialization)"""
+        if self._statement_manager is None:
+            self._statement_manager = get_prepared_statement_manager()
+        return self._statement_manager
+
     async def execute_query(
         self,
         session: Union[AsyncSession, Session],
         sql: str,
         params: Optional[Dict[str, Any]] = None,
+        connection_id: Optional[int] = None,
+        database_type: Optional[str] = None,
+        schema_fingerprint: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Execute SQL query with safety checks and timeout protection
+        Execute SQL query with query compilation (Phase 4.2 feature)
+
+        Integrates three compilation layers:
+        1. SQL Normalization: Extracts literals to parameters
+        2. EXPLAIN Plan Caching: Caches execution plans with schema validation
+        3. Prepared Statement Management: Reuses prepared statements
 
         Args:
             session: Database session (async or sync)
             sql: SQL query to execute
             params: Optional query parameters
+            connection_id: Database connection ID (for plan caching and statement management)
+            database_type: Database type (postgresql, mysql, sqlite, duckdb)
+            schema_fingerprint: Current schema fingerprint (for plan cache validation)
 
         Returns:
             Dictionary with:
@@ -75,6 +111,7 @@ class SQLExecutor:
                 - row_count: Number of rows returned
                 - execution_time_ms: Execution time
                 - truncated: Whether results were truncated
+                - compilation: Compilation metadata (if enabled)
                 - error: Error message if failed
         """
         start_time = datetime.utcnow()
@@ -113,18 +150,57 @@ class SQLExecutor:
             # Add compilation metadata if enabled
             if self.enable_compilation:
                 try:
+                    # Layer 1: SQL Normalization
                     normalizer = self._get_normalizer()
                     normalized = normalizer.normalize(sql)
-                    response["compilation"] = {
+
+                    compilation_meta = {
                         "enabled": True,
                         "normalized": True,
-                        "template": normalized.template,
                         "normalization_hash": normalized.normalization_hash,
                         "parameter_count": len(normalized.parameters),
-                        "metadata": normalized.metadata,
+                        "query_metadata": normalized.metadata,
                     }
+
+                    # Layer 2 & 3: Plan Cache + Prepared Statements (if connection context provided)
+                    if connection_id and database_type:
+                        plan_cache = self._get_plan_cache()
+                        stmt_manager = self._get_statement_manager()
+
+                        # Check plan cache
+                        cached_plan = None
+                        if schema_fingerprint:
+                            cached_plan = await plan_cache.get_cached_plan(
+                                connection_id=connection_id,
+                                normalized_hash=normalized.normalization_hash,
+                                current_schema_fingerprint=schema_fingerprint,
+                            )
+
+                        compilation_meta["plan_cached"] = cached_plan is not None
+                        if cached_plan:
+                            compilation_meta["plan_cost"] = cached_plan.estimated_cost
+                            compilation_meta["plan_scan_type"] = cached_plan.scan_type
+                            compilation_meta["plan_indexes"] = cached_plan.uses_indexes
+
+                        # Check prepared statement
+                        stmt = await stmt_manager.get_or_create_statement(
+                            connection_id=connection_id,
+                            normalized_hash=normalized.normalization_hash,
+                            template_sql=normalized.template,
+                            database_type=database_type,
+                        )
+
+                        compilation_meta["prepared_statement_id"] = stmt.statement_id
+                        compilation_meta["prepared"] = stmt.is_prepared
+                        compilation_meta["statement_executions"] = stmt.execution_count
+
+                        # Record execution time
+                        stmt_manager.record_execution(stmt.statement_id, execution_time_ms)
+
+                    response["compilation"] = compilation_meta
+
                 except Exception as e:
-                    logger.debug(f"Failed to normalize SQL for compilation: {e}")
+                    logger.debug(f"Error in query compilation: {e}")
                     response["compilation"] = {
                         "enabled": True,
                         "normalized": False,
