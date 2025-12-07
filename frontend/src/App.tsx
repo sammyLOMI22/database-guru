@@ -7,6 +7,7 @@ import { FeedbackStats } from './components/FeedbackStats';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ToolsPanel } from './components/ToolsPanel';
 import { SemanticCachePanel } from './components/SemanticCachePanel';
+import { ConnectionPoolMetrics } from './components/ConnectionPoolMetrics';
 import { healthAPI } from './services/api';
 
 const queryClient = new QueryClient({
@@ -21,7 +22,7 @@ const queryClient = new QueryClient({
 function App() {
   const [isHealthy, setIsHealthy] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'feedback' | 'tools' | 'cache' | 'settings'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'feedback' | 'tools' | 'cache' | 'pools' | 'settings'>('chat');
 
   useEffect(() => {
     // Check health on mount
@@ -94,6 +95,16 @@ function App() {
               💾 Cache
             </button>
             <button
+              onClick={() => setActiveTab('pools')}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'pools'
+                  ? 'border-cyan-500 text-cyan-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              🔗 Pools
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'settings'
@@ -127,6 +138,11 @@ function App() {
             {/* Cache */}
             <div className={`flex-1 overflow-auto p-6 ${activeTab === 'cache' ? '' : 'hidden'}`}>
               <SemanticCachePanel />
+            </div>
+
+            {/* Pools */}
+            <div className={`flex-1 overflow-auto p-6 ${activeTab === 'pools' ? '' : 'hidden'}`}>
+              <ConnectionPoolMetrics />
             </div>
 
             {/* Settings */}

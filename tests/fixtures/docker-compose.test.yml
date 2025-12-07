@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # PostgreSQL test database
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: database-guru-postgres-test
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: test_pooling
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_pooling"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    networks:
+      - test-network
+
+  # MySQL test database
+  mysql-test:
+    image: mysql:8.0
+    container_name: database-guru-mysql-test
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_DATABASE: test_pooling
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_pass
+      MYSQL_ROOT_PASSWORD: root_pass
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "test_user", "-ptest_pass"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - mysql-test-data:/var/lib/mysql
+    networks:
+      - test-network
+
+  # MongoDB test database (for future use when MongoDB query support is implemented)
+  mongodb-test:
+    image: mongo:7.0
+    container_name: database-guru-mongodb-test
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_DATABASE: test_pooling
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - mongodb-test-data:/data/db
+    networks:
+      - test-network
+
+volumes:
+  postgres-test-data:
+  mysql-test-data:
+  mongodb-test-data:
+
+networks:
+  test-network:
+    driver: bridge
