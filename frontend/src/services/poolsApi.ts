@@ -41,7 +41,7 @@ export interface PoolMetrics {
   health_status: 'healthy' | 'degraded' | 'unhealthy';
   pool_size: number;
   max_overflow: number;
-  capacity: number;
+  total_capacity: number;
 }
 
 export interface PoolInfo {

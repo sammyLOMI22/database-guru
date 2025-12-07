@@ -312,11 +312,24 @@ class ConnectionPoolManager:
         """
         async with self._lock:
             if database_type:
-                # Evict specific pool
-                key = (connection_id, database_type)
-                if key in self._pools:
-                    await self._dispose_pool(key)
-                    logger.info(f"Evicted pool for connection {connection_id} ({database_type})")
+                # Evict specific pool (case-insensitive)
+                target_key = None
+                target_db_type_lower = database_type.lower()
+                
+                # Check for direct match first
+                direct_key = (connection_id, database_type)
+                if direct_key in self._pools:
+                    target_key = direct_key
+                else:
+                    # Search for case-insensitive match
+                    for key in self._pools.keys():
+                        if key[0] == connection_id and key[1].lower() == target_db_type_lower:
+                            target_key = key
+                            break
+                
+                if target_key:
+                    await self._dispose_pool(target_key)
+                    logger.info(f"Evicted pool for connection {connection_id} ({target_key[1]})")
             else:
                 # Evict all pools for connection
                 keys_to_remove = [
@@ -421,7 +434,8 @@ class ConnectionPoolManager:
         """Get metrics for all pools"""
         pools_data = []
 
-        for key, pool in self._pools.items():
+        # Iterate over copy of items to ensure thread safety
+        for key, pool in list(self._pools.items()):
             # Update age before returning
             pool.metrics.update_age()
 

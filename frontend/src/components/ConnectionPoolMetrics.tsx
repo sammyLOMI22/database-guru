@@ -46,7 +46,7 @@ export const ConnectionPoolMetrics: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   // Use ref to store interval ID for manual control
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startAutoRefresh = () => {
     // Clear any existing interval first
@@ -370,9 +370,7 @@ export const ConnectionPoolMetrics: React.FC = () => {
                           {pool.metrics.idle_connections}
                         </span>
                         <span className="text-gray-400">/</span>
-                        <span className="text-gray-500 text-xs">
-                          {pool.metrics.capacity}
-                        </span>
+                        {pool.metrics.total_capacity}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
                         active / idle / capacity
@@ -404,7 +402,11 @@ export const ConnectionPoolMetrics: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => handleEvictPool(pool.connection_id, pool.database_type)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleEvictPool(pool.connection_id, pool.database_type);
+                        }}
                         disabled={evicting === pool.connection_id}
                         className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
                         title="Evict pool (will be recreated on next use)"

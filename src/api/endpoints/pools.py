@@ -160,7 +160,7 @@ async def evict_connection_pools(
         pools_before = len([
             pool for pool in all_metrics["pools"]
             if pool["connection_id"] == connection_id and (
-                database_type is None or pool["database_type"] == database_type
+                database_type is None or pool["database_type"].lower() == database_type.lower()
             )
         ])
 
