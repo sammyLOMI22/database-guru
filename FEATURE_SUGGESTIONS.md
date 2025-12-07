@@ -56,6 +56,13 @@ Currently, the user has to ask a question. The system could work in the backgrou
 -   **Client-Side SQL Engine**: Integrate **DuckDB-WASM** in the browser. This allows users to "explore" (filter/sort/group) a large result set (e.g., 100k rows) instantly on the client side without round-tripping to the server for every interaction.
 -   **Query Compilation**: Implement prepared statements for frequently used query patterns to skip the parsing/planning stage on the database side.
 
+## 8. 🤖 Agentic Architecture Evolution (LangGraph)
+*Redesigning for complexity and control.*
+
+-   **Supervisor-Worker Pattern**: Move away from a monolithic agent. Implement a "Supervisor" node that routes tasks to specialized workers (e.g., `SQLWriter`, `ChartGenerator`, `DataAnalyst`). This improves separation of concerns and accuracy.
+-   **Stateful Workflows & Time Travel**: Leverage LangGraph's checkpointing to allow "Time Travel". If a user says "Wait, go back to the query before the filter", the state can be rewound instantly without re-execution.
+-   **Human-in-the-Loop Checkpoints**: Explicitly model "Pause for Approval" states. For potentially expensive queries (e.g., `DROP TABLE` or `SELECT *` on huge tables), the graph pauses and requires a user approval signal to proceed.
+
 ## 📋 Feedback on Current Roadmap Priorities
 
 1.  **Query Compilation & Prepared Statements**: **Strong Agree**. Since connection pooling is done, this is the next logical backend optimization for speed.
