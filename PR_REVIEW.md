@@ -33,8 +33,12 @@ This PR introduces a robust connection pooling mechanism for user database conne
 
 ### 1. Pool Eviction Failure
 *   **Original Observation**: Clicking the "Evict" button does not remove the pool from the dashboard. Attempts to find the "Evict All" button failed (it appears missing).
-*   **Re-test Result**: ❌ **FAIL** - Issue persists. UI button click processes but pool remains in list.
-*   **Note**: Backend unit tests for eviction PASS, so the issue is likely in the frontend API call or state update logic.
+*   **Re-test (Round 2) Result**: ❌ **FAIL** - Issue persists despite added delay/reload code.
+*   **Diagnosis**:
+    *   **Backend API**: ✅ Verified working via `curl`.
+    *   **UI Display**: ✅ Verified working (shows empty state after backend eviction).
+    *   **Button Handler**: ❌ **BROKEN**. The frontend click handler is not successfully triggering the API call or handling the promise.
+*   **Recommendation**: Check network tab in DevTools for 404/500 errors on the DELETE request, or check if the click handler is silently catching an error before the API call is made.
 *   **Status**: ⚠️ **STILL BROKEN**
 
 ### 2. Broken Age Display ✅ **FIXED**
