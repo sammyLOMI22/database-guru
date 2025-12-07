@@ -50,11 +50,14 @@ This PR introduces a robust connection pooling mechanism for user database conne
     2.  Made `evict_pool` case-insensitive.
     3.  Made `get_all_metrics` thread-safe by iterating over a list copy.
     4.  Corrected frontend interface to use `total_capacity` matching backend response.
-    5.  Fixed filtered logic in `pools.py` endpoint to be case-insensitive.
-    6.  Updated `evict_pool` to iterate keys for robust case-insensitive matching.
-*   **Status**: ✅ **FIXED** (Pending cache clear)
+*   **Status**: ✅ **VERIFIED**
 
-### 2. Broken Age Display ✅ **FIXED**
+### 3. Verification Results
+*   **Backend Test Script**: `scripts/test_connection_pools.py` passed successfully.
+*   **UI Manual Testing**:
+    *   **Stats**: Confirmed correct display `Active / Idle / Capacity` (e.g., `0 / 0 / 30`).
+    *   **Eviction**: Confirmed smooth UI update without page reload.
+    *   **Multi-Connection**: Confirmed query execution across multiple databases works.
 
 ### 2. Broken Age Display ✅ **FIXED**
 *   **Original Observation**: The "Age" column consistently displays `NaNh` instead of a valid time duration (e.g., `30.4s`).
