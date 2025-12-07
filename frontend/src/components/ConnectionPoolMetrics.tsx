@@ -86,10 +86,18 @@ export const ConnectionPoolMetrics: React.FC = () => {
     }
 
     setEvicting(connectionId);
+    setError(null);
     try {
-      await poolsAPI.evictConnectionPools(connectionId, databaseType);
-      await loadData();
+      const result = await poolsAPI.evictConnectionPools(connectionId, databaseType);
+      console.log('Eviction result:', result);
+
+      // Small delay to ensure backend has fully processed eviction
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Force full reload of data
+      await loadData(true);
     } catch (err: unknown) {
+      console.error('Eviction error:', err);
       setError(getErrorMessage(err, 'Failed to evict pool'));
     } finally {
       setEvicting(null);
