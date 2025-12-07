@@ -24,7 +24,24 @@ Manual testing revealed that clicking the "Evict" button in the Pool Dashboard d
 
 ### Frontend Changes (`frontend/src/components/ConnectionPoolMetrics.tsx`)
 
-Updated the `handleEvictPool` function with the following improvements:
+#### Change 1: Added useRef for Interval Management
+
+```typescript
+import React, { useState, useEffect, useRef } from 'react';
+
+const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+const startAutoRefresh = () => {
+  if (intervalRef.current) {
+    clearInterval(intervalRef.current);
+  }
+  intervalRef.current = setInterval(() => {
+    loadData(false);
+  }, 10000);
+};
+```
+
+#### Change 2: Updated handleEvictPool to Pause/Resume Auto-Refresh
 
 ```typescript
 const handleEvictPool = async (connectionId: number, databaseType: string) => {
@@ -34,32 +51,44 @@ const handleEvictPool = async (connectionId: number, databaseType: string) => {
     return;
   }
 
+  // ← PAUSE auto-refresh during eviction to prevent race conditions
+  if (intervalRef.current) {
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }
+
   setEvicting(connectionId);
-  setError(null);  // ← Clear any previous errors
+  setError(null);
   try {
     const result = await poolsAPI.evictConnectionPools(connectionId, databaseType);
-    console.log('Eviction result:', result);  // ← Debug logging
+    console.log('✅ Eviction successful:', result);
 
     // Small delay to ensure backend has fully processed eviction
-    await new Promise(resolve => setTimeout(resolve, 200));  // ← Increased to 200ms
+    await new Promise(resolve => setTimeout(resolve, 300));  // ← 300ms delay
 
     // Force full reload of data with loading state
-    await loadData(true);  // ← Changed from loadData() to loadData(true)
+    console.log('🔄 Reloading pool data...');
+    await loadData(true);
+    console.log('✅ Data reloaded. Total pools:', stats?.total_pools);
   } catch (err: unknown) {
-    console.error('Eviction error:', err);  // ← Error logging
+    console.error('❌ Eviction error:', err);
     setError(getErrorMessage(err, 'Failed to evict pool'));
   } finally {
     setEvicting(null);
+    // ← RESTART auto-refresh after eviction completes
+    startAutoRefresh();
   }
 };
 ```
 
 **Key Changes**:
-1. **Clear previous errors**: `setError(null)` before eviction
-2. **Console logging**: Debug output for troubleshooting
-3. **Increased delay**: 200ms wait after eviction (was 100ms)
-4. **Force full reload**: `loadData(true)` shows loading spinner and forces state update
-5. **Better error handling**: Console.error for debugging
+1. **Auto-refresh control**: Pause before eviction, restart after completion
+2. **Race condition fix**: Prevents auto-refresh from interfering with manual eviction
+3. **Clear previous errors**: `setError(null)` before eviction
+4. **Enhanced logging**: Console output with emojis for debugging
+5. **Increased delay**: 300ms wait after eviction
+6. **Force full reload**: `loadData(true)` with loading state
+7. **Guaranteed cleanup**: `startAutoRefresh()` in finally block
 
 ---
 

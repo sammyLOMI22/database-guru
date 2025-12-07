@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Database,
   Activity,
@@ -45,15 +45,29 @@ export const ConnectionPoolMetrics: React.FC = () => {
   const [evicting, setEvicting] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadData(true);
+  // Use ref to store interval ID for manual control
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(() => {
+  const startAutoRefresh = () => {
+    // Clear any existing interval first
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    // Start new interval
+    intervalRef.current = setInterval(() => {
       loadData(false);
     }, 10000);
+  };
 
-    return () => clearInterval(interval);
+  useEffect(() => {
+    loadData(true);
+    startAutoRefresh();
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, []);
 
   const loadData = async (isInitial = false) => {
@@ -85,22 +99,32 @@ export const ConnectionPoolMetrics: React.FC = () => {
       return;
     }
 
+    // Pause auto-refresh during eviction to prevent race conditions
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     setEvicting(connectionId);
     setError(null);
     try {
       const result = await poolsAPI.evictConnectionPools(connectionId, databaseType);
-      console.log('Eviction result:', result);
+      console.log('✅ Eviction successful:', result);
 
       // Small delay to ensure backend has fully processed eviction
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Force full reload of data
+      // Force full reload of data with loading state
+      console.log('🔄 Reloading pool data...');
       await loadData(true);
+      console.log('✅ Data reloaded. Total pools:', stats?.total_pools);
     } catch (err: unknown) {
-      console.error('Eviction error:', err);
+      console.error('❌ Eviction error:', err);
       setError(getErrorMessage(err, 'Failed to evict pool'));
     } finally {
       setEvicting(null);
+      // Restart auto-refresh
+      startAutoRefresh();
     }
   };
 
