@@ -188,6 +188,11 @@ class QueryResponse(BaseModel):
         default=None,
         description="Original question that matched in semantic cache"
     )
+    # Query compilation metadata (Phase 4.2)
+    compilation: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Query compilation metadata (normalization, plan caching, prepared statements)"
+    )
 
     class Config:
         json_schema_extra = {

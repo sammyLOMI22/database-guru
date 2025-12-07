@@ -7,7 +7,10 @@ from src.database.connection import Base
 
 
 class QueryHistory(Base):
-    """Store history of natural language queries and generated SQL"""
+    """Store history of natural language queries and generated SQL
+
+    Extended with query compilation metrics (Phase 4.2)
+    """
     __tablename__ = "query_history"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -30,6 +33,12 @@ class QueryHistory(Base):
     database_type = Column(String(50))  # postgres, mysql, sqlite, etc.
     model_used = Column(String(100))  # llama3, gpt-4, etc.
 
+    # Query Compilation Metrics (Phase 4.2)
+    normalized_hash = Column(String(64), nullable=True, index=True)  # Hash of normalized query template
+    used_prepared_statement = Column(Boolean, default=False)  # Whether prepared statement was used
+    plan_cache_hit = Column(Boolean, default=False)  # Whether plan was cached
+    compilation_speedup_ms = Column(Float, nullable=True)  # Estimated speedup from compilation
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
@@ -40,6 +49,7 @@ class QueryHistory(Base):
     __table_args__ = (
         Index('idx_user_created', 'user_id', 'created_at'),
         Index('idx_created', 'created_at'),
+        Index('idx_normalized_hash', 'normalized_hash'),  # For compilation lookups
     )
 
 
@@ -265,4 +275,97 @@ class SystemSettings(Base):
         return (
             f"<SystemSettings(auto_learning={self.auto_learning_enabled}, "
             f"threshold={self.confidence_threshold}, mode={self.apply_mode})>"
+        )
+
+
+class CompiledQueryMetrics(Base):
+    """Track performance and compilation status of queries (Phase 4.2)
+
+    Stores metrics for compiled queries including execution counts,
+    plan cache hits, and prepared statement usage.
+    """
+    __tablename__ = "compiled_query_metrics"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Query identification
+    normalized_hash = Column(String(64), unique=True, index=True, nullable=False)
+    connection_id = Column(Integer, ForeignKey("database_connections.id"), nullable=False, index=True)
+    template_sql = Column(Text, nullable=False)
+
+    # Compilation status
+    is_prepared = Column(Boolean, default=False, index=True)
+    is_plan_cached = Column(Boolean, default=False, index=True)
+
+    # Execution metrics
+    total_executions = Column(Integer, default=0)
+    total_execution_ms = Column(Float, default=0.0)
+    avg_execution_ms = Column(Float, default=0.0)
+    min_execution_ms = Column(Float, nullable=True)
+    max_execution_ms = Column(Float, nullable=True)
+
+    # Cache hit metrics
+    plan_cache_hits = Column(Integer, default=0)
+    plan_cache_misses = Column(Integer, default=0)
+    prepared_statement_hits = Column(Integer, default=0)
+
+    # Timestamps
+    first_executed_at = Column(DateTime, default=datetime.utcnow, index=True)
+    last_executed_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Indexes for common queries
+    __table_args__ = (
+        Index('idx_connection_hash', 'connection_id', 'normalized_hash'),
+        Index('idx_last_executed', 'last_executed_at'),
+        Index('idx_is_prepared', 'is_prepared'),
+    )
+
+    def __repr__(self):
+        return (
+            f"<CompiledQueryMetrics(hash={self.normalized_hash[:8]}, "
+            f"executions={self.total_executions}, prepared={self.is_prepared})>"
+        )
+
+
+class CompilationInvalidationLog(Base):
+    """Log schema changes and cache invalidations (Phase 4.2)
+
+    Tracks when and why cached plans and prepared statements are invalidated
+    due to schema changes or manual invalidation.
+    """
+    __tablename__ = "compilation_invalidation_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Connection and table information
+    connection_id = Column(Integer, ForeignKey("database_connections.id"), nullable=False, index=True)
+    table_name = Column(String(255), nullable=True, index=True)  # NULL for connection-wide invalidation
+
+    # Schema fingerprints
+    old_fingerprint = Column(String(32), nullable=True)
+    new_fingerprint = Column(String(32), nullable=True)
+
+    # Invalidation details
+    invalidation_reason = Column(String(50), nullable=False)  # 'schema_change', 'manual', 'ttl_expired'
+    plans_invalidated = Column(Integer, default=0)
+    statements_invalidated = Column(Integer, default=0)
+
+    # Optional details
+    affected_queries = Column(JSON, nullable=True)  # List of affected query hashes
+    details = Column(Text, nullable=True)  # Additional context
+
+    # Timestamps
+    invalidated_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_connection_reason', 'connection_id', 'invalidation_reason'),
+        Index('idx_table_invalidation', 'table_name', 'invalidated_at'),
+    )
+
+    def __repr__(self):
+        return (
+            f"<CompilationInvalidationLog(connection={self.connection_id}, "
+            f"reason={self.invalidation_reason}, table={self.table_name})>"
         )

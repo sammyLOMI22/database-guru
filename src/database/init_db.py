@@ -11,6 +11,8 @@ from src.database.models import (
     ChatSession,
     ChatMessage,
     LearnedCorrection,
+    CompiledQueryMetrics,
+    CompilationInvalidationLog,
 )
 
 logging.basicConfig(level=logging.INFO)
