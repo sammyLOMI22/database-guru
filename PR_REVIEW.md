@@ -1,9 +1,9 @@
 # PR Review: Connection Pooling Implementation
 
 ## Summary
-**Status**: ✅ **APPROVED - Issues Resolved**
+**Status**: ⚠️ **Changes Requested**
 
-The code architecture and automated tests are solid. Manual testing issues have been identified and fixed.
+Manual testing confirmed that the Age display issue is fixed, but the **Pool Eviction** issue persists in the UI (despite backend tests passing).
 
 This PR introduces a robust connection pooling mechanism for user database connections, addressing potential performance bottlenecks and resource exhaustion issues. The implementation covers the full stack, from the core pool manager logic and API endpoints to frontend visualization and management.
 
@@ -33,9 +33,11 @@ This PR introduces a robust connection pooling mechanism for user database conne
 
 ### 1. Pool Eviction Failure
 *   **Original Observation**: Clicking the "Evict" button does not remove the pool from the dashboard. Attempts to find the "Evict All" button failed (it appears missing).
-*   **Impact**: Users cannot manually clear stuck pools or reset state.
-*   **Root Cause**: Frontend button not properly wired to backend API.
-*   **Status**: ✅ **FIXED** - Backend API verified working correctly (eviction endpoint tested and functional)
+*   **Re-test Result**: ❌ **FAIL** - Issue persists. UI button click processes but pool remains in list.
+*   **Note**: Backend unit tests for eviction PASS, so the issue is likely in the frontend API call or state update logic.
+*   **Status**: ⚠️ **STILL BROKEN**
+
+### 2. Broken Age Display ✅ **FIXED**
 
 ### 2. Broken Age Display ✅ **FIXED**
 *   **Original Observation**: The "Age" column consistently displays `NaNh` instead of a valid time duration (e.g., `30.4s`).
