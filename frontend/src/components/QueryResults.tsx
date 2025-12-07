@@ -38,6 +38,16 @@ interface QueryResultsProps {
   cacheType?: 'exact' | 'semantic' | null;
   semanticSimilarity?: number | null;
   matchedQuestion?: string | null;
+  // Query Compilation Metadata (Phase 4.2)
+  compilation?: {
+    enabled?: boolean;
+    normalized?: boolean;
+    plan_cached?: boolean;
+    prepared?: boolean;
+    estimated_cost?: number;
+    plan_scan_type?: string;
+    plan_indexes?: string[];
+  } | null;
 }
 
 export default function QueryResults({
@@ -60,6 +70,7 @@ export default function QueryResults({
   cacheType,
   semanticSimilarity,
   matchedQuestion,
+  compilation,
 }: QueryResultsProps) {
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -121,6 +132,50 @@ export default function QueryResults({
           {matchedQuestion && cacheType === 'semantic' && (
             <p className="text-sm text-amber-600 mt-2">
               <span className="font-medium">Matched:</span> "{matchedQuestion}"
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Compilation Badge */}
+      {compilation && compilation.enabled && (
+        <div className="rounded-lg p-3 border bg-red-50 border-red-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-red-600" />
+              <div>
+                <span className="font-medium text-red-800">Query Compiled</span>
+                <div className="flex gap-2 mt-1">
+                  {compilation.normalized && (
+                    <span className="inline-block text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">
+                      ✓ Normalized
+                    </span>
+                  )}
+                  {compilation.plan_cached && (
+                    <span className="inline-block text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-700">
+                      ✓ Plan Cached
+                    </span>
+                  )}
+                  {compilation.prepared && (
+                    <span className="inline-block text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-700">
+                      ✓ Prepared
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="text-right text-xs text-red-700">
+              {compilation.estimated_cost && (
+                <div>Cost: {compilation.estimated_cost.toFixed(2)}</div>
+              )}
+              {compilation.plan_scan_type && (
+                <div>{compilation.plan_scan_type} Scan</div>
+              )}
+            </div>
+          </div>
+          {compilation.plan_indexes && compilation.plan_indexes.length > 0 && (
+            <p className="text-xs text-red-600 mt-2">
+              <span className="font-medium">Indexes:</span> {compilation.plan_indexes.join(', ')}
             </p>
           )}
         </div>
