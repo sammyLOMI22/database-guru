@@ -110,6 +110,7 @@ class PoolEntry:
     session_factory: Union[async_sessionmaker, sessionmaker]
     connection_id: int
     database_type: str
+    connection_name: str = ""  # Connection name for display
     metrics: PoolMetrics = field(default_factory=PoolMetrics)
 
     def __post_init__(self):
@@ -291,6 +292,7 @@ class ConnectionPoolManager:
             session_factory=session_factory,
             connection_id=connection.id,
             database_type=connection.database_type,
+            connection_name=connection.name,
         )
 
         # Set pool capacity from settings
@@ -420,9 +422,16 @@ class ConnectionPoolManager:
         pools_data = []
 
         for key, pool in self._pools.items():
+            # Update age before returning
+            pool.metrics.update_age()
+
             pools_data.append({
                 "connection_id": key[0],
                 "database_type": key[1],
+                "connection_name": pool.connection_name,
+                "created_at": pool.metrics.created_at.isoformat(),
+                "last_used": pool.metrics.last_used.isoformat(),
+                "age_seconds": round(pool.metrics.total_age_seconds, 1),
                 "metrics": pool.metrics.to_dict(),
             })
 

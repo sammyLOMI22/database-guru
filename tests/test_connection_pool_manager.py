@@ -137,6 +137,7 @@ class TestConnectionPoolManager:
             assert pool_entry is not None
             assert pool_entry.connection_id == mock_sqlite_connection.id
             assert pool_entry.database_type == mock_sqlite_connection.database_type
+            assert pool_entry.connection_name == mock_sqlite_connection.name
             assert pool_entry.metrics.total_checkouts == 1
             assert pool_entry.metrics.health_status == HealthStatus.HEALTHY
 
@@ -154,6 +155,7 @@ class TestConnectionPoolManager:
             assert pool_entry is not None
             assert pool_entry.connection_id == mock_duckdb_connection.id
             assert pool_entry.database_type == "duckdb"
+            assert pool_entry.connection_name == mock_duckdb_connection.name
             assert pool_entry.metrics.total_checkouts == 1
 
     @pytest.mark.asyncio
@@ -352,6 +354,19 @@ class TestConnectionPoolManager:
             assert len(metrics["pools"]) == 2
             assert "global_metrics" in metrics
             assert metrics["global_metrics"]["total_active_connections"] >= 0
+
+            # Verify top-level fields in pool data
+            pool_data = metrics["pools"][0]
+            assert "connection_id" in pool_data
+            assert "database_type" in pool_data
+            assert "connection_name" in pool_data
+            assert "age_seconds" in pool_data
+            assert "created_at" in pool_data
+            assert "last_used" in pool_data
+            assert "metrics" in pool_data
+
+            # Verify connection_name matches
+            assert pool_data["connection_name"] in ["db1", "db2"]
 
     @pytest.mark.asyncio
     async def test_warm_pool(self, pool_manager, mock_sqlite_connection):
