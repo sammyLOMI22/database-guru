@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, DBAPIError, OperationalError
 
+from src.core.sql_normalizer import SQLNormalizer, get_normalizer
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,6 +28,7 @@ class SQLExecutor:
         max_rows: int = 1000,
         timeout_seconds: int = 30,
         allow_write: bool = False,
+        enable_compilation: bool = False,
     ):
         """
         Initialize SQL executor
@@ -34,10 +37,21 @@ class SQLExecutor:
             max_rows: Maximum number of rows to return
             timeout_seconds: Query timeout in seconds
             allow_write: Whether to allow write operations
+            enable_compilation: Whether to enable query compilation (Phase 4.2 feature)
         """
         self.max_rows = max_rows
         self.timeout_seconds = timeout_seconds
         self.allow_write = allow_write
+        self.enable_compilation = enable_compilation
+
+        # Compilation components (initialized lazily)
+        self._normalizer: Optional[SQLNormalizer] = None
+
+    def _get_normalizer(self) -> SQLNormalizer:
+        """Get or create SQL normalizer (lazy initialization)"""
+        if self._normalizer is None:
+            self._normalizer = get_normalizer()
+        return self._normalizer
 
     async def execute_query(
         self,
@@ -86,7 +100,7 @@ class SQLExecutor:
             end_time = datetime.utcnow()
             execution_time_ms = (end_time - start_time).total_seconds() * 1000
 
-            return {
+            response = {
                 "success": True,
                 "data": result["data"],
                 "columns": result["columns"],
@@ -95,6 +109,29 @@ class SQLExecutor:
                 "truncated": result["truncated"],
                 "error": None,
             }
+
+            # Add compilation metadata if enabled
+            if self.enable_compilation:
+                try:
+                    normalizer = self._get_normalizer()
+                    normalized = normalizer.normalize(sql)
+                    response["compilation"] = {
+                        "enabled": True,
+                        "normalized": True,
+                        "template": normalized.template,
+                        "normalization_hash": normalized.normalization_hash,
+                        "parameter_count": len(normalized.parameters),
+                        "metadata": normalized.metadata,
+                    }
+                except Exception as e:
+                    logger.debug(f"Failed to normalize SQL for compilation: {e}")
+                    response["compilation"] = {
+                        "enabled": True,
+                        "normalized": False,
+                        "error": str(e),
+                    }
+
+            return response
 
         except asyncio.TimeoutError:
             execution_time = (datetime.utcnow() - start_time).total_seconds()
