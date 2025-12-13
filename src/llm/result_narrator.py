@@ -412,27 +412,53 @@ class ResultNarrator:
         row_count: int,
         statistics: Dict[str, Any]
     ) -> NarrativeResult:
-        """Generate basic fallback narrative when LLM fails"""
-        summary = f"Query returned {row_count} row{'s' if row_count != 1 else ''}."
+        """Generate insightful fallback narrative when LLM fails"""
+        # Create a more insightful summary
+        summary = f"Found {row_count} record{'s' if row_count != 1 else ''}"
 
         insights = []
         if statistics:
-            # Add insights from statistics
+            # Collect numeric and string columns for better insights
+            numeric_cols = []
+            string_cols = []
+
             for col, stats in statistics.items():
                 if col == "row_count":
                     continue
                 if isinstance(stats, dict):
-                    if "avg" in stats and isinstance(stats["avg"], (int, float)):
-                        insights.append(f"Average {col}: {stats['avg']}")
-                    elif "unique_count" in stats:
-                        insights.append(f"Unique values in {col}: {stats['unique_count']}")
-                    elif "most_common" in stats:
-                        insights.append(f"Most common {col}: {stats['most_common']}")
+                    if stats.get("type") == "numeric":
+                        numeric_cols.append((col, stats))
+                    elif stats.get("type") == "string":
+                        string_cols.append((col, stats))
+
+            # Generate insights from numeric columns (ranges are more interesting than averages)
+            for col, stats in numeric_cols[:2]:  # Top 2 numeric columns
+                min_val = stats.get("min")
+                max_val = stats.get("max")
+                avg_val = stats.get("avg")
+                if min_val is not None and max_val is not None:
+                    insights.append(f"{col.replace('_', ' ').title()}: ranges from {min_val} to {max_val} (avg: {avg_val})")
+
+            # Generate insights from string columns (unique counts are interesting)
+            for col, stats in string_cols[:2]:  # Top 2 string columns
+                unique_count = stats.get("unique_count")
+                most_common = stats.get("most_common")
+                if unique_count is not None:
+                    if most_common:
+                        insights.append(f"{col.replace('_', ' ').title()}: {unique_count} unique values, with '{most_common}' being most common")
+                    else:
+                        insights.append(f"{col.replace('_', ' ').title()}: {unique_count} unique values")
+
+            # Add distribution info if only one category
+            if len(string_cols) > 0:
+                first_string_col = string_cols[0]
+                if first_string_col[1].get("unique_count") == 1:
+                    insights.append(f"All records belong to a single {first_string_col[0]} category")
 
         return NarrativeResult(
             summary=summary,
-            key_insights=insights[:3],
-            confidence=0.4,
+            key_insights=insights[:4],
+            confidence=0.5,
             statistics=statistics
         )
 
