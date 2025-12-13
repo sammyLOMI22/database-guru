@@ -339,6 +339,7 @@ export interface MultiDatabaseQueryRequest {
   use_cache?: boolean;
   model?: string;
   force_schema_refresh?: boolean;
+  enable_narratives?: boolean;
 }
 
 export interface DatabaseQueryResult {
@@ -362,6 +363,8 @@ export interface DatabaseQueryResult {
   used_planning?: boolean;
   // Parallel Execution Metrics
   _parallel_execution_metrics?: ParallelExecutionMetrics | null;
+  // Intelligent Data Narratives fields
+  result_analysis?: ResultAnalysis | null;
 }
 
 // Cache Info for Multi-Database Queries (Phase 3.2: Semantic Caching)
@@ -385,6 +388,8 @@ export interface MultiDatabaseQueryResponse {
   cached: boolean;
   timestamp: string;
   cache_info?: CacheInfo | null;  // Cache operation summary
+  // Intelligent Data Narratives fields
+  combined_analysis?: ResultAnalysis | null;
 }
 
 // Mapping Management Types (Phase 2: Non-SQL Feedback)

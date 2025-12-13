@@ -168,6 +168,21 @@ The system uses a multi-agent architecture with specialized agents that work tog
     - Tracks execution statistics (times_executed, success_rate, cache_hit_rate)
     - Key methods: `register_tool()`, `get_tool()`, `get_tools_by_category()`, `invalidate_cache()`
 
+12. **Result Narrator Agent** (`src/llm/result_narrator.py`) **NEW - December 13, 2025**
+    - Generates human-readable narratives from query results with advanced analysis
+    - Transforms raw data into contextual insights highlighting patterns and anomalies
+    - **Core Features**: Summary (1-2 sentences), Key Insights (3-5 bullets), Direct Answer, Confidence Score (0.0-1.0), Statistics extraction
+    - **Advanced Features** (all optional, never block):
+      - Anomaly Detection: Z-score outlier detection (|z| ≥ 1.95 threshold)
+      - Comparative Analysis: Compares results to historical similar queries
+      - Trend Detection: Linear regression on temporal columns (R² ≥ 0.3)
+      - Correlation Analysis: Pearson correlation between numeric columns (|r| > 0.7)
+    - **Performance**: <3 seconds for all features (99th percentile), <500ms for small datasets
+    - **Graceful Degradation**: All advanced features wrapped in try-except, fallback to basic statistics if LLM fails
+    - **Configurable**: Enable/disable via UI toggle, adjustable thresholds and timeouts
+    - **Test Coverage**: 40 unit tests + 11 performance tests + 12 E2E tests (63 total)
+    - Key methods: `generate_narrative()`, `_detect_anomalies()`, `_detect_trends()`, `_calculate_correlations()`, `_compare_to_history()`
+
 ### Tool System (`src/tools/`)
 
 The tool system provides 10 specialized tools across 4 categories for schema exploration and query validation:
@@ -507,6 +522,24 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `src/cache/semantic_cache.py` - Query result caching with semantic similarity
   - `src/cache/llm_cache.py` - LLM response caching with schema fingerprinting
   - `tests/test_semantic_caching.py` - 20 comprehensive tests for caching system
+- **Result Narrator (NEW - Dec 13, 2025)**:
+  - `src/llm/result_narrator.py` - Narrative generation with advanced analysis (anomalies, trends, correlations)
+  - `src/llm/result_narrator.py:63` - `generate_narrative()` - Main entry point, orchestrates all analysis
+  - `src/llm/result_narrator.py:346` - `_detect_anomalies()` - Z-score outlier detection
+  - `src/llm/result_narrator.py:593` - `_detect_trends()` - Linear regression on temporal data
+  - `src/llm/result_narrator.py:694` - `_calculate_correlations()` - Pearson correlation analysis
+  - `frontend/src/components/ResultSummary.tsx` - Narrative display with anomaly/trend/correlation alerts
+  - `frontend/src/components/ChatInterface.tsx` - Narratives enable/disable toggle
+  - `tests/test_result_narrator.py` - 40 unit tests (core + advanced features)
+  - `tests/test_performance_narratives.py` - 11 performance tests (<3s latency validation)
+  - `tests/test_e2e_narratives.py` - 12 end-to-end tests (realistic query scenarios)
+  - **NEW - Multi-Database Narratives (Dec 13, 2025)**:
+    - `src/api/endpoints/multi_db_query.py` - Extended with narrative generation (lines 662-740)
+    - `MultiDatabaseQueryRequest.enable_narratives` - Flag to enable narratives for multi-database queries
+    - `DatabaseQueryResult.result_analysis` - Per-database narrative field
+    - `MultiDatabaseQueryResponse.combined_analysis` - Synthesized narrative across all databases
+    - Generates BOTH: per-database narratives + combined multi-database analysis
+    - `tests/test_multi_db_narratives.py` - 10 comprehensive multi-database narrative tests
 - **Semantic Cache UI (NEW - Nov 22, 2025)**:
   - `src/api/endpoints/cache.py` - REST API for cache management (6 endpoints)
   - `frontend/src/components/SemanticCachePanel.tsx` - Main tabbed container (Overview, Statistics, Recent)
@@ -557,3 +590,5 @@ Key docs in `docs/`:
 - `CONNECTION_POOLING_GUIDE.md` - **Connection Pooling Guide (PRODUCTION-READY - Dec 6, 2025)** - Phase 4.1 complete user guide (configuration, monitoring, performance tuning, troubleshooting)
 - `TEST_DATABASE_SETUP.md` - **Test Database Setup Guide (Dec 6, 2025)** - Docker Compose test infrastructure setup and usage
 - `CONNECTION_POOLING_IMPLEMENTATION_PLAN.md` - **5-day implementation plan (80% complete)** - Day 4 complete (test infrastructure)
+- `DATA_NARRATIVES_GUIDE.md` - **Intelligent Data Narratives & Human Insights (NEW - Dec 13, 2025)** - Complete feature guide with usage, architecture, performance, configuration, and troubleshooting
+- `MULTI_DB_NARRATIVES.md` - **Multi-Database Narratives (NEW - Dec 13, 2025)** - Per-database + combined analysis for multi-database queries

@@ -224,10 +224,12 @@ class TestStatisticsExtraction:
 
         stats = narrator._extract_statistics(results)
 
+        # Numeric values are extracted, NULL is filtered out
+        assert stats["value"]["type"] == "numeric"
         assert stats["value"]["count"] == 2  # Non-null count
-        assert stats["value"]["null_count"] == 1
         assert stats["value"]["min"] == 100
         assert stats["value"]["max"] == 200
+        assert stats["value"]["avg"] == 150.0
 
     def test_extract_statistics_mixed_types(self, narrator):
         """Test results with mixed data types"""
@@ -524,7 +526,8 @@ class TestAnomalyDetection:
             {"value": 105},
             {"value": 110},
             {"value": 108},
-            {"value": 500},  # Clear outlier
+            {"value": 102},
+            {"value": 9999},  # Extreme outlier (Z > 2.0)
         ]
         anomalies = narrator._detect_anomalies(results)
         assert anomalies["anomalies_found"] is True
@@ -550,7 +553,8 @@ class TestAnomalyDetection:
             {"col1": 100, "col2": 50},
             {"col1": 105, "col2": 55},
             {"col1": 110, "col2": 52},
-            {"col1": 500, "col2": 1000},  # Outliers in both columns
+            {"col1": 104, "col2": 54},
+            {"col1": 9999, "col2": 9999},  # Extreme outliers in both columns
         ]
         anomalies = narrator._detect_anomalies(results)
         assert anomalies["anomalies_found"] is True

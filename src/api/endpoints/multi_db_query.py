@@ -24,6 +24,8 @@ from src.core.user_db_connector import UserDatabaseConnector
 from src.core.schema_inspector import SchemaInspector
 from src.core.executor import SQLExecutor
 from src.llm.self_correcting_agent import AgentTrace
+from src.llm.result_narrator import ResultNarrator
+from src.llm.ollama_client import OllamaClient
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,7 @@ class MultiDatabaseQueryRequest(BaseModel):
     allow_write: bool = False
     use_cache: bool = True
     model: Optional[str] = None
+    enable_narratives: bool = True  # NEW: Enable narrative generation for multi-database results
 
 
 class DatabaseQueryResult(BaseModel):
@@ -62,6 +65,8 @@ class DatabaseQueryResult(BaseModel):
     total_attempts: Optional[int] = 1
     verification_warnings: Optional[List[str]] = None
     used_planning: Optional[bool] = False
+    # NEW: Per-database narrative (generated for each database result)
+    result_analysis: Optional[Dict[str, Any]] = None  # Narrative for this database
 
 
 class CacheInfo(BaseModel):
@@ -86,6 +91,8 @@ class MultiDatabaseQueryResponse(BaseModel):
     cached: bool
     timestamp: str
     cache_info: Optional[CacheInfo] = None  # Cache operation summary
+    # NEW: Combined narrative synthesizing insights across all databases
+    combined_analysis: Optional[Dict[str, Any]] = None  # Narrative across all databases
 
 
 @router.post("/", response_model=MultiDatabaseQueryResponse)
@@ -651,6 +658,108 @@ async def process_multi_database_query(
             "timestamp": datetime.utcnow().isoformat(),
             "cache_info": cache_info_data.model_dump(),
         }
+
+        # NEW: Generate narratives if enabled
+        if request.enable_narratives and len(database_results) > 0:
+            logger.info(f"Starting narrative generation for {len(database_results)} databases, enable_narratives={request.enable_narratives}")
+            ollama_client = None
+            try:
+                # Initialize Ollama client and narrator
+                logger.info("Initializing Ollama client for narrative generation...")
+                ollama_client = OllamaClient(settings=settings)
+                await ollama_client.connect()
+                logger.info("Ollama client initialized successfully")
+
+                narrator = ResultNarrator(
+                    ollama_client=ollama_client,
+                    db_session=db,
+                    enable_statistics=True,
+                    timeout_seconds=5
+                )
+                logger.info("ResultNarrator initialized successfully")
+
+                # 1. Generate per-database narratives
+                logger.info(f"Generating per-database narratives for {len(database_results)} databases...")
+                for i, db_result in enumerate(database_results):
+                    logger.info(f"Processing database {i+1}/{len(database_results)}: {db_result.connection_name}, success={db_result.success}, has_results={db_result.results is not None and len(db_result.results) > 0}")
+                    if db_result.success and db_result.results:
+                        try:
+                            logger.info(f"Generating narrative for {db_result.connection_name}...")
+                            db_narrative = await narrator.generate_narrative(
+                                question=request.question,
+                                sql=db_result.sql,
+                                results=db_result.results,
+                                row_count=db_result.row_count or 0,
+                                execution_time_ms=db_result.execution_time_ms or 0
+                            )
+                            # Store per-database narrative
+                            response_data["database_results"][i]["result_analysis"] = {
+                                "summary": db_narrative.summary,
+                                "key_insights": db_narrative.key_insights,
+                                "direct_answer": db_narrative.direct_answer,
+                                "confidence": db_narrative.confidence,
+                                "statistics": db_narrative.statistics,
+                                "generated_at": db_narrative.generated_at,
+                            }
+                            logger.info(f"✓ Generated narrative for {db_result.connection_name}: confidence={db_narrative.confidence}")
+                        except Exception as e:
+                            logger.error(f"Failed to generate narrative for {db_result.connection_name}: {e}", exc_info=True)
+                            # Continue without narrative for this database
+
+                # 2. Generate combined narrative across all databases (if multiple databases)
+                if len(database_results) > 1:
+                    logger.info(f"Generating combined narrative across {len(database_results)} databases...")
+                    try:
+                        # Combine results from all databases for cross-database analysis
+                        combined_results = []
+                        for db_result in database_results:
+                            if db_result.success and db_result.results:
+                                for row in db_result.results:
+                                    # Tag each row with source database
+                                    row_with_source = dict(row)
+                                    row_with_source["_source_database"] = db_result.connection_name
+                                    combined_results.append(row_with_source)
+
+                        logger.info(f"Combined {len(combined_results)} rows from {len(database_results)} databases for analysis")
+                        if combined_results:
+                            # Generate narrative synthesizing all databases
+                            logger.info(f"Calling generate_narrative for combined analysis...")
+                            combined_narrative = await narrator.generate_narrative(
+                                question=f"{request.question} (across {len(database_results)} databases: {', '.join(r.connection_name for r in database_results)})",
+                                sql="[Multiple databases]",
+                                results=combined_results,
+                                row_count=len(combined_results),
+                                execution_time_ms=total_execution_time
+                            )
+
+                            response_data["combined_analysis"] = {
+                                "summary": combined_narrative.summary,
+                                "key_insights": combined_narrative.key_insights,
+                                "direct_answer": combined_narrative.direct_answer,
+                                "confidence": combined_narrative.confidence,
+                                "statistics": combined_narrative.statistics,
+                                "generated_at": combined_narrative.generated_at,
+                                "databases_included": len(database_results),
+                                "total_rows_analyzed": len(combined_results),
+                            }
+                            logger.info(f"✓ Generated combined narrative: confidence={combined_narrative.confidence}")
+                    except Exception as e:
+                        logger.error(f"Failed to generate combined narrative: {e}", exc_info=True)
+                        # Continue without combined narrative
+                else:
+                    logger.info(f"Skipping combined narrative - only {len(database_results)} database(s)")
+
+            except Exception as e:
+                logger.error(f"Failed to initialize narrator: {e}", exc_info=True)
+                # Continue without narratives if initialization fails
+            finally:
+                # Cleanup Ollama client connection
+                if ollama_client:
+                    try:
+                        await ollama_client.disconnect()
+                        logger.info("Ollama client disconnected successfully")
+                    except Exception as e:
+                        logger.warning(f"Failed to disconnect Ollama client: {e}")
 
         # Cache the result
         if request.use_cache:

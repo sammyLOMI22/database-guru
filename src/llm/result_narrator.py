@@ -107,8 +107,32 @@ class ResultNarrator:
             sample_results = results[:self.max_sample_rows] if results else []
             statistics = self._extract_statistics(sample_results) if self.enable_statistics else {}
 
-            # Build LLM prompt
+            # Detect anomalies in the results
+            anomalies = self._detect_anomalies(results) if results else {}
+
+            # Detect temporal columns for trend analysis
+            temporal_columns = self._detect_temporal_columns(results) if results else []
+
+            # Detect trends if temporal data exists
+            trends = self._detect_trends(results, temporal_columns) if results and temporal_columns else {}
+
+            # Calculate correlations between numeric columns
+            correlations = self._calculate_correlations(results) if results else {}
+
+            # Build enriched prompt with all detected insights
             prompt = self._build_prompt(question, sql, sample_results, statistics, row_count, execution_time_ms)
+
+            # Add advanced insights to prompt for LLM to consider
+            advanced_insights = []
+            if anomalies.get("anomalies_found"):
+                advanced_insights.append(f"Statistical anomalies detected: {len(anomalies.get('unusual_patterns', []))} findings")
+            if trends.get("trends_found"):
+                advanced_insights.append(f"Temporal trends detected: {len(trends.get('trends', []))} trends")
+            if correlations.get("correlations_found"):
+                advanced_insights.append(f"Column correlations detected: {len(correlations.get('correlations', []))} significant correlations")
+
+            if advanced_insights:
+                prompt += "\n\nAdvanced Analysis Available:\n" + "\n".join(f"- {insight}" for insight in advanced_insights)
 
             # Call LLM with timeout
             try:
@@ -130,6 +154,24 @@ class ResultNarrator:
             # Parse response
             narrative = self._parse_response(response_text)
             narrative.statistics = statistics
+
+            # Add advanced analysis findings to statistics for UI display
+            if anomalies.get("anomalies_found"):
+                narrative.statistics["anomalies"] = {
+                    "found": True,
+                    "count": anomalies.get("anomaly_count", 0),
+                    "patterns": anomalies.get("unusual_patterns", [])
+                }
+            if trends.get("trends_found"):
+                narrative.statistics["trends"] = {
+                    "found": True,
+                    "detected_trends": trends.get("trends", [])
+                }
+            if correlations.get("correlations_found"):
+                narrative.statistics["correlations"] = {
+                    "found": True,
+                    "significant_correlations": correlations.get("correlations", [])
+                }
 
             return narrative
 
@@ -382,8 +424,8 @@ class ResultNarrator:
                 if stdev == 0:
                     continue
 
-                # Find outliers using Z-score (threshold: |z| > 2.5)
-                outlier_threshold = 2.5
+                # Find outliers using Z-score (threshold: |z| >= 1.95 to catch z=2.0 cases)
+                outlier_threshold = 1.95
                 column_outliers = []
 
                 for idx, value in zip(valid_indices, values):

@@ -66,25 +66,83 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
         </div>
       )}
 
+      {/* Advanced Analysis Section */}
+      {analysis.statistics && (
+        <>
+          {/* Anomalies Alert */}
+          {analysis.statistics.anomalies?.found && (
+            <div className="bg-red-50 border border-red-200 rounded px-4 py-3">
+              <p className="text-sm font-semibold text-red-900 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                Statistical Anomalies Detected
+              </p>
+              <ul className="mt-2 space-y-1">
+                {analysis.statistics.anomalies?.patterns?.map((pattern: string, idx: number) => (
+                  <li key={idx} className="text-xs text-red-800 ml-6">
+                    • {pattern}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Trends Alert */}
+          {analysis.statistics.trends?.found && (
+            <div className="bg-blue-50 border border-blue-200 rounded px-4 py-3">
+              <p className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Temporal Trends Detected
+              </p>
+              <ul className="mt-2 space-y-1">
+                {analysis.statistics.trends?.detected_trends?.map((trend: any, idx: number) => (
+                  <li key={idx} className="text-xs text-blue-800 ml-6">
+                    • {trend.insight}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Correlations Alert */}
+          {analysis.statistics.correlations?.found && (
+            <div className="bg-purple-50 border border-purple-200 rounded px-4 py-3">
+              <p className="text-sm font-semibold text-purple-900 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                Column Correlations Found
+              </p>
+              <ul className="mt-2 space-y-1">
+                {analysis.statistics.correlations?.significant_correlations?.map((corr: any, idx: number) => (
+                  <li key={idx} className="text-xs text-purple-800 ml-6">
+                    • {corr.insight}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
+
       {/* Statistics (Expandable) */}
       {analysis.statistics && Object.keys(analysis.statistics).length > 0 && (
         <details className="bg-white px-4 py-3 rounded cursor-pointer group">
           <summary className="flex items-center gap-2 font-medium text-gray-700 text-sm select-none">
             <CheckCircle className="w-4 h-4 text-blue-600" />
-            Statistics
+            Detailed Statistics
             <span className="ml-auto text-gray-400 group-open:rotate-180 transition-transform">▼</span>
           </summary>
           <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
-            {Object.entries(analysis.statistics).map(([key, value]) => (
-              <div key={key} className="flex justify-between text-sm">
-                <span className="text-gray-600 capitalize">{key.replace(/_/g, ' ')}:</span>
-                <span className="font-mono text-gray-900">
-                  {typeof value === 'object'
-                    ? JSON.stringify(value)
-                    : String(value)}
-                </span>
-              </div>
-            ))}
+            {Object.entries(analysis.statistics)
+              .filter(([key]) => !['anomalies', 'trends', 'correlations'].includes(key))
+              .map(([key, value]) => (
+                <div key={key} className="flex justify-between text-sm">
+                  <span className="text-gray-600 capitalize">{key.replace(/_/g, ' ')}:</span>
+                  <span className="font-mono text-gray-900">
+                    {typeof value === 'object'
+                      ? JSON.stringify(value)
+                      : String(value)}
+                  </span>
+                </div>
+              ))}
             {rowCount !== undefined && executionTime !== undefined && (
               <>
                 <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
