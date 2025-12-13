@@ -50,6 +50,15 @@ class Settings(BaseSettings):
     MAX_PARALLEL_DATABASES: int = 10  # Max concurrent database queries (prevents resource exhaustion)
     PARALLEL_CORRECTIONS_TIMEOUT: int = 10  # Max seconds for all parallel correction strategies (prevents hanging)
 
+    # Query Compilation (Phase 4.2 - PRODUCTION-READY - Dec 7, 2025)
+    ENABLE_QUERY_COMPILATION: bool = True  # Feature flag for query compilation system
+    COMPILATION_MAX_STATEMENTS: int = 100  # Maximum prepared statements per connection pool (LRU eviction beyond this)
+    COMPILATION_STATEMENT_TTL: int = 1800  # Time-to-live for prepared statements in seconds (30 minutes)
+    COMPILATION_MIN_EXECUTIONS: int = 2  # Prepare statement only after N executions (lazy preparation to avoid overhead)
+    PLAN_CACHE_TTL_LOOKUP: int = 86400  # TTL for simple lookup queries in seconds (24 hours)
+    PLAN_CACHE_TTL_AGGREGATION: int = 3600  # TTL for aggregation queries in seconds (1 hour - data volatile)
+    PLAN_CACHE_TTL_JOIN: int = 21600  # TTL for JOIN queries in seconds (6 hours - moderate volatility)
+
     class Config:
         env_file = ".env"
         case_sensitive = True
