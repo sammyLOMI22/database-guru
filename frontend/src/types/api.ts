@@ -9,6 +9,7 @@ export interface QueryRequest {
   use_cache?: boolean;
   session_id?: string;
   force_schema_refresh?: boolean;
+  enable_narratives?: boolean;
 }
 
 // Option 2: Observability Types
@@ -143,6 +144,16 @@ export interface ConversationContextResponse {
   window_size: number;
 }
 
+// Intelligent Data Narratives Types
+export interface ResultAnalysis {
+  summary: string;
+  key_insights: string[];
+  direct_answer: string | null;
+  confidence: number;
+  statistics: Record<string, any>;
+  generated_at: string;
+}
+
 export interface QueryResponse {
   query_id: number;
   question: string;
@@ -166,6 +177,15 @@ export interface QueryResponse {
   // Conversational Memory fields
   conversation_context?: ConversationContext | null;
   used_context?: boolean;
+  // Parallel Execution Metrics
+  parallelExecutionMetrics?: ParallelExecutionMetrics | null;
+  parallelCorrectionMetrics?: ParallelCorrectionMetrics | null;
+  // Cache Information
+  cache_type?: 'exact' | 'semantic' | null;
+  semantic_similarity?: number | null;
+  matched_question?: string | null;
+  // Intelligent Data Narratives fields
+  result_analysis?: ResultAnalysis | null;
 }
 
 export interface Model {

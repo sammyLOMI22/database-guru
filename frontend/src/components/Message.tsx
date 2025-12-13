@@ -56,6 +56,15 @@ export default function Message({ type, content, queryResponse }: MessageProps) 
                 totalAttempts={queryResponse.total_attempts}
                 verificationWarnings={queryResponse.verification_warnings}
                 usedPlanning={queryResponse.used_planning}
+                // Parallel Execution Metrics
+                parallelExecutionMetrics={queryResponse.parallelExecutionMetrics}
+                parallelCorrectionMetrics={queryResponse.parallelCorrectionMetrics}
+                // Cache Information
+                cacheType={queryResponse.cache_type}
+                semanticSimilarity={queryResponse.semantic_similarity}
+                matchedQuestion={queryResponse.matched_question}
+                // Intelligent Data Narratives
+                resultAnalysis={queryResponse.result_analysis}
               />
             </div>
           )}

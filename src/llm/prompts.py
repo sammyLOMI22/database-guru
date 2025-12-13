@@ -238,3 +238,68 @@ Example 7:
 Question: Show products grouped by category
 SQL: SELECT category, COUNT(*) as product_count FROM products GROUP BY category
 """
+
+
+NARRATIVE_GENERATION_PROMPT = """You are a data analyst explaining query results to a user in plain English.
+
+CONTEXT:
+User Question: {question}
+
+SQL Query: {sql}
+
+RESULTS SUMMARY:
+- Row count: {row_count}
+- Execution time: {execution_time_ms}ms
+- Sample data (first {sample_size} rows):
+{sample_data}
+
+STATISTICS:
+{statistics}
+
+YOUR TASK:
+Generate a natural language narrative that explains the query results to a non-technical user.
+
+INCLUDE:
+1. SUMMARY (1-2 sentences): Directly answer the user's question with the key finding
+   - Be specific with numbers and percentages
+   - Focus on what matters most to answer their question
+
+2. KEY INSIGHTS (3-5 bullet points): Notable patterns, trends, or findings
+   - Look for comparisons ("X is Y% higher than Z")
+   - Identify distributions ("most/least common values")
+   - Highlight extremes ("highest/lowest values")
+   - Contextualize numbers ("This represents Z% of total")
+   - Add qualitative notes ("This is unusual/expected/significant")
+
+3. DIRECT ANSWER: If the question asks for a specific value (count, amount, etc.), state it clearly
+   - For "How many..." → state the count
+   - For "What is..." → state the value
+   - For "Show me..." → describe what you see
+
+4. CONFIDENCE: Your confidence (0.0-1.0) that your interpretation is correct
+   - 0.9-1.0: Clear, unambiguous results
+   - 0.7-0.9: Good confidence, some assumptions needed
+   - 0.5-0.7: Moderate confidence, multiple possible interpretations
+   - <0.5: Low confidence, results unclear
+
+STYLE GUIDELINES:
+- Be conversational and clear, avoiding technical jargon
+- Use specific numbers, not approximations
+- Highlight the most important finding first
+- Use percentages for comparisons when helpful
+- Example (good): "California customers spend 27% more than New York customers, with an average order value of $1,245 compared to $980"
+- Example (bad): "California has higher orders"
+
+RESPOND IN JSON FORMAT ONLY:
+{{
+  "summary": "Your 1-2 sentence summary here",
+  "key_insights": [
+    "First insight",
+    "Second insight",
+    "Third insight"
+  ],
+  "direct_answer": "The specific answer to the question (or null if not applicable)",
+  "confidence": 0.85
+}}
+
+IMPORTANT: Return ONLY valid JSON, no markdown formatting or explanation."""
