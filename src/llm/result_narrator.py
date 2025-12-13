@@ -179,6 +179,25 @@ class ResultNarrator:
             logger.error(f"Error generating narrative: {e}", exc_info=True)
             return self._fallback_narrative(row_count, {})
 
+    def _is_id_column(self, column_name: str) -> bool:
+        """Check if a column appears to be an ID column (not meaningful to analyze)"""
+        column_lower = column_name.lower()
+        # Check for ID-like patterns
+        id_patterns = ['id', '_id', 'key', 'pk_', 'primary_key', 'uuid', 'guid']
+        for pattern in id_patterns:
+            if pattern in column_lower:
+                return True
+        return False
+
+    def _is_metadata_column(self, column_name: str) -> bool:
+        """Check if a column is metadata (created_at, updated_at, etc.)"""
+        column_lower = column_name.lower()
+        metadata_patterns = ['created_at', 'updated_at', 'timestamp', 'date_', '_date', 'created_by', 'modified_by']
+        for pattern in metadata_patterns:
+            if pattern in column_lower:
+                return True
+        return False
+
     def _extract_statistics(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Extract statistics from query results
@@ -186,6 +205,8 @@ class ResultNarrator:
         Analyzes numeric columns (min/max/avg/sum/median),
         string columns (unique count, most common),
         and temporal columns (date range)
+
+        Intelligently skips ID columns and focuses on meaningful data columns
         """
         if not results:
             return {}
@@ -197,6 +218,10 @@ class ResultNarrator:
             if not isinstance(column, str):
                 continue
 
+            # Skip ID columns - they're not meaningful to analyze
+            if self._is_id_column(column):
+                continue
+
             # Collect all values for this column
             column_values = []
             for row in results:
@@ -206,10 +231,9 @@ class ResultNarrator:
                         column_values.append(col_val)
 
             if not column_values:
-                stats[f"{column}_null_count"] = len(results)
                 continue
 
-            # Numeric column analysis
+            # Numeric column analysis (but skip if all values look like IDs)
             try:
                 numeric_values = []
                 for v in column_values:
@@ -218,7 +242,17 @@ class ResultNarrator:
                     except (ValueError, TypeError):
                         pass
 
-                if numeric_values:
+                if numeric_values and len(numeric_values) == len(column_values):
+                    # Check if this looks like an ID column by value range
+                    # IDs typically have min=1, max~=row_count, all unique/near-unique
+                    min_val = min(numeric_values)
+                    max_val = max(numeric_values)
+                    unique_count = len(set(numeric_values))
+
+                    # If all values are unique/near-unique and sequential, likely an ID
+                    if unique_count >= len(numeric_values) * 0.9 and min_val >= 0 and max_val <= len(results) * 10:
+                        continue
+
                     col_stats = {
                         "type": "numeric",
                         "min": min(numeric_values),
@@ -280,16 +314,33 @@ class ResultNarrator:
         """Build the LLM prompt with question, SQL, data, and statistics"""
         from src.llm.prompts import NARRATIVE_GENERATION_PROMPT
 
-        # Format sample data
+        # Format sample data with better formatting
         if sample_results:
-            sample_text = "\n".join([
-                "  " + str(row) for row in sample_results[:min(5, len(sample_results))]
-            ])
+            # Pretty print sample data
+            sample_lines = []
+            for row in sample_results[:min(5, len(sample_results))]:
+                # Format each row with column names for better readability
+                formatted_row = []
+                for key, value in row.items():
+                    if not self._is_id_column(key):  # Skip ID columns in display
+                        formatted_row.append(f"{key}: {value}")
+                if formatted_row:
+                    sample_lines.append("  " + ", ".join(formatted_row))
+
+            if sample_lines:
+                sample_text = "\n".join(sample_lines)
+            else:
+                sample_text = "  (no meaningful results to display)"
         else:
             sample_text = "  (no results)"
 
-        # Format statistics
-        stats_text = json.dumps(statistics, indent=2, default=str) if statistics else "{}"
+        # Format statistics - only include meaningful columns
+        meaningful_stats = {}
+        for key, value in statistics.items():
+            if not self._is_id_column(key):
+                meaningful_stats[key] = value
+
+        stats_text = json.dumps(meaningful_stats, indent=2, default=str) if meaningful_stats else json.dumps({"row_count": statistics.get("row_count", 0)})
 
         # Build prompt
         prompt = NARRATIVE_GENERATION_PROMPT.format(
