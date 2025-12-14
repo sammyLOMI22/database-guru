@@ -68,6 +68,8 @@ class ResultNarrator:
         row_count: int,
         execution_time_ms: float,
         database_type: str = "postgresql",
+        databases: Optional[List[str]] = None,
+        multi_database: bool = False,
     ) -> NarrativeResult:
         """
         Generate natural language narrative from query results
@@ -79,6 +81,8 @@ class ResultNarrator:
             row_count: Total number of rows returned
             execution_time_ms: Query execution time in milliseconds
             database_type: Type of database (postgresql, mysql, sqlite, etc.)
+            databases: List of database names (for multi-database narratives)
+            multi_database: True if this is a cross-database analysis
 
         Returns:
             NarrativeResult with summary, insights, and statistics
@@ -119,8 +123,17 @@ class ResultNarrator:
             # Calculate correlations between numeric columns
             correlations = self._calculate_correlations(results) if results else {}
 
+            # Calculate cross-database comparisons if multi-database
+            database_comparisons = self._calculate_database_comparisons(results) if multi_database and results else {}
+
             # Build enriched prompt with all detected insights
-            prompt = self._build_prompt(question, sql, sample_results, statistics, row_count, execution_time_ms)
+            if multi_database and databases:
+                prompt = self._build_multi_database_prompt(
+                    question, sql, sample_results, statistics, row_count,
+                    execution_time_ms, databases, database_comparisons
+                )
+            else:
+                prompt = self._build_prompt(question, sql, sample_results, statistics, row_count, execution_time_ms)
 
             # Add advanced insights to prompt for LLM to consider
             advanced_insights = []
@@ -302,6 +315,98 @@ class ResultNarrator:
 
         return stats
 
+    def _build_multi_database_prompt(
+        self,
+        question: str,
+        sql: str,
+        sample_results: List[Dict[str, Any]],
+        statistics: Dict[str, Any],
+        row_count: int,
+        execution_time_ms: float,
+        databases: List[str],
+        database_comparisons: Dict[str, Any] = None
+    ) -> str:
+        """Build the LLM prompt for multi-database narratives with comparison focus"""
+        from src.llm.prompts import MULTI_DATABASE_NARRATIVE_PROMPT
+
+        if database_comparisons is None:
+            database_comparisons = {}
+
+        # Extract per-database statistics from results
+        # Results should have _source_database field added
+        database_stats = {}
+        for result in sample_results:
+            db_name = result.get("_source_database", "Unknown")
+            if db_name not in database_stats:
+                database_stats[db_name] = {
+                    "row_count": 0,
+                    "sample_values": []
+                }
+            database_stats[db_name]["row_count"] += 1
+            if len(database_stats[db_name]["sample_values"]) < 3:
+                # Keep sample values without source database field
+                sample_row = {k: v for k, v in result.items() if k != "_source_database"}
+                database_stats[db_name]["sample_values"].append(sample_row)
+
+        # Build database breakdown
+        database_breakdown_lines = []
+        for db_name in databases:
+            stats = database_stats.get(db_name, {})
+            count = stats.get("row_count", 0)
+            database_breakdown_lines.append(f"  - {db_name}: {count} rows")
+        database_breakdown = "\n".join(database_breakdown_lines) if database_breakdown_lines else "  (no results)"
+
+        # Build database details for context
+        database_details_lines = []
+        for db_name in databases:
+            stats = database_stats.get(db_name, {})
+            count = stats.get("row_count", 0)
+            sample_values = stats.get("sample_values", [])
+            if count > 0:
+                detail = f"{db_name}:\n    Row count: {count}"
+                if sample_values:
+                    detail += "\n    Sample values: "
+                    formatted_sample = ", ".join(
+                        f"{k}:{v}" for sample in sample_values[:1]
+                        for k, v in list(sample.items())[:3]
+                    )
+                    detail += formatted_sample
+                database_details_lines.append(detail)
+
+        # Add comparison insights if available
+        if database_comparisons.get("comparisons_found"):
+            comparison_lines = []
+            if database_comparisons.get("differences"):
+                comparison_lines.append("KEY DIFFERENCES DETECTED:")
+                for diff in database_comparisons["differences"][:3]:  # Top 3 differences
+                    comparison_lines.append(f"  - {diff.get('description', 'Difference found')}")
+            if comparison_lines:
+                database_details_lines.extend(comparison_lines)
+
+        database_details = "\n  ".join(database_details_lines) if database_details_lines else "  (no details)"
+
+        # Format statistics
+        meaningful_stats = {}
+        for key, value in statistics.items():
+            if not self._is_id_column(key):
+                meaningful_stats[key] = value
+
+        stats_text = json.dumps(meaningful_stats, indent=2, default=str) if meaningful_stats else json.dumps({"row_count": row_count})
+
+        # Build prompt with multi-database template
+        prompt = MULTI_DATABASE_NARRATIVE_PROMPT.format(
+            question=question,
+            databases=", ".join(databases),
+            database_count=len(databases),
+            total_rows=row_count,
+            execution_time_ms=execution_time_ms,
+            database_breakdown=database_breakdown,
+            statistics=stats_text,
+            database_details=database_details
+        )
+
+        return prompt
+
     def _build_prompt(
         self,
         question: str,
@@ -407,6 +512,112 @@ class ResultNarrator:
             confidence=0.5
         )
 
+    def _generate_smart_insights(self, statistics: Dict[str, Any], row_count: int) -> List[str]:
+        """Generate meaningful business insights from statistics instead of raw stats.
+
+        Converts raw statistics into actionable, contextual insights that explain
+        what the data means, not just what the numbers are.
+        """
+        insights = []
+
+        if not statistics:
+            return insights
+
+        # Collect numeric and string columns
+        numeric_cols = []
+        string_cols = []
+
+        for col, stats in statistics.items():
+            if col == "row_count":
+                continue
+            if isinstance(stats, dict):
+                if stats.get("type") == "numeric":
+                    numeric_cols.append((col, stats))
+                elif stats.get("type") == "string":
+                    string_cols.append((col, stats))
+
+        # NUMERIC INSIGHTS: Focus on ranges, outliers, and comparisons
+        for col, stats in numeric_cols[:3]:  # Top 3 numeric columns
+            min_val = stats.get("min")
+            max_val = stats.get("max")
+            avg_val = stats.get("avg")
+            median_val = stats.get("median")
+            stdev = stats.get("stdev")
+
+            if min_val is None or max_val is None:
+                continue
+
+            col_name = col.replace('_', ' ').title()
+
+            # Calculate spread/variance
+            value_range = max_val - min_val
+
+            # Generate contextual insight based on data characteristics
+            if stdev and median_val:
+                # High variance = diverse values
+                cv = stdev / avg_val if avg_val != 0 else 0  # Coefficient of variation
+                if cv > 0.5:
+                    # Highly varied - mention the spread
+                    insights.append(f"{col_name} shows wide variation: from {min_val} to {max_val}, with median at {median_val}")
+                else:
+                    # Low variance - mention consistency
+                    insights.append(f"{col_name} values are consistent, mostly around {median_val} (range: {min_val}-{max_val})")
+            else:
+                # Fallback: simple range insight
+                if value_range > avg_val * 2:
+                    insights.append(f"{col_name} spans a wide range ({min_val} to {max_val}), suggesting diverse data")
+                else:
+                    insights.append(f"{col_name} ranges from {min_val} to {max_val}, averaging {avg_val}")
+
+        # STRING INSIGHTS: Focus on concentration, diversity, and dominance
+        for col, stats in string_cols[:3]:  # Top 3 string columns
+            unique_count = stats.get("unique_count")
+            total_count = stats.get("total_count", 0)
+            most_common = stats.get("most_common")
+            most_common_pct = stats.get("most_common_percent", 0)
+
+            if unique_count is None:
+                continue
+
+            col_name = col.replace('_', ' ').title()
+
+            # Calculate diversity
+            diversity_ratio = unique_count / total_count if total_count > 0 else 0
+
+            # Generate contextual insight
+            if unique_count == 1:
+                # Only one value - uniform data
+                insights.append(f"All {row_count} records have the same {col_name} ('{most_common}')")
+            elif diversity_ratio > 0.8:
+                # Highly diverse - mostly unique values
+                insights.append(f"{col_name} is highly diverse with {unique_count} unique values across {row_count} records")
+            elif most_common_pct > 50:
+                # Dominated by one value
+                insights.append(f"{col_name} is dominated by '{most_common}' ({most_common_pct:.0f}% of records)")
+            elif unique_count < 5:
+                # Few categories - good for segmentation
+                insights.append(f"{col_name} falls into {unique_count} main categories, with '{most_common}' being most common")
+            else:
+                # Moderate diversity
+                insights.append(f"{col_name} has {unique_count} distinct values, fairly distributed")
+
+        # DISTRIBUTION INSIGHTS: Identify patterns across columns
+        if len(string_cols) > 0 and len(numeric_cols) > 0:
+            # Check for concentration patterns
+            first_string_col = string_cols[0]
+            if first_string_col[1].get("unique_count") == 1:
+                insights.append(f"Data is concentrated in a single {first_string_col[0]} segment - consider applying filters for targeted analysis")
+            elif first_string_col[1].get("unique_count") <= 3:
+                insights.append(f"Data breaks into {first_string_col[1].get('unique_count')} main segments - natural segmentation opportunity")
+
+        # SAMPLE SIZE INSIGHT
+        if row_count < 10:
+            insights.append("Note: Small sample size (< 10 records) - results may not be representative")
+        elif row_count > 1000:
+            insights.append(f"Large dataset ({row_count:,} records) - consider filtering or aggregating for more focused analysis")
+
+        return insights
+
     def _fallback_narrative(
         self,
         row_count: int,
@@ -416,44 +627,8 @@ class ResultNarrator:
         # Create a more insightful summary
         summary = f"Found {row_count} record{'s' if row_count != 1 else ''}"
 
-        insights = []
-        if statistics:
-            # Collect numeric and string columns for better insights
-            numeric_cols = []
-            string_cols = []
-
-            for col, stats in statistics.items():
-                if col == "row_count":
-                    continue
-                if isinstance(stats, dict):
-                    if stats.get("type") == "numeric":
-                        numeric_cols.append((col, stats))
-                    elif stats.get("type") == "string":
-                        string_cols.append((col, stats))
-
-            # Generate insights from numeric columns (ranges are more interesting than averages)
-            for col, stats in numeric_cols[:2]:  # Top 2 numeric columns
-                min_val = stats.get("min")
-                max_val = stats.get("max")
-                avg_val = stats.get("avg")
-                if min_val is not None and max_val is not None:
-                    insights.append(f"{col.replace('_', ' ').title()}: ranges from {min_val} to {max_val} (avg: {avg_val})")
-
-            # Generate insights from string columns (unique counts are interesting)
-            for col, stats in string_cols[:2]:  # Top 2 string columns
-                unique_count = stats.get("unique_count")
-                most_common = stats.get("most_common")
-                if unique_count is not None:
-                    if most_common:
-                        insights.append(f"{col.replace('_', ' ').title()}: {unique_count} unique values, with '{most_common}' being most common")
-                    else:
-                        insights.append(f"{col.replace('_', ' ').title()}: {unique_count} unique values")
-
-            # Add distribution info if only one category
-            if len(string_cols) > 0:
-                first_string_col = string_cols[0]
-                if first_string_col[1].get("unique_count") == 1:
-                    insights.append(f"All records belong to a single {first_string_col[0]} category")
+        # Generate smart insights instead of raw statistics
+        insights = self._generate_smart_insights(statistics, row_count)
 
         return NarrativeResult(
             summary=summary,
@@ -809,6 +984,119 @@ class ResultNarrator:
             logger.warning(f"Error detecting trends: {e}")
 
         return trends
+
+    def _calculate_database_comparisons(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Calculate comparison metrics across databases.
+
+        Returns:
+            Dict with cross-database statistics and comparisons
+        """
+        if not results or "_source_database" not in results[0]:
+            return {"comparisons_found": False}
+
+        comparisons = {
+            "comparisons_found": False,
+            "database_stats": {},
+            "differences": []
+        }
+
+        try:
+            # Group results by database
+            database_groups = {}
+            for result in results:
+                db_name = result.get("_source_database", "Unknown")
+                if db_name not in database_groups:
+                    database_groups[db_name] = []
+                database_groups[db_name].append(result)
+
+            # Calculate stats per database
+            for db_name, rows in database_groups.items():
+                db_stats = {
+                    "row_count": len(rows),
+                    "percentage": round((len(rows) / len(results)) * 100, 1)
+                }
+
+                # Calculate numeric column averages per database
+                numeric_cols = {}
+                for row in rows:
+                    for key, value in row.items():
+                        if key == "_source_database":
+                            continue
+                        if isinstance(value, (int, float)):
+                            if key not in numeric_cols:
+                                numeric_cols[key] = []
+                            numeric_cols[key].append(value)
+
+                if numeric_cols:
+                    db_stats["numeric_summary"] = {}
+                    for col, values in numeric_cols.items():
+                        if len(values) > 0:
+                            db_stats["numeric_summary"][col] = {
+                                "avg": round(sum(values) / len(values), 2),
+                                "min": min(values),
+                                "max": max(values)
+                            }
+
+                comparisons["database_stats"][db_name] = db_stats
+
+            # Find significant differences between databases
+            if len(database_groups) > 1:
+                db_names = list(database_groups.keys())
+
+                # Compare row counts
+                row_counts = [comparisons["database_stats"][db]["row_count"] for db in db_names]
+                if row_counts:
+                    max_count = max(row_counts)
+                    min_count = min(row_counts)
+                    if max_count > 0 and max_count != min_count:
+                        ratio = round(max_count / min_count, 1) if min_count > 0 else max_count
+                        max_db = db_names[row_counts.index(max_count)]
+                        min_db = db_names[row_counts.index(min_count)]
+                        comparisons["differences"].append({
+                            "type": "volume",
+                            "description": f"{max_db} has {ratio}x more records than {min_db}",
+                            "max_db": max_db,
+                            "min_db": min_db,
+                            "ratio": ratio
+                        })
+                        comparisons["comparisons_found"] = True
+
+                # Compare numeric column averages
+                all_numeric_cols = set()
+                for db_stats in comparisons["database_stats"].values():
+                    if "numeric_summary" in db_stats:
+                        all_numeric_cols.update(db_stats["numeric_summary"].keys())
+
+                for col in all_numeric_cols:
+                    col_avgs = []
+                    col_dbs = []
+                    for db_name in db_names:
+                        if col in comparisons["database_stats"][db_name].get("numeric_summary", {}):
+                            col_avgs.append(comparisons["database_stats"][db_name]["numeric_summary"][col]["avg"])
+                            col_dbs.append(db_name)
+
+                    if len(col_avgs) > 1:
+                        max_avg = max(col_avgs)
+                        min_avg = min(col_avgs)
+                        if min_avg > 0 and max_avg != min_avg:
+                            ratio = round(max_avg / min_avg, 1)
+                            if ratio > 1.5:  # Only report significant differences
+                                max_idx = col_avgs.index(max_avg)
+                                min_idx = col_avgs.index(min_avg)
+                                comparisons["differences"].append({
+                                    "type": "column_value",
+                                    "column": col,
+                                    "description": f"{col_dbs[max_idx]} shows {ratio}x higher {col} than {col_dbs[min_idx]}",
+                                    "leader": col_dbs[max_idx],
+                                    "laggard": col_dbs[min_idx],
+                                    "ratio": ratio
+                                })
+                                comparisons["comparisons_found"] = True
+
+        except Exception as e:
+            logger.error(f"Error calculating database comparisons: {e}")
+
+        return comparisons
 
     def _calculate_correlations(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Calculate Pearson correlations between numeric columns.

@@ -725,11 +725,13 @@ async def process_multi_database_query(
                             # Generate narrative synthesizing all databases
                             logger.info(f"Calling generate_narrative for combined analysis...")
                             combined_narrative = await narrator.generate_narrative(
-                                question=f"{request.question} (across {len(database_results)} databases: {', '.join(r.connection_name for r in database_results)})",
+                                question=request.question,
                                 sql="[Multiple databases]",
                                 results=combined_results,
                                 row_count=len(combined_results),
-                                execution_time_ms=total_execution_time
+                                execution_time_ms=total_execution_time,
+                                databases=[r.connection_name for r in database_results],
+                                multi_database=True
                             )
 
                             response_data["combined_analysis"] = {

@@ -314,3 +314,90 @@ RESPOND IN JSON FORMAT ONLY:
 }}
 
 IMPORTANT: Return ONLY valid JSON, no markdown formatting or explanation."""
+
+
+MULTI_DATABASE_NARRATIVE_PROMPT = """You are a data analyst comparing query results across MULTIPLE databases.
+Your job is to tell a compelling story about what the combined data reveals, showing differences, patterns, and insights across sources.
+
+CONTEXT:
+User Question: {question}
+
+DATABASES ANALYZED: {databases}
+
+RESULTS SUMMARY:
+- Databases queried: {database_count}
+- Total row count: {total_rows}
+- Total execution time: {execution_time_ms}ms
+- Data by database:
+{database_breakdown}
+
+COMBINED DATA STATISTICS:
+{statistics}
+
+YOUR TASK:
+Generate a natural language narrative that synthesizes insights across ALL databases, highlighting:
+1. How results DIFFER between databases
+2. What patterns are CONSISTENT across databases
+3. WHICH DATABASE has the most/least/best/worst data
+4. Cross-database COMPARISONS and TRENDS
+5. UNIQUE insights from combining the data
+
+CRITICAL: DO NOT say "X databases returned Y rows" - that's obvious. Instead:
+- Show what's DIFFERENT about each database
+- Highlight COMPARISONS between databases
+- Explain what combining the data reveals
+- Find CONTRADICTIONS or PATTERNS across sources
+
+INCLUDE:
+1. SUMMARY (1-2 sentences): A direct answer showing the CROSS-DATABASE story
+   - NOT: "Queried 2 databases, found X and Y rows"
+   - YES: "Database A shows 45% higher values than Database B, with DB B having more consistent patterns"
+   - Highlight the MOST INTERESTING finding that spans databases
+
+2. KEY INSIGHTS (4-6 bullet points): Patterns and comparisons across databases
+   - Compare databases: "Database A leads with X feature, but Database B has better Y coverage"
+   - Show differences: "Results vary by 30-50% between databases, suggesting different data collection methods"
+   - Identify leaders: "Database C has the highest volume (5000+ rows), Database A has the most recent data"
+   - Find patterns: "All databases show X trend, but magnitude differs 3x between sources"
+   - Highlight gaps: "Database B is missing data for category Z, only found in A and C"
+   - Show completeness: "Complete coverage across all databases for metric X, but sparse for Y"
+
+3. DIRECT ANSWER: If the question asks for comparison, state it clearly
+   - For "Compare..." → "Database A has [metric] while Database B has [metric], meaning..."
+   - For "Which..." → "Database A [wins/leads/shows most] for [reason]"
+   - For "Show me..." → "The data shows X across databases, with these differences..."
+
+4. CONFIDENCE: Your confidence (0.0-1.0) that your interpretation is correct
+   - 0.9-1.0: Clear patterns visible across all databases with large sample sizes
+   - 0.7-0.9: Good confidence, strong patterns visible despite some variation
+   - 0.5-0.7: Moderate confidence, patterns exist but databases are inconsistent
+   - <0.5: Low confidence, very different data or small samples across databases
+
+STYLE GUIDELINES:
+- Compare explicitly: "Database A shows 3x the volume of B"
+- Highlight gaps: "Coverage varies: A has 100% for metric X, B only 40%"
+- Show ranking: "By volume: C > A > B. By recency: A > C > B"
+- Use percentages for comparisons: "Database B is 25% higher than average"
+- Note consistency: "All databases agree on X, but diverge significantly on Y"
+- GOOD: "DB A dominates with 60% of total records and most recent data, while DB B shows deeper historical patterns"
+- BAD: "Queried 2 databases and found 100 and 80 rows respectively"
+
+DATABASE BREAKDOWN CONTEXT:
+{database_details}
+
+RESPOND IN JSON FORMAT ONLY:
+{{
+  "summary": "Direct cross-database comparison showing the most important finding that spans sources",
+  "key_insights": [
+    "Database-specific finding with comparison to others",
+    "Pattern that differs across databases with magnitude",
+    "Ranking or leadership by key metric",
+    "Consistency or gaps across sources",
+    "Unexpected finding from combining the data",
+    "Actionable difference between databases"
+  ],
+  "direct_answer": "Specific answer to the question comparing databases (or null if narrative covers it)",
+  "confidence": 0.85
+}}
+
+IMPORTANT: Return ONLY valid JSON, no markdown formatting or explanation."""
