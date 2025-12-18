@@ -28,25 +28,28 @@ interface PieChartViewProps {
 interface PieDataItem {
   name: string;
   value: number;
+  [key: string]: unknown;
 }
 
 const RADIAN = Math.PI / 180;
 
+interface LabelProps {
+  cx?: number;
+  cy?: number;
+  midAngle?: number;
+  innerRadius?: number;
+  outerRadius?: number;
+  percent?: number;
+}
+
 const renderCustomizedLabel = ({
-  cx,
-  cy,
-  midAngle,
-  innerRadius,
-  outerRadius,
-  percent,
-}: {
-  cx: number;
-  cy: number;
-  midAngle: number;
-  innerRadius: number;
-  outerRadius: number;
-  percent: number;
-}) => {
+  cx = 0,
+  cy = 0,
+  midAngle = 0,
+  innerRadius = 0,
+  outerRadius = 0,
+  percent = 0,
+}: LabelProps) => {
   // Only show label if percentage is significant
   if (percent < 0.05) return null;
 
@@ -78,10 +81,14 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
   showLegend = true,
   animate = true,
 }) => {
-  const chartData = useMemo(() => {
+  const chartData = useMemo((): PieDataItem[] => {
     const prepared = prepareChartData(data, xColumn, yColumn, 'pie', 20);
-    // Ensure we have name and value for pie chart
-    return prepared as PieDataItem[];
+    // Transform to pie chart format with name and value
+    return prepared.map((item) => ({
+      ...item,
+      name: String(item[xColumn] ?? 'Unknown'),
+      value: Number(item[yColumn]) || 0,
+    }));
   }, [data, xColumn, yColumn]);
 
   const total = useMemo(() => {
@@ -128,9 +135,11 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
               borderRadius: '6px',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
             }}
-            formatter={(value: number, name: string) => [
-              `${value.toLocaleString()} (${((value / total) * 100).toFixed(1)}%)`,
-              name,
+            formatter={(value: number | undefined, name: string | undefined) => [
+              value !== undefined
+                ? `${value.toLocaleString()} (${((value / total) * 100).toFixed(1)}%)`
+                : '0',
+              name ?? '',
             ]}
           />
           {showLegend && (

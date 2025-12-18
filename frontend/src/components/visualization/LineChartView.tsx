@@ -83,7 +83,10 @@ export const LineChartView: React.FC<LineChartViewProps> = ({
               borderRadius: '6px',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
             }}
-            formatter={(value: number) => [value.toLocaleString(), yColumn]}
+            formatter={(value: number | undefined) => [
+              value !== undefined ? value.toLocaleString() : '0',
+              yColumn,
+            ]}
           />
           {showLegend && <Legend />}
           <Line

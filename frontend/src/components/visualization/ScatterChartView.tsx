@@ -30,7 +30,7 @@ interface ScatterChartViewProps {
 interface ScatterDataPoint {
   x: number;
   y: number;
-  name?: string;
+  name: string;
 }
 
 export const ScatterChartView: React.FC<ScatterChartViewProps> = ({
@@ -46,14 +46,15 @@ export const ScatterChartView: React.FC<ScatterChartViewProps> = ({
     const maxPoints = 200; // Limit for performance
     const limitedData = data.slice(0, maxPoints);
 
-    return limitedData
-      .map((row, idx) => {
-        const x = Number(row[xColumn]);
-        const y = Number(row[yColumn]);
-        if (isNaN(x) || isNaN(y)) return null;
-        return { x, y, name: `Point ${idx + 1}` };
-      })
-      .filter((point): point is ScatterDataPoint => point !== null);
+    const result: ScatterDataPoint[] = [];
+    limitedData.forEach((row, idx) => {
+      const x = Number(row[xColumn]);
+      const y = Number(row[yColumn]);
+      if (!isNaN(x) && !isNaN(y)) {
+        result.push({ x, y, name: `Point ${idx + 1}` });
+      }
+    });
+    return result;
   }, [data, xColumn, yColumn]);
 
   if (!chartData || chartData.length === 0) {
@@ -124,8 +125,8 @@ export const ScatterChartView: React.FC<ScatterChartViewProps> = ({
               borderRadius: '6px',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
             }}
-            formatter={(value: number, name: string) => [
-              value.toLocaleString(),
+            formatter={(value: number | undefined, name: string | undefined) => [
+              value !== undefined ? value.toLocaleString() : '0',
               name === 'x' ? xColumn : yColumn,
             ]}
             cursor={{ strokeDasharray: '3 3' }}

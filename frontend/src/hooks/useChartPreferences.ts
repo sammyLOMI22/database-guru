@@ -5,7 +5,6 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { ChartType } from '../utils/chartUtils';
 
 export type ViewMode = 'table' | 'chart';
 

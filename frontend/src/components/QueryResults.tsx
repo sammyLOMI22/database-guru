@@ -72,6 +72,17 @@ export default function QueryResults({
 }: QueryResultsProps) {
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+
+  // Detect chart availability based on data and statistics
+  const chartRecommendation = useMemo(() => {
+    if (!results || results.length === 0) {
+      return { chartType: 'table' as const, confidence: 0, xColumn: null, yColumn: null, reason: 'No data' };
+    }
+    return detectChartType(results, resultAnalysis?.statistics || {});
+  }, [results, resultAnalysis]);
+
+  const chartAvailable = chartRecommendation.chartType !== 'table';
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(sql);
@@ -224,7 +235,7 @@ export default function QueryResults({
       {/* Results */}
       {results && results.length > 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          {/* Header with stats */}
+          {/* Header with stats, toggle, and export */}
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center space-x-4 text-sm text-gray-600">
               <span>
@@ -236,48 +247,69 @@ export default function QueryResults({
                 </span>
               )}
             </div>
+            <div className="flex items-center gap-2">
+              <ChartToggle
+                mode={viewMode}
+                onModeChange={setViewMode}
+                chartAvailable={chartAvailable}
+                chartType={chartRecommendation.chartType}
+              />
+              <ExportDropdown data={results} sql={sql} />
+            </div>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  {Object.keys(results[0]).map((column) => (
-                    <th
-                      key={column}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
-                    >
-                      {column}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {results.map((row, rowIndex) => (
-                  <tr
-                    key={rowIndex}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    {Object.values(row).map((value, colIndex) => (
-                      <td
-                        key={colIndex}
-                        className="px-4 py-3 text-sm text-gray-900 font-mono"
+          {/* Chart or Table View */}
+          {viewMode === 'chart' && chartAvailable ? (
+            <div className="p-4">
+              <ChartVisualization
+                data={results}
+                statistics={resultAnalysis?.statistics || {}}
+                height={350}
+                showLegend={true}
+                animate={true}
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {Object.keys(results[0]).map((column) => (
+                      <th
+                        key={column}
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
                       >
-                        {value === null ? (
-                          <span className="text-gray-400 italic">null</span>
-                        ) : typeof value === 'object' ? (
-                          JSON.stringify(value)
-                        ) : (
-                          String(value)
-                        )}
-                      </td>
+                        {column}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {results.map((row, rowIndex) => (
+                    <tr
+                      key={rowIndex}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      {Object.values(row).map((value, colIndex) => (
+                        <td
+                          key={colIndex}
+                          className="px-4 py-3 text-sm text-gray-900 font-mono"
+                        >
+                          {value === null ? (
+                            <span className="text-gray-400 italic">null</span>
+                          ) : typeof value === 'object' ? (
+                            JSON.stringify(value)
+                          ) : (
+                            String(value)
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-gray-50 rounded-lg p-8 text-center">
