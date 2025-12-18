@@ -5,7 +5,8 @@ import {
   QueryPlan,
   CorrectionAttempt,
   ParallelExecutionMetrics,
-  ParallelCorrectionMetrics
+  ParallelCorrectionMetrics,
+  ResultAnalysis
 } from '../types/api';
 import { AgentTrace } from './AgentTrace';
 import { CorrectionHistory } from './CorrectionHistory';
@@ -13,6 +14,7 @@ import { QueryPlanVisualization } from './QueryPlanVisualization';
 import { VerificationWarnings } from './VerificationWarnings';
 import { FeedbackModal, FeedbackData } from './FeedbackModal';
 import { ParallelDatabaseMetrics, ParallelCorrectionsMetrics } from './ParallelExecutionMetrics';
+import { ResultSummary } from './ResultSummary';
 import { feedbackAPI } from '../services/api';
 
 interface QueryResultsProps {
@@ -38,6 +40,8 @@ interface QueryResultsProps {
   cacheType?: 'exact' | 'semantic' | null;
   semanticSimilarity?: number | null;
   matchedQuestion?: string | null;
+  // Intelligent Data Narratives
+  resultAnalysis?: ResultAnalysis | null;
 }
 
 export default function QueryResults({
@@ -60,6 +64,7 @@ export default function QueryResults({
   cacheType,
   semanticSimilarity,
   matchedQuestion,
+  resultAnalysis,
 }: QueryResultsProps) {
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -124,6 +129,15 @@ export default function QueryResults({
             </p>
           )}
         </div>
+      )}
+
+      {/* Result Narratives - Intelligent Data Insights */}
+      {resultAnalysis && (
+        <ResultSummary
+          analysis={resultAnalysis}
+          rowCount={rowCount || undefined}
+          executionTime={executionTime || undefined}
+        />
       )}
 
       {/* SQL Display */}

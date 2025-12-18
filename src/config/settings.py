@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     MAX_PARALLEL_DATABASES: int = 10  # Max concurrent database queries (prevents resource exhaustion)
     PARALLEL_CORRECTIONS_TIMEOUT: int = 10  # Max seconds for all parallel correction strategies (prevents hanging)
 
+    # Intelligent Data Narratives
+    ENABLE_NARRATIVES: bool = True  # Feature flag: Generate natural language insights from results
+    NARRATIVE_TIMEOUT_SECONDS: int = 5  # Max seconds for LLM narrative generation
+    NARRATIVE_MAX_SAMPLE_ROWS: int = 20  # Only analyze first N rows for large result sets
+
     class Config:
         env_file = ".env"
         case_sensitive = True

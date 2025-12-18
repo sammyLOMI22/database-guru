@@ -21,6 +21,11 @@ export default function ChatInterface() {
     },
   ]);
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [enableNarratives, setEnableNarratives] = useState<boolean>(() => {
+    // Load from localStorage, default to true
+    const stored = localStorage.getItem('enableNarratives');
+    return stored !== null ? JSON.parse(stored) : true;
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryMutation = useQuerySubmit();
@@ -32,6 +37,11 @@ export default function ChatInterface() {
       setSelectedModel(modelsData.default_model);
     }
   }, [modelsData, selectedModel]);
+
+  // Save narratives preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('enableNarratives', JSON.stringify(enableNarratives));
+  }, [enableNarratives]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -52,6 +62,7 @@ export default function ChatInterface() {
       const response = await queryMutation.mutateAsync({
         question,
         model: selectedModel || undefined,
+        enable_narratives: enableNarratives,
       });
 
       // Add assistant response
@@ -77,22 +88,44 @@ export default function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Model selector header */}
+      {/* Model selector and options header */}
       <div className="px-6 py-3 bg-white border-b border-gray-200 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <span className="text-sm text-gray-600">Model:</span>
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-          >
-            {modelsData?.models.map((model) => (
-              <option key={model} value={model}>
-                {model}
-                {model === modelsData.default_model && ' (default)'}
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-3">
+            <span className="text-sm text-gray-600">Model:</span>
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              {modelsData?.models.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                  {model === modelsData.default_model && ' (default)'}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Narratives Toggle */}
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <button
+              onClick={() => setEnableNarratives(!enableNarratives)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                enableNarratives ? 'bg-blue-600' : 'bg-gray-300'
+              }`}
+              title={enableNarratives ? 'Disable AI Narratives' : 'Enable AI Narratives'}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  enableNarratives ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            <span className="text-xs text-gray-600 whitespace-nowrap">
+              {enableNarratives ? '✨ Narratives' : '📊 Data Only'}
+            </span>
+          </label>
         </div>
 
         <div className="text-xs text-gray-500">

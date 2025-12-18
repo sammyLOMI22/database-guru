@@ -30,6 +30,11 @@ export default function EnhancedChatInterface() {
   const [showContextPanel, setShowContextPanel] = useState(true);
   const [hasContext, setHasContext] = useState(false);
   const [forceSchemaRefresh, setForceSchemaRefresh] = useState(false);
+  const [enableNarratives, setEnableNarratives] = useState<boolean>(() => {
+    // Load from localStorage, default to true
+    const stored = localStorage.getItem('enableNarratives');
+    return stored !== null ? JSON.parse(stored) : true;
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { loading, executeQuery } = useMultiQuery();
@@ -41,6 +46,11 @@ export default function EnhancedChatInterface() {
       setSelectedModel(modelsData.default_model);
     }
   }, [modelsData, selectedModel]);
+
+  // Save narratives preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('enableNarratives', JSON.stringify(enableNarratives));
+  }, [enableNarratives]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -61,6 +71,7 @@ export default function EnhancedChatInterface() {
       const response = await executeQuery(question, currentSession, {
         model: selectedModel || undefined,
         force_schema_refresh: forceSchemaRefresh,
+        enable_narratives: enableNarratives,
       });
 
       // Reset force refresh after query
@@ -77,6 +88,9 @@ export default function EnhancedChatInterface() {
           : 'Query executed.',
         multiQueryResponse: response,
       };
+      console.log('DEBUG: Response from multi-query:', response);
+      console.log('DEBUG: Combined analysis:', response.combined_analysis);
+      console.log('DEBUG: DB results[0].result_analysis:', response.database_results[0]?.result_analysis);
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error: any) {
       // Add error message
@@ -191,6 +205,26 @@ export default function EnhancedChatInterface() {
                 </label>
               </div>
 
+              {/* Narratives Toggle */}
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <button
+                  onClick={() => setEnableNarratives(!enableNarratives)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    enableNarratives ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
+                  title={enableNarratives ? 'Disable AI Narratives' : 'Enable AI Narratives'}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      enableNarratives ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className="text-xs text-gray-600 whitespace-nowrap">
+                  {enableNarratives ? '✨ Narratives' : '📊 Data Only'}
+                </span>
+              </label>
+
               {/* Query count */}
               <div className="text-xs text-gray-500">
                 {messages.length - 1} {messages.length === 2 ? 'query' : 'queries'}
@@ -276,6 +310,7 @@ export default function EnhancedChatInterface() {
                       totalExecutionTime={message.multiQueryResponse.total_execution_time_ms}
                       question={message.multiQueryResponse.question}
                       cacheInfo={message.multiQueryResponse.cache_info}
+                      combinedAnalysis={message.multiQueryResponse.combined_analysis}
                     />
                   </div>
                 )}

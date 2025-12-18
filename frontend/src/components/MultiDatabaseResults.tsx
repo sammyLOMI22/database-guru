@@ -6,6 +6,7 @@ import { CorrectionHistory } from './CorrectionHistory';
 import { QueryPlanVisualization } from './QueryPlanVisualization';
 import { VerificationWarnings } from './VerificationWarnings';
 import { FeedbackModal, FeedbackData } from './FeedbackModal';
+import { ResultSummary } from './ResultSummary';
 import { feedbackAPI } from '../services/api';
 
 interface MultiDatabaseResultsProps {
@@ -14,6 +15,7 @@ interface MultiDatabaseResultsProps {
   totalExecutionTime: number;
   question: string;
   cacheInfo?: CacheInfo | null;
+  combinedAnalysis?: any; // ResultAnalysis from multi-db response
 }
 
 export default function MultiDatabaseResults({
@@ -21,7 +23,10 @@ export default function MultiDatabaseResults({
   totalRows,
   totalExecutionTime,
   cacheInfo,
+  combinedAnalysis,
 }: MultiDatabaseResultsProps) {
+  console.log('DEBUG: MultiDatabaseResults props:', { combinedAnalysis, resultAnalysis0: results[0]?.result_analysis });
+
   const [expandedDatabases, setExpandedDatabases] = useState<Set<number>>(
     new Set(results.map((r) => r.connection_id))
   );
@@ -63,6 +68,18 @@ export default function MultiDatabaseResults({
 
   return (
     <div className="space-y-4">
+      {/* Combined Multi-Database Analysis (if available) */}
+      {combinedAnalysis && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">Cross-Database Insights</h3>
+          <ResultSummary
+            analysis={combinedAnalysis}
+            rowCount={totalRows}
+            executionTime={totalExecutionTime}
+          />
+        </div>
+      )}
+
       {/* Summary header */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
         <h3 className="font-semibold text-gray-900 mb-2">Multi-Database Query Results</h3>
@@ -169,9 +186,20 @@ export default function MultiDatabaseResults({
 
             {/* Expanded content */}
             {expandedDatabases.has(result.connection_id) && (
-              <div className="border-t border-gray-200 p-4 bg-white">
+              <div className="border-t border-gray-200 p-4 bg-white space-y-4">
+                {/* Result Analysis / Narrative (if available) */}
+                {result.result_analysis && (
+                  <div>
+                    <ResultSummary
+                      analysis={result.result_analysis}
+                      rowCount={result.row_count}
+                      executionTime={result.execution_time_ms}
+                    />
+                  </div>
+                )}
+
                 {/* SQL Query */}
-                <div className="mb-4">
+                <div>
                   <div className="flex items-center justify-between mb-2">
                     <h5 className="text-xs font-semibold text-gray-700">
                       Generated SQL {/* DEBUG */}
@@ -211,14 +239,14 @@ export default function MultiDatabaseResults({
                 {/* Option 2: Observability Components */}
                 {/* Verification Warnings */}
                 {result.verification_warnings && result.verification_warnings.length > 0 && (
-                  <div className="mb-4">
+                  <div>
                     <VerificationWarnings warnings={result.verification_warnings} />
                   </div>
                 )}
 
                 {/* Correction History */}
                 {result.self_corrected && result.attempts && result.attempts.length > 0 && (
-                  <div className="mb-4">
+                  <div>
                     <CorrectionHistory
                       attempts={result.attempts}
                       selfCorrected={result.self_corrected}
@@ -228,7 +256,7 @@ export default function MultiDatabaseResults({
 
                 {/* Query Plan */}
                 {result.used_planning && result.query_plan && (
-                  <div className="mb-4">
+                  <div>
                     <QueryPlanVisualization
                       plan={result.query_plan}
                       usedPlanning={result.used_planning}
@@ -238,7 +266,7 @@ export default function MultiDatabaseResults({
 
                 {/* Agent Trace */}
                 {result.agent_trace && (
-                  <div className="mb-4">
+                  <div>
                     <AgentTrace trace={result.agent_trace} />
                   </div>
                 )}

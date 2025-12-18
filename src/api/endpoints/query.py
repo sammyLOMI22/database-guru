@@ -22,6 +22,7 @@ from src.database.models import QueryHistory, ChatSession, ChatMessage
 from src.llm.sql_generator import SQLGenerator
 from src.llm.self_correcting_agent import SelfCorrectingSQLAgent, AgentTrace
 from src.llm.conversational_memory_agent import get_memory_agent
+from src.llm.result_narrator import ResultNarrator
 from src.cache.redis_client import RedisCache
 from src.cache.semantic_cache import SemanticCache
 from src.config.settings import Settings
@@ -361,6 +362,67 @@ async def process_query(
             await db.commit()
             logger.info(f"Saved conversation to session {request.session_id}")
 
+        # Generate natural language narrative of results (Intelligent Data Narratives feature)
+        result_analysis = None
+        if (
+            settings.ENABLE_NARRATIVES
+            and request.enable_narratives
+            and execution_result
+            and execution_result.get("success")
+            and 1 <= execution_result.get("row_count", 0) <= 1000
+        ):
+            try:
+                # Initialize narrator with settings
+                narrator = ResultNarrator(
+                    ollama_client=sql_generator.ollama,
+                    enable_statistics=True,
+                    max_sample_rows=settings.NARRATIVE_MAX_SAMPLE_ROWS,
+                    timeout_seconds=settings.NARRATIVE_TIMEOUT_SECONDS,
+                    db_session=db
+                )
+
+                # Generate narrative
+                narrative = await narrator.generate_narrative(
+                    question=request.question,
+                    sql=sql,
+                    results=execution_result.get("data", []),
+                    row_count=execution_result.get("row_count", 0),
+                    execution_time_ms=execution_result.get("execution_time_ms", 0),
+                    database_type=database_type,
+                )
+
+                # Convert to response format
+                result_analysis = {
+                    "summary": narrative.summary,
+                    "key_insights": narrative.key_insights,
+                    "direct_answer": narrative.direct_answer,
+                    "confidence": narrative.confidence,
+                    "statistics": narrative.statistics,
+                    "generated_at": narrative.generated_at,
+                }
+
+                # Add to agent trace for observability
+                if isinstance(agent_trace_dict, dict) and "steps" in agent_trace_dict:
+                    agent_trace_dict["steps"].append({
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "elapsed_ms": 0,
+                        "type": "narrative_generation",
+                        "message": f"Generated narrative with {len(narrative.key_insights)} insights",
+                        "metadata": {
+                            "confidence": narrative.confidence,
+                            "insight_count": len(narrative.key_insights),
+                            "has_direct_answer": narrative.direct_answer is not None,
+                        },
+                        "icon": "📊"
+                    })
+
+                logger.info(f"Generated narrative: {narrative.summary[:100]}...")
+
+            except Exception as e:
+                # Don't fail query if narrative generation fails - log and continue
+                logger.warning(f"Failed to generate narrative for query: {e}")
+                result_analysis = None
+
         # Merge cache trace steps with agent trace (prepend cache steps)
         agent_trace_dict = agent_result.get("agent_trace")
         if agent_trace_dict and cache_trace.steps:
@@ -395,6 +457,8 @@ async def process_query(
             "used_planning": agent_result.get("used_planning", False),
             "conversation_context": conversation_context,
             "used_context": used_context,
+            # Intelligent Data Narratives
+            "result_analysis": result_analysis,
         }
 
         # Cache the result (both exact and semantic)

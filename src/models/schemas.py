@@ -46,6 +46,10 @@ class QueryRequest(BaseModel):
         default=False,
         description="Force re-introspection of database schema (bypasses cache)",
     )
+    enable_narratives: bool = Field(
+        default=True,
+        description="Enable natural language narrative generation from query results",
+    )
 
     @validator('question')
     def question_not_empty(cls, v):
@@ -89,6 +93,36 @@ class AgentTrace(BaseModel):
     )
     total_elapsed_ms: float = Field(..., description="Total execution time in milliseconds")
     start_time: str = Field(..., description="ISO timestamp when trace started")
+
+
+class ResultAnalysis(BaseModel):
+    """Natural language analysis of query results"""
+    summary: str = Field(
+        ...,
+        description="1-2 sentence overview of the query results"
+    )
+    key_insights: List[str] = Field(
+        default_factory=list,
+        description="3-5 key findings, patterns, or observations from the results"
+    )
+    direct_answer: Optional[str] = Field(
+        default=None,
+        description="Direct answer to the user's question if applicable (e.g., for 'How many...' questions)"
+    )
+    confidence: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score (0.0-1.0) indicating how confident the analysis is"
+    )
+    statistics: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Extracted statistics from the query results"
+    )
+    generated_at: str = Field(
+        default_factory=lambda: datetime.utcnow().isoformat(),
+        description="ISO timestamp when the analysis was generated"
+    )
 
 
 class QueryResponse(BaseModel):
@@ -187,6 +221,11 @@ class QueryResponse(BaseModel):
     matched_question: Optional[str] = Field(
         default=None,
         description="Original question that matched in semantic cache"
+    )
+    # Intelligent Data Narratives
+    result_analysis: Optional[ResultAnalysis] = Field(
+        default=None,
+        description="Natural language analysis and insights from query results"
     )
 
     class Config:
