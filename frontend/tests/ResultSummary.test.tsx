@@ -86,7 +86,7 @@ describe('ResultSummary Component', () => {
 
   it('should display statistics in expandable details element', () => {
     render(<ResultSummary analysis={mockAnalysis} />);
-    const statsButton = screen.getByText('Statistics');
+    const statsButton = screen.getByText('Detailed Statistics');
     expect(statsButton).toBeInTheDocument();
   });
 
@@ -105,7 +105,7 @@ describe('ResultSummary Component', () => {
 
   it('should format statistics object correctly', () => {
     render(<ResultSummary analysis={mockAnalysis} />);
-    const statsButton = screen.getByText('Statistics');
+    const statsButton = screen.getByText('Detailed Statistics');
     expect(statsButton).toBeInTheDocument();
   });
 
@@ -116,7 +116,7 @@ describe('ResultSummary Component', () => {
     };
     render(<ResultSummary analysis={analysis} />);
     // Statistics section shouldn't render if no stats and no row count/execution time
-    expect(screen.queryByText('Statistics')).not.toBeInTheDocument();
+    expect(screen.queryByText('Detailed Statistics')).not.toBeInTheDocument();
   });
 
   it('should display generated_at timestamp', () => {
