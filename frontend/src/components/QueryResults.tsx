@@ -1,5 +1,5 @@
 import { Copy, Check, MessageSquare, Zap, Database } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   AgentTrace as AgentTraceType,
   QueryPlan,
@@ -16,6 +16,10 @@ import { FeedbackModal, FeedbackData } from './FeedbackModal';
 import { ParallelDatabaseMetrics, ParallelCorrectionsMetrics } from './ParallelExecutionMetrics';
 import { ResultSummary } from './ResultSummary';
 import { feedbackAPI } from '../services/api';
+import { ChartVisualization } from './visualization/ChartVisualization';
+import { ChartToggle, ViewMode } from './visualization/ChartToggle';
+import { ExportDropdown } from './visualization/ExportDropdown';
+import { detectChartType } from '../utils/chartUtils';
 
 interface QueryResultsProps {
   sql: string;
