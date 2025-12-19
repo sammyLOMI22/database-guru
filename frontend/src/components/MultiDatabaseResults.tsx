@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { MessageSquare, Copy, Check, Zap, Database } from 'lucide-react';
 import type { DatabaseQueryResult, CacheInfo } from '../types/api';
 import { AgentTrace } from './AgentTrace';
@@ -8,6 +8,10 @@ import { VerificationWarnings } from './VerificationWarnings';
 import { FeedbackModal, FeedbackData } from './FeedbackModal';
 import { ResultSummary } from './ResultSummary';
 import { feedbackAPI } from '../services/api';
+import { ChartVisualization } from './visualization/ChartVisualization';
+import { ChartToggle, ViewMode } from './visualization/ChartToggle';
+import { ExportDropdown } from './visualization/ExportDropdown';
+import { detectChartType, ChartRecommendation } from '../utils/chartUtils';
 
 interface MultiDatabaseResultsProps {
   results: DatabaseQueryResult[];
@@ -32,6 +36,23 @@ export default function MultiDatabaseResults({
   );
   const [feedbackModal, setFeedbackModal] = useState<{ queryId: number; sql: string } | null>(null);
   const [copiedStates, setCopiedStates] = useState<Record<number, boolean>>({});
+
+  // Per-database view modes for chart/table toggle
+  const [viewModes, setViewModes] = useState<Record<number, ViewMode>>(() =>
+    Object.fromEntries(results.map((r) => [r.connection_id, 'table']))
+  );
+
+  // Memoized chart recommendations for each database
+  const chartRecommendations = useMemo<Record<number, ChartRecommendation>>(() => {
+    return Object.fromEntries(
+      results.map((r) => [
+        r.connection_id,
+        r.results && r.results.length > 0
+          ? detectChartType(r.results, r.result_analysis?.statistics || {})
+          : { chartType: 'table' as const, confidence: 0, xColumn: null, yColumn: null, reason: 'No data' },
+      ])
+    );
+  }, [results]);
 
   const toggleDatabase = (connectionId: number) => {
     setExpandedDatabases((prev) => {
