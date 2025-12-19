@@ -11,7 +11,10 @@ import { feedbackAPI } from '../services/api';
 import { ChartVisualization } from './visualization/ChartVisualization';
 import { ChartToggle, ViewMode } from './visualization/ChartToggle';
 import { ExportDropdown } from './visualization/ExportDropdown';
+import { CombinedExportDropdown } from './visualization/CombinedExportDropdown';
+import { CrossDatabaseChart } from './visualization/CrossDatabaseChart';
 import { detectChartType, ChartRecommendation } from '../utils/chartUtils';
+import { detectCrossDbComparison } from '../utils/crossDbUtils';
 
 interface MultiDatabaseResultsProps {
   results: DatabaseQueryResult[];
@@ -26,6 +29,7 @@ export default function MultiDatabaseResults({
   results,
   totalRows,
   totalExecutionTime,
+  question,
   cacheInfo,
   combinedAnalysis,
 }: MultiDatabaseResultsProps) {
@@ -53,6 +57,9 @@ export default function MultiDatabaseResults({
       ])
     );
   }, [results]);
+
+  // Memoized cross-database comparison configuration
+  const crossDbConfig = useMemo(() => detectCrossDbComparison(results), [results]);
 
   const toggleDatabase = (connectionId: number) => {
     setExpandedDatabases((prev) => {
@@ -101,9 +108,15 @@ export default function MultiDatabaseResults({
         </div>
       )}
 
+      {/* Cross-Database Comparison Chart */}
+      {crossDbConfig && <CrossDatabaseChart config={crossDbConfig} />}
+
       {/* Summary header */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-semibold text-gray-900 mb-2">Multi-Database Query Results</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold text-gray-900">Multi-Database Query Results</h3>
+          <CombinedExportDropdown results={results} question={question} />
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
             <p className="text-gray-600">Databases Queried</p>
@@ -296,45 +309,77 @@ export default function MultiDatabaseResults({
                 {result.success ? (
                   result.results && result.results.length > 0 ? (
                     <div>
-                      <h5 className="text-xs font-semibold text-gray-700 mb-2">
-                        Results ({result.row_count} row{result.row_count !== 1 ? 's' : ''})
-                      </h5>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              {Object.keys(result.results[0]).map((key) => (
-                                <th
-                                  key={key}
-                                  className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
-                                >
-                                  {key}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {result.results.slice(0, 10).map((row, idx) => (
-                              <tr key={idx} className="hover:bg-gray-50">
-                                {Object.values(row).map((value, vidx) => (
-                                  <td key={vidx} className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                                    {value === null ? (
-                                      <span className="text-gray-400 italic">null</span>
-                                    ) : (
-                                      String(value)
-                                    )}
-                                  </td>
+                      {/* Results header with controls */}
+                      <div className="flex items-center justify-between mb-2">
+                        <h5 className="text-xs font-semibold text-gray-700">
+                          Results ({result.row_count} row{result.row_count !== 1 ? 's' : ''})
+                        </h5>
+                        <div className="flex items-center gap-2">
+                          <ChartToggle
+                            mode={viewModes[result.connection_id] || 'table'}
+                            onModeChange={(mode) =>
+                              setViewModes((prev) => ({ ...prev, [result.connection_id]: mode }))
+                            }
+                            chartAvailable={chartRecommendations[result.connection_id]?.chartType !== 'table'}
+                            chartType={chartRecommendations[result.connection_id]?.chartType || 'table'}
+                          />
+                          <ExportDropdown
+                            data={result.results || []}
+                            sql={result.sql}
+                            connectionName={result.connection_name}
+                            databaseType={result.database_type}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Conditional Chart or Table rendering */}
+                      {viewModes[result.connection_id] === 'chart' &&
+                      chartRecommendations[result.connection_id]?.chartType !== 'table' ? (
+                        <ChartVisualization
+                          data={result.results}
+                          statistics={result.result_analysis?.statistics || {}}
+                          height={300}
+                          showLegend={true}
+                          animate={true}
+                        />
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                {Object.keys(result.results[0]).map((key) => (
+                                  <th
+                                    key={key}
+                                    className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
+                                  >
+                                    {key}
+                                  </th>
                                 ))}
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {result.row_count && result.row_count > 10 && (
-                          <p className="mt-2 text-xs text-gray-500 text-center">
-                            Showing 10 of {result.row_count} rows
-                          </p>
-                        )}
-                      </div>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {result.results.slice(0, 10).map((row, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                  {Object.values(row).map((value, vidx) => (
+                                    <td key={vidx} className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                                      {value === null ? (
+                                        <span className="text-gray-400 italic">null</span>
+                                      ) : (
+                                        String(value)
+                                      )}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {result.row_count && result.row_count > 10 && (
+                            <p className="mt-2 text-xs text-gray-500 text-center">
+                              Showing 10 of {result.row_count} rows
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 italic">No results returned</p>

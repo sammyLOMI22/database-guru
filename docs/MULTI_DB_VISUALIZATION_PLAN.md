@@ -238,142 +238,142 @@ MultiDatabaseResults
 ### Phase 1: Per-Database Charts + Export
 
 #### 1.1 Modify MultiDatabaseResults.tsx
-- [ ] Add imports for ChartVisualization, ChartToggle, ExportDropdown, detectChartType
-- [ ] Add ViewMode type import from ChartToggle
-- [ ] Add useMemo import if not present
-- [ ] Add state: `viewModes` - Record<number, ViewMode> for per-database view modes
-- [ ] Add memoized `chartRecommendations` - detectChartType for each database
-- [ ] Add `showCrossDbChart` state for collapsible comparison section
+- [x] Add imports for ChartVisualization, ChartToggle, ExportDropdown, detectChartType
+- [x] Add ViewMode type import from ChartToggle
+- [x] Add useMemo import if not present
+- [x] Add state: `viewModes` - Record<number, ViewMode> for per-database view modes
+- [x] Add memoized `chartRecommendations` - detectChartType for each database
+- [x] Add `showCrossDbChart` state for collapsible comparison section
 
 #### 1.2 Per-Database Header Controls
-- [ ] Add ChartToggle to each database's expanded section header
-- [ ] Add ExportDropdown next to ChartToggle
-- [ ] Wire up onModeChange to update viewModes state
-- [ ] Pass correct chartAvailable and chartType to ChartToggle
+- [x] Add ChartToggle to each database's expanded section header
+- [x] Add ExportDropdown next to ChartToggle
+- [x] Wire up onModeChange to update viewModes state
+- [x] Pass correct chartAvailable and chartType to ChartToggle
 
 #### 1.3 Conditional Chart/Table Rendering
-- [ ] Replace hardcoded table (lines 282-310) with conditional
-- [ ] Render ChartVisualization when viewMode is 'chart' and chart available
-- [ ] Render table when viewMode is 'table' or no chart available
-- [ ] Pass result.results and result.result_analysis?.statistics to ChartVisualization
+- [x] Replace hardcoded table (lines 282-310) with conditional
+- [x] Render ChartVisualization when viewMode is 'chart' and chart available
+- [x] Render table when viewMode is 'table' or no chart available
+- [x] Pass result.results and result.result_analysis?.statistics to ChartVisualization
 
 #### 1.4 Verify Phase 1
-- [ ] Test toggle works independently for each database
-- [ ] Test chart detection works with various data types
-- [ ] Test export works for individual databases
-- [ ] Verify no TypeScript errors
+- [x] Test toggle works independently for each database
+- [x] Test chart detection works with various data types
+- [x] Test export works for individual databases
+- [x] Verify no TypeScript errors
 
 ---
 
 ### Phase 2: Combined Export
 
 #### 2.1 Add Export Utilities
-- [ ] Add `exportCombinedCSV()` to exportUtils.ts - merges all DBs with source column
-- [ ] Add `exportSeparateFiles()` to exportUtils.ts - creates ZIP with jszip
-- [ ] Add jszip dependency if needed: `npm install jszip`
+- [x] Add `exportCombinedCSV()` to exportUtils.ts - merges all DBs with source column
+- [x] Add `exportSeparateFiles()` to exportUtils.ts - creates ZIP with jszip
+- [x] Add jszip dependency if needed: `npm install jszip`
 
 #### 2.2 Create CombinedExportDropdown.tsx
-- [ ] Create component file in frontend/src/components/visualization/
-- [ ] Add dropdown button with "Export All" label
-- [ ] Add dropdown menu with radio options: "Stacked CSV" (default), "Separate Files"
-- [ ] Add format selection state
-- [ ] Add CSV export handler (stacked format)
-- [ ] Add JSON export handler (stacked format)
-- [ ] Add ZIP export handler (separate files)
-- [ ] Show total row count from all databases
-- [ ] Handle empty/failed results gracefully
+- [x] Create component file in frontend/src/components/visualization/
+- [x] Add dropdown button with "Export All" label
+- [x] Add dropdown menu with radio options: "Stacked CSV" (default), "Separate Files"
+- [x] Add format selection state
+- [x] Add CSV export handler (stacked format)
+- [x] Add JSON export handler (stacked format)
+- [x] Add ZIP export handler (separate files)
+- [x] Show total row count from all databases
+- [x] Handle empty/failed results gracefully
 
 #### 2.3 Integrate Combined Export
-- [ ] Add CombinedExportDropdown to MultiDatabaseResults summary header
-- [ ] Pass results array and question prop
-- [ ] Position next to existing summary stats
+- [x] Add CombinedExportDropdown to MultiDatabaseResults summary header
+- [x] Pass results array and question prop
+- [x] Position next to existing summary stats
 
 #### 2.4 Verify Phase 2
-- [ ] Test stacked CSV export includes database_name column
-- [ ] Test separate files creates valid ZIP
-- [ ] Test handles mixed success/failure results
-- [ ] Test with empty results
+- [x] Test stacked CSV export includes database_name column
+- [x] Test separate files creates valid ZIP
+- [x] Test handles mixed success/failure results
+- [x] Test with empty results
 
 ---
 
 ### Phase 3: Cross-Database Comparison Chart
 
 #### 3.1 Create crossDbUtils.ts
-- [ ] Create file in frontend/src/utils/
-- [ ] Add `findCommonNumericColumns()` - finds columns present in all DBs
-- [ ] Add `aggregateByDatabase()` - sums/averages numeric columns per DB
-- [ ] Add `detectCrossDbComparison()` - returns config or null
-- [ ] Add CrossDbChartConfig type definition
+- [x] Create file in frontend/src/utils/
+- [x] Add `findCommonNumericColumns()` - finds columns present in all DBs
+- [x] Add `aggregateByDatabase()` - sums/averages numeric columns per DB
+- [x] Add `detectCrossDbComparison()` - returns config or null
+- [x] Add CrossDbChartConfig type definition
 
 #### 3.2 Create CrossDatabaseChart.tsx
-- [ ] Create component file in frontend/src/components/visualization/
-- [ ] Accept results and config props
-- [ ] Use Recharts BarChart with grouped bars
-- [ ] Color-code bars by database (use existing color palette)
-- [ ] Add legend showing database names
-- [ ] Add axis labels for metric names
-- [ ] Handle single database gracefully (no comparison needed)
+- [x] Create component file in frontend/src/components/visualization/
+- [x] Accept results and config props
+- [x] Use Recharts BarChart with grouped bars
+- [x] Color-code bars by database (use existing color palette)
+- [x] Add legend showing database names
+- [x] Add axis labels for metric names
+- [x] Handle single database gracefully (no comparison needed)
 
 #### 3.3 Integrate Cross-Database Chart
-- [ ] Add crossDbConfig memoized detection to MultiDatabaseResults
-- [ ] Add showCrossDbChart toggle state (default: true if config exists)
-- [ ] Add collapsible section after Combined Analysis
-- [ ] Add expand/collapse button with chevron icon
-- [ ] Render CrossDatabaseChart when expanded and config exists
+- [x] Add crossDbConfig memoized detection to MultiDatabaseResults
+- [x] Add showCrossDbChart toggle state (default: true if config exists)
+- [x] Add collapsible section after Combined Analysis
+- [x] Add expand/collapse button with chevron icon
+- [x] Render CrossDatabaseChart when expanded and config exists
 
 #### 3.4 Verify Phase 3
-- [ ] Test detection finds common numeric columns
-- [ ] Test chart renders with multiple databases
-- [ ] Test collapsible toggle works
-- [ ] Test graceful handling when no common columns
+- [x] Test detection finds common numeric columns
+- [x] Test chart renders with multiple databases
+- [x] Test collapsible toggle works
+- [x] Test graceful handling when no common columns
 
 ---
 
 ### Phase 4: Testing
 
 #### 4.1 Create MultiDatabaseVisualization.test.tsx
-- [ ] Test per-database toggle independence
-- [ ] Test chart detection per database
-- [ ] Test ExportDropdown renders for each database
-- [ ] Test view mode state management
-- [ ] Test chart/table conditional rendering
+- [x] Test per-database toggle independence
+- [x] Test chart detection per database
+- [x] Test ExportDropdown renders for each database
+- [x] Test view mode state management
+- [x] Test chart/table conditional rendering
 
 #### 4.2 Create CombinedExportDropdown.test.tsx
-- [ ] Test dropdown opens/closes
-- [ ] Test format selection
-- [ ] Test stacked export generates correct data
-- [ ] Test handles empty results
-- [ ] Test row count display
+- [x] Test dropdown opens/closes
+- [x] Test format selection
+- [x] Test stacked export generates correct data
+- [x] Test handles empty results
+- [x] Test row count display
 
 #### 4.3 Create CrossDatabaseChart.test.tsx
-- [ ] Test common column detection
-- [ ] Test aggregation logic
-- [ ] Test chart renders with mock data
-- [ ] Test handles no common columns
-- [ ] Test collapsible state
+- [x] Test common column detection
+- [x] Test aggregation logic
+- [x] Test chart renders with mock data
+- [x] Test handles no common columns
+- [x] Test collapsible state
 
 #### 4.4 Run All Tests
-- [ ] Run `npm test` and verify all pass
-- [ ] Fix any failing tests
-- [ ] Verify build succeeds: `npm run build`
+- [x] Run `npm test` and verify all pass
+- [x] Fix any failing tests
+- [x] Verify build succeeds: `npm run build`
 
 ---
 
 ### Phase 5: Documentation & Cleanup
 
 #### 5.1 Update Documentation
-- [ ] Update ADVANCED_VISUALIZATION_GUIDE.md with multi-database section
-- [ ] Add examples for cross-database comparison
-- [ ] Document combined export formats
+- [x] Update ADVANCED_VISUALIZATION_GUIDE.md with multi-database section
+- [x] Add examples for cross-database comparison
+- [x] Document combined export formats
 
 #### 5.2 Code Cleanup
-- [ ] Remove any debug console.logs
-- [ ] Ensure consistent code style
-- [ ] Add JSDoc comments to new utility functions
+- [x] Remove any debug console.logs
+- [x] Ensure consistent code style
+- [x] Add JSDoc comments to new utility functions
 
 #### 5.3 Final Verification
-- [ ] Manual test with real multi-database query
-- [ ] Verify all features work end-to-end
+- [x] Manual test with real multi-database query
+- [x] Verify all features work end-to-end
 - [ ] Create commit with descriptive message
 
 ---

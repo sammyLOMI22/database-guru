@@ -384,6 +384,86 @@ frontend/tests/
 
 ---
 
+## Multi-Database Visualization
+
+The visualization system extends to multi-database query results, providing per-database charts, combined exports, and cross-database comparison charts.
+
+### Per-Database Charts
+
+Each database result in a multi-database query can independently toggle between table and chart views:
+
+```tsx
+// Each database has independent view mode
+const [viewModes, setViewModes] = useState<Record<number, ViewMode>>(() =>
+  Object.fromEntries(results.map(r => [r.connection_id, 'table']))
+);
+```
+
+Features:
+- **Independent toggles**: Each database's view mode is controlled separately
+- **Chart detection**: Uses the same intelligent detection as single queries
+- **Per-database export**: Each database has its own export dropdown
+
+### Combined Export
+
+Export all database results together with format choice:
+
+| Mode | Description | Output |
+|------|-------------|--------|
+| **Stacked CSV** (default) | All rows merged with `database_name` column | Single CSV file |
+| **Stacked JSON** | All data with database metadata | Single JSON file |
+| **Separate Files** | One file per database | ZIP archive |
+
+```tsx
+<CombinedExportDropdown
+  results={results}
+  question={question}
+/>
+```
+
+### Cross-Database Comparison Chart
+
+Automatically detects common numeric columns across databases and displays a grouped bar chart comparison:
+
+```tsx
+// Detection
+const crossDbConfig = detectCrossDbComparison(results);
+
+// Rendering
+{crossDbConfig && <CrossDatabaseChart config={crossDbConfig} />}
+```
+
+Features:
+- **Common column detection**: Finds numeric columns present in all successful results
+- **Aggregation**: Sums values per database for comparison
+- **Metric selector**: Switch between different metrics when multiple are available
+- **Collapsible section**: Toggle visibility of the comparison chart
+- **Summary stats**: Shows aggregated values and row counts per database
+
+### New Components
+
+| Component | Purpose |
+|-----------|---------|
+| `CombinedExportDropdown.tsx` | Multi-database export with format selection |
+| `CrossDatabaseChart.tsx` | Cross-database comparison visualization |
+
+### New Utilities
+
+| File | Functions |
+|------|-----------|
+| `crossDbUtils.ts` | `findCommonNumericColumns()`, `aggregateByDatabase()`, `detectCrossDbComparison()`, `formatMetricValue()` |
+| `exportUtils.ts` | `exportCombinedCSV()`, `exportCombinedJSON()`, `exportSeparateFiles()` |
+
+### Test Coverage
+
+| Test File | Tests |
+|-----------|-------|
+| `crossDbUtils.test.ts` | 19 tests for cross-database utilities |
+| `CombinedExportDropdown.test.tsx` | 17 tests for combined export component |
+| `CrossDatabaseChart.test.tsx` | 17 tests for comparison chart component |
+
+---
+
 ## Future Enhancements (Phase 2)
 
 ### Dashboard Feature
@@ -485,5 +565,5 @@ function truncateString(str: string, maxLength?: number): string;
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: December 18, 2025
+**Document Version**: 2.0
+**Last Updated**: December 19, 2025

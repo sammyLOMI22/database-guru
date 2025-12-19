@@ -184,3 +184,187 @@ export function truncateString(str: string, maxLength: number = 50): string {
   if (str.length <= maxLength) return str;
   return str.substring(0, maxLength - 3) + '...';
 }
+
+/**
+ * Database result type for combined exports
+ */
+export interface DatabaseResultForExport {
+  connection_id: number;
+  connection_name: string;
+  database_type: string;
+  results?: Record<string, unknown>[] | null;
+  success: boolean;
+  sql: string;
+}
+
+/**
+ * Exports combined data from multiple databases as stacked CSV
+ * Adds a 'database_name' column to identify the source database
+ *
+ * @param results - Array of database query results
+ * @param filename - Optional custom filename
+ */
+export function exportCombinedCSV(
+  results: DatabaseResultForExport[],
+  filename?: string
+): void {
+  // Filter successful results with data
+  const successfulResults = results.filter(
+    (r) => r.success && r.results && r.results.length > 0
+  );
+
+  if (successfulResults.length === 0) {
+    console.warn('No data to export');
+    return;
+  }
+
+  // Get all unique columns across all databases
+  const allColumns = new Set<string>();
+  allColumns.add('database_name'); // Add source column first
+
+  for (const result of successfulResults) {
+    if (result.results && result.results.length > 0) {
+      Object.keys(result.results[0]).forEach((col) => allColumns.add(col));
+    }
+  }
+
+  const headers = Array.from(allColumns);
+  const rows: string[] = [];
+
+  // Add header row
+  rows.push(headers.map((h) => escapeCSVField(h)).join(','));
+
+  // Add data rows from all databases
+  for (const result of successfulResults) {
+    if (result.results) {
+      for (const row of result.results) {
+        const values = headers.map((h) => {
+          if (h === 'database_name') {
+            return escapeCSVField(result.connection_name);
+          }
+          return escapeCSVField(String(row[h] ?? ''));
+        });
+        rows.push(values.join(','));
+      }
+    }
+  }
+
+  const csvContent = rows.join('\n');
+  const finalFilename = filename || generateFilename('multi-db-results');
+  downloadFile(csvContent, `${finalFilename}.csv`, 'text/csv;charset=utf-8;');
+}
+
+/**
+ * Exports combined data from multiple databases as stacked JSON
+ *
+ * @param results - Array of database query results
+ * @param question - Original query question
+ * @param filename - Optional custom filename
+ */
+export function exportCombinedJSON(
+  results: DatabaseResultForExport[],
+  question?: string,
+  filename?: string
+): void {
+  const successfulResults = results.filter(
+    (r) => r.success && r.results && r.results.length > 0
+  );
+
+  if (successfulResults.length === 0) {
+    console.warn('No data to export');
+    return;
+  }
+
+  const exportData = {
+    metadata: {
+      question,
+      exportedAt: new Date().toISOString(),
+      databaseCount: successfulResults.length,
+      totalRows: successfulResults.reduce(
+        (sum, r) => sum + (r.results?.length || 0),
+        0
+      ),
+    },
+    databases: successfulResults.map((r) => ({
+      name: r.connection_name,
+      type: r.database_type,
+      sql: r.sql,
+      rowCount: r.results?.length || 0,
+      columns: r.results && r.results.length > 0 ? Object.keys(r.results[0]) : [],
+      data: r.results,
+    })),
+  };
+
+  const jsonContent = JSON.stringify(exportData, null, 2);
+  const finalFilename = filename || generateFilename('multi-db-results');
+  downloadFile(jsonContent, `${finalFilename}.json`, 'application/json');
+}
+
+/**
+ * Exports each database's results as separate files in a ZIP archive
+ *
+ * @param results - Array of database query results
+ * @param format - Export format ('csv' or 'json')
+ * @param filename - Optional custom filename for ZIP
+ */
+export async function exportSeparateFiles(
+  results: DatabaseResultForExport[],
+  format: 'csv' | 'json' = 'csv',
+  filename?: string
+): Promise<void> {
+  const successfulResults = results.filter(
+    (r) => r.success && r.results && r.results.length > 0
+  );
+
+  if (successfulResults.length === 0) {
+    console.warn('No data to export');
+    return;
+  }
+
+  // Dynamic import of jszip
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+
+  for (const result of successfulResults) {
+    if (!result.results || result.results.length === 0) continue;
+
+    const safeName = result.connection_name.replace(/[^a-zA-Z0-9-_]/g, '_');
+
+    if (format === 'csv') {
+      const headers = Object.keys(result.results[0]);
+      const rows: string[] = [];
+      rows.push(headers.map((h) => escapeCSVField(h)).join(','));
+
+      for (const row of result.results) {
+        const values = headers.map((h) => escapeCSVField(String(row[h] ?? '')));
+        rows.push(values.join(','));
+      }
+
+      zip.file(`${safeName}.csv`, rows.join('\n'));
+    } else {
+      const jsonData = {
+        metadata: {
+          database: result.connection_name,
+          type: result.database_type,
+          sql: result.sql,
+          exportedAt: new Date().toISOString(),
+          rowCount: result.results.length,
+        },
+        columns: Object.keys(result.results[0]),
+        data: result.results,
+      };
+      zip.file(`${safeName}.json`, JSON.stringify(jsonData, null, 2));
+    }
+  }
+
+  // Generate and download ZIP
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(zipBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${filename || generateFilename('multi-db-export')}.zip`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}

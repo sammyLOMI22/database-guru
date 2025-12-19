@@ -86,3 +86,4 @@ frontend/node_modules/.vite/deps/_metadata.json
 frontend/node_modules/.vite/deps/
 frontend/node_modules/
 node_modules/
+frontend/node_modules/unist-util-is/index.d.ts
