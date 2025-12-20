@@ -13,7 +13,7 @@ import { ChartToggle, ViewMode } from './visualization/ChartToggle';
 import { ExportDropdown } from './visualization/ExportDropdown';
 import { CombinedExportDropdown } from './visualization/CombinedExportDropdown';
 import { CrossDatabaseChart } from './visualization/CrossDatabaseChart';
-import { detectChartType, ChartRecommendation } from '../utils/chartUtils';
+import { detectChartType, ChartRecommendation, ChartType } from '../utils/chartUtils';
 import { detectCrossDbComparison } from '../utils/crossDbUtils';
 
 interface MultiDatabaseResultsProps {
@@ -44,6 +44,11 @@ export default function MultiDatabaseResults({
   // Per-database view modes for chart/table toggle
   const [viewModes, setViewModes] = useState<Record<number, ViewMode>>(() =>
     Object.fromEntries(results.map((r) => [r.connection_id, 'table']))
+  );
+
+  // Per-database selected chart types (overrides auto-detection when set)
+  const [selectedChartTypes, setSelectedChartTypes] = useState<Record<number, ChartType | null>>(() =>
+    Object.fromEntries(results.map((r) => [r.connection_id, null]))
   );
 
   // Memoized chart recommendations for each database
@@ -322,6 +327,10 @@ export default function MultiDatabaseResults({
                             }
                             chartAvailable={chartRecommendations[result.connection_id]?.chartType !== 'table'}
                             chartType={chartRecommendations[result.connection_id]?.chartType || 'table'}
+                            selectedChartType={selectedChartTypes[result.connection_id]}
+                            onChartTypeChange={(type) =>
+                              setSelectedChartTypes((prev) => ({ ...prev, [result.connection_id]: type }))
+                            }
                           />
                           <ExportDropdown
                             data={result.results || []}
@@ -341,6 +350,7 @@ export default function MultiDatabaseResults({
                           height={300}
                           showLegend={true}
                           animate={true}
+                          overrideChartType={selectedChartTypes[result.connection_id]}
                         />
                       ) : (
                         <div className="overflow-x-auto">

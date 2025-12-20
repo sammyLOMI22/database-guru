@@ -19,7 +19,7 @@ import { feedbackAPI } from '../services/api';
 import { ChartVisualization } from './visualization/ChartVisualization';
 import { ChartToggle, ViewMode } from './visualization/ChartToggle';
 import { ExportDropdown } from './visualization/ExportDropdown';
-import { detectChartType } from '../utils/chartUtils';
+import { detectChartType, ChartType } from '../utils/chartUtils';
 
 interface QueryResultsProps {
   sql: string;
@@ -73,6 +73,7 @@ export default function QueryResults({
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [selectedChartType, setSelectedChartType] = useState<ChartType | null>(null);
 
   // Detect chart availability based on data and statistics
   const chartRecommendation = useMemo(() => {
@@ -253,6 +254,8 @@ export default function QueryResults({
                 onModeChange={setViewMode}
                 chartAvailable={chartAvailable}
                 chartType={chartRecommendation.chartType}
+                selectedChartType={selectedChartType}
+                onChartTypeChange={setSelectedChartType}
               />
               <ExportDropdown data={results} sql={sql} />
             </div>
@@ -267,6 +270,7 @@ export default function QueryResults({
                 height={350}
                 showLegend={true}
                 animate={true}
+                overrideChartType={selectedChartType}
               />
             </div>
           ) : (

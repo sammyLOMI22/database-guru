@@ -23,6 +23,8 @@ interface ChartVisualizationProps {
   height?: number;
   showLegend?: boolean;
   animate?: boolean;
+  /** Override the auto-detected chart type */
+  overrideChartType?: ChartType | null;
 }
 
 interface ChartInfoBadgeProps {
@@ -55,11 +57,24 @@ export const ChartVisualization: React.FC<ChartVisualizationProps> = ({
   height = 300,
   showLegend = true,
   animate = true,
+  overrideChartType,
 }) => {
-  const recommendation = useMemo(
+  const autoRecommendation = useMemo(
     () => detectChartType(data, statistics),
     [data, statistics]
   );
+
+  // Use override chart type if provided, otherwise use auto-detected
+  const recommendation: ChartRecommendation = useMemo(() => {
+    if (overrideChartType && overrideChartType !== 'table') {
+      return {
+        ...autoRecommendation,
+        chartType: overrideChartType,
+        reason: `Manually selected ${overrideChartType} chart`,
+      };
+    }
+    return autoRecommendation;
+  }, [autoRecommendation, overrideChartType]);
 
   // Get correlation value if available for scatter plot
   const correlationValue = useMemo(() => {
