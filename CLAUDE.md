@@ -176,11 +176,11 @@ The system uses a multi-agent architecture with specialized agents that work tog
       - Anomaly Detection: Z-score outlier detection (|z| ≥ 1.95 threshold)
       - Comparative Analysis: Compares results to historical similar queries
       - Trend Detection: Linear regression on temporal columns (R² ≥ 0.3)
-      - Correlation Analysis: Pearson correlation between numeric columns (|r| > 0.7)
+      - Correlation Analysis: Pearson correlation between numeric columns (|r| > 0.7, minimum 10 rows)
     - **Performance**: <3 seconds for all features (99th percentile), <500ms for small datasets
     - **Graceful Degradation**: All advanced features wrapped in try-except, fallback to basic statistics if LLM fails
     - **Configurable**: Enable/disable via UI toggle, adjustable thresholds and timeouts
-    - **Test Coverage**: 40 unit tests + 11 performance tests + 12 E2E tests (63 total)
+    - **Test Coverage**: 41 unit tests + 11 performance tests + 12 E2E tests (64 total)
     - Key methods: `generate_narrative()`, `_detect_anomalies()`, `_detect_trends()`, `_calculate_correlations()`, `_compare_to_history()`
 
 ### Tool System (`src/tools/`)
@@ -530,7 +530,7 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `src/llm/result_narrator.py:694` - `_calculate_correlations()` - Pearson correlation analysis
   - `frontend/src/components/ResultSummary.tsx` - Narrative display with anomaly/trend/correlation alerts
   - `frontend/src/components/ChatInterface.tsx` - Narratives enable/disable toggle
-  - `tests/test_result_narrator.py` - 40 unit tests (core + advanced features)
+  - `tests/test_result_narrator.py` - 41 unit tests (core + advanced features)
   - `tests/test_performance_narratives.py` - 11 performance tests (<3s latency validation)
   - `tests/test_e2e_narratives.py` - 12 end-to-end tests (realistic query scenarios)
   - **NEW - Multi-Database Narratives (Dec 13, 2025)**:

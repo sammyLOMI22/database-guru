@@ -19,7 +19,7 @@ The system automatically analyzes query results to determine the best visualizat
 | Chart Type | Detection Criteria | Use Case |
 |------------|-------------------|----------|
 | **Line Chart** | Temporal column + numeric column, or trend detected | Time-series, trends |
-| **Scatter Plot** | Correlation detected between numeric columns | Relationships, correlations |
+| **Scatter Plot** | Correlation detected (≥10 rows, r > 0.7) | Relationships, correlations |
 | **Pie Chart** | Categorical column + numeric, 2-8 unique values | Distribution, proportions |
 | **Bar Chart** | Categorical column + numeric, 9-15 unique values | Comparisons |
 | **Table** | Default fallback, or too many unique values | Raw data viewing |
@@ -49,6 +49,7 @@ The system automatically analyzes query results to determine the best visualizat
 - Displays correlation coefficient (r value)
 - Handles up to 200 data points
 - Correlation strength indicator
+- **Requires minimum 10 data points** to avoid spurious correlations in small datasets
 
 ### 3. Export Capabilities
 
@@ -215,7 +216,7 @@ Dropdown menu with export options:
    - OR trends detected in ResultNarrator statistics
 
 2. **Scatter Plot**
-   - Correlations detected in statistics
+   - Correlations detected in statistics (minimum 10 rows required)
    - Two numeric columns available
 
 3. **Pie Chart**
@@ -619,10 +620,14 @@ function truncateString(str: string, maxLength?: number): string;
 
 ---
 
-**Document Version**: 2.1
-**Last Updated**: December 19, 2025
+**Document Version**: 2.2
+**Last Updated**: December 20, 2025
 
 ### Changelog
+
+**v2.2** - Improved correlation detection reliability
+- Scatter plot now requires minimum 10 data points to avoid spurious correlations
+- Added test for small dataset rejection in correlation analysis
 
 **v2.1** - Added manual chart type selection feature
 - Chart type selector dropdown for single queries, per-database charts, and cross-database comparison
