@@ -1,22 +1,75 @@
 /**
  * Cross-Database Comparison Chart Component
  *
- * Displays a grouped bar chart comparing the same metrics across multiple databases.
+ * Displays a comparison chart (bar, line, pie, or scatter) comparing metrics across multiple databases.
+ * Auto-detects the best chart type based on data characteristics.
  */
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  ScatterChart,
+  Scatter,
   XAxis,
   YAxis,
+  ZAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { ChevronDown, ChevronRight, BarChart3 } from 'lucide-react';
+import { ChevronDown, ChevronRight, BarChart3, TrendingUp, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon } from 'lucide-react';
 import { CrossDbChartConfig, formatMetricValue } from '../../utils/crossDbUtils';
+
+type CrossDbChartType = 'bar' | 'line' | 'pie' | 'scatter';
+
+interface ChartTypeRecommendation {
+  type: CrossDbChartType;
+  reason: string;
+}
+
+/**
+ * Detect the best chart type for cross-database comparison
+ */
+function detectBestChartType(config: CrossDbChartConfig): ChartTypeRecommendation {
+  const dbCount = config.aggregatedData.length;
+  const metricCount = config.commonColumns.length;
+
+  // Scatter plot: Best for 2+ metrics to show relationships between metrics across databases
+  if (metricCount >= 2 && dbCount >= 3) {
+    return {
+      type: 'scatter',
+      reason: 'Scatter plot shows relationships between metrics across databases',
+    };
+  }
+
+  // Pie chart: Best for single metric with 2-6 databases (shows proportional distribution)
+  if (metricCount === 1 && dbCount >= 2 && dbCount <= 6) {
+    return {
+      type: 'pie',
+      reason: 'Pie chart shows metric distribution across databases',
+    };
+  }
+
+  // Bar chart: Default for comparisons
+  return {
+    type: 'bar',
+    reason: 'Bar chart for comparing values across databases',
+  };
+}
+
+const chartTypeOptions: { type: CrossDbChartType; label: string; icon: React.ReactNode }[] = [
+  { type: 'bar', label: 'Bar', icon: <BarChart3 className="w-4 h-4" /> },
+  { type: 'line', label: 'Line', icon: <TrendingUp className="w-4 h-4" /> },
+  { type: 'pie', label: 'Pie', icon: <PieChartIcon className="w-4 h-4" /> },
+  { type: 'scatter', label: 'Scatter', icon: <ScatterChartIcon className="w-4 h-4" /> },
+];
 
 interface CrossDatabaseChartProps {
   config: CrossDbChartConfig;
@@ -29,6 +82,28 @@ export function CrossDatabaseChart({
 }: CrossDatabaseChartProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [selectedMetric, setSelectedMetric] = useState(config.primaryMetric);
+  const [showChartTypeDropdown, setShowChartTypeDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Auto-detect best chart type
+  const recommendation = useMemo(() => detectBestChartType(config), [config]);
+  const [selectedChartType, setSelectedChartType] = useState<CrossDbChartType | null>(null);
+  const chartType = selectedChartType || recommendation.type;
+
+  // For scatter plot, allow selecting which metrics to compare
+  const [scatterXMetric, setScatterXMetric] = useState(config.commonColumns[0] || '');
+  const [scatterYMetric, setScatterYMetric] = useState(config.commonColumns[1] || config.commonColumns[0] || '');
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowChartTypeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Transform data for Recharts - one entry per metric with bars for each database
   const chartData = config.commonColumns.map((column) => {
@@ -48,6 +123,28 @@ export function CrossDatabaseChart({
           color: db.color,
         }))
       : null;
+
+  // Data for pie chart - shows distribution of selected metric across databases
+  const pieData = config.aggregatedData.map((db) => ({
+    name: db.databaseName,
+    value: db.metrics[selectedMetric] || 0,
+    color: db.color,
+  }));
+
+  // Data for scatter plot - each database is a point with x and y metrics
+  const scatterData = config.aggregatedData.map((db) => ({
+    name: db.databaseName,
+    x: db.metrics[scatterXMetric] || 0,
+    y: db.metrics[scatterYMetric] || 0,
+    color: db.color,
+    rowCount: db.rowCount,
+  }));
+
+  // Data for line chart - databases on x-axis with selected metric values
+  const lineData = config.aggregatedData.map((db) => ({
+    database: db.databaseName,
+    value: db.metrics[selectedMetric] || 0,
+  }));
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -74,88 +171,221 @@ export function CrossDatabaseChart({
       {/* Chart Content */}
       {isExpanded && (
         <div className="p-4 bg-white">
-          {/* Metric selector (if multiple metrics) */}
-          {config.commonColumns.length > 1 && (
-            <div className="mb-4">
-              <label className="text-sm text-gray-600 mr-2">Compare:</label>
-              <select
-                value={selectedMetric}
-                onChange={(e) => setSelectedMetric(e.target.value)}
-                className="text-sm border border-gray-300 rounded px-2 py-1"
+          {/* Chart controls row */}
+          <div className="mb-4 flex flex-wrap items-center gap-4">
+            {/* Chart type selector */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setShowChartTypeDropdown(!showChartTypeDropdown)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                {config.commonColumns.map((col) => (
-                  <option key={col} value={col}>
-                    {col}
-                  </option>
-                ))}
-              </select>
+                {chartTypeOptions.find((o) => o.type === chartType)?.icon}
+                <span>{chartTypeOptions.find((o) => o.type === chartType)?.label}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${showChartTypeDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showChartTypeDropdown && (
+                <div className="absolute left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                  <div className="py-1">
+                    <div className="px-3 py-1.5 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Chart Type
+                    </div>
+                    {chartTypeOptions.map((option) => (
+                      <button
+                        key={option.type}
+                        onClick={() => {
+                          setSelectedChartType(option.type);
+                          setShowChartTypeDropdown(false);
+                        }}
+                        className={`
+                          w-full flex items-center gap-2 px-3 py-2 text-sm text-left
+                          ${chartType === option.type
+                            ? 'bg-purple-50 text-purple-700'
+                            : 'text-gray-700 hover:bg-gray-50'}
+                        `}
+                      >
+                        {option.icon}
+                        <span className="flex-1">{option.label}</span>
+                        {recommendation.type === option.type && (
+                          <span className="text-xs text-purple-500 font-medium">(recommended)</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Metric selector for bar/line/pie (if multiple metrics) */}
+            {chartType !== 'scatter' && config.commonColumns.length > 1 && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">Metric:</label>
+                <select
+                  value={selectedMetric}
+                  onChange={(e) => setSelectedMetric(e.target.value)}
+                  className="text-sm border border-gray-300 rounded px-2 py-1"
+                >
+                  {config.commonColumns.map((col) => (
+                    <option key={col} value={col}>
+                      {col}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Axis selectors for scatter plot */}
+            {chartType === 'scatter' && config.commonColumns.length >= 2 && (
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600">X-Axis:</label>
+                  <select
+                    value={scatterXMetric}
+                    onChange={(e) => setScatterXMetric(e.target.value)}
+                    className="text-sm border border-gray-300 rounded px-2 py-1"
+                  >
+                    {config.commonColumns.map((col) => (
+                      <option key={col} value={col}>
+                        {col}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600">Y-Axis:</label>
+                  <select
+                    value={scatterYMetric}
+                    onChange={(e) => setScatterYMetric(e.target.value)}
+                    className="text-sm border border-gray-300 rounded px-2 py-1"
+                  >
+                    {config.commonColumns.map((col) => (
+                      <option key={col} value={col}>
+                        {col}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Chart */}
           <div style={{ height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
-              {singleMetricData ? (
-                // Single metric: show databases on x-axis
-                <BarChart data={singleMetricData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              {/* Bar Chart */}
+              {chartType === 'bar' && (
+                singleMetricData ? (
+                  <BarChart data={singleMetricData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="database" tick={{ fontSize: 12 }} tickLine={{ stroke: '#9ca3af' }} />
+                    <YAxis tick={{ fontSize: 12 }} tickLine={{ stroke: '#9ca3af' }} tickFormatter={(value) => formatMetricValue(value)} />
+                    <Tooltip
+                      formatter={(value) => [formatMetricValue(Number(value)), config.primaryMetric]}
+                      contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '0.375rem' }}
+                    />
+                    <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} name={config.primaryMetric} />
+                  </BarChart>
+                ) : (
+                  <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="metric" tick={{ fontSize: 12 }} tickLine={{ stroke: '#9ca3af' }} />
+                    <YAxis tick={{ fontSize: 12 }} tickLine={{ stroke: '#9ca3af' }} tickFormatter={(value) => formatMetricValue(value)} />
+                    <Tooltip
+                      formatter={(value, name) => [formatMetricValue(Number(value)), String(name)]}
+                      contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '0.375rem' }}
+                    />
+                    <Legend />
+                    {config.aggregatedData.map((db) => (
+                      <Bar key={db.databaseName} dataKey={db.databaseName} fill={db.color} radius={[4, 4, 0, 0]} />
+                    ))}
+                  </BarChart>
+                )
+              )}
+
+              {/* Line Chart */}
+              {chartType === 'line' && (
+                <LineChart data={lineData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis
-                    dataKey="database"
-                    tick={{ fontSize: 12 }}
-                    tickLine={{ stroke: '#9ca3af' }}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    tickLine={{ stroke: '#9ca3af' }}
-                    tickFormatter={(value) => formatMetricValue(value)}
-                  />
+                  <XAxis dataKey="database" tick={{ fontSize: 12 }} tickLine={{ stroke: '#9ca3af' }} />
+                  <YAxis tick={{ fontSize: 12 }} tickLine={{ stroke: '#9ca3af' }} tickFormatter={(value) => formatMetricValue(value)} />
                   <Tooltip
-                    formatter={(value) => [formatMetricValue(Number(value)), config.primaryMetric]}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.375rem',
-                    }}
+                    formatter={(value) => [formatMetricValue(Number(value)), selectedMetric]}
+                    contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '0.375rem' }}
                   />
-                  <Bar
+                  <Legend />
+                  <Line
+                    type="monotone"
                     dataKey="value"
-                    fill="#8b5cf6"
-                    radius={[4, 4, 0, 0]}
-                    name={config.primaryMetric}
+                    stroke="#8b5cf6"
+                    strokeWidth={2}
+                    dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
+                    name={selectedMetric}
                   />
-                </BarChart>
-              ) : (
-                // Multiple metrics: show metrics on x-axis with grouped bars per database
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                </LineChart>
+              )}
+
+              {/* Pie Chart */}
+              {chartType === 'pie' && (
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    dataKey="value"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value) => [formatMetricValue(Number(value)), selectedMetric]}
+                    contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '0.375rem' }}
+                  />
+                  <Legend />
+                </PieChart>
+              )}
+
+              {/* Scatter Plot */}
+              {chartType === 'scatter' && (
+                <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis
-                    dataKey="metric"
-                    tick={{ fontSize: 12 }}
-                    tickLine={{ stroke: '#9ca3af' }}
-                  />
-                  <YAxis
+                    type="number"
+                    dataKey="x"
+                    name={scatterXMetric}
                     tick={{ fontSize: 12 }}
                     tickLine={{ stroke: '#9ca3af' }}
                     tickFormatter={(value) => formatMetricValue(value)}
+                    label={{ value: scatterXMetric, position: 'bottom', offset: -5, fontSize: 12 }}
                   />
+                  <YAxis
+                    type="number"
+                    dataKey="y"
+                    name={scatterYMetric}
+                    tick={{ fontSize: 12 }}
+                    tickLine={{ stroke: '#9ca3af' }}
+                    tickFormatter={(value) => formatMetricValue(value)}
+                    label={{ value: scatterYMetric, angle: -90, position: 'insideLeft', fontSize: 12 }}
+                  />
+                  <ZAxis type="number" dataKey="rowCount" range={[100, 500]} name="Rows" />
                   <Tooltip
+                    cursor={{ strokeDasharray: '3 3' }}
                     formatter={(value, name) => [formatMetricValue(Number(value)), String(name)]}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.375rem',
-                    }}
+                    contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '0.375rem' }}
                   />
                   <Legend />
                   {config.aggregatedData.map((db) => (
-                    <Bar
+                    <Scatter
                       key={db.databaseName}
-                      dataKey={db.databaseName}
+                      name={db.databaseName}
+                      data={[scatterData.find((d) => d.name === db.databaseName)]}
                       fill={db.color}
-                      radius={[4, 4, 0, 0]}
                     />
                   ))}
-                </BarChart>
+                </ScatterChart>
               )}
             </ResponsiveContainer>
           </div>

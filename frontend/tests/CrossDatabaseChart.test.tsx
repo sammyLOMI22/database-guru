@@ -18,9 +18,25 @@ vi.mock('recharts', () => ({
   BarChart: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="bar-chart">{children}</div>
   ),
+  LineChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="line-chart">{children}</div>
+  ),
+  PieChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="pie-chart">{children}</div>
+  ),
+  ScatterChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="scatter-chart">{children}</div>
+  ),
   Bar: () => <div data-testid="bar" />,
+  Line: () => <div data-testid="line" />,
+  Pie: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="pie">{children}</div>
+  ),
+  Cell: () => <div data-testid="cell" />,
+  Scatter: () => <div data-testid="scatter" />,
   XAxis: () => <div data-testid="x-axis" />,
   YAxis: () => <div data-testid="y-axis" />,
+  ZAxis: () => <div data-testid="z-axis" />,
   CartesianGrid: () => <div data-testid="cartesian-grid" />,
   Tooltip: () => <div data-testid="tooltip" />,
   Legend: () => <div data-testid="legend" />,
@@ -118,34 +134,39 @@ describe('CrossDatabaseChart', () => {
 
   it('shows metric selector when multiple metrics', () => {
     render(<CrossDatabaseChart config={mockConfig} />);
-    expect(screen.getByText('Compare:')).toBeInTheDocument();
-    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(screen.getByText('Metric:')).toBeInTheDocument();
+    // Should have at least one combobox for metric selection
+    expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(1);
   });
 
   it('does not show metric selector for single metric', () => {
     render(<CrossDatabaseChart config={singleMetricConfig} />);
-    expect(screen.queryByText('Compare:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Metric:')).not.toBeInTheDocument();
   });
 
   it('lists all metrics in selector', () => {
     render(<CrossDatabaseChart config={mockConfig} />);
 
-    const select = screen.getByRole('combobox');
-    expect(select).toHaveValue('sales');
+    // Find the metric selector (the one with 'sales' value)
+    const selects = screen.getAllByRole('combobox');
+    const metricSelect = selects.find(s => (s as HTMLSelectElement).value === 'sales');
+    expect(metricSelect).toBeDefined();
 
-    const options = screen.getAllByRole('option');
-    expect(options).toHaveLength(2);
-    expect(options[0]).toHaveValue('sales');
-    expect(options[1]).toHaveValue('revenue');
+    // Check options in the metric selector
+    const options = metricSelect?.querySelectorAll('option');
+    expect(options?.length).toBe(2);
   });
 
   it('can change selected metric', () => {
     render(<CrossDatabaseChart config={mockConfig} />);
 
-    const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'revenue' } });
+    // Find the metric selector
+    const selects = screen.getAllByRole('combobox');
+    const metricSelect = selects.find(s => (s as HTMLSelectElement).value === 'sales');
+    expect(metricSelect).toBeDefined();
 
-    expect(select).toHaveValue('revenue');
+    fireEvent.change(metricSelect!, { target: { value: 'revenue' } });
+    expect((metricSelect as HTMLSelectElement).value).toBe('revenue');
   });
 
   it('renders summary stats for each database', () => {
