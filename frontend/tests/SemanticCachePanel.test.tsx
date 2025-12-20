@@ -219,9 +219,14 @@ describe('CacheOverview', () => {
 
   it('shows embedding service status as Online', async () => {
     render(<CacheOverview />);
+    // First wait for stats to load (indicated by hit rate showing)
     await waitFor(() => {
-      expect(screen.getByText('Online')).toBeInTheDocument();
+      expect(screen.getByText('50.0%')).toBeInTheDocument();
     });
+    // Now check for Online status (ollama_available: true in mockStats)
+    // There are multiple "Online" elements on the page
+    const onlineElements = screen.getAllByText('Online');
+    expect(onlineElements.length).toBeGreaterThan(0);
   });
 
   it('handles error state', async () => {

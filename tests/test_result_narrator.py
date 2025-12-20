@@ -676,12 +676,18 @@ class TestCorrelationAnalysis:
 
     def test_calculate_correlations_perfect_positive(self, narrator):
         """Test detection of perfect positive correlation"""
+        # Minimum 10 rows required for correlation detection
         results = [
             {"x": 1, "y": 1},
             {"x": 2, "y": 2},
             {"x": 3, "y": 3},
             {"x": 4, "y": 4},
             {"x": 5, "y": 5},
+            {"x": 6, "y": 6},
+            {"x": 7, "y": 7},
+            {"x": 8, "y": 8},
+            {"x": 9, "y": 9},
+            {"x": 10, "y": 10},
         ]
         correlations = narrator._calculate_correlations(results)
         assert correlations["correlations_found"] is True
@@ -690,12 +696,18 @@ class TestCorrelationAnalysis:
 
     def test_calculate_correlations_strong_negative(self, narrator):
         """Test detection of strong negative correlation"""
+        # Minimum 10 rows required for correlation detection
         results = [
-            {"x": 1, "y": 5},
-            {"x": 2, "y": 4},
-            {"x": 3, "y": 3},
-            {"x": 4, "y": 2},
-            {"x": 5, "y": 1},
+            {"x": 1, "y": 10},
+            {"x": 2, "y": 9},
+            {"x": 3, "y": 8},
+            {"x": 4, "y": 7},
+            {"x": 5, "y": 6},
+            {"x": 6, "y": 5},
+            {"x": 7, "y": 4},
+            {"x": 8, "y": 3},
+            {"x": 9, "y": 2},
+            {"x": 10, "y": 1},
         ]
         correlations = narrator._calculate_correlations(results)
         assert correlations["correlations_found"] is True
@@ -704,14 +716,35 @@ class TestCorrelationAnalysis:
 
     def test_calculate_correlations_no_correlation(self, narrator):
         """Test when columns have no correlation"""
+        # Minimum 10 rows required for correlation detection
         results = [
-            {"x": 1, "y": 100},
-            {"x": 2, "y": 50},
-            {"x": 3, "y": 90},
-            {"x": 4, "y": 40},
-            {"x": 5, "y": 80},
+            {"x": 1, "y": 50},
+            {"x": 2, "y": 80},
+            {"x": 3, "y": 30},
+            {"x": 4, "y": 90},
+            {"x": 5, "y": 20},
+            {"x": 6, "y": 70},
+            {"x": 7, "y": 40},
+            {"x": 8, "y": 60},
+            {"x": 9, "y": 10},
+            {"x": 10, "y": 100},
         ]
         correlations = narrator._calculate_correlations(results)
         # May or may not find correlations depending on the specific values
         assert isinstance(correlations, dict)
         assert "correlations_found" in correlations
+
+    def test_calculate_correlations_small_dataset_ignored(self, narrator):
+        """Test that small datasets (< 10 rows) don't trigger correlation detection"""
+        # Even with perfect correlation, small datasets should be skipped
+        results = [
+            {"x": 1, "y": 1},
+            {"x": 2, "y": 2},
+            {"x": 3, "y": 3},
+            {"x": 4, "y": 4},
+            {"x": 5, "y": 5},
+        ]
+        correlations = narrator._calculate_correlations(results)
+        # Should not find correlations due to small sample size
+        assert correlations["correlations_found"] is False
+        assert len(correlations["correlations"]) == 0

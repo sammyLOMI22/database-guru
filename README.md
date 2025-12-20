@@ -105,6 +105,8 @@ The demo showcases:
 - 📊 **Semantic Cache Dashboard** - Cache monitoring, stats, and management
 - ⚡ **Cache Trace Integration** - Cache hit/miss visible in execution trace
 - 🔌 **Enhanced Connections** - Edit, delete, and manage database connections
+- 📊 **Advanced Visualization** - Intelligent chart detection with Bar, Line, Pie, Scatter charts
+- 📈 **Cross-Database Comparison** - Visual comparison across multiple databases
 
 All with mock data - no database connection needed!
 
@@ -205,6 +207,8 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Result Verification** - Catches logical errors and suspicious results
 - ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB)
 - ✅ **Multi-database queries** - Query multiple databases simultaneously with parallel execution
+- ✅ **Advanced Visualization (NEW!)** - Intelligent chart detection with manual override, export to CSV/JSON/ZIP
+- ✅ **Cross-Database Comparison Charts** - Visual comparison across databases with auto-detection
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
@@ -1233,6 +1237,65 @@ Database Guru's interface has been enhanced with several quality-of-life improve
 - **Cache Metrics** - Real-time cache hit/miss tracking
 
 All improvements maintain the existing color scheme and design language for consistency.
+
+---
+
+## 📊 Advanced Visualization (NEW!)
+
+Database Guru now includes **intelligent chart visualization** with automatic chart type detection and manual override capabilities!
+
+### Key Features:
+
+**1. Intelligent Chart Detection**
+The system automatically analyzes your query results and recommends the best chart type:
+
+| Chart Type | Auto-Detection Criteria | Use Case |
+|------------|------------------------|----------|
+| **Line Chart** | Temporal column + numeric data, or trend detected | Time-series, trends |
+| **Scatter Plot** | Correlation detected (≥10 rows, r > 0.7) | Relationships, correlations |
+| **Pie Chart** | Categorical + numeric, 2-8 unique values | Distribution, proportions |
+| **Bar Chart** | Categorical + numeric, 9-15 unique values | Comparisons |
+| **Table** | Default fallback | Raw data viewing |
+
+**2. Manual Chart Type Selection**
+Override the auto-detection anytime:
+- Click the dropdown (▼) next to the Table/Chart toggle
+- See which type is "(recommended)" by auto-detection
+- Switch between Bar, Line, Pie, and Scatter charts
+- Works in single queries, per-database views, and cross-database comparisons
+
+**3. Export Capabilities**
+
+| Format | Description |
+|--------|-------------|
+| **CSV** | Comma-separated values (Excel compatible) |
+| **JSON** | Includes metadata, timestamps, and SQL |
+| **Clipboard** | Tab-separated for quick paste to spreadsheets |
+| **ZIP** | Separate files per database (multi-database only) |
+
+**4. Multi-Database Visualization**
+- **Per-database charts** - Each database result has independent chart controls
+- **Cross-database comparison** - Automatically finds common numeric columns and visualizes comparisons
+- **Combined export** - Export all database results in one file (stacked) or separate files (ZIP)
+
+### Example:
+```
+Query: "Show me total sales by category"
+
+Auto-Detection: Bar Chart (recommended)
+  → 5 categories detected
+  → Numeric 'total_sales' column found
+
+User Override: Switch to Pie Chart
+  → Shows proportional distribution instead
+```
+
+### Correlation Detection:
+Scatter plots require **minimum 10 data points** to avoid spurious correlations in small datasets. This ensures statistical reliability when visualizing relationships between columns.
+
+**Documentation:**
+- [Advanced Visualization Guide](docs/ADVANCED_VISUALIZATION_GUIDE.md) - Complete feature documentation
+- [Chart Type Selector PR Review](docs/CHART_TYPE_SELECTOR_PR_REVIEW.md) - Manual testing guide
 
 ---
 
