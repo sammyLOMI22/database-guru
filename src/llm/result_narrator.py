@@ -1124,7 +1124,9 @@ class ResultNarrator:
                     if value is not None and isinstance(value, (int, float)):
                         values.append(float(value))
 
-                if len(values) == len(results) and len(values) >= 3:
+                # Require minimum 10 rows for correlation detection to avoid
+                # spurious correlations in small datasets (reviewer feedback)
+                if len(values) == len(results) and len(values) >= 10:
                     numeric_columns[key] = values
 
             # Calculate correlations between pairs
