@@ -98,7 +98,8 @@ export default function QueryResults({
       setShowFeedbackModal(false);
     } catch (error) {
       console.error('Failed to submit feedback:', error);
-      throw error;
+      // Error is logged but not re-thrown to avoid unhandled rejections
+      // FeedbackModal can display its own error handling if needed
     }
   };
 

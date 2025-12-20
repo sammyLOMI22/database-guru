@@ -427,3 +427,250 @@ cd frontend && npm install jszip
 | `frontend/tests/MultiDatabaseVisualization.test.tsx` | Integration tests |
 | `frontend/tests/CombinedExportDropdown.test.tsx` | Export component tests |
 | `frontend/tests/CrossDatabaseChart.test.tsx` | Chart component tests |
+
+---
+
+## Phase 6: Chart Type Selector (COMPLETED)
+
+### 6.1 ChartToggle Enhancement
+- [x] Add `selectedChartType` and `onChartTypeChange` props
+- [x] Add `showChartTypeSelector` prop (default: true)
+- [x] Create dropdown menu with chart type options
+- [x] Show "(recommended)" label for auto-detected type
+- [x] Update icon and label based on selected type
+- [x] Close dropdown on outside click
+
+### 6.2 ChartVisualization Enhancement
+- [x] Add `overrideChartType` prop
+- [x] Use override when provided, otherwise auto-detect
+- [x] Update info badge for manually selected charts
+
+### 6.3 QueryResults Integration
+- [x] Add `selectedChartType` state
+- [x] Wire up ChartToggle with new props
+- [x] Pass override to ChartVisualization
+
+### 6.4 MultiDatabaseResults Integration
+- [x] Add `selectedChartTypes` state (per-database Record)
+- [x] Wire up per-database ChartToggle
+- [x] Pass per-database override to ChartVisualization
+
+### 6.5 CrossDatabaseChart Enhancement
+- [x] Add auto-detection logic (scatter/pie/bar based on data)
+- [x] Add chart type dropdown with 4 options (Bar, Line, Pie, Scatter)
+- [x] Add axis selectors for scatter plot
+- [x] Implement all 4 chart type renderings
+- [x] Update tests with new recharts mocks
+
+---
+
+## Future Improvements Roadmap
+
+### Phase 7: Entity Relationship Diagram Generator
+
+**Priority**: High
+**Estimated Effort**: 3-5 days
+
+Generate visual ER diagrams from database schema for connected databases.
+
+#### 7.1 Schema Analysis
+- [ ] Extract tables, columns, primary keys from schema
+- [ ] Detect foreign key relationships
+- [ ] Infer relationships from naming conventions (e.g., `user_id` → `users.id`)
+- [ ] Support multiple databases in single diagram
+
+#### 7.2 Diagram Rendering
+- [ ] Use react-flow or d3.js for interactive diagrams
+- [ ] Display tables as nodes with column lists
+- [ ] Show relationships as connecting lines (1:1, 1:N, M:N)
+- [ ] Support zoom, pan, and drag positioning
+- [ ] Auto-layout algorithm for clean arrangement
+
+#### 7.3 Interactivity
+- [ ] Click table to see full column details
+- [ ] Highlight related tables on hover
+- [ ] Filter by schema/table prefix
+- [ ] Search for tables/columns
+- [ ] Export diagram as PNG/SVG
+
+#### 7.4 Multi-Database Support
+- [ ] Show cross-database relationships (if any)
+- [ ] Color-code tables by database
+- [ ] Toggle database visibility
+
+---
+
+### Phase 8: Improved Chart Intelligence
+
+**Priority**: High
+**Estimated Effort**: 2-3 days
+
+Enhance chart detection and recommendations with smarter analysis.
+
+#### 8.1 Data Pattern Recognition
+- [ ] Detect time-series patterns (even without date columns)
+- [ ] Identify periodic data (weekly, monthly cycles)
+- [ ] Recognize hierarchical data for treemaps
+- [ ] Detect geographic data for map visualizations
+
+#### 8.2 Multi-Column Analysis
+- [ ] Suggest multiple charts for complex datasets
+- [ ] Recommend chart combinations (e.g., bar + line overlay)
+- [ ] Detect grouping opportunities (stacked/grouped bars)
+- [ ] Identify suitable drill-down hierarchies
+
+#### 8.3 Statistical Intelligence
+- [ ] Show outliers with visual markers
+- [ ] Add trend lines to scatter/line charts
+- [ ] Display confidence intervals where applicable
+- [ ] Highlight statistically significant differences
+
+#### 8.4 Natural Language Chart Recommendations
+- [ ] "This data shows a strong upward trend - try a line chart"
+- [ ] "With 5 categories, a pie chart works well for proportions"
+- [ ] "Consider a scatter plot to explore the correlation between X and Y"
+
+---
+
+### Phase 9: Dashboard Builder
+
+**Priority**: Medium
+**Estimated Effort**: 5-7 days
+
+Create and save custom dashboards with multiple visualizations.
+
+#### 9.1 Dashboard Layout
+- [ ] Drag-and-drop grid layout
+- [ ] Resizable chart panels
+- [ ] Multiple layout templates (2x2, 3-column, etc.)
+- [ ] Responsive design for different screen sizes
+
+#### 9.2 Chart Management
+- [ ] Add charts from saved queries
+- [ ] Configure chart settings per panel
+- [ ] Duplicate/remove charts
+- [ ] Reorder panels
+
+#### 9.3 Persistence
+- [ ] Save dashboards to database
+- [ ] Load saved dashboards
+- [ ] Share dashboard links
+- [ ] Export dashboard as PDF/image
+
+#### 9.4 Real-time Updates
+- [ ] Auto-refresh interval setting
+- [ ] Manual refresh button
+- [ ] Last updated timestamp
+- [ ] Connection status indicator
+
+---
+
+### Phase 10: Advanced Chart Types
+
+**Priority**: Medium
+**Estimated Effort**: 3-4 days
+
+Add specialized chart types for specific data patterns.
+
+#### 10.1 Hierarchical Charts
+- [ ] Treemap for hierarchical data
+- [ ] Sunburst chart for nested categories
+- [ ] Sankey diagram for flow data
+
+#### 10.2 Geographic Charts
+- [ ] Choropleth maps for regional data
+- [ ] Point maps for location data
+- [ ] Heat maps for density visualization
+
+#### 10.3 Statistical Charts
+- [ ] Box plots for distribution analysis
+- [ ] Histogram for frequency distribution
+- [ ] Violin plots for density comparison
+- [ ] Bubble charts (3-variable scatter)
+
+#### 10.4 Time-Series Enhancements
+- [ ] Area charts with stacking
+- [ ] Candlestick charts for OHLC data
+- [ ] Sparklines for inline trends
+- [ ] Gantt charts for timeline data
+
+---
+
+### Phase 11: Chart Annotations & Insights
+
+**Priority**: Low
+**Estimated Effort**: 2-3 days
+
+Add interactive annotations and AI-generated insights.
+
+#### 11.1 Manual Annotations
+- [ ] Add text notes to specific data points
+- [ ] Draw reference lines (targets, thresholds)
+- [ ] Highlight date ranges
+- [ ] Add callout boxes
+
+#### 11.2 Automated Insights
+- [ ] "Peak value on [date]"
+- [ ] "23% increase from previous period"
+- [ ] "Anomaly detected at [point]"
+- [ ] "Category X accounts for 45% of total"
+
+#### 11.3 Comparison Features
+- [ ] Period-over-period comparison
+- [ ] Benchmark lines from historical data
+- [ ] Goal tracking visualization
+
+---
+
+### Phase 12: Export & Sharing Enhancements
+
+**Priority**: Low
+**Estimated Effort**: 1-2 days
+
+Improve export options and collaboration features.
+
+#### 12.1 Chart Export
+- [ ] Export chart as PNG/SVG/PDF
+- [ ] Include/exclude legend option
+- [ ] Custom dimensions for export
+- [ ] Batch export multiple charts
+
+#### 12.2 Sharing
+- [ ] Generate shareable chart links
+- [ ] Embed code for external sites
+- [ ] Email chart directly
+- [ ] Slack/Teams integration
+
+#### 12.3 Scheduling
+- [ ] Schedule recurring exports
+- [ ] Email reports on schedule
+- [ ] Webhook notifications
+
+---
+
+## Implementation Priority Matrix
+
+| Phase | Feature | Impact | Effort | Priority |
+|-------|---------|--------|--------|----------|
+| 7 | ER Diagram Generator | High | Medium | **P1** |
+| 8 | Improved Chart Intelligence | High | Low | **P1** |
+| 9 | Dashboard Builder | High | High | **P2** |
+| 10 | Advanced Chart Types | Medium | Medium | **P2** |
+| 11 | Annotations & Insights | Medium | Low | **P3** |
+| 12 | Export & Sharing | Low | Low | **P3** |
+
+---
+
+## Status Summary
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Per-database charts + export | ✅ Complete |
+| 2 | Combined export | ✅ Complete |
+| 3 | Cross-database comparison | ✅ Complete |
+| 4 | Testing | ✅ Complete |
+| 5 | Documentation & cleanup | ✅ Complete |
+| 6 | Chart type selector | ✅ Complete |
+| 7-12 | Future improvements | 📋 Planned |
+
+**Last Updated**: December 19, 2025

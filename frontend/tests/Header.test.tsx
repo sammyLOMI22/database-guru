@@ -73,7 +73,8 @@ describe('Header', () => {
 
       const svg = container.querySelector('svg');
       expect(svg).toBeInTheDocument();
-      expect(svg).toHaveAttribute('fill', 'currentColor');
+      // Lucide icons use fill="none" with stroke-based rendering
+      expect(svg).toHaveAttribute('fill', 'none');
       expect(svg).toHaveAttribute('viewBox', '0 0 24 24');
     });
   });

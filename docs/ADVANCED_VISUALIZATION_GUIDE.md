@@ -1,7 +1,7 @@
 # Advanced Visualization and Dashboards
 
 **Feature Branch**: Advanced-Visualization-and-Dashboards
-**Status**: Phase 1 Complete - Core Implementation
+**Status**: Phase 1 Complete - Core Implementation + Chart Type Selector
 **Created**: December 18, 2025
 
 ---
@@ -67,6 +67,30 @@ Chart preferences are persisted in localStorage:
 - **Show Legend**: Toggle legend visibility
 - **Animations**: Enable/disable chart animations
 
+### 5. Manual Chart Type Selection
+
+While the system auto-detects the best chart type, users can manually override the selection:
+
+**How It Works:**
+1. Click the dropdown chevron (▼) next to the Table/Chart toggle
+2. A dropdown menu appears with all available chart types
+3. The recommended (auto-detected) type shows **(recommended)** label
+4. Select any chart type to switch the visualization
+5. The toggle button icon and label update to reflect the selection
+
+**Available Chart Types:**
+| Icon | Type | Description |
+|------|------|-------------|
+| 📊 | Bar | Vertical bars for comparisons |
+| 📈 | Line | Connected points for trends |
+| 🥧 | Pie | Circular segments for proportions |
+| ⚬ | Scatter | Points for correlations |
+
+**Where Available:**
+- Single query results (QueryResults.tsx)
+- Per-database charts in multi-database queries (MultiDatabaseResults.tsx)
+- Cross-database comparison chart (CrossDatabaseChart.tsx)
+
 ---
 
 ## Architecture
@@ -128,6 +152,7 @@ Main orchestrator component that:
 2. Displays info badge with chart type and reason
 3. Renders the appropriate chart component
 4. Handles "no visualization available" state
+5. Supports chart type override via `overrideChartType` prop
 
 ```tsx
 <ChartVisualization
@@ -136,21 +161,34 @@ Main orchestrator component that:
   height={350}
   showLegend={true}
   animate={true}
+  overrideChartType={selectedChartType}  // Optional: override auto-detection
 />
 ```
+
+When `overrideChartType` is provided, the component uses that chart type instead of the auto-detected one, and the info badge displays "Manually selected X chart".
 
 ### ChartToggle.tsx
 
-Toggle button group for switching between table and chart views:
+Toggle button group for switching between table and chart views, with optional chart type selector:
 
 ```tsx
 <ChartToggle
-  mode={viewMode}              // 'table' | 'chart'
+  mode={viewMode}                    // 'table' | 'chart'
   onModeChange={setViewMode}
   chartAvailable={chartAvailable}
-  chartType={recommendation.chartType}
+  chartType={recommendation.chartType}  // Auto-detected type
+  selectedChartType={selectedChartType} // User-selected override (optional)
+  onChartTypeChange={setSelectedChartType} // Callback for type changes
+  showChartTypeSelector={true}       // Show dropdown to change chart type
 />
 ```
+
+**Chart Type Selector Features:**
+- Dropdown button (▼) appears next to the Table/Chart toggle
+- Shows all available chart types: Bar, Line, Pie, Scatter
+- Displays **(recommended)** label next to the auto-detected type
+- Selecting a type switches the view and updates the chart
+- Icon and label on the toggle button update to reflect the selected type
 
 ### ExportDropdown.tsx
 
@@ -390,18 +428,22 @@ The visualization system extends to multi-database query results, providing per-
 
 ### Per-Database Charts
 
-Each database result in a multi-database query can independently toggle between table and chart views:
+Each database result in a multi-database query can independently toggle between table and chart views, with manual chart type selection:
 
 ```tsx
-// Each database has independent view mode
+// Each database has independent view mode and chart type
 const [viewModes, setViewModes] = useState<Record<number, ViewMode>>(() =>
   Object.fromEntries(results.map(r => [r.connection_id, 'table']))
+);
+const [selectedChartTypes, setSelectedChartTypes] = useState<Record<number, ChartType | null>>(() =>
+  Object.fromEntries(results.map(r => [r.connection_id, null]))
 );
 ```
 
 Features:
 - **Independent toggles**: Each database's view mode is controlled separately
 - **Chart detection**: Uses the same intelligent detection as single queries
+- **Chart type selector**: Users can override the recommended chart type per database
 - **Per-database export**: Each database has its own export dropdown
 
 ### Combined Export
@@ -423,7 +465,7 @@ Export all database results together with format choice:
 
 ### Cross-Database Comparison Chart
 
-Automatically detects common numeric columns across databases and displays a grouped bar chart comparison:
+Automatically detects common numeric columns across databases and displays a comparison chart with intelligent chart type selection:
 
 ```tsx
 // Detection
@@ -433,10 +475,22 @@ const crossDbConfig = detectCrossDbComparison(results);
 {crossDbConfig && <CrossDatabaseChart config={crossDbConfig} />}
 ```
 
+**Chart Type Auto-Detection:**
+
+| Chart Type | Detection Criteria | Use Case |
+|------------|-------------------|----------|
+| **Scatter Plot** | 2+ metrics AND 3+ databases | Show relationships between metrics across databases |
+| **Pie Chart** | Single metric with 2-6 databases | Show proportional distribution |
+| **Bar Chart** | Default fallback | Compare values across databases |
+| **Line Chart** | User-selectable | Trend visualization (databases on x-axis) |
+
 Features:
 - **Common column detection**: Finds numeric columns present in all successful results
 - **Aggregation**: Sums values per database for comparison
-- **Metric selector**: Switch between different metrics when multiple are available
+- **Chart type selector**: Dropdown to switch between Bar, Line, Pie, and Scatter charts
+- **Auto-detection**: System recommends best chart type with "(recommended)" label
+- **Metric selector**: Switch between different metrics when multiple are available (for bar/line/pie)
+- **Axis selectors**: Choose X and Y metrics for scatter plot
 - **Collapsible section**: Toggle visibility of the comparison chart
 - **Summary stats**: Shows aggregated values and row counts per database
 
@@ -565,5 +619,12 @@ function truncateString(str: string, maxLength?: number): string;
 
 ---
 
-**Document Version**: 2.0
+**Document Version**: 2.1
 **Last Updated**: December 19, 2025
+
+### Changelog
+
+**v2.1** - Added manual chart type selection feature
+- Chart type selector dropdown for single queries, per-database charts, and cross-database comparison
+- Auto-detection with "(recommended)" labels
+- Cross-database chart supports Bar, Line, Pie, and Scatter with smart detection
