@@ -310,6 +310,84 @@ function scoreChartTypes(
     scores.table += 10;
   }
 
+  // ========== PHASE 10: Advanced Chart Scoring ==========
+
+  // AREA CHART scoring (time-series alternative to line)
+  if (patterns.timeSeries?.isTimeSeries) {
+    scores.area += 35;
+    if (patterns.hasTrend) scores.area += 15;
+    // Area is better for showing cumulative/filled data
+    if (numericColumns.length === 1) scores.area += 10;
+  }
+  if (temporalColumns.length > 0 && numericColumns.length > 0) {
+    scores.area += 20;
+  }
+  // Penalize area for few data points
+  if (rowCount < 5) scores.area -= 20;
+
+  // HISTOGRAM scoring (distribution analysis)
+  if (numericColumns.length >= 1 && categoricalColumns.length === 0) {
+    scores.histogram += 30;
+    // Histogram needs enough data points for meaningful distribution
+    if (rowCount >= 20) scores.histogram += 25;
+    if (rowCount >= 50) scores.histogram += 10;
+    // Single numeric column is ideal for histogram
+    if (numericColumns.length === 1) scores.histogram += 15;
+  }
+  // Penalize histogram for too few data points
+  if (rowCount < 10) scores.histogram -= 30;
+
+  // BOXPLOT scoring (statistical distribution by category)
+  if (categoricalColumns.length >= 1 && numericColumns.length >= 1) {
+    const uniqueCategories = getUniqueCount(categoricalColumns[0], results);
+    // Box plot is good for comparing distributions across categories
+    if (uniqueCategories >= 2 && uniqueCategories <= 10) {
+      scores.boxplot += 35;
+      // Need enough data per category for meaningful statistics
+      if (rowCount >= uniqueCategories * 5) scores.boxplot += 20;
+    }
+    // Penalize for too many categories
+    if (uniqueCategories > 15) scores.boxplot -= 20;
+  }
+  // Penalize boxplot for too few data points
+  if (rowCount < 10) scores.boxplot -= 25;
+
+  // TREEMAP scoring (hierarchical data)
+  if (patterns.hierarchy?.isHierarchical) {
+    scores.treemap += 50;
+    if (patterns.hierarchy.maxDepth >= 2) scores.treemap += 15;
+  }
+  if (categoricalColumns.length >= 2 && numericColumns.length >= 1) {
+    scores.treemap += 25;
+    // Treemap works well with nested categories
+    const uniqueCat1 = getUniqueCount(categoricalColumns[0], results);
+    const uniqueCat2 = getUniqueCount(categoricalColumns[1], results);
+    if (uniqueCat1 >= 2 && uniqueCat2 >= 2) scores.treemap += 15;
+  }
+
+  // SUNBURST scoring (hierarchical data, radial alternative to treemap)
+  if (patterns.hierarchy?.isHierarchical) {
+    scores.sunburst += 45;
+    if (patterns.hierarchy.maxDepth >= 2) scores.sunburst += 20;
+  }
+  if (categoricalColumns.length >= 2 && numericColumns.length >= 1) {
+    scores.sunburst += 20;
+    // Sunburst works well with proportional hierarchical data
+    const uniqueCat1 = getUniqueCount(categoricalColumns[0], results);
+    if (uniqueCat1 >= 3 && uniqueCat1 <= 8) scores.sunburst += 15;
+  }
+
+  // BUBBLE CHART scoring (three-dimensional scatter)
+  if (numericColumns.length >= 3) {
+    scores.bubble += 40;
+    if (patterns.hasCorrelation) scores.bubble += 20;
+    // Bubble needs moderate data for visibility
+    if (rowCount >= 5 && rowCount <= 50) scores.bubble += 15;
+  } else if (numericColumns.length >= 2 && categoricalColumns.length >= 1) {
+    // Can use category for color grouping
+    scores.bubble += 25;
+  }
+
   // Normalize scores to 0-100
   const maxScore = Math.max(...Object.values(scores), 1);
   for (const type of Object.keys(scores) as ChartType[]) {
@@ -353,6 +431,44 @@ function selectColumnsForChart(
         yColumn: numericColumns[0] || null,
       };
 
+    // Phase 10: Advanced Chart Types
+    case 'area':
+      // Similar to line - temporal for X, numeric for Y
+      return {
+        xColumn: temporalColumns[0] || categoricalColumns[0] || null,
+        yColumn: numericColumns[0] || null,
+      };
+
+    case 'histogram':
+      // Single numeric column for distribution
+      return {
+        xColumn: null, // Histogram auto-generates bins
+        yColumn: numericColumns[0] || null,
+      };
+
+    case 'boxplot':
+      // Categorical for grouping, numeric for values
+      return {
+        xColumn: categoricalColumns[0] || null,
+        yColumn: numericColumns[0] || null,
+      };
+
+    case 'treemap':
+    case 'sunburst':
+      // Multiple categorical for hierarchy, numeric for size
+      return {
+        xColumn: categoricalColumns[0] || null, // Primary category
+        yColumn: numericColumns[0] || null, // Size/value
+      };
+
+    case 'bubble':
+      // Three numeric columns: x, y, size
+      return {
+        xColumn: numericColumns[0] || null,
+        yColumn: numericColumns[1] || numericColumns[0] || null,
+        // Note: size column would be numericColumns[2], handled by component
+      };
+
     default:
       return { xColumn: null, yColumn: null };
   }
@@ -394,6 +510,37 @@ function generateChartReason(
 
     case 'table':
       return 'Data best viewed as table';
+
+    // Phase 10: Advanced Charts
+    case 'area':
+      if (patterns.timeSeries?.isTimeSeries) {
+        return 'Time-series data ideal for area chart';
+      }
+      return 'Sequential data suitable for area visualization';
+
+    case 'histogram':
+      return 'Numeric distribution ideal for histogram';
+
+    case 'boxplot':
+      return 'Statistical distribution comparison across categories';
+
+    case 'treemap':
+      if (patterns.hierarchy?.isHierarchical) {
+        return 'Hierarchical data detected - treemap shows nested proportions';
+      }
+      return 'Categorical breakdown suitable for treemap';
+
+    case 'sunburst':
+      if (patterns.hierarchy?.isHierarchical) {
+        return 'Hierarchical data detected - sunburst shows radial breakdown';
+      }
+      return 'Nested categories ideal for sunburst chart';
+
+    case 'bubble':
+      if (patterns.hasCorrelation) {
+        return 'Multi-dimensional correlation shown with bubble sizes';
+      }
+      return 'Three numeric dimensions suitable for bubble chart';
 
     default:
       return 'Default visualization';
@@ -455,6 +602,35 @@ function generateNLExplanation(
 
     case 'table':
       parts.push('- the data is best viewed as a table for detailed inspection');
+      break;
+
+    // Phase 10: Advanced Charts
+    case 'area':
+      if (patterns.hasTrend) {
+        parts.push('- an area chart emphasizes the magnitude of change over time');
+      } else {
+        parts.push('- an area chart shows cumulative values effectively');
+      }
+      break;
+
+    case 'histogram':
+      parts.push('- a histogram shows the distribution of values across ranges');
+      break;
+
+    case 'boxplot':
+      parts.push('- a box plot compares statistical distributions across categories');
+      break;
+
+    case 'treemap':
+      parts.push('- a treemap shows hierarchical proportions in nested rectangles');
+      break;
+
+    case 'sunburst':
+      parts.push('- a sunburst chart displays hierarchy as concentric rings');
+      break;
+
+    case 'bubble':
+      parts.push('- a bubble chart shows relationships between three numeric values');
       break;
   }
 

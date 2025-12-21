@@ -38,7 +38,13 @@ const CHART_PATTERNS: ChartPattern[] = [
   { pattern: /\b(?:pie\s*(?:chart|graph)?|piechart|piegraph)\b/i, type: 'pie', confidence: 'high' },
   { pattern: /\b(?:line\s*(?:chart|graph|plot)?|linechart|linegraph)\b/i, type: 'line', confidence: 'high' },
   { pattern: /\b(?:scatter\s*(?:plot|chart|graph)?|scatterplot|scatterchart)\b/i, type: 'scatter', confidence: 'high' },
-  { pattern: /\b(?:area\s*(?:chart|graph)?|areachart)\b/i, type: 'line', confidence: 'high' }, // Area treated as line for now
+  { pattern: /\b(?:area\s*(?:chart|graph)?|areachart)\b/i, type: 'area', confidence: 'high' },
+  // Phase 10: Advanced chart patterns
+  { pattern: /\b(?:histogram|frequency\s*(?:chart|graph)?)\b/i, type: 'histogram', confidence: 'high' },
+  { pattern: /\b(?:box\s*(?:plot|and\s*whisker)?|boxplot|whisker\s*(?:plot|chart)?)\b/i, type: 'boxplot', confidence: 'high' },
+  { pattern: /\b(?:tree\s*map|treemap)\b/i, type: 'treemap', confidence: 'high' },
+  { pattern: /\b(?:sunburst|radial\s*(?:chart|graph)?)\b/i, type: 'sunburst', confidence: 'high' },
+  { pattern: /\b(?:bubble\s*(?:chart|graph|plot)?|bubblechart)\b/i, type: 'bubble', confidence: 'high' },
 
   // "Create a X chart" pattern
   { pattern: /\bcreate\s+(?:a\s+)?(\w+)\s+(?:chart|graph|plot)\b/i, type: 'dynamic', confidence: 'high' },
@@ -73,16 +79,15 @@ const CHART_PATTERNS: ChartPattern[] = [
  * Map of chart type synonyms to canonical types
  */
 const CHART_TYPE_SYNONYMS: Record<string, ChartType> = {
+  // Basic charts
   'bar': 'bar',
   'bars': 'bar',
   'column': 'bar',
   'columns': 'bar',
-  'histogram': 'bar',
 
   'line': 'line',
   'lines': 'line',
   'trend': 'line',
-  'area': 'line',
   'timeline': 'line',
 
   'pie': 'pie',
@@ -97,6 +102,31 @@ const CHART_TYPE_SYNONYMS: Record<string, ChartType> = {
   'point': 'scatter',
   'points': 'scatter',
   'xy': 'scatter',
+
+  // Phase 10: Advanced charts
+  'area': 'area',
+  'areachart': 'area',
+  'filled': 'area',
+
+  'histogram': 'histogram',
+  'distribution': 'histogram',
+  'frequency': 'histogram',
+
+  'boxplot': 'boxplot',
+  'box': 'boxplot',
+  'whisker': 'boxplot',
+  'quartile': 'boxplot',
+
+  'treemap': 'treemap',
+  'tree': 'treemap',
+  'heatmap': 'treemap',
+
+  'sunburst': 'sunburst',
+  'radial': 'sunburst',
+  'ring': 'sunburst',
+
+  'bubble': 'bubble',
+  'bubbles': 'bubble',
 };
 
 /**

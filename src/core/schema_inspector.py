@@ -111,8 +111,15 @@ class SchemaInspector:
                 },
             }
 
-            # Columns to sample (helps LLM understand format)
-            sample_column_keywords = ['state', 'status', 'type', 'category', 'country', 'region']
+            # Columns to sample (helps LLM understand data formats and values)
+            # Location columns: state, country, region, city, address - for geographic queries
+            # Domain columns: status, type, category - for enumerated/filter values
+            sample_column_keywords = [
+                # Location-related (helps with "shipped to New York" type queries)
+                'state', 'country', 'region', 'city', 'address',
+                # Domain-related (helps understand valid filter values)
+                'status', 'type', 'category'
+            ]
 
             for table_name in tables:
                 # Get columns
