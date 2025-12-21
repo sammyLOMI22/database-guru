@@ -441,3 +441,31 @@ The following test failures are due to **missing data/schema in the local SQL en
 
 **Next Steps**:
 *   To enable full manual verification, run a migration or seed script to create the `customers` table and add `subcategory_id` to `products` in the local dev database.
+
+---
+
+## Investigation: Functionality Regression in SQL Generation (Date: December 21, 2025)
+
+**Issue**: The user reported a regression where the query "what products shipped to new york" returns a date-based query (e.g., `WHERE shipped_date IS NOT NULL`) instead of filtering by location, ignoring "New York".
+
+**Investigation Findings**:
+1.  **Metric Analysis**:
+    *   The phrase "products shipped to new york" generates a query complexity score of approximately **0.2**.
+        *   +0.2 for location keywords ("shipped to")
+        *   +0.0 for other factors (simple select/join)
+    *   The threshold for enabling the `QueryPlanningAgent` is **0.5**.
+2.  **Root Cause**:
+    *   Because the complexity score (0.2) is below the threshold (0.5), the request **bypasses the `QueryPlanningAgent`**.
+    *   The `QueryPlanningAgent` contains the dedicated `LocationMapper` logic responsible for converting "New York" to state codes (e.g., "NY") or generating location-specific hints.
+    *   The fallback `SQLGenerator` (used for simple queries) **does not implement `LocationMapper` logic** for single-database queries. It relies purely on the system prompt and schema.
+    *   Without the location hints, the LLM latches onto the word "shipped" as a strong signal for "completed action" or "date existence" (`shipped_date IS NOT NULL`) rather than a destination.
+
+**Conclusion**:
+The "Chart Features" themselves are likely not the direct cause, but the regression highlights a fragility in the routing logic: legitimate location queries are being classified as "too simple" for the smart agent, but the dumb agent isn't smart enough to handle them without hints.
+
+**Correction Plan (No Code Changes Required in PR)**:
+To resolve this without code changes in this PR, we document that **Location Intelligence is currently gated behind the Complexity Threshold**.
+
+**Future Fix Recommendation**:
+1.  **Lower Threshold for Locations**: Update `_calculate_complexity_score` to give a higher weight (+0.4 or +0.5) to explicit location markers like "to [City/State]".
+2.  **Port Logic**: Move `_generate_location_hints` from `QueryPlanningAgent` to the shared `SQLGenerator` so it applies to *all* queries, not just complex ones.
