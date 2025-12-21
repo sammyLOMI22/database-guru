@@ -41,6 +41,7 @@ class MultiDatabaseQueryRequest(BaseModel):
     use_cache: bool = True
     model: Optional[str] = None
     enable_narratives: bool = True  # NEW: Enable narrative generation for multi-database results
+    preferred_chart_type: Optional[str] = None  # User-requested chart type (bar, line, pie, scatter, table)
 
 
 class DatabaseQueryResult(BaseModel):
@@ -93,6 +94,8 @@ class MultiDatabaseQueryResponse(BaseModel):
     cache_info: Optional[CacheInfo] = None  # Cache operation summary
     # NEW: Combined narrative synthesizing insights across all databases
     combined_analysis: Optional[Dict[str, Any]] = None  # Narrative across all databases
+    # Chart Intent (Phase 8: Chart Intelligence)
+    preferred_chart_type: Optional[str] = None  # User-requested chart type passed through from request
 
 
 @router.post("/", response_model=MultiDatabaseQueryResponse)
@@ -657,6 +660,8 @@ async def process_multi_database_query(
             "cached": False,
             "timestamp": datetime.utcnow().isoformat(),
             "cache_info": cache_info_data.model_dump(),
+            # Chart Intent (Phase 8: Chart Intelligence)
+            "preferred_chart_type": request.preferred_chart_type,
         }
 
         # NEW: Generate narratives if enabled

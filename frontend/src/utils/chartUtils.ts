@@ -5,7 +5,30 @@
  * and statistics from the ResultNarrator.
  */
 
-export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'table';
+/**
+ * Chart types supported by the visualization system
+ *
+ * Basic charts: bar, line, pie, scatter, table
+ * Hierarchical charts: treemap, sunburst
+ * Statistical charts: boxplot, histogram, bubble
+ * Time-series charts: area
+ */
+export type ChartType =
+  // Basic charts
+  | 'bar'
+  | 'line'
+  | 'pie'
+  | 'scatter'
+  | 'table'
+  // Hierarchical charts (Phase 10)
+  | 'treemap'
+  | 'sunburst'
+  // Statistical charts (Phase 10)
+  | 'boxplot'
+  | 'histogram'
+  | 'bubble'
+  // Time-series charts (Phase 10)
+  | 'area';
 
 export interface ChartRecommendation {
   chartType: ChartType;

@@ -1,5 +1,5 @@
 import { Copy, Check, MessageSquare, Zap, Database } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   AgentTrace as AgentTraceType,
   QueryPlan,
@@ -46,6 +46,8 @@ interface QueryResultsProps {
   matchedQuestion?: string | null;
   // Intelligent Data Narratives
   resultAnalysis?: ResultAnalysis | null;
+  // Chart Intent (Phase 8: Chart Intelligence)
+  preferredChartType?: ChartType | null;
 }
 
 export default function QueryResults({
@@ -69,11 +71,20 @@ export default function QueryResults({
   semanticSimilarity,
   matchedQuestion,
   resultAnalysis,
+  preferredChartType,
 }: QueryResultsProps) {
   const [copied, setCopied] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [selectedChartType, setSelectedChartType] = useState<ChartType | null>(null);
+
+  // Auto-select chart type and view mode when preferred chart type is provided
+  useEffect(() => {
+    if (preferredChartType && preferredChartType !== 'table' && results && results.length > 0) {
+      setSelectedChartType(preferredChartType);
+      setViewMode('chart');
+    }
+  }, [preferredChartType, results]);
 
   // Detect chart availability based on data and statistics
   const chartRecommendation = useMemo(() => {

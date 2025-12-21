@@ -1,5 +1,7 @@
 // API Types for Database Guru
 
+import { ChartType } from '../utils/chartUtils';
+
 export interface QueryRequest {
   question: string;
   database_type?: string;
@@ -10,6 +12,8 @@ export interface QueryRequest {
   session_id?: string;
   force_schema_refresh?: boolean;
   enable_narratives?: boolean;
+  /** User-requested chart type from natural language parsing */
+  preferred_chart_type?: ChartType | null;
 }
 
 // Option 2: Observability Types
@@ -186,6 +190,8 @@ export interface QueryResponse {
   matched_question?: string | null;
   // Intelligent Data Narratives fields
   result_analysis?: ResultAnalysis | null;
+  // Chart Intent fields (Phase 8: Chart Intelligence)
+  preferred_chart_type?: ChartType | null;
 }
 
 export interface Model {
@@ -340,6 +346,8 @@ export interface MultiDatabaseQueryRequest {
   model?: string;
   force_schema_refresh?: boolean;
   enable_narratives?: boolean;
+  /** User-requested chart type from natural language parsing */
+  preferred_chart_type?: ChartType | null;
 }
 
 export interface DatabaseQueryResult {
@@ -390,6 +398,8 @@ export interface MultiDatabaseQueryResponse {
   cache_info?: CacheInfo | null;  // Cache operation summary
   // Intelligent Data Narratives fields
   combined_analysis?: ResultAnalysis | null;
+  // Chart Intent fields (Phase 8: Chart Intelligence)
+  preferred_chart_type?: ChartType | null;
 }
 
 // Mapping Management Types (Phase 2: Non-SQL Feedback)

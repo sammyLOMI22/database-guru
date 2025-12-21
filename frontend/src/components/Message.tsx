@@ -65,6 +65,8 @@ export default function Message({ type, content, queryResponse }: MessageProps) 
                 matchedQuestion={queryResponse.matched_question}
                 // Intelligent Data Narratives
                 resultAnalysis={queryResponse.result_analysis}
+                // Chart Intent (Phase 8: Chart Intelligence)
+                preferredChartType={queryResponse.preferred_chart_type}
               />
             </div>
           )}

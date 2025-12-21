@@ -11,11 +11,18 @@ import {
   detectChartType,
   ChartRecommendation,
   ChartType,
+  classifyColumns,
 } from '../../utils/chartUtils';
 import { BarChartView } from './BarChartView';
 import { LineChartView } from './LineChartView';
 import { PieChartView } from './PieChartView';
 import { ScatterChartView } from './ScatterChartView';
+// Phase 10: Advanced Charts
+import { TreemapView } from './TreemapView';
+import { SunburstView } from './SunburstView';
+import { HistogramView } from './HistogramView';
+import { BoxPlotView } from './BoxPlotView';
+import { AreaChartView } from './AreaChartView';
 
 interface ChartVisualizationProps {
   data: Record<string, unknown>[];
@@ -38,6 +45,13 @@ const ChartInfoBadge: React.FC<ChartInfoBadgeProps> = ({ recommendation }) => {
     pie: 'Pie Chart',
     scatter: 'Scatter Plot',
     table: 'Table',
+    // Phase 10: Advanced Charts
+    treemap: 'Treemap',
+    sunburst: 'Sunburst',
+    boxplot: 'Box Plot',
+    histogram: 'Histogram',
+    bubble: 'Bubble Chart',
+    area: 'Area Chart',
   };
 
   return (
@@ -155,6 +169,70 @@ export const ChartVisualization: React.FC<ChartVisualizationProps> = ({
           height={height}
           animate={animate}
           correlationValue={correlationValue}
+        />
+      )}
+
+      {/* Phase 10: Advanced Charts */}
+      {recommendation.chartType === 'area' && recommendation.xColumn && recommendation.yColumn && (
+        <AreaChartView
+          data={data}
+          xColumn={recommendation.xColumn}
+          yColumns={[recommendation.yColumn]}
+          title={chartTitle}
+          height={height}
+          showLegend={showLegend}
+          animate={animate}
+        />
+      )}
+
+      {recommendation.chartType === 'histogram' && recommendation.yColumn && (
+        <HistogramView
+          data={data}
+          valueColumn={recommendation.yColumn}
+          title={chartTitle}
+          height={height}
+          animate={animate}
+        />
+      )}
+
+      {recommendation.chartType === 'boxplot' && recommendation.xColumn && recommendation.yColumn && (
+        <BoxPlotView
+          data={data}
+          categoryColumn={recommendation.xColumn}
+          valueColumn={recommendation.yColumn}
+          title={chartTitle}
+          height={height}
+          animate={animate}
+        />
+      )}
+
+      {recommendation.chartType === 'treemap' && (
+        <TreemapView
+          data={data}
+          categoryColumns={
+            recommendation.xColumn
+              ? [recommendation.xColumn]
+              : classifyColumns(data, statistics).categoricalColumns.slice(0, 2)
+          }
+          valueColumn={recommendation.yColumn || classifyColumns(data, statistics).numericColumns[0] || ''}
+          title={chartTitle}
+          height={height}
+          animate={animate}
+        />
+      )}
+
+      {recommendation.chartType === 'sunburst' && (
+        <SunburstView
+          data={data}
+          categoryColumns={
+            recommendation.xColumn
+              ? [recommendation.xColumn]
+              : classifyColumns(data, statistics).categoricalColumns.slice(0, 2)
+          }
+          valueColumn={recommendation.yColumn || classifyColumns(data, statistics).numericColumns[0] || ''}
+          title={chartTitle}
+          height={height}
+          animate={animate}
         />
       )}
     </div>

@@ -3,6 +3,7 @@ import Message from './Message';
 import QueryInput from './QueryInput';
 import { useQuerySubmit } from '../hooks/useQuerySubmit';
 import { useModels } from '../hooks/useModels';
+import { parseChartIntent, getChartIntentHint } from '../utils/chartIntentParser';
 import type { QueryResponse } from '../types/api';
 
 interface ChatMessage {
@@ -49,20 +50,25 @@ export default function ChatInterface() {
   }, [messages]);
 
   const handleSubmit = async (question: string) => {
-    // Add user message
+    // Parse chart intent from the question
+    const chartIntent = parseChartIntent(question);
+    const chartHint = getChartIntentHint(chartIntent);
+
+    // Add user message (show chart hint if detected)
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
-      content: question,
+      content: chartHint ? `${question}\n\n_${chartHint}_` : question,
     };
     setMessages((prev) => [...prev, userMessage]);
 
-    // Submit query
+    // Submit query with chart preference
     try {
       const response = await queryMutation.mutateAsync({
-        question,
+        question: chartIntent.cleanedQuestion || question,
         model: selectedModel || undefined,
         enable_narratives: enableNarratives,
+        preferred_chart_type: chartIntent.chartType,
       });
 
       // Add assistant response

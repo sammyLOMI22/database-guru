@@ -50,6 +50,10 @@ class QueryRequest(BaseModel):
         default=True,
         description="Enable natural language narrative generation from query results",
     )
+    preferred_chart_type: Optional[str] = Field(
+        default=None,
+        description="User-requested chart type from natural language parsing (bar, line, pie, scatter, table)",
+    )
 
     @validator('question')
     def question_not_empty(cls, v):
@@ -226,6 +230,11 @@ class QueryResponse(BaseModel):
     result_analysis: Optional[ResultAnalysis] = Field(
         default=None,
         description="Natural language analysis and insights from query results"
+    )
+    # Chart Intent (Phase 8: Chart Intelligence)
+    preferred_chart_type: Optional[str] = Field(
+        default=None,
+        description="User-requested chart type passed through from request (bar, line, pie, scatter, table)"
     )
 
     class Config:
