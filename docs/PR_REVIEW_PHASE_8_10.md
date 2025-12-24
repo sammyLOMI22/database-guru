@@ -469,3 +469,116 @@ To resolve this without code changes in this PR, we document that **Location Int
 **Future Fix Recommendation**:
 1.  **Lower Threshold for Locations**: Update `_calculate_complexity_score` to give a higher weight (+0.4 or +0.5) to explicit location markers like "to [City/State]".
 2.  **Port Logic**: Move `_generate_location_hints` from `QueryPlanningAgent` to the shared `SQLGenerator` so it applies to *all* queries, not just complex ones.
+
+---
+
+## Resolution: Fixes Implemented (Date: December 24, 2025)
+
+The issues identified in the investigation above have been resolved. Here is a summary of all fixes implemented:
+
+### 1. Location Query Complexity Scoring (FIXED)
+
+**File**: `src/llm/query_planning_agent.py` (lines 290-302)
+
+**Change**: Increased location keyword weight from `+0.2` to `+0.5`
+
+```python
+# Before: +0.2 (below 0.5 threshold, planning skipped)
+# After: +0.5 (meets threshold, planning enabled)
+location_keywords = [
+    "shipped to", "delivered to", "sent to",
+    "to new york", "to california", "to texas", "to florida",
+    "from new york", "from california", "from texas", "from florida",
+    "in california", "in texas", "in new york", "in florida",
+    "location", "address", "city", "state", "country", "zip", "postal"
+]
+if any(kw in question_lower for kw in location_keywords):
+    score += 0.5  # Was 0.2
+```
+
+**Result**: Location queries like "what products shipped to new york" now score `0.50`, triggering `QueryPlanningAgent` which includes `LocationMapper` for proper state code normalization (e.g., "New York" → "NY").
+
+### 2. QueryPlan Attribute Bug (FIXED)
+
+**File**: `src/llm/self_correcting_agent.py` (line 796)
+
+**Change**: Fixed typo `tables_needed` → `tables`
+
+```python
+# Before (broken):
+"estimated_tables": len(query_plan.tables_needed)  # AttributeError!
+
+# After (fixed):
+"estimated_tables": len(query_plan.tables)
+```
+
+**Result**: Query planning no longer crashes with `AttributeError: 'QueryPlan' object has no attribute 'tables_needed'`.
+
+### 3. ResultNarrator Model Selection (FIXED)
+
+**Files**:
+- `src/api/endpoints/multi_db_query.py` (lines 675-678)
+- `src/api/endpoints/query.py` (lines 375-378)
+
+**Change**: Narrator now uses user-selected model from UI instead of default
+
+```python
+# Added to both endpoints:
+if request.model:
+    ollama_client.model = request.model
+    logger.info(f"Using user-selected model for narratives: {request.model}")
+```
+
+**Result**: Narrative generation respects the model selected in the UI dropdown.
+
+### 4. Robust JSON Parsing for Narratives (FIXED)
+
+**File**: `src/llm/result_narrator.py`
+
+**Changes**:
+- Added `_extract_json_object()` method with balanced brace matching (lines 463-514)
+- Added JSON fragment filtering in `_parse_response()` (lines 541-559)
+- Added validation to reject malformed summaries (lines 529-532)
+
+**Result**: Handles malformed LLM responses (e.g., from `llama3.2:latest`) that contain nested JSON or echo JSON structure in `key_insights`.
+
+### 5. Configuration Updates
+
+**File**: `src/config/settings.py`
+
+| Setting | Before | After |
+|---------|--------|-------|
+| `NARRATIVE_TIMEOUT_SECONDS` | 5 | 15 |
+
+### 6. Test Coverage Added
+
+**File**: `tests/test_result_narrator.py`
+
+Added 11 new tests in `TestJsonExtraction` class:
+- `test_extract_json_object_simple`
+- `test_extract_json_object_nested`
+- `test_extract_json_object_with_surrounding_text`
+- `test_extract_json_object_no_json`
+- `test_extract_json_object_with_escaped_quotes`
+- `test_parse_response_filters_json_fragments`
+- `test_parse_response_rejects_bracket_summary`
+- `test_parse_response_rejects_short_summary`
+- `test_parse_response_cleans_quoted_insights`
+- `test_parse_response_valid_json`
+- `test_parse_response_falls_back_to_text_on_all_fragments`
+
+### Verification
+
+**Query**: "what products shipped to new york"
+
+| Metric | Before Fix | After Fix |
+|--------|------------|-----------|
+| Complexity Score | 0.20 | 0.50 |
+| Planning Enabled | No | Yes |
+| LocationMapper Used | No | Yes |
+| SQL Generated | `WHERE shipped_date IS NOT NULL` | `JOIN customers ... WHERE c.city = 'New York'` |
+
+### Notes
+
+- The `gemma3:27b` model produces properly formatted JSON responses for narratives
+- The `llama3.2:latest` model sometimes outputs malformed JSON; the new filtering handles this gracefully

@@ -168,7 +168,7 @@ The system uses a multi-agent architecture with specialized agents that work tog
     - Tracks execution statistics (times_executed, success_rate, cache_hit_rate)
     - Key methods: `register_tool()`, `get_tool()`, `get_tools_by_category()`, `invalidate_cache()`
 
-12. **Result Narrator Agent** (`src/llm/result_narrator.py`) **NEW - December 13, 2025**
+12. **Result Narrator Agent** (`src/llm/result_narrator.py`) **NEW - December 13, 2025** (Updated Dec 24, 2025)
     - Generates human-readable narratives from query results with advanced analysis
     - Transforms raw data into contextual insights highlighting patterns and anomalies
     - **Core Features**: Summary (1-2 sentences), Key Insights (3-5 bullets), Direct Answer, Confidence Score (0.0-1.0), Statistics extraction
@@ -179,9 +179,11 @@ The system uses a multi-agent architecture with specialized agents that work tog
       - Correlation Analysis: Pearson correlation between numeric columns (|r| > 0.7, minimum 10 rows)
     - **Performance**: <3 seconds for all features (99th percentile), <500ms for small datasets
     - **Graceful Degradation**: All advanced features wrapped in try-except, fallback to basic statistics if LLM fails
-    - **Configurable**: Enable/disable via UI toggle, adjustable thresholds and timeouts
-    - **Test Coverage**: 41 unit tests + 11 performance tests + 12 E2E tests (64 total)
-    - Key methods: `generate_narrative()`, `_detect_anomalies()`, `_detect_trends()`, `_calculate_correlations()`, `_compare_to_history()`
+    - **Robust JSON Parsing** (Dec 24, 2025): Balanced brace extraction, JSON fragment filtering, handles malformed LLM output
+    - **Configurable**: Enable/disable via UI toggle, `NARRATIVE_TIMEOUT_SECONDS` (default: 15s)
+    - **Model Compatibility**: Works best with `gemma3:27b`; `llama3.2:latest` may produce malformed JSON (handled gracefully)
+    - **Test Coverage**: 52 unit tests + 11 performance tests + 12 E2E tests (75 total)
+    - Key methods: `generate_narrative()`, `_extract_json_object()`, `_detect_anomalies()`, `_detect_trends()`, `_calculate_correlations()`
 
 ### Tool System (`src/tools/`)
 

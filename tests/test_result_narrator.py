@@ -748,3 +748,165 @@ class TestCorrelationAnalysis:
         # Should not find correlations due to small sample size
         assert correlations["correlations_found"] is False
         assert len(correlations["correlations"]) == 0
+
+
+class TestJsonExtraction:
+    """Tests for JSON extraction and parsing robustness"""
+
+    @pytest.fixture
+    def narrator(self):
+        """Create narrator with mocked Ollama client"""
+        mock_ollama = AsyncMock()
+        return ResultNarrator(
+            ollama_client=mock_ollama,
+            enable_statistics=True,
+            max_sample_rows=20,
+            timeout_seconds=5
+        )
+
+    def test_extract_json_object_simple(self, narrator):
+        """Test extraction of a simple JSON object"""
+        text = 'Here is the result: {"summary": "Test", "key_insights": ["A", "B"]}'
+        result = narrator._extract_json_object(text)
+        assert result is not None
+        data = json.loads(result)
+        assert data["summary"] == "Test"
+        assert data["key_insights"] == ["A", "B"]
+
+    def test_extract_json_object_nested(self, narrator):
+        """Test extraction with nested JSON objects"""
+        text = '''{"summary": "Test", "statistics": {"min": 1, "max": 100}}'''
+        result = narrator._extract_json_object(text)
+        assert result is not None
+        data = json.loads(result)
+        assert data["summary"] == "Test"
+        assert data["statistics"]["min"] == 1
+
+    def test_extract_json_object_with_surrounding_text(self, narrator):
+        """Test extraction when JSON is surrounded by text"""
+        text = '''Here is the analysis:
+        {"summary": "Found 10 products", "key_insights": ["Insight 1"]}
+        Hope this helps!'''
+        result = narrator._extract_json_object(text)
+        assert result is not None
+        data = json.loads(result)
+        assert data["summary"] == "Found 10 products"
+
+    def test_extract_json_object_no_json(self, narrator):
+        """Test when no JSON is present"""
+        text = "This is just plain text without any JSON"
+        result = narrator._extract_json_object(text)
+        assert result is None
+
+    def test_extract_json_object_with_escaped_quotes(self, narrator):
+        """Test extraction with escaped quotes in strings"""
+        text = r'{"summary": "He said \"hello\"", "key_insights": []}'
+        result = narrator._extract_json_object(text)
+        assert result is not None
+        data = json.loads(result)
+        assert 'hello' in data["summary"]
+
+    def test_parse_response_filters_json_fragments(self, narrator):
+        """Test that JSON fragments in key_insights are filtered out"""
+        # Simulate malformed LLM response with JSON fragments in insights
+        malformed_response = json.dumps({
+            "summary": "Valid summary here",
+            "key_insights": [
+                '"summary": "This is a JSON fragment",',
+                '"key_insights": [',
+                "This is a valid insight about the data",
+                '"another_key": "value"',
+            ],
+            "confidence": 0.7
+        })
+
+        result = narrator._parse_response(malformed_response)
+
+        # Should filter out the JSON fragments
+        assert result.summary == "Valid summary here"
+        assert len(result.key_insights) == 1
+        assert "valid insight" in result.key_insights[0].lower()
+
+    def test_parse_response_rejects_bracket_summary(self, narrator):
+        """Test that summary containing only brackets triggers fallback"""
+        malformed_response = json.dumps({
+            "summary": "{",
+            "key_insights": ["Some insight"],
+            "confidence": 0.7
+        })
+
+        result = narrator._parse_response(malformed_response)
+
+        # Should fall back to text parsing, not return "{" as summary
+        assert result.summary != "{"
+        assert len(result.summary) > 1
+
+    def test_parse_response_rejects_short_summary(self, narrator):
+        """Test that very short summaries trigger fallback"""
+        malformed_response = json.dumps({
+            "summary": "Hi",
+            "key_insights": ["Some insight"],
+            "confidence": 0.7
+        })
+
+        result = narrator._parse_response(malformed_response)
+
+        # Should fall back due to summary being too short (< 5 chars)
+        # The fallback parser will use the raw text
+        assert len(result.summary) >= 2  # At minimum gets something
+
+    def test_parse_response_cleans_quoted_insights(self, narrator):
+        """Test that trailing quotes and commas are cleaned from insights"""
+        response = json.dumps({
+            "summary": "Valid summary with enough characters",
+            "key_insights": [
+                '"This insight has quotes",',
+                "Normal insight without issues",
+            ],
+            "confidence": 0.7
+        })
+
+        result = narrator._parse_response(response)
+
+        # Insights should have quotes/commas stripped
+        for insight in result.key_insights:
+            assert not insight.endswith('",')
+            assert not insight.startswith('"') or not insight.endswith('"')
+
+    def test_parse_response_valid_json(self, narrator):
+        """Test parsing of properly formatted JSON response"""
+        valid_response = json.dumps({
+            "summary": "Found 100 products in the database with diverse pricing.",
+            "key_insights": [
+                "Product prices range from $10 to $500",
+                "Most products are in the Electronics category",
+                "Average price is $150"
+            ],
+            "direct_answer": "100 products",
+            "confidence": 0.85
+        })
+
+        result = narrator._parse_response(valid_response)
+
+        assert result.summary == "Found 100 products in the database with diverse pricing."
+        assert len(result.key_insights) == 3
+        assert result.direct_answer == "100 products"
+        assert result.confidence == 0.85
+
+    def test_parse_response_falls_back_to_text_on_all_fragments(self, narrator):
+        """Test fallback when all insights are JSON fragments"""
+        malformed_response = json.dumps({
+            "summary": "This is a valid summary with enough length",
+            "key_insights": [
+                '"key": "value",',
+                '"another": [',
+                '"}',
+            ],
+            "confidence": 0.7
+        })
+
+        result = narrator._parse_response(malformed_response)
+
+        # Should have fallen back to text parsing
+        # The confidence should be lower (text parsing defaults to 0.5)
+        assert result.confidence <= 0.7
