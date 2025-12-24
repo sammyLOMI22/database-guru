@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # Ollama - Auto-detect local or Docker
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "llama3"  # Default model
+    OLLAMA_MODEL: str = "llama3.2:latest"  # Default model
     OLLAMA_ALLOW_MODEL_SELECTION: bool = True  # Allow users to choose models
 
     # Redis
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
 
     # Intelligent Data Narratives
     ENABLE_NARRATIVES: bool = True  # Feature flag: Generate natural language insights from results
-    NARRATIVE_TIMEOUT_SECONDS: int = 5  # Max seconds for LLM narrative generation
+    NARRATIVE_TIMEOUT_SECONDS: int = 15  # Max seconds for LLM narrative generation
     NARRATIVE_MAX_SAMPLE_ROWS: int = 20  # Only analyze first N rows for large result sets
 
     class Config:

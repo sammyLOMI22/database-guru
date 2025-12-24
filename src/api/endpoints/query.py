@@ -372,6 +372,11 @@ async def process_query(
             and 1 <= execution_result.get("row_count", 0) <= 1000
         ):
             try:
+                # Use the user-selected model for narrative generation, not the default
+                if request.model:
+                    sql_generator.ollama.model = request.model
+                    logger.info(f"Using user-selected model for narratives: {request.model}")
+
                 # Initialize narrator with settings
                 narrator = ResultNarrator(
                     ollama_client=sql_generator.ollama,

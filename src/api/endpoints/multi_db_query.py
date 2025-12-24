@@ -672,6 +672,10 @@ async def process_multi_database_query(
                 # Initialize Ollama client and narrator
                 logger.info("Initializing Ollama client for narrative generation...")
                 ollama_client = OllamaClient(settings=settings)
+                # Use the user-selected model from the request, not the default
+                if request.model:
+                    ollama_client.model = request.model
+                    logger.info(f"Using user-selected model for narratives: {request.model}")
                 await ollama_client.connect()
                 logger.info("Ollama client initialized successfully")
 
