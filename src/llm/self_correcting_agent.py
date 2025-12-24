@@ -793,7 +793,7 @@ class SelfCorrectingSQLAgent:
                         metadata={
                             "complexity": query_plan.complexity.value,
                             "confidence": query_plan.confidence,
-                            "estimated_tables": len(query_plan.tables_needed)
+                            "estimated_tables": len(query_plan.tables)
                         }
                     )
                     logger.info(
