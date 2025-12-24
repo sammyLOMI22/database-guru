@@ -582,3 +582,49 @@ Added 11 new tests in `TestJsonExtraction` class:
 
 - The `gemma3:27b` model produces properly formatted JSON responses for narratives
 - The `llama3.2:latest` model sometimes outputs malformed JSON; the new filtering handles this gracefully
+
+---
+
+## Independent Verification (Date: December 24, 2025)
+
+I have independently verified the codebase and confirmed that all critical fixes listed above are correctly implemented:
+
+1.  **Metric Analysis**: Confirmed `query_planning_agent.py` includes the +0.5 complexity score for location keywords (lines 290-302), ensuring location queries trigger the planning agent.
+2.  **Code Correction**: Confirmed `self_correcting_agent.py` uses `.tables` instead of the non-existent `.tables_needed` attribute (line ~796), resolving the potential crash.
+3.  **Narrative Robustness**: Confirmed `result_narrator.py` implements `_extract_json_object` with brace matching and `_parse_response` with fragment filtering, making it robust against malformed LLM outputs.
+4.  **Model Propagation**: Confirmed `query.py` properly respects the user-selected model for narrative generation.
+5.  **Schema Introspection**: Confirmed `schema_inspector.py` adds `city` and `address` to the sampling keywords.
+
+**Status**: The branch is consistent with the "Resolution" notes. The fixes appear correct and should resolve the reported regressions.
+
+---
+
+## Manual UI Verification (Date: December 24, 2025)
+
+I performed a manual walk-through of the application on `localhost:3000` to validate the features in a live environment.
+
+### 1. Location Query Fix (`ECommerceTestDB`)
+*   **Query**: "what products shipped to New York"
+*   **Result**: **FAILED** (SQL Error)
+*   **Details**: The query failed because the `customers` table does not exist in the local `ECommerceTestDB` (SQLite). The `Duck db eCommerce` database also failed (missing `ship_to` column).
+*   **Observation**: The **UI for Auto-Correction** works effectively. It displayed multiple correction attempts and clearly explained why each failed. The Code Logic for triggering the planning agent appears to handle the complexity, but it cannot fix missing tables.
+
+### 2. Advanced Charts
+*   **Queries Tested**:
+    *   "Show sales breakdown by category and subcategory" (Target: Treemap/Sunburst) -> **FAILED** (SQL generation error on joins).
+    *   "Show sales over time" (Target: Area Chart) -> **FAILED** (SQL generation error: `no such column: order_total`).
+    *   "Show distribution of product prices" (Target: Histogram/Box Plot) -> **PARTIAL SUCCESS**.
+*   **Findings**:
+    *   The "Distribution" query **successfully returned data** and the **Narrative Agent** correctly identified statistical properties including outliers ("Detected 1 outlier in 'price'").
+    *   **CRITICAL UI BUG**: Despite successful data retrieval and statistical analysis, **NO CHART WAS RENDERED**. The UI displayed the narrative text but did not show the expected Histogram or Box Plot component.
+
+### 3. General UI/UX
+*   **Positives**:
+    *   Multi-database session management is intuitive.
+    *   The "Agent Trace" and "Auto-Correction" panels provide excellent visibility into system logic.
+    *   Data Narratives are generating meaningful insights even when charts fail.
+*   **Negatives**:
+    *   Visualization components seem disconnected or failing to render even when data is available.
+
+### Recommendation
+The backend logic fixes are present, but the **Visualization UI integration** needs immediate debugging. The Chart Intelligence system is analyzing the data (evidenced by the narrative's outlier detection), but the `ChartVisualization` component is not displaying the result in some cases. Sometimes the chart appears but after changing to a different one like scatter point it disappears completely and never reappears even when changing to a different chart type.
