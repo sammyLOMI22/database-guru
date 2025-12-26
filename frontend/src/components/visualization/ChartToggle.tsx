@@ -6,7 +6,18 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Table, BarChart2, ChevronDown, TrendingUp, PieChart, ScatterChart } from 'lucide-react';
+import {
+  Table,
+  BarChart2,
+  ChevronDown,
+  TrendingUp,
+  PieChart,
+  ScatterChart,
+  LayoutGrid,
+  BarChart3,
+  Activity,
+  Circle,
+} from 'lucide-react';
 import { ChartType } from '../../utils/chartUtils';
 
 export type ViewMode = 'table' | 'chart';
@@ -30,6 +41,13 @@ const chartTypeLabels: Record<ChartType, string> = {
   pie: 'Pie Chart',
   scatter: 'Scatter Plot',
   table: 'Table',
+  // Phase 10: Advanced Charts
+  treemap: 'Treemap',
+  sunburst: 'Sunburst',
+  boxplot: 'Box Plot',
+  histogram: 'Histogram',
+  bubble: 'Bubble Chart',
+  area: 'Area Chart',
 };
 
 const chartTypeIcons: Record<ChartType, React.ReactNode> = {
@@ -38,9 +56,20 @@ const chartTypeIcons: Record<ChartType, React.ReactNode> = {
   pie: <PieChart className="w-4 h-4" />,
   scatter: <ScatterChart className="w-4 h-4" />,
   table: <Table className="w-4 h-4" />,
+  // Phase 10: Advanced Charts
+  treemap: <LayoutGrid className="w-4 h-4" />,
+  sunburst: <Circle className="w-4 h-4" />,
+  boxplot: <BarChart3 className="w-4 h-4" />,
+  histogram: <BarChart3 className="w-4 h-4" />,
+  bubble: <Circle className="w-4 h-4" />,
+  area: <Activity className="w-4 h-4" />,
 };
 
-const availableChartTypes: ChartType[] = ['bar', 'line', 'pie', 'scatter'];
+// Basic chart types always available
+const basicChartTypes: ChartType[] = ['bar', 'line', 'pie', 'scatter'];
+// Advanced chart types (Phase 10)
+const advancedChartTypes: ChartType[] = ['area', 'histogram', 'boxplot', 'treemap', 'sunburst', 'bubble'];
+const availableChartTypes: ChartType[] = [...basicChartTypes, ...advancedChartTypes];
 
 export const ChartToggle: React.FC<ChartToggleProps> = ({
   mode,

@@ -168,7 +168,7 @@ The system uses a multi-agent architecture with specialized agents that work tog
     - Tracks execution statistics (times_executed, success_rate, cache_hit_rate)
     - Key methods: `register_tool()`, `get_tool()`, `get_tools_by_category()`, `invalidate_cache()`
 
-12. **Result Narrator Agent** (`src/llm/result_narrator.py`) **NEW - December 13, 2025**
+12. **Result Narrator Agent** (`src/llm/result_narrator.py`) **NEW - December 13, 2025** (Updated Dec 24, 2025)
     - Generates human-readable narratives from query results with advanced analysis
     - Transforms raw data into contextual insights highlighting patterns and anomalies
     - **Core Features**: Summary (1-2 sentences), Key Insights (3-5 bullets), Direct Answer, Confidence Score (0.0-1.0), Statistics extraction
@@ -179,9 +179,11 @@ The system uses a multi-agent architecture with specialized agents that work tog
       - Correlation Analysis: Pearson correlation between numeric columns (|r| > 0.7, minimum 10 rows)
     - **Performance**: <3 seconds for all features (99th percentile), <500ms for small datasets
     - **Graceful Degradation**: All advanced features wrapped in try-except, fallback to basic statistics if LLM fails
-    - **Configurable**: Enable/disable via UI toggle, adjustable thresholds and timeouts
-    - **Test Coverage**: 41 unit tests + 11 performance tests + 12 E2E tests (64 total)
-    - Key methods: `generate_narrative()`, `_detect_anomalies()`, `_detect_trends()`, `_calculate_correlations()`, `_compare_to_history()`
+    - **Robust JSON Parsing** (Dec 24, 2025): Balanced brace extraction, JSON fragment filtering, handles malformed LLM output
+    - **Configurable**: Enable/disable via UI toggle, `NARRATIVE_TIMEOUT_SECONDS` (default: 15s)
+    - **Model Compatibility**: Works best with `gemma3:27b`; `llama3.2:latest` may produce malformed JSON (handled gracefully)
+    - **Test Coverage**: 52 unit tests + 11 performance tests + 12 E2E tests (75 total)
+    - Key methods: `generate_narrative()`, `_extract_json_object()`, `_detect_anomalies()`, `_detect_trends()`, `_calculate_correlations()`
 
 ### Tool System (`src/tools/`)
 
@@ -562,6 +564,23 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `tests/test_pooling_performance.py` - Performance tests (3 tests, 320 lines)
   - `tests/fixtures/docker-compose.test.yml` - Test database infrastructure (PostgreSQL, MySQL, MongoDB)
   - `scripts/setup_test_databases.sh` - One-command test database setup (180 lines)
+- **Advanced Visualization (Phase 8 & 10 - Dec 20-26, 2025)**:
+  - `frontend/src/utils/chartIntelligence.ts` - Pattern detection engine (~700 lines)
+  - `frontend/src/utils/chartIntentParser.ts` - NL chart request parsing (~240 lines)
+  - `frontend/src/utils/timeSeriesDetector.ts` - Periodic pattern detection (~180 lines)
+  - `frontend/src/utils/hierarchyDetector.ts` - Parent-child data detection (~150 lines)
+  - `frontend/src/utils/hierarchicalChartUtils.ts` - Treemap/Sunburst data prep (~300 lines)
+  - `frontend/src/utils/statisticalChartUtils.ts` - Box plot/histogram calculations (~360 lines)
+  - `frontend/src/components/visualization/TreemapView.tsx` - Treemap chart (~180 lines)
+  - `frontend/src/components/visualization/SunburstView.tsx` - Radial hierarchy (~190 lines)
+  - `frontend/src/components/visualization/HistogramView.tsx` - Distribution histogram (~190 lines)
+  - `frontend/src/components/visualization/BoxPlotView.tsx` - Statistical box plot (~240 lines)
+  - `frontend/src/components/visualization/AreaChartView.tsx` - Time-series area (~190 lines)
+  - `frontend/src/components/visualization/BubbleChartView.tsx` - 3-variable scatter (~140 lines)
+  - `frontend/src/components/visualization/ChartVisualization.tsx` - Main chart container
+  - `frontend/src/components/visualization/ChartToggle.tsx` - Table/chart toggle with type selector
+  - `frontend/tests/AdvancedCharts.test.tsx` - 61 comprehensive tests
+  - `frontend/tests/chartIntelligence.test.ts` - Pattern detection tests
 
 ## Documentation
 
@@ -592,3 +611,4 @@ Key docs in `docs/`:
 - `CONNECTION_POOLING_IMPLEMENTATION_PLAN.md` - **5-day implementation plan (80% complete)** - Day 4 complete (test infrastructure)
 - `DATA_NARRATIVES_GUIDE.md` - **Intelligent Data Narratives & Human Insights (NEW - Dec 13, 2025)** - Complete feature guide with usage, architecture, performance, configuration, and troubleshooting
 - `MULTI_DB_NARRATIVES.md` - **Multi-Database Narratives (NEW - Dec 13, 2025)** - Per-database + combined analysis for multi-database queries
+- `ADVANCED_VISUALIZATION_PHASE2_PLAN.md` - **Advanced Visualization Phase 2 (Dec 20-26, 2025)** - Chart Intelligence (Phase 8) + Advanced Charts (Phase 10) with 10 chart types, 132 tests

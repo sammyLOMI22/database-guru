@@ -372,6 +372,11 @@ async def process_query(
             and 1 <= execution_result.get("row_count", 0) <= 1000
         ):
             try:
+                # Use the user-selected model for narrative generation, not the default
+                if request.model:
+                    sql_generator.ollama.model = request.model
+                    logger.info(f"Using user-selected model for narratives: {request.model}")
+
                 # Initialize narrator with settings
                 narrator = ResultNarrator(
                     ollama_client=sql_generator.ollama,
@@ -459,6 +464,8 @@ async def process_query(
             "used_context": used_context,
             # Intelligent Data Narratives
             "result_analysis": result_analysis,
+            # Chart Intent (Phase 8: Chart Intelligence)
+            "preferred_chart_type": request.preferred_chart_type,
         }
 
         # Cache the result (both exact and semantic)

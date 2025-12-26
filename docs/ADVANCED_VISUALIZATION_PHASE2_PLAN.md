@@ -1,39 +1,145 @@
 # Advanced Visualization Phase 2 Implementation Plan
 
-**Feature Branch**: Advanced-Visualization-and-Dashboards
-**Status**: Planned
+**Feature Branch**: `advanced-visualization-V2`
+**Status**: Phase 8 & 10 Complete, Phase 7 Planned
 **Created**: December 20, 2025
-**Phases**: 7 (ER Diagrams), 8 (Chart Intelligence), 10 (Advanced Charts)
-**Estimated New Code**: ~5,700 lines
+**Last Updated**: December 26, 2025
+**Phases**: 7 (ER Diagrams), 8 (Chart Intelligence), 10 (Advanced Charts), 11 (Data Lineage)
+
+---
+
+## Current Status
+
+| Phase | Feature | Status | Tests | Branch |
+|-------|---------|--------|-------|--------|
+| **Phase 8** | Chart Intelligence | **COMPLETE** | 71 tests | `advanced-visualization-V2` |
+| **Phase 10** | Advanced Charts | **COMPLETE** | 61 tests | `advanced-visualization-V2` |
+| **Phase 7** | ER Diagram Generator | Planned | - | - |
+| **Phase 11** | Data Lineage & Impact Analysis | Planned | - | - |
+
+**Total Frontend Tests**: 526 (all passing)
+**Build Status**: Passing
 
 ---
 
 ## Executive Summary
 
-This plan covers three major visualization enhancements for Database Guru:
+This plan covers four major visualization enhancements for Database Guru:
 
-- **Phase 7**: ER Diagram Generator - Interactive entity-relationship diagrams
-- **Phase 8**: Improved Chart Intelligence - Smarter pattern detection and recommendations
-- **Phase 10**: Advanced Chart Types - Specialized charts for hierarchical, statistical, and time-series data
+- **Phase 7**: ER Diagram Generator - Interactive entity-relationship diagrams with health indicators (NEXT)
+- **Phase 8**: Improved Chart Intelligence - Smarter pattern detection and recommendations (COMPLETE)
+- **Phase 10**: Advanced Chart Types - Specialized charts for hierarchical, statistical, and time-series data (COMPLETE)
+- **Phase 11**: Data Lineage & Impact Analysis - Query flow visualization and schema change impact (FUTURE)
 
 All phases build on the existing visualization architecture (Phases 1-6 complete).
+
+---
+
+## Completed Work & Bug Fixes (Phase 8 & 10)
+
+### Phase 8 & 10 Implementation (December 20-21, 2025)
+
+#### Files Created
+
+**Phase 8 - Chart Intelligence:**
+| File | Lines | Purpose |
+|------|-------|---------|
+| `src/utils/chartIntelligence.ts` | ~400 | Main intelligence engine with `analyzeData()` |
+| `src/utils/timeSeriesDetector.ts` | ~180 | Time-series patterns, periodicity detection |
+| `src/utils/hierarchyDetector.ts` | ~150 | Parent-child hierarchical data detection |
+| `src/utils/geoDetector.ts` | ~120 | Geographic data (lat/lon, country codes) |
+| `src/utils/trendLineCalculator.ts` | ~100 | Linear regression calculations |
+| `src/utils/chartIntentParser.ts` | ~240 | Parses NL queries for chart type hints |
+| `src/components/visualization/OutlierMarkers.tsx` | ~120 | Visual outlier indicators |
+| `src/components/visualization/TrendLine.tsx` | ~150 | Trend line overlay component |
+
+**Phase 10 - Advanced Charts:**
+| File | Lines | Purpose |
+|------|-------|---------|
+| `TreemapView.tsx` | ~180 | Hierarchical treemap with custom renderer |
+| `SunburstView.tsx` | ~190 | Radial hierarchical chart |
+| `HistogramView.tsx` | ~190 | Distribution histogram with markers |
+| `BoxPlotView.tsx` | ~240 | Statistical box plot |
+| `AreaChartView.tsx` | ~190 | Time-series area chart |
+| `hierarchicalChartUtils.ts` | ~300 | Treemap/Sunburst data preparation |
+| `statisticalChartUtils.ts` | ~360 | Box plot, histogram calculations |
+
+### Bug Fixes Applied
+
+#### 1. Chart Type Override Column Selection Bug (December 26, 2025)
+
+**Issue**: When user overrides chart type via dropdown, columns were NOT recalculated for the new chart type. Charts would fail to render or disappear.
+
+**Root Cause**: `ChartVisualization.tsx` spread `autoRecommendation` without recalculating `xColumn`/`yColumn` for the override type.
+
+**Fix**:
+- Exported `selectColumnsForChart()` from `chartIntelligence.ts`
+- Updated `ChartVisualization.tsx` to recalculate columns when override is set
+
+```typescript
+// Fixed: Recalculate columns for overridden chart type
+const { xColumn, yColumn } = selectColumnsForChart(
+  overrideChartType, classification, autoRecommendation.patterns, data
+);
+```
+
+#### 2. Logic Integration (December 21, 2025)
+
+**Issue**: `ChartVisualization.tsx` was importing from legacy `chartUtils.ts` instead of new `chartIntelligence.ts`.
+
+**Fix**: Updated imports to use `analyzeData` from `chartIntelligence.ts`.
+
+#### 3. Intent Parsing Mapping (December 21, 2025)
+
+**Issue**: `chartIntentParser.ts` mapped 'area' to 'line' instead of 'area'.
+
+**Fix**: Updated mapping to correctly map 'area' → 'area'.
+
+### Deferred Items
+
+The following were planned but deferred for future iterations:
+
+| Item | Reason | Priority |
+|------|--------|----------|
+| `SankeyView.tsx` | Requires d3-sankey dependency | Medium |
+| `ViolinPlotView.tsx` | Complex kernel density estimation | Low |
+| `SparklineView.tsx` | Lower priority | Low |
+| `ConfidenceInterval.tsx` | Future enhancement | Low |
+
+**Note:** `BubbleChartView.tsx` was implemented December 26, 2025 (139 lines, 8 tests).
+
+### Related Backend Fixes (December 24, 2025)
+
+These backend fixes were made alongside the visualization work:
+
+1. **Location Query Complexity Scoring** (`query_planning_agent.py`): Increased location keyword weight from +0.2 to +0.5
+2. **QueryPlan Attribute Bug** (`self_correcting_agent.py`): Fixed typo `tables_needed` → `tables`
+3. **ResultNarrator Model Selection**: Now respects user-selected model from UI
+4. **Robust JSON Parsing** (`result_narrator.py`): Added balanced brace extraction for malformed LLM output
+5. **Schema Inspection** (`schema_inspector.py`): Added 'city' and 'address' to sampling keywords
 
 ---
 
 ## Implementation Order
 
 ```
-Phase 8: Chart Intelligence (Foundation)
-    └──► Phase 10: Advanced Charts (Uses Phase 8 detection)
+Phase 8: Chart Intelligence (Foundation) ────────────────► COMPLETE
+    └──► Phase 10: Advanced Charts (Uses Phase 8 detection) ► COMPLETE
 
-Phase 7: ER Diagram Generator (Independent, can parallel Phase 10)
+Phase 7: ER Diagram Generator ◄──────────────────────────── NEXT
+    └──► Phase 11: Data Lineage (Uses Phase 7 schema + query history)
 ```
 
-**Rationale**: Phase 8's enhanced detection logic is foundational for Phase 10's advanced chart types. Phase 7 is independent and can be implemented in parallel with later stages.
+**Rationale**:
+- Phase 8's enhanced detection logic is foundational for Phase 10's advanced chart types (both COMPLETE).
+- Phase 7 (ER Diagrams) is independent and is the next priority.
+- Phase 11 (Data Lineage) builds on Phase 7's schema visualization and existing query history.
 
 ---
 
-## Phase 8: Improved Chart Intelligence
+## Phase 8: Improved Chart Intelligence (COMPLETE)
+
+> **Status**: Implemented December 20-21, 2025 | 71 Tests | All Passing
 
 ### Purpose
 
@@ -234,7 +340,9 @@ Output: EnhancedChartRecommendation
 
 ---
 
-## Phase 10: Advanced Chart Types
+## Phase 10: Advanced Chart Types (COMPLETE)
+
+> **Status**: Implemented December 20-21, 2025 | 61 Tests | All Passing
 
 ### Purpose
 
@@ -344,7 +452,9 @@ if (hasSourceTargetValue(columns)) {
 
 ---
 
-## Phase 7: ER Diagram Generator
+## Phase 7: ER Diagram Generator (NEXT)
+
+> **Status**: Planned | Estimated: ~1,600 lines | Priority: P1
 
 ### Purpose
 
@@ -505,82 +615,269 @@ function inferFromNaming(tables: TableInfo[]): InferredRelationship[] {
 }
 ```
 
+### Phase 7 Extensions: Enhanced Schema Insights
+
+These features extend the base ER diagram with actionable insights:
+
+#### Query Path Visualization
+
+Highlight tables and joins used by the current query directly on the ER diagram:
+
+```
+User runs: "Show orders with customer names"
+    │
+    ▼
+ER Diagram highlights:
+    ┌─────────┐         ┌───────────┐
+    │ orders  │─────────│ customers │
+    │ (USED)  │  JOIN   │  (USED)   │
+    └─────────┘         └───────────┘
+         │
+    other tables remain dimmed
+```
+
+#### Table Statistics Overlay
+
+Show live statistics on table nodes:
+
+```
+┌─────────────────────────┐
+│ 📊 orders               │
+├─────────────────────────┤
+│ Rows: 15,432           │
+│ Size: 2.3 MB           │
+│ Last query: 2 min ago  │
+├─────────────────────────┤
+│ id (PK)                │
+│ customer_id (FK)       │
+│ order_date             │
+│ total                  │
+└─────────────────────────┘
+```
+
+#### Schema Health Indicators
+
+Visual warnings for schema issues:
+
+| Indicator | Meaning | Icon |
+|-----------|---------|------|
+| 🔴 No Primary Key | Table lacks PK constraint | Red dot |
+| 🟡 Orphan FK | FK references missing table | Yellow warning |
+| 🟠 Circular Reference | A→B→C→A cycle detected | Orange cycle |
+| ⚪ Unused Table | No FK references to/from | Gray badge |
+| 🔵 High Cardinality | >1M rows (performance note) | Blue info |
+
+#### Diagram Annotations
+
+Allow users to add notes directly on the diagram:
+
+- **Sticky notes**: Attach to tables or relationships
+- **Grouping boxes**: Draw regions around related tables
+- **Custom labels**: Add business context ("Legacy - Do Not Use")
+- **Persistence**: Save annotations per connection
+
+### New Files for Phase 7 Extensions
+
+| File | Purpose | Est. Lines |
+|------|---------|------------|
+| `frontend/src/components/schema/QueryPathOverlay.tsx` | Highlights query tables on diagram | ~150 |
+| `frontend/src/components/schema/TableStatsNode.tsx` | Extended table node with statistics | ~180 |
+| `frontend/src/components/schema/HealthIndicators.tsx` | Schema health warning badges | ~120 |
+| `frontend/src/components/schema/DiagramAnnotations.tsx` | Sticky notes and annotations | ~200 |
+| `frontend/src/utils/schemaHealthAnalyzer.ts` | Detect schema issues | ~150 |
+| `frontend/src/hooks/useQueryPath.ts` | Track which tables current query uses | ~80 |
+| `src/api/endpoints/table_stats.py` | Backend for table statistics | ~100 |
+
+**Phase 7 Extensions Subtotal: ~980 lines**
+
+---
+
+## Phase 11: Data Lineage & Impact Analysis (FUTURE)
+
+> **Status**: Planned | Estimated: ~2,200 lines | Priority: P2
+> **Prerequisite**: Phase 7 (ER Diagrams) must be complete
+
+### Purpose
+
+Visualize how data flows through queries and transformations, enabling impact analysis before schema changes.
+
+### Features
+
+1. **Query Lineage Graph**
+   - Parse SQL to extract source tables → transformations → result columns
+   - Visualize data flow as a directed graph
+   - Show JOIN paths and aggregation points
+
+2. **Column-Level Lineage**
+   - Track individual columns through SELECT, JOIN, GROUP BY
+   - Show which source columns contribute to each result column
+   - Detect column transformations (CONCAT, SUM, CASE, etc.)
+
+3. **Impact Analysis**
+   - "What breaks if I drop this column?" - show affected queries
+   - "What uses this table?" - list all queries referencing it
+   - Preview impact before schema migrations
+
+4. **Query Pattern Analytics**
+   - Heatmap of table usage frequency
+   - Most common JOIN patterns
+   - Identify performance bottlenecks (frequently joined large tables)
+
+### Architecture
+
+```
+User asks: "What happens if I rename orders.total to orders.amount?"
+    │
+    ▼
+ImpactAnalyzer
+    │
+    ├──► Query history scan (existing query_history table)
+    │              │
+    │              ▼
+    │    Found 47 queries using orders.total
+    │
+    ├──► Parse each query for column references
+    │              │
+    │              ▼
+    │    SELECT o.total FROM orders o...
+    │    SELECT SUM(total) FROM orders...
+    │
+    └──► Generate Impact Report
+               │
+               ▼
+         {
+           affected_queries: 47,
+           query_types: { select: 42, aggregate: 5 },
+           sample_queries: [...],
+           risk_level: 'high'
+         }
+```
+
+### New Files
+
+| File | Purpose | Est. Lines |
+|------|---------|------------|
+| `frontend/src/components/lineage/LineageGraph.tsx` | Main lineage visualization | ~300 |
+| `frontend/src/components/lineage/ColumnLineage.tsx` | Column-level tracing UI | ~250 |
+| `frontend/src/components/lineage/ImpactAnalysisPanel.tsx` | Impact preview panel | ~200 |
+| `frontend/src/components/lineage/QueryPatternHeatmap.tsx` | Usage frequency heatmap | ~180 |
+| `frontend/src/utils/sqlLineageParser.ts` | Parse SQL for lineage extraction | ~350 |
+| `frontend/src/utils/impactAnalyzer.ts` | Calculate change impact | ~250 |
+| `frontend/src/hooks/useLineage.ts` | Lineage state management | ~120 |
+| `src/api/endpoints/lineage.py` | Backend lineage API | ~200 |
+| `src/core/sql_parser.py` | SQL parsing for column extraction | ~250 |
+| `frontend/tests/Lineage.test.tsx` | Test suite | ~300 |
+
+**Phase 11 Subtotal: ~2,400 lines**
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Query Lineage View                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│   ┌──────────┐      ┌──────────┐      ┌──────────────┐     │
+│   │ customers│──┐   │  orders  │──┐   │    Result    │     │
+│   │          │  │   │          │  │   │              │     │
+│   │ • id     │  └──►│ • cust_id│  └──►│ • cust_name  │     │
+│   │ • name ──┼─────►│ • total ─┼─────►│ • order_total│     │
+│   │ • email  │      │ • date   │      │ • order_date │     │
+│   └──────────┘      └──────────┘      └──────────────┘     │
+│                                                              │
+│   Legend: ──► Column flows to result                        │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Dependencies
+
+```json
+{
+  "sql-parser-cst": "^0.25.0"
+}
+```
+
 ---
 
 ## Detailed Task Checklist
 
-### Phase 8: Chart Intelligence
+### Phase 8: Chart Intelligence (COMPLETE)
 
 #### 8.1 Natural Language Chart Requests
-- [ ] Create `chartIntentParser.ts` with keyword matching for chart types
-- [ ] Add regex patterns for "bar chart", "pie chart", "line graph", "scatter plot"
-- [ ] Handle variations: "show as bar", "create a graph", "visualize as pie"
-- [ ] Add `preferred_chart_type` to `QueryRequest` interface in `api.ts`
-- [ ] Update `QueryInput.tsx` to parse chart intent before submit
-- [ ] Update `ChatInterface.tsx` to pass preference to API
-- [ ] Add `preferred_chart_type` field to backend `QueryRequest` schema
-- [ ] Pass preference through `query.py` response
-- [ ] Update `QueryResults.tsx` to auto-select chart type from response
-- [ ] Auto-switch to chart view when chart type is specified
+- [x] Create `chartIntentParser.ts` with keyword matching for chart types
+- [x] Add regex patterns for "bar chart", "pie chart", "line graph", "scatter plot"
+- [x] Handle variations: "show as bar", "create a graph", "visualize as pie"
+- [x] Add `preferred_chart_type` to `QueryRequest` interface in `api.ts`
+- [x] Update `QueryInput.tsx` to parse chart intent before submit
+- [x] Update `ChatInterface.tsx` to pass preference to API
+- [x] Add `preferred_chart_type` field to backend `QueryRequest` schema
+- [x] Pass preference through `query.py` response
+- [x] Update `QueryResults.tsx` to auto-select chart type from response
+- [x] Auto-switch to chart view when chart type is specified
 
 #### 8.2 Core Detection Engine
-- [ ] Create `chartIntelligence.ts` with `analyzeData()` main function
-- [ ] Create `timeSeriesDetector.ts` with periodic pattern detection
-- [ ] Create `hierarchyDetector.ts` with parent-child detection
-- [ ] Create `geoDetector.ts` with lat/lon and code detection
-- [ ] Create `trendLineCalculator.ts` with linear regression
+- [x] Create `chartIntelligence.ts` with `analyzeData()` main function
+- [x] Create `timeSeriesDetector.ts` with periodic pattern detection
+- [x] Create `hierarchyDetector.ts` with parent-child detection
+- [x] Create `geoDetector.ts` with lat/lon and code detection
+- [x] Create `trendLineCalculator.ts` with linear regression
 
 #### 8.3 Enhanced ChartRecommendation Type
-- [ ] Update `ChartRecommendation` interface with alternatives, nlExplanation
-- [ ] Modify `detectChartType()` to use intelligence engine
-- [ ] Add grouping detection (stacked, grouped)
+- [x] Update `ChartRecommendation` interface with alternatives, nlExplanation
+- [x] Modify `detectChartType()` to use intelligence engine
+- [x] Add grouping detection (stacked, grouped)
 
-#### 8.3 Visual Components
-- [ ] Create `ChartRecommendations.tsx` panel
-- [ ] Create `OutlierMarkers.tsx` overlay
-- [ ] Create `TrendLine.tsx` overlay
-- [ ] Create `ConfidenceInterval.tsx` overlay
-- [ ] Integrate overlays into ScatterChartView, LineChartView
+#### 8.4 Visual Components
+- [x] Create `ChartRecommendations.tsx` panel (integrated into ChartInfoBadge)
+- [x] Create `OutlierMarkers.tsx` overlay
+- [x] Create `TrendLine.tsx` overlay
+- [ ] Create `ConfidenceInterval.tsx` overlay (DEFERRED)
+- [x] Integrate overlays into ScatterChartView, LineChartView
 
-#### 8.4 Testing
-- [ ] Write tests for pattern detection (20+ tests)
-- [ ] Test NL recommendation generation
-- [ ] Test trend line calculations
+#### 8.5 Testing
+- [x] Write tests for pattern detection (36 tests)
+- [x] Test NL recommendation generation (35 tests)
+- [x] Test trend line calculations
+
+#### 8.6 Bug Fixes
+- [x] Fix column selection when chart type is overridden (Dec 26, 2025)
+- [x] Export `selectColumnsForChart()` for override recalculation
 
 ---
 
-### Phase 10: Advanced Chart Types
+### Phase 10: Advanced Chart Types (COMPLETE)
 
 #### 10.1 Hierarchical Charts
-- [ ] Create `TreemapView.tsx` following BarChartView pattern
-- [ ] Create `SunburstView.tsx` with drill-down support
-- [ ] Create `SankeyView.tsx` for flow data
-- [ ] Create `hierarchicalChartUtils.ts` for data preparation
+- [x] Create `TreemapView.tsx` following BarChartView pattern
+- [x] Create `SunburstView.tsx` with drill-down support
+- [ ] Create `SankeyView.tsx` for flow data (DEFERRED - requires d3-sankey)
+- [x] Create `hierarchicalChartUtils.ts` for data preparation
 
 #### 10.2 Statistical Charts
-- [ ] Create `BoxPlotView.tsx` with quartile calculations
-- [ ] Create `HistogramView.tsx` with binning logic
-- [ ] Create `ViolinPlotView.tsx` for distribution shape
-- [ ] Create `BubbleChartView.tsx` for 3-variable scatter
-- [ ] Create `statisticalChartUtils.ts` for calculations
+- [x] Create `BoxPlotView.tsx` with quartile calculations
+- [x] Create `HistogramView.tsx` with binning logic
+- [ ] Create `ViolinPlotView.tsx` for distribution shape (DEFERRED)
+- [x] Create `BubbleChartView.tsx` for 3-variable scatter (IMPLEMENTED Dec 26, 2025)
+- [x] Create `statisticalChartUtils.ts` for calculations
 
 #### 10.3 Time-Series Charts
-- [ ] Create `AreaChartView.tsx` with stacking
-- [ ] Create `SparklineView.tsx` for inline trends
+- [x] Create `AreaChartView.tsx` with stacking
+- [ ] Create `SparklineView.tsx` for inline trends (DEFERRED)
 
 #### 10.4 Integration
-- [ ] Extend `ChartType` in chartUtils.ts
-- [ ] Add rendering cases in ChartVisualization.tsx
-- [ ] Add new types to ChartToggle dropdown
-- [ ] Update detection to recommend new types
+- [x] Extend `ChartType` in chartUtils.ts (5 → 11 types)
+- [x] Add rendering cases in ChartVisualization.tsx
+- [x] Add new types to ChartToggle dropdown
+- [x] Update detection to recommend new types
 
 #### 10.5 Testing
-- [ ] Write tests for each new chart (25+ tests)
-- [ ] Test data preparation utilities
+- [x] Write tests for each new chart (53 tests total)
+- [x] Test data preparation utilities
 
 ---
 
-### Phase 7: ER Diagram Generator
+### Phase 7: ER Diagram Generator (NEXT)
 
 #### 7.1 Backend
 - [ ] Create `er_diagram.py` endpoint
@@ -613,6 +910,75 @@ function inferFromNaming(tables: TableInfo[]): InferredRelationship[] {
 - [ ] Test relationship inference
 - [ ] Test layout algorithm
 
+#### 7.7 Query Path Visualization (Extension)
+- [ ] Create `QueryPathOverlay.tsx` component
+- [ ] Parse current query for table references
+- [ ] Highlight used tables on ER diagram
+- [ ] Animate JOIN edges
+- [ ] Dim unused tables
+
+#### 7.8 Table Statistics Overlay (Extension)
+- [ ] Create `TableStatsNode.tsx` extended node
+- [ ] Create `table_stats.py` backend endpoint
+- [ ] Fetch row counts from database
+- [ ] Display size and last query time
+- [ ] Add toggle to show/hide stats
+
+#### 7.9 Schema Health Indicators (Extension)
+- [ ] Create `schemaHealthAnalyzer.ts` utility
+- [ ] Create `HealthIndicators.tsx` component
+- [ ] Detect missing primary keys
+- [ ] Detect orphaned foreign keys
+- [ ] Detect circular references
+- [ ] Add health summary panel
+
+#### 7.10 Diagram Annotations (Extension)
+- [ ] Create `DiagramAnnotations.tsx` component
+- [ ] Implement sticky note creation
+- [ ] Implement grouping boxes
+- [ ] Save annotations to localStorage/backend
+- [ ] Export annotations with diagram
+
+---
+
+### Phase 11: Data Lineage & Impact Analysis (FUTURE)
+
+#### 11.1 Query Lineage Graph
+- [ ] Create `LineageGraph.tsx` main component
+- [ ] Create `sqlLineageParser.ts` for SQL parsing
+- [ ] Extract source tables and result columns
+- [ ] Visualize as directed graph
+- [ ] Show JOIN paths and aggregations
+
+#### 11.2 Column-Level Lineage
+- [ ] Create `ColumnLineage.tsx` component
+- [ ] Track columns through transformations
+- [ ] Detect column operations (SUM, CONCAT, CASE)
+- [ ] Show source → result column mappings
+
+#### 11.3 Impact Analysis
+- [ ] Create `ImpactAnalysisPanel.tsx` component
+- [ ] Create `impactAnalyzer.ts` utility
+- [ ] Create `lineage.py` backend endpoint
+- [ ] Query history scanning for column usage
+- [ ] Generate impact reports with risk levels
+
+#### 11.4 Query Pattern Analytics
+- [ ] Create `QueryPatternHeatmap.tsx` component
+- [ ] Track table usage frequency from history
+- [ ] Identify common JOIN patterns
+- [ ] Highlight performance bottlenecks
+
+#### 11.5 Integration
+- [ ] Add "Lineage" tab to App.tsx
+- [ ] Connect to existing query history
+- [ ] Add "Impact Analysis" button to Schema tab
+
+#### 11.6 Testing
+- [ ] Write lineage parser tests (20+ tests)
+- [ ] Test impact analysis calculations
+- [ ] Test UI components
+
 ---
 
 ## Test Strategy
@@ -640,16 +1006,17 @@ vi.mock('reactflow', () => ({
 
 ### Test Categories
 
-| Phase | Category | Count |
-|-------|----------|-------|
-| 8 | Pattern detection | 10+ |
-| 8 | Trend/outlier calculations | 5+ |
-| 8 | NL recommendations | 5+ |
-| 10 | Chart rendering (9 charts × 2) | 18+ |
-| 10 | Data preparation | 7+ |
-| 7 | ER diagram rendering | 8+ |
-| 7 | Relationship inference | 5+ |
-| 7 | Layout/export | 5+ |
+| Phase | Category | Count | Status |
+|-------|----------|-------|--------|
+| 8 | Pattern detection | 36 | ✅ Complete |
+| 8 | NL recommendations | 35 | ✅ Complete |
+| 10 | Chart rendering | 53 | ✅ Complete |
+| 7 | ER diagram core | 15+ | Planned |
+| 7 | Relationship inference | 5+ | Planned |
+| 7 | Extensions (stats, health) | 10+ | Planned |
+| 11 | Lineage parser | 20+ | Future |
+| 11 | Impact analysis | 10+ | Future |
+| 11 | UI components | 10+ | Future |
 
 ---
 
@@ -667,22 +1034,59 @@ vi.mock('reactflow', () => ({
 
 ## Summary
 
-| Phase | Feature | New Files | New Lines | Dependencies |
-|-------|---------|-----------|-----------|--------------|
-| 8 | Chart Intelligence + NL Requests | 12 | ~2,030 | simple-statistics |
-| 10 | Advanced Charts | 12 | ~2,310 | d3-hierarchy |
-| 7 | ER Diagrams | 10 | ~1,600 | reactflow, dagre |
-| **Total** | | **34** | **~5,940** | **4 packages** |
+| Phase | Feature | Status | New Files | New Lines | Tests |
+|-------|---------|--------|-----------|-----------|-------|
+| 8 | Chart Intelligence + NL Requests | **COMPLETE** | 8 | ~1,660 | 71 |
+| 10 | Advanced Charts | **COMPLETE** | 8 | ~1,790 | 61 |
+| 7 | ER Diagrams (Core) | Planned | 10 | ~1,600 | 15+ |
+| 7 | ER Diagrams (Extensions) | Planned | 7 | ~980 | 10+ |
+| 11 | Data Lineage & Impact | Future | 10 | ~2,400 | 40+ |
+| **Total** | | | **42** | **~8,290** | **189+** |
 
 ---
 
 ## Priority Matrix
 
-| Phase | Feature | Impact | Effort | Priority |
-|-------|---------|--------|--------|----------|
-| 8 | Chart Intelligence | High | Medium | **P1** |
-| 10 | Advanced Charts | Medium | Medium | **P1** |
-| 7 | ER Diagrams | High | Medium | **P1** |
+| Phase | Feature | Impact | Effort | Status |
+|-------|---------|--------|--------|--------|
+| 8 | Chart Intelligence | High | Medium | **COMPLETE** |
+| 10 | Advanced Charts | Medium | Medium | **COMPLETE** |
+| 7 | ER Diagrams (Core) | High | Medium | **NEXT** |
+| 7 | ER Diagrams (Extensions) | Medium | Low | **NEXT** |
+| 11 | Data Lineage | High | High | **FUTURE** |
+
+---
+
+## Next Steps
+
+### Phase 7: ER Diagram Generator (NEXT)
+
+1. **Core Implementation** (~1,600 lines)
+   - Install dependencies: `reactflow`, `dagre`
+   - Create backend endpoint for enhanced schema
+   - Build React Flow components (TableNode, RelationshipEdge)
+   - Implement auto-layout and export
+
+2. **Extensions** (~980 lines)
+   - Query Path Visualization - highlight tables used by queries
+   - Table Statistics Overlay - show row counts, size
+   - Schema Health Indicators - warnings for missing PKs, orphan FKs
+   - Diagram Annotations - sticky notes, grouping
+
+### Phase 11: Data Lineage (FUTURE)
+
+After Phase 7 is complete:
+- Query lineage graph visualization
+- Column-level lineage tracking
+- Impact analysis for schema changes
+- Query pattern analytics and heatmaps
+
+### Deferred Chart Items (Lower Priority)
+- SankeyView.tsx (requires d3-sankey)
+- ViolinPlotView.tsx
+- BubbleChartView.tsx
+- SparklineView.tsx
+- ConfidenceInterval.tsx
 
 ---
 
@@ -690,8 +1094,9 @@ vi.mock('reactflow', () => ({
 
 - [Multi-DB Visualization Plan](MULTI_DB_VISUALIZATION_PLAN.md) - Phases 1-6 complete
 - [Advanced Visualization Guide](ADVANCED_VISUALIZATION_GUIDE.md) - Current feature docs
+- [PR Review: Phase 8 & 10](PR_REVIEW_PHASE_8_10.md) - Detailed review and fixes
 - [Future Plans](FUTURE_PLANS.md) - Overall roadmap
 
 ---
 
-**Last Updated**: December 20, 2025
+**Last Updated**: December 26, 2025

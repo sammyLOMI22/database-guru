@@ -207,7 +207,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Result Verification** - Catches logical errors and suspicious results
 - ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB)
 - ✅ **Multi-database queries** - Query multiple databases simultaneously with parallel execution
-- ✅ **Advanced Visualization (NEW!)** - Intelligent chart detection with manual override, export to CSV/JSON/ZIP
+- ✅ **Advanced Visualization (NEW!)** - 10 chart types (Bar, Line, Pie, Scatter, Area, Histogram, Box Plot, Treemap, Sunburst, Bubble) with intelligent auto-detection, manual override, export to CSV/JSON/ZIP
 - ✅ **Cross-Database Comparison Charts** - Visual comparison across databases with auto-detection
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
@@ -1255,13 +1255,19 @@ The system automatically analyzes your query results and recommends the best cha
 | **Scatter Plot** | Correlation detected (≥10 rows, r > 0.7) | Relationships, correlations |
 | **Pie Chart** | Categorical + numeric, 2-8 unique values | Distribution, proportions |
 | **Bar Chart** | Categorical + numeric, 9-15 unique values | Comparisons |
+| **Area Chart** | Time-series with composition data | Stacked trends |
+| **Histogram** | Single numeric column, >20 rows | Distribution analysis |
+| **Box Plot** | Categorical + numeric for grouping | Statistical distribution |
+| **Treemap** | Hierarchical categorical data | Nested proportions |
+| **Sunburst** | Multi-level hierarchical data | Radial hierarchy |
+| **Bubble** | 3+ numeric columns | 3-variable relationships |
 | **Table** | Default fallback | Raw data viewing |
 
 **2. Manual Chart Type Selection**
 Override the auto-detection anytime:
 - Click the dropdown (▼) next to the Table/Chart toggle
 - See which type is "(recommended)" by auto-detection
-- Switch between Bar, Line, Pie, and Scatter charts
+- Switch between all 10 chart types: Bar, Line, Pie, Scatter, Area, Histogram, Box Plot, Treemap, Sunburst, Bubble
 - Works in single queries, per-database views, and cross-database comparisons
 
 **3. Export Capabilities**

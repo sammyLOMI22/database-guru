@@ -66,9 +66,10 @@ describe('ChartVisualization', () => {
 
   it('displays chart type badge', () => {
     render(<ChartVisualization data={mockBarData} statistics={{}} />);
-    // Should show either Bar Chart, Pie Chart, etc.
-    const badge = screen.getByText(/Chart|Plot/);
-    expect(badge).toBeInTheDocument();
+    // Should show either Bar Chart, Pie Chart, etc. (may have alternatives too)
+    const badges = screen.getAllByText(/Chart|Plot/);
+    expect(badges.length).toBeGreaterThan(0);
+    expect(badges[0]).toBeInTheDocument();
   });
 
   it('displays reason for chart selection', () => {

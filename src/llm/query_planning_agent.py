@@ -287,10 +287,19 @@ class QueryPlanningAgent:
         if any(kw in question_lower for kw in comparison_keywords):
             score += 0.2
 
-        # Geography/location queries (often need joins) (+0.2)
-        location_keywords = ["shipped to", "delivered to", "sent to", "in california", "in texas", "location", "address", "city", "state", "country"]
+        # Geography/location queries (often need joins) (+0.5)
+        # High weight because location queries REQUIRE LocationMapper for state code normalization
+        # Without planning, "New York" won't be converted to "NY" causing 0-result queries
+        # See: PR_REVIEW_PHASE_8_10.md lines 447-471 for regression analysis
+        location_keywords = [
+            "shipped to", "delivered to", "sent to",  # Destination patterns
+            "to new york", "to california", "to texas", "to florida",  # Common state destinations
+            "from new york", "from california", "from texas", "from florida",  # Origin patterns
+            "in california", "in texas", "in new york", "in florida",  # Location patterns
+            "location", "address", "city", "state", "country", "zip", "postal"  # Generic location terms
+        ]
         if any(kw in question_lower for kw in location_keywords):
-            score += 0.2
+            score += 0.5
 
         # Temporal/trend analysis (+0.1)
         temporal_keywords = ["trend", "over time", "change", "growth", "decline"]
