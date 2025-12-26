@@ -68,7 +68,7 @@ const chartTypeIcons: Record<ChartType, React.ReactNode> = {
 // Basic chart types always available
 const basicChartTypes: ChartType[] = ['bar', 'line', 'pie', 'scatter'];
 // Advanced chart types (Phase 10)
-const advancedChartTypes: ChartType[] = ['area', 'histogram', 'boxplot', 'treemap'];
+const advancedChartTypes: ChartType[] = ['area', 'histogram', 'boxplot', 'treemap', 'sunburst', 'bubble'];
 const availableChartTypes: ChartType[] = [...basicChartTypes, ...advancedChartTypes];
 
 export const ChartToggle: React.FC<ChartToggleProps> = ({

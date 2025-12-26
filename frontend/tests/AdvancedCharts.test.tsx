@@ -15,6 +15,7 @@ import { SunburstView } from '../src/components/visualization/SunburstView';
 import { HistogramView } from '../src/components/visualization/HistogramView';
 import { BoxPlotView } from '../src/components/visualization/BoxPlotView';
 import { AreaChartView } from '../src/components/visualization/AreaChartView';
+import { BubbleChartView } from '../src/components/visualization/BubbleChartView';
 import { ChartToggle } from '../src/components/visualization/ChartToggle';
 
 // Import utility functions
@@ -62,6 +63,9 @@ vi.mock('recharts', () => ({
   Area: () => <div data-testid="area" />,
   ComposedChart: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="composed-chart">{children}</div>
+  ),
+  ScatterChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="scatter-chart">{children}</div>
   ),
   Scatter: () => <div data-testid="scatter" />,
   XAxis: () => <div data-testid="x-axis" />,
@@ -430,6 +434,111 @@ describe('AreaChartView', () => {
 });
 
 // =============================================================================
+// BUBBLE CHART VIEW TESTS
+// =============================================================================
+
+describe('BubbleChartView', () => {
+  const mockBubbleData = [
+    { x: 10, y: 20, size: 100, name: 'A' },
+    { x: 20, y: 30, size: 200, name: 'B' },
+    { x: 30, y: 40, size: 150, name: 'C' },
+    { x: 40, y: 50, size: 300, name: 'D' },
+    { x: 50, y: 60, size: 250, name: 'E' },
+  ];
+
+  it('renders without crashing', () => {
+    render(
+      <BubbleChartView
+        data={mockBubbleData}
+        xColumn="x"
+        yColumn="y"
+        zColumn="size"
+      />
+    );
+    expect(screen.getByTestId('responsive-container')).toBeInTheDocument();
+  });
+
+  it('displays title when provided', () => {
+    render(
+      <BubbleChartView
+        data={mockBubbleData}
+        xColumn="x"
+        yColumn="y"
+        zColumn="size"
+        title="Sales by Region"
+      />
+    );
+    expect(screen.getByText('Sales by Region')).toBeInTheDocument();
+  });
+
+  it('shows no data message for empty data', () => {
+    render(
+      <BubbleChartView
+        data={[]}
+        xColumn="x"
+        yColumn="y"
+        zColumn="size"
+      />
+    );
+    expect(screen.getByText(/No numeric data available for bubble chart/)).toBeInTheDocument();
+  });
+
+  it('shows bubble size legend', () => {
+    render(
+      <BubbleChartView
+        data={mockBubbleData}
+        xColumn="x"
+        yColumn="y"
+        zColumn="size"
+      />
+    );
+    expect(screen.getByText(/Bubble size represents size/)).toBeInTheDocument();
+  });
+
+  it('renders scatter chart for bubbles', () => {
+    render(
+      <BubbleChartView
+        data={mockBubbleData}
+        xColumn="x"
+        yColumn="y"
+        zColumn="size"
+      />
+    );
+    expect(screen.getByTestId('scatter')).toBeInTheDocument();
+  });
+
+  it('handles data with name column', () => {
+    render(
+      <BubbleChartView
+        data={mockBubbleData}
+        xColumn="x"
+        yColumn="y"
+        zColumn="size"
+        nameColumn="name"
+      />
+    );
+    expect(screen.getByTestId('responsive-container')).toBeInTheDocument();
+  });
+
+  it('shows truncation message for large datasets', () => {
+    const largeData = Array.from({ length: 150 }, (_, i) => ({
+      x: i,
+      y: i * 2,
+      size: i * 10,
+    }));
+    render(
+      <BubbleChartView
+        data={largeData}
+        xColumn="x"
+        yColumn="y"
+        zColumn="size"
+      />
+    );
+    expect(screen.getByText(/Showing first 100 of 150 points/)).toBeInTheDocument();
+  });
+});
+
+// =============================================================================
 // HIERARCHICAL CHART UTILS TESTS
 // =============================================================================
 
@@ -735,5 +844,17 @@ describe('ChartToggle with Advanced Chart Types', () => {
       />
     );
     expect(screen.getByTitle('View as Sunburst')).toBeInTheDocument();
+  });
+
+  it('shows bubble chart label', () => {
+    render(
+      <ChartToggle
+        mode="chart"
+        onModeChange={mockOnModeChange}
+        chartAvailable={true}
+        chartType="bubble"
+      />
+    );
+    expect(screen.getByTitle('View as Bubble Chart')).toBeInTheDocument();
   });
 });

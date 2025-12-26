@@ -27,6 +27,7 @@ import { SunburstView } from './SunburstView';
 import { HistogramView } from './HistogramView';
 import { BoxPlotView } from './BoxPlotView';
 import { AreaChartView } from './AreaChartView';
+import { BubbleChartView } from './BubbleChartView';
 
 interface ChartVisualizationProps {
   data: Record<string, unknown>[];
@@ -300,6 +301,18 @@ export const ChartVisualization: React.FC<ChartVisualizationProps> = ({
               : classifyColumns(data, statistics).categoricalColumns.slice(0, 2)
           }
           valueColumn={recommendation.yColumn || classifyColumns(data, statistics).numericColumns[0] || ''}
+          title={chartTitle}
+          height={height}
+          animate={animate}
+        />
+      )}
+
+      {recommendation.primaryChart === 'bubble' && recommendation.xColumn && recommendation.yColumn && (
+        <BubbleChartView
+          data={data}
+          xColumn={recommendation.xColumn}
+          yColumn={recommendation.yColumn}
+          zColumn={classifyColumns(data, statistics).numericColumns[2] || recommendation.yColumn}
           title={chartTitle}
           height={height}
           animate={animate}

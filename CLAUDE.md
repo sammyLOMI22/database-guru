@@ -564,6 +564,23 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `tests/test_pooling_performance.py` - Performance tests (3 tests, 320 lines)
   - `tests/fixtures/docker-compose.test.yml` - Test database infrastructure (PostgreSQL, MySQL, MongoDB)
   - `scripts/setup_test_databases.sh` - One-command test database setup (180 lines)
+- **Advanced Visualization (Phase 8 & 10 - Dec 20-26, 2025)**:
+  - `frontend/src/utils/chartIntelligence.ts` - Pattern detection engine (~700 lines)
+  - `frontend/src/utils/chartIntentParser.ts` - NL chart request parsing (~240 lines)
+  - `frontend/src/utils/timeSeriesDetector.ts` - Periodic pattern detection (~180 lines)
+  - `frontend/src/utils/hierarchyDetector.ts` - Parent-child data detection (~150 lines)
+  - `frontend/src/utils/hierarchicalChartUtils.ts` - Treemap/Sunburst data prep (~300 lines)
+  - `frontend/src/utils/statisticalChartUtils.ts` - Box plot/histogram calculations (~360 lines)
+  - `frontend/src/components/visualization/TreemapView.tsx` - Treemap chart (~180 lines)
+  - `frontend/src/components/visualization/SunburstView.tsx` - Radial hierarchy (~190 lines)
+  - `frontend/src/components/visualization/HistogramView.tsx` - Distribution histogram (~190 lines)
+  - `frontend/src/components/visualization/BoxPlotView.tsx` - Statistical box plot (~240 lines)
+  - `frontend/src/components/visualization/AreaChartView.tsx` - Time-series area (~190 lines)
+  - `frontend/src/components/visualization/BubbleChartView.tsx` - 3-variable scatter (~140 lines)
+  - `frontend/src/components/visualization/ChartVisualization.tsx` - Main chart container
+  - `frontend/src/components/visualization/ChartToggle.tsx` - Table/chart toggle with type selector
+  - `frontend/tests/AdvancedCharts.test.tsx` - 61 comprehensive tests
+  - `frontend/tests/chartIntelligence.test.ts` - Pattern detection tests
 
 ## Documentation
 
@@ -594,3 +611,4 @@ Key docs in `docs/`:
 - `CONNECTION_POOLING_IMPLEMENTATION_PLAN.md` - **5-day implementation plan (80% complete)** - Day 4 complete (test infrastructure)
 - `DATA_NARRATIVES_GUIDE.md` - **Intelligent Data Narratives & Human Insights (NEW - Dec 13, 2025)** - Complete feature guide with usage, architecture, performance, configuration, and troubleshooting
 - `MULTI_DB_NARRATIVES.md` - **Multi-Database Narratives (NEW - Dec 13, 2025)** - Per-database + combined analysis for multi-database queries
+- `ADVANCED_VISUALIZATION_PHASE2_PLAN.md` - **Advanced Visualization Phase 2 (Dec 20-26, 2025)** - Chart Intelligence (Phase 8) + Advanced Charts (Phase 10) with 10 chart types, 132 tests

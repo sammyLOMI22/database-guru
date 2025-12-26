@@ -13,7 +13,7 @@
 | Phase | Feature | Status | Tests | Branch |
 |-------|---------|--------|-------|--------|
 | **Phase 8** | Chart Intelligence | **COMPLETE** | 71 tests | `advanced-visualization-V2` |
-| **Phase 10** | Advanced Charts | **COMPLETE** | 53 tests | `advanced-visualization-V2` |
+| **Phase 10** | Advanced Charts | **COMPLETE** | 61 tests | `advanced-visualization-V2` |
 | **Phase 7** | ER Diagram Generator | Planned | - | - |
 | **Phase 11** | Data Lineage & Impact Analysis | Planned | - | - |
 
@@ -103,9 +103,10 @@ The following were planned but deferred for future iterations:
 |------|--------|----------|
 | `SankeyView.tsx` | Requires d3-sankey dependency | Medium |
 | `ViolinPlotView.tsx` | Complex kernel density estimation | Low |
-| `BubbleChartView.tsx` | Lower priority | Low |
 | `SparklineView.tsx` | Lower priority | Low |
 | `ConfidenceInterval.tsx` | Future enhancement | Low |
+
+**Note:** `BubbleChartView.tsx` was implemented December 26, 2025 (139 lines, 8 tests).
 
 ### Related Backend Fixes (December 24, 2025)
 
@@ -341,7 +342,7 @@ Output: EnhancedChartRecommendation
 
 ## Phase 10: Advanced Chart Types (COMPLETE)
 
-> **Status**: Implemented December 20-21, 2025 | 53 Tests | All Passing
+> **Status**: Implemented December 20-21, 2025 | 61 Tests | All Passing
 
 ### Purpose
 
@@ -857,7 +858,7 @@ ImpactAnalyzer
 - [x] Create `BoxPlotView.tsx` with quartile calculations
 - [x] Create `HistogramView.tsx` with binning logic
 - [ ] Create `ViolinPlotView.tsx` for distribution shape (DEFERRED)
-- [ ] Create `BubbleChartView.tsx` for 3-variable scatter (DEFERRED)
+- [x] Create `BubbleChartView.tsx` for 3-variable scatter (IMPLEMENTED Dec 26, 2025)
 - [x] Create `statisticalChartUtils.ts` for calculations
 
 #### 10.3 Time-Series Charts
@@ -1036,7 +1037,7 @@ vi.mock('reactflow', () => ({
 | Phase | Feature | Status | New Files | New Lines | Tests |
 |-------|---------|--------|-----------|-----------|-------|
 | 8 | Chart Intelligence + NL Requests | **COMPLETE** | 8 | ~1,660 | 71 |
-| 10 | Advanced Charts | **COMPLETE** | 7 | ~1,650 | 53 |
+| 10 | Advanced Charts | **COMPLETE** | 8 | ~1,790 | 61 |
 | 7 | ER Diagrams (Core) | Planned | 10 | ~1,600 | 15+ |
 | 7 | ER Diagrams (Extensions) | Planned | 7 | ~980 | 10+ |
 | 11 | Data Lineage & Impact | Future | 10 | ~2,400 | 40+ |
