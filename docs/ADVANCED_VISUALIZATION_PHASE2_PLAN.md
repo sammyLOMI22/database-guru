@@ -698,7 +698,7 @@ Allow users to add notes directly on the diagram:
 
 ### Purpose
 
-Visualize how data flows through queries and transformations, enabling impact analysis before schema changes. Inspired by tools like [Dataedo](https://dataedo.com/product/data-lineage), [SQLFlow](https://dbmstools.com/categories/sql-lineage-tools), and [Datafold](https://seemoredata.io/blog/data-lineage-tools-key-features-8-tools-to-know-in-2025/).
+Visualize how data flows through queries and transformations, enabling impact analysis before schema changes.
 
 ### Features
 
