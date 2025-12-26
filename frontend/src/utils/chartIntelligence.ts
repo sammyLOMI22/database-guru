@@ -400,7 +400,7 @@ function scoreChartTypes(
 /**
  * Select optimal columns for the given chart type
  */
-function selectColumnsForChart(
+export function selectColumnsForChart(
   chartType: ChartType,
   classification: ReturnType<typeof classifyColumns>,
   _patterns: DetectedPatterns,

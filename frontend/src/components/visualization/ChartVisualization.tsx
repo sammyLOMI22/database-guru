@@ -15,6 +15,7 @@ import {
   analyzeData,
   IntelligentChartRecommendation,
   DataInsight,
+  selectColumnsForChart,
 } from '../../utils/chartIntelligence';
 import { BarChartView } from './BarChartView';
 import { LineChartView } from './LineChartView';
@@ -138,14 +139,25 @@ export const ChartVisualization: React.FC<ChartVisualizationProps> = ({
   // Use override chart type if provided, otherwise use auto-detected
   const recommendation: IntelligentChartRecommendation = useMemo(() => {
     if (overrideChartType && overrideChartType !== 'table') {
+      // CRITICAL: Recalculate columns for the overridden chart type
+      // Different chart types need different column configurations
+      const classification = classifyColumns(data, statistics);
+      const { xColumn, yColumn } = selectColumnsForChart(
+        overrideChartType,
+        classification,
+        autoRecommendation.patterns,
+        data
+      );
       return {
         ...autoRecommendation,
         primaryChart: overrideChartType,
+        xColumn,
+        yColumn,
         reason: `Manually selected ${overrideChartType} chart`,
       };
     }
     return autoRecommendation;
-  }, [autoRecommendation, overrideChartType]);
+  }, [autoRecommendation, overrideChartType, data, statistics]);
 
   // Get correlation value if available for scatter plot
   const correlationValue = useMemo(() => {
