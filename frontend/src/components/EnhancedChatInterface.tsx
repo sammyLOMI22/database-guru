@@ -57,7 +57,7 @@ export default function EnhancedChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSubmit = async (question: string) => {
+  const handleSubmit = async (question: string, rowLimit: number = 100) => {
     // Add user message
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -72,6 +72,7 @@ export default function EnhancedChatInterface() {
         model: selectedModel || undefined,
         force_schema_refresh: forceSchemaRefresh,
         enable_narratives: enableNarratives,
+        row_limit: rowLimit,
       });
 
       // Reset force refresh after query

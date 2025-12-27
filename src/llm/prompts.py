@@ -33,12 +33,14 @@ SQL_GENERATION_TEMPLATE = """Given the following database schema:
 Generate a SQL query to answer this question: {question}
 
 Database type: {database_type}
+Row limit: {row_limit}
 
 CRITICAL - READ THE SCHEMA ABOVE CAREFULLY:
 - Use ONLY the table names listed in the schema above (look for "Table:" entries)
 - NEVER assume table names exist - only use what's in the schema
 - If the question asks about data that doesn't exist in this schema (e.g., "customers" when there's no customers table, or "state/location" when no such column exists), respond with: CANNOT_ANSWER: [what data is missing]
 - For location/state queries, use 2-letter codes (CA, TX, NY) if a state column exists
+- Include LIMIT {row_limit} in your query (unless doing aggregations like COUNT/SUM/AVG)
 
 SQL Query (or CANNOT_ANSWER if impossible):"""
 
@@ -150,6 +152,7 @@ def build_sql_prompt(
     schema: str,
     database_type: str = "postgresql",
     examples: str = "",
+    row_limit: int = 100,
 ) -> str:
     """
     Build a complete prompt for SQL generation
@@ -159,6 +162,7 @@ def build_sql_prompt(
         schema: Database schema information
         database_type: Type of database (postgresql, mysql, sqlite, etc.)
         examples: Optional few-shot examples
+        row_limit: Maximum rows to return (default: 100)
 
     Returns:
         Complete prompt string
@@ -167,6 +171,7 @@ def build_sql_prompt(
         schema=schema,
         question=question,
         database_type=database_type,
+        row_limit=row_limit,
     )
 
     if examples:
@@ -180,6 +185,7 @@ def build_chat_messages(
     schema: str,
     database_type: str = "postgresql",
     conversation_history: list = None,
+    row_limit: int = 100,
 ) -> list:
     """
     Build chat messages for conversation-based SQL generation
@@ -189,6 +195,7 @@ def build_chat_messages(
         schema: Database schema information
         database_type: Type of database
         conversation_history: Previous conversation messages
+        row_limit: Maximum rows to return (default: 100)
 
     Returns:
         List of message dictionaries
@@ -201,8 +208,8 @@ def build_chat_messages(
     if conversation_history:
         messages.extend(conversation_history)
 
-    # Add current question
-    user_message = build_sql_prompt(question, schema, database_type)
+    # Add current question with row limit
+    user_message = build_sql_prompt(question, schema, database_type, row_limit=row_limit)
     messages.append({"role": "user", "content": user_message})
 
     return messages

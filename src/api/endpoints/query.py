@@ -267,6 +267,7 @@ async def process_query(
                 connection_name=active_connection.name,  # Pass connection name for learned mappings
                 schema_inspector=schema_inspector,  # Pass for tool-using agent
                 connection_id=active_connection.id,  # Pass for tool-using agent
+                row_limit=request.row_limit,  # Pass row limit from request
             )
 
             # Extract results from agent

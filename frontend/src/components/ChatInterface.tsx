@@ -49,7 +49,7 @@ export default function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSubmit = async (question: string) => {
+  const handleSubmit = async (question: string, rowLimit: number = 100) => {
     // Parse chart intent from the question
     const chartIntent = parseChartIntent(question);
     const chartHint = getChartIntentHint(chartIntent);
@@ -62,13 +62,14 @@ export default function ChatInterface() {
     };
     setMessages((prev) => [...prev, userMessage]);
 
-    // Submit query with chart preference
+    // Submit query with chart preference and row limit
     try {
       const response = await queryMutation.mutateAsync({
         question: chartIntent.cleanedQuestion || question,
         model: selectedModel || undefined,
         enable_narratives: enableNarratives,
         preferred_chart_type: chartIntent.chartType,
+        row_limit: rowLimit,
       });
 
       // Add assistant response

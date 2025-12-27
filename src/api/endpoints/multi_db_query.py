@@ -42,6 +42,7 @@ class MultiDatabaseQueryRequest(BaseModel):
     model: Optional[str] = None
     enable_narratives: bool = True  # NEW: Enable narrative generation for multi-database results
     preferred_chart_type: Optional[str] = None  # User-requested chart type (bar, line, pie, scatter, table)
+    row_limit: int = Field(default=100, ge=1, le=10000, description="Maximum rows to return (1-10000)")
 
 
 class DatabaseQueryResult(BaseModel):
@@ -397,6 +398,7 @@ async def process_multi_database_query(
                         combined_schema_data=combined_schema_data,
                         allow_write=request.allow_write,
                         model_used=model_used,
+                        row_limit=request.row_limit,
                     )
                 )
                 task_metadata.append({"has_error": False, "connection": connection, "from_cache": False})

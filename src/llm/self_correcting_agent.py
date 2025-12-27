@@ -731,6 +731,7 @@ class SelfCorrectingSQLAgent:
         schema_inspector=None,  # NEW: SchemaInspector for tool-using agent
         schema_cache=None,  # NEW: SchemaCache for tool-using agent
         connection_id: Optional[int] = None,  # NEW: Connection ID for tool-using agent
+        row_limit: int = 100,  # NEW: Maximum rows to return
     ) -> Dict[str, Any]:
         """
         Generate SQL with automatic error correction and retry
@@ -745,6 +746,7 @@ class SelfCorrectingSQLAgent:
             schema_dict: Optional parsed schema dictionary
             use_parallel_corrections: Whether to enable parallel correction attempts
             connection_name: Optional connection name for applying learned mappings
+            row_limit: Maximum rows to return (default: 100)
 
         Returns:
             Dictionary with:
@@ -887,6 +889,7 @@ class SelfCorrectingSQLAgent:
                             model=model,
                             quality_profile=self.quality_profile,
                             schema_dict=schema_dict,  # Pass for LocationMapper
+                            row_limit=row_limit,  # Pass row limit to LLM
                         )
 
                         # Check if LLM says query cannot be answered

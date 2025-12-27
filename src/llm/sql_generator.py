@@ -225,6 +225,7 @@ class SQLGenerator:
         skip_cache: bool = False,
         quality_profile: Optional["QualityProfile"] = None,
         schema_dict: Optional[Dict[str, Any]] = None,
+        row_limit: int = 100,
     ) -> Dict[str, Any]:
         """
         Generate SQL query from natural language question
@@ -239,6 +240,7 @@ class SQLGenerator:
             skip_cache: Skip LLM cache lookup (useful for retries)
             quality_profile: Optional quality profile for controlling generation behavior
             schema_dict: Optional parsed schema dictionary for LocationMapper
+            row_limit: Maximum rows to return in query (default: 100)
 
         Returns:
             Dictionary with:
@@ -323,6 +325,7 @@ class SQLGenerator:
                 question=enhanced_question,
                 schema=schema,
                 database_type=database_type,
+                row_limit=row_limit,
             )
 
             # Determine temperature from quality profile or use default

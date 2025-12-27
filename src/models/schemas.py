@@ -54,6 +54,12 @@ class QueryRequest(BaseModel):
         default=None,
         description="User-requested chart type from natural language parsing (bar, line, pie, scatter, table)",
     )
+    row_limit: int = Field(
+        default=100,
+        ge=1,
+        le=10000,
+        description="Maximum number of rows to return (1-10000, default: 100)",
+    )
 
     @validator('question')
     def question_not_empty(cls, v):
