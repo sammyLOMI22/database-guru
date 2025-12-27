@@ -1,11 +1,15 @@
 """Self-Correcting SQL Agent with automatic error recovery"""
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, TYPE_CHECKING
 from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime
 
 from src.llm.sql_generator import SQLGenerator
+
+# Avoid circular import
+if TYPE_CHECKING:
+    from src.llm.quality_profile import QualityProfile
 from src.core.executor import SQLExecutor
 from src.database.models import DatabaseConnection
 from src.config.settings import Settings
@@ -282,7 +286,8 @@ class SelfCorrectingSQLAgent:
         enable_result_verification: bool = True,
         enable_query_planning: bool = True,
         learner_session = None,
-        planning_session = None
+        planning_session = None,
+        quality_profile: Optional["QualityProfile"] = None,
     ):
         """
         Initialize the self-correcting agent
@@ -297,9 +302,22 @@ class SelfCorrectingSQLAgent:
             enable_query_planning: Whether to enable query planning for complex queries
             learner_session: Database session for the learner (optional)
             planning_session: Database session for the query planner (optional, for learned mappings)
+            quality_profile: Optional quality profile for controlling agent behavior
         """
         self.generator = sql_generator
-        self.max_retries = max_retries
+        self.quality_profile = quality_profile
+
+        # Apply quality profile settings if provided
+        if quality_profile:
+            self.max_retries = quality_profile.max_retries
+            enable_result_verification = quality_profile.enable_result_verification
+            logger.info(
+                f"Applied quality profile: {quality_profile.level.value} "
+                f"(retries={self.max_retries}, verification={enable_result_verification})"
+            )
+        else:
+            self.max_retries = max_retries
+
         self.enable_diagnostics = enable_diagnostics
         self.enable_schema_fixes = enable_schema_fixes
         self.enable_result_verification = enable_result_verification
@@ -358,8 +376,12 @@ class SelfCorrectingSQLAgent:
                 self.enable_query_planning = False
 
         # Initialize tool-using agent for enhanced error correction
+        # Respect quality profile's enable_tool_exploration if provided
         self.tool_using_agent = None
-        self.enable_tool_using = TOOL_USING_AVAILABLE
+        tool_exploration_enabled = TOOL_USING_AVAILABLE
+        if quality_profile:
+            tool_exploration_enabled = quality_profile.enable_tool_exploration and TOOL_USING_AVAILABLE
+        self.enable_tool_using = tool_exploration_enabled
         if self.enable_tool_using:
             try:
                 self.tool_using_agent = ToolUsingAgent(
@@ -782,7 +804,8 @@ class SelfCorrectingSQLAgent:
                     sql_generator=self.generator,
                     model=model,
                     schema_dict=schema_dict,
-                    connection_name=connection_name
+                    connection_name=connection_name,
+                    quality_profile=self.quality_profile,
                 )
 
                 if planning_result.get("used_planning"):
@@ -858,7 +881,8 @@ class SelfCorrectingSQLAgent:
                             schema=enhanced_schema,  # Use enhanced schema with tool context
                             database_type=database_type,
                             allow_write=allow_write,
-                            model=model
+                            model=model,
+                            quality_profile=self.quality_profile,
                         )
                         sql = gen_result["sql"]
                         trace.add_step("generation", f"Generated SQL: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql})

@@ -30,6 +30,7 @@ async def get_or_create_settings(db: AsyncSession) -> SystemSettings:
             require_result_comparison=True,
             enable_audit_log=True,
             max_audit_log_days=90,
+            query_quality_level=50,  # Balanced default (0-100 scale)
         )
         db.add(settings)
         await db.commit()
@@ -118,6 +119,7 @@ async def reset_settings(db: AsyncSession = Depends(get_db)):
     - require_result_comparison: true
     - enable_audit_log: true
     - max_audit_log_days: 90
+    - query_quality_level: 50
     """
     try:
         settings = await get_or_create_settings(db)
@@ -131,6 +133,7 @@ async def reset_settings(db: AsyncSession = Depends(get_db)):
         settings.require_result_comparison = True
         settings.enable_audit_log = True
         settings.max_audit_log_days = 90
+        settings.query_quality_level = 50
 
         await db.commit()
         await db.refresh(settings)

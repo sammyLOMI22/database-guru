@@ -237,6 +237,31 @@ SQL: SELECT status, COUNT(*) as count FROM orders GROUP BY status
 Example 7:
 Question: Show products grouped by category
 SQL: SELECT category, COUNT(*) as product_count FROM products GROUP BY category
+
+Example 8:
+Question: Show me customers from California
+SQL: SELECT * FROM customers WHERE state = 'CA' LIMIT 100
+
+Example 9:
+Question: Find orders shipped to New York
+SQL: SELECT o.* FROM orders o
+JOIN customers c ON o.customer_id = c.id
+WHERE c.state = 'NY' LIMIT 100
+
+Example 10:
+Question: Show products with their categories
+SQL: SELECT p.name, c.name as category_name
+FROM products p
+JOIN categories c ON p.category_id = c.id
+LIMIT 100
+
+Example 11:
+Question: Get order totals by customer
+SQL: SELECT c.name, SUM(o.total) as total_spent
+FROM customers c
+JOIN orders o ON c.id = o.customer_id
+GROUP BY c.id, c.name
+ORDER BY total_spent DESC LIMIT 10
 """
 
 

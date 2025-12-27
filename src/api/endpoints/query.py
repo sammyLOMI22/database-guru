@@ -23,6 +23,8 @@ from src.llm.sql_generator import SQLGenerator
 from src.llm.self_correcting_agent import SelfCorrectingSQLAgent, AgentTrace
 from src.llm.conversational_memory_agent import get_memory_agent
 from src.llm.result_narrator import ResultNarrator
+from src.llm.quality_profile import get_quality_profile
+from src.api.endpoints.settings import get_or_create_settings
 from src.cache.redis_client import RedisCache
 from src.cache.semantic_cache import SemanticCache
 from src.config.settings import Settings
@@ -237,12 +239,18 @@ async def process_query(
                 schema = schema_inspector.format_schema_for_llm(schema_data)
                 logger.debug(f"Using schema with {len(schema_data['tables'])} tables")
 
+            # Load system settings and create quality profile
+            settings_record = await get_or_create_settings(db)
+            quality_profile = get_quality_profile(settings_record.query_quality_level)
+            logger.info(f"Using quality profile: {quality_profile.level.value} (level={settings_record.query_quality_level})")
+
             # Use Self-Correcting Agent for automatic error recovery
             self_correcting_agent = SelfCorrectingSQLAgent(
                 sql_generator=sql_generator,
-                max_retries=3,
+                max_retries=3,  # Will be overridden by quality_profile
                 enable_diagnostics=True,
-                planning_session=db  # Pass metadata db session for learned mappings
+                planning_session=db,  # Pass metadata db session for learned mappings
+                quality_profile=quality_profile,
             )
 
             # Generate and execute with automatic retry

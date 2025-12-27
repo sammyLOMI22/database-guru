@@ -12,12 +12,17 @@ Features:
 - Schema validation and intelligent error correction
 - Location intelligence (converts "New York" → "NY" for database codes)
 - Column naming convention detection (handles id vs table_id patterns)
+- Quality profile integration for configurable planning thresholds
 """
 import logging
 import json
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, TYPE_CHECKING
 from dataclasses import dataclass, asdict
 from enum import Enum
+
+# Avoid circular import
+if TYPE_CHECKING:
+    from src.llm.quality_profile import QualityProfile
 
 from src.llm.ollama_client import OllamaClient, get_ollama_client
 from src.config.settings import Settings
@@ -318,19 +323,30 @@ class QueryPlanningAgent:
 
         return min(score, 1.0)  # Cap at 1.0
 
-    async def should_use_planning(self, question: str, schema: str) -> bool:
+    async def should_use_planning(
+        self,
+        question: str,
+        schema: str,
+        quality_profile: Optional["QualityProfile"] = None,
+    ) -> bool:
         """
         Determine if query planning should be used for this question
 
         Args:
             question: Natural language question
             schema: Database schema
+            quality_profile: Optional quality profile for configurable thresholds
 
         Returns:
             True if planning should be used, False otherwise
         """
         if not self.enable_planning:
             return False
+
+        # If quality profile forces planning, always plan
+        if quality_profile and quality_profile.force_planning:
+            logger.info(f"✓ Force planning enabled by quality profile ({quality_profile.level.value})")
+            return True
 
         # Parse schema for complexity analysis
         schema_dict = None
@@ -342,24 +358,31 @@ class QueryPlanningAgent:
         # Calculate complexity score
         complexity_score = self._calculate_complexity_score(question, schema_dict)
 
-        # Log complexity decision
-        logger.info(f"Query complexity score: {complexity_score:.2f} for question: '{question[:50]}...'")
+        # Get threshold from quality profile or use default 0.5
+        threshold = 0.5  # Default
+        if quality_profile:
+            threshold = quality_profile.complexity_threshold
 
-        # Use planning if complexity score >= 0.5 (moderate or higher)
+        # Log complexity decision
+        logger.info(f"Query complexity score: {complexity_score:.2f} for question: '{question[:50]}...' (threshold: {threshold})")
+
+        # Use planning if complexity score >= threshold
         # This balances accuracy (planning helps) vs speed (planning costs time)
-        if complexity_score >= 0.5:
-            logger.info(f"✓ Enabling query planning (complexity: {complexity_score:.2f})")
+        if complexity_score >= threshold:
+            logger.info(f"✓ Enabling query planning (complexity: {complexity_score:.2f} >= {threshold})")
             return True
 
         # For very large schemas (>5 tables), use planning for safety even on simple queries
         # to catch potential schema mismatches (e.g., looking for columns in wrong tables)
         if schema_dict:
             num_tables = len(schema_dict.get("tables", {}))
-            if num_tables > 5 and complexity_score >= 0.3:
+            # Also adjust this secondary threshold based on profile
+            secondary_threshold = 0.3 if not quality_profile else max(0.2, threshold - 0.2)
+            if num_tables > 5 and complexity_score >= secondary_threshold:
                 logger.info(f"✓ Enabling query planning for large schema ({num_tables} tables, complexity: {complexity_score:.2f})")
                 return True
 
-        logger.info(f"✗ Skipping query planning (complexity: {complexity_score:.2f} < 0.5)")
+        logger.info(f"✗ Skipping query planning (complexity: {complexity_score:.2f} < {threshold})")
         return False
 
     async def create_query_plan(
@@ -521,7 +544,8 @@ class QueryPlanningAgent:
         sql_generator = None,
         model: Optional[str] = None,
         schema_dict: Optional[Dict] = None,
-        connection_name: Optional[str] = None
+        connection_name: Optional[str] = None,
+        quality_profile: Optional["QualityProfile"] = None,
     ) -> Dict[str, Any]:
         """
         Create query plan and generate SQL from the plan
@@ -534,6 +558,7 @@ class QueryPlanningAgent:
             model: Optional model name to use
             schema_dict: Optional parsed schema dictionary (for location normalization)
             connection_name: Optional database connection name for applying learned mappings
+            quality_profile: Optional quality profile for configurable planning behavior
 
         Returns:
             Dictionary with:
@@ -542,8 +567,8 @@ class QueryPlanningAgent:
                 - used_planning: Whether planning was used
                 - confidence: Confidence score
         """
-        # Check if planning should be used
-        use_planning = await self.should_use_planning(question, schema)
+        # Check if planning should be used (respects quality profile thresholds)
+        use_planning = await self.should_use_planning(question, schema, quality_profile)
 
         if not use_planning:
             logger.info("Query is simple, skipping planning phase")

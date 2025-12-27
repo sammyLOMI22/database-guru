@@ -442,6 +442,7 @@ class SystemSettingsResponse(BaseModel):
     require_result_comparison: bool
     enable_audit_log: bool
     max_audit_log_days: int
+    query_quality_level: int  # 0-100 scale
     created_at: datetime
     updated_at: datetime
 
@@ -459,3 +460,4 @@ class SystemSettingsUpdateRequest(BaseModel):
     require_result_comparison: Optional[bool] = None
     enable_audit_log: Optional[bool] = None
     max_audit_log_days: Optional[int] = Field(None, ge=1, le=365)
+    query_quality_level: Optional[int] = Field(None, ge=0, le=100)

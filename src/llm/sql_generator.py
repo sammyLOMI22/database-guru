@@ -1,8 +1,12 @@
 """SQL Generator using Ollama LLM"""
 import logging
 import re
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, TYPE_CHECKING
 from src.llm.ollama_client import OllamaClient, get_ollama_client
+
+# Avoid circular import
+if TYPE_CHECKING:
+    from src.llm.quality_profile import QualityProfile
 from src.llm.prompts import (
     SYSTEM_PROMPT,
     build_sql_prompt,
@@ -173,6 +177,7 @@ class SQLGenerator:
         use_few_shot: bool = True,
         model: Optional[str] = None,
         skip_cache: bool = False,
+        quality_profile: Optional["QualityProfile"] = None,
     ) -> Dict[str, Any]:
         """
         Generate SQL query from natural language question
@@ -185,6 +190,7 @@ class SQLGenerator:
             use_few_shot: Whether to include few-shot examples
             model: Optional model name to use (overrides default)
             skip_cache: Skip LLM cache lookup (useful for retries)
+            quality_profile: Optional quality profile for controlling generation behavior
 
         Returns:
             Dictionary with:
@@ -200,6 +206,23 @@ class SQLGenerator:
             # Use specified model or default
             model_to_use = model or self.settings.OLLAMA_MODEL
             llm_cache_hit = False
+
+            # Apply location hints when enabled by quality profile
+            enhanced_question = question
+            if quality_profile and quality_profile.include_location_hints:
+                try:
+                    from src.core.location_mapper import LocationMapper
+                    enhanced_question = LocationMapper.enhance_query_with_location_hints(
+                        question, schema
+                    )
+                    if enhanced_question != question:
+                        logger.info(
+                            f"Applied location hints: '{question[:50]}...' -> "
+                            f"'{enhanced_question[:50]}...'"
+                        )
+                except Exception as e:
+                    logger.warning(f"Location hint enhancement failed: {e}")
+                    enhanced_question = question
 
             # Check LLM cache first (if enabled and not skipped)
             if self.use_llm_cache and self.llm_cache and not skip_cache:
@@ -244,20 +267,25 @@ class SQLGenerator:
                 except Exception as e:
                     logger.warning(f"LLM cache lookup failed: {e}")
 
-            # Build prompt
+            # Build prompt with enhanced question (includes location hints if enabled)
             examples = FEW_SHOT_EXAMPLES if use_few_shot else ""
             messages = build_chat_messages(
-                question=question,
+                question=enhanced_question,
                 schema=schema,
                 database_type=database_type,
             )
 
+            # Determine temperature from quality profile or use default
+            temperature = 0.1  # Default
+            if quality_profile:
+                temperature = quality_profile.temperature
+
             # Generate SQL using LLM
-            logger.info(f"Generating SQL for: {question} (using model: {model_to_use})")
+            logger.info(f"Generating SQL for: {enhanced_question[:80]} (using model: {model_to_use})")
             raw_output = await self.ollama.chat(
                 messages=messages,
                 model=model_to_use,
-                temperature=0.1,  # Low temperature for more deterministic output
+                temperature=temperature,
             )
 
             # Clean and extract SQL
