@@ -1,15 +1,30 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
-import { Send } from 'lucide-react';
+import { Send, ChevronDown } from 'lucide-react';
 
 interface QueryInputProps {
-  onSubmit: (question: string) => void;
+  onSubmit: (question: string, rowLimit: number) => void;
   isLoading: boolean;
   selectedModel?: string;
 }
 
+const ROW_LIMIT_OPTIONS = [
+  { value: 10, label: '10 rows' },
+  { value: 25, label: '25 rows' },
+  { value: 50, label: '50 rows' },
+  { value: 100, label: '100 rows' },
+  { value: 250, label: '250 rows' },
+  { value: 500, label: '500 rows' },
+  { value: 1000, label: '1,000 rows' },
+  { value: 5000, label: '5,000 rows' },
+  { value: 10000, label: '10,000 rows' },
+];
+
 export default function QueryInput({ onSubmit, isLoading, selectedModel }: QueryInputProps) {
   const [question, setQuestion] = useState('');
+  const [rowLimit, setRowLimit] = useState(100);
+  const [showLimitDropdown, setShowLimitDropdown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -19,9 +34,20 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel }: Query
     }
   }, [question]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowLimitDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleSubmit = () => {
     if (question.trim() && !isLoading) {
-      onSubmit(question.trim());
+      onSubmit(question.trim(), rowLimit);
       setQuestion('');
     }
   };
@@ -32,6 +58,8 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel }: Query
       handleSubmit();
     }
   };
+
+  const selectedOption = ROW_LIMIT_OPTIONS.find(o => o.value === rowLimit) || ROW_LIMIT_OPTIONS[3];
 
   return (
     <div className="border-t border-gray-200 bg-white p-4">
@@ -55,6 +83,38 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel }: Query
             {question.length > 0 && (
               <div className="absolute bottom-2 right-2 text-xs text-gray-400">
                 {question.length}/500
+              </div>
+            )}
+          </div>
+
+          {/* Row Limit Selector */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setShowLimitDropdown(!showLimitDropdown)}
+              disabled={isLoading}
+              className="px-3 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors flex items-center space-x-1 text-sm text-gray-700"
+              title="Maximum rows to return"
+            >
+              <span>{selectedOption.label}</span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
+
+            {showLimitDropdown && (
+              <div className="absolute bottom-full mb-1 right-0 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[120px]">
+                {ROW_LIMIT_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      setRowLimit(option.value);
+                      setShowLimitDropdown(false);
+                    }}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
+                      option.value === rowLimit ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
             )}
           </div>

@@ -257,6 +257,9 @@ class SystemSettings(Base):
     enable_audit_log = Column(Boolean, default=True, nullable=False)
     max_audit_log_days = Column(Integer, default=90, nullable=False)
 
+    # Query Quality Settings
+    query_quality_level = Column(Integer, default=50, nullable=False)  # 0-100 scale
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

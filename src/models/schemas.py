@@ -54,6 +54,12 @@ class QueryRequest(BaseModel):
         default=None,
         description="User-requested chart type from natural language parsing (bar, line, pie, scatter, table)",
     )
+    row_limit: int = Field(
+        default=100,
+        ge=1,
+        le=10000,
+        description="Maximum number of rows to return (1-10000, default: 100)",
+    )
 
     @validator('question')
     def question_not_empty(cls, v):
@@ -442,6 +448,7 @@ class SystemSettingsResponse(BaseModel):
     require_result_comparison: bool
     enable_audit_log: bool
     max_audit_log_days: int
+    query_quality_level: int  # 0-100 scale
     created_at: datetime
     updated_at: datetime
 
@@ -459,3 +466,4 @@ class SystemSettingsUpdateRequest(BaseModel):
     require_result_comparison: Optional[bool] = None
     enable_audit_log: Optional[bool] = None
     max_audit_log_days: Optional[int] = Field(None, ge=1, le=365)
+    query_quality_level: Optional[int] = Field(None, ge=0, le=100)

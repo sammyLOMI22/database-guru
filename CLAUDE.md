@@ -426,6 +426,12 @@ Located in `frontend/src/`:
 - Total: **~1,000 lines** of new UI code for Tool-Using Agent management
 - Tests: `ToolsPanel.test.tsx` with 30 comprehensive tests
 
+**Row Limit & Pagination Components (NEW - December 27, 2025):**
+- `QueryInput.tsx` - Updated with row limit dropdown selector (10-10,000 rows)
+- `QueryResults.tsx` - Added pagination with 10/25/50/100 rows per page, navigation controls
+- `MultiDatabaseResults.tsx` - Per-database pagination with independent controls
+- Tests: `QueryResults.test.tsx` with 10 new pagination tests, `MultiDatabaseResults.test.tsx` with 16 tests
+
 **Semantic Cache UI Components (NEW - November 22, 2025):**
 - `SemanticCachePanel.tsx` (~110 lines) - Main tabbed container with 3 views (Overview, Statistics, Recent)
 - `CacheOverview.tsx` (~370 lines) - Summary dashboard with stats cards, cache breakdown, quick actions
@@ -509,6 +515,15 @@ Settings managed via Pydantic in `src/config/settings.py`:
 - **Parallel Multi-DB Tests (PRODUCTION-READY)**: `tests/test_parallel_multi_db.py` - 6 tests (3x speedup + timeout verification)
 - **Parallel Corrections Tests (PRODUCTION-READY)**: `tests/test_parallel_corrections.py` - 7 tests (1.6x speedup + timeout + metrics verification)
 - **Frontend Parallel Metrics**: `frontend/src/components/ParallelExecutionMetrics.tsx` - Real-time visualization (42 tests total)
+- **Row Limit & Pagination (NEW - Dec 27, 2025)**:
+  - `frontend/src/components/QueryInput.tsx` - Row limit dropdown (10-10,000 rows)
+  - `frontend/src/components/QueryResults.tsx` - Table pagination with page size selector
+  - `frontend/src/components/MultiDatabaseResults.tsx` - Per-database pagination controls
+  - `src/models/schemas.py` - `row_limit` field in QueryRequest (1-10000, default 100)
+  - `src/api/endpoints/query.py` - Passes row_limit to agent chain
+  - `src/core/multi_db_handler.py` - Passes row_limit through multi-database execution
+  - `frontend/tests/QueryResults.test.tsx` - 10 pagination tests
+  - `frontend/tests/MultiDatabaseResults.test.tsx` - 16 pagination tests
 - **Tool-Using Agent (NEW)**: `src/llm/tool_using_agent.py` - Schema exploration and context building for SQL generation
 - **Tool Registry (NEW)**: `src/tools/tool_registry.py` - Central registry with caching (follows ColumnMapper pattern)
 - **Schema Tools (NEW)**: `src/tools/schema_tools.py` - 4 tools for schema exploration (search_schema, get_table_info, find_columns, get_relationships)

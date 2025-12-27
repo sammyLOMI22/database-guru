@@ -1,11 +1,15 @@
 """Self-Correcting SQL Agent with automatic error recovery"""
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, TYPE_CHECKING
 from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime
 
 from src.llm.sql_generator import SQLGenerator
+
+# Avoid circular import
+if TYPE_CHECKING:
+    from src.llm.quality_profile import QualityProfile
 from src.core.executor import SQLExecutor
 from src.database.models import DatabaseConnection
 from src.config.settings import Settings
@@ -282,7 +286,8 @@ class SelfCorrectingSQLAgent:
         enable_result_verification: bool = True,
         enable_query_planning: bool = True,
         learner_session = None,
-        planning_session = None
+        planning_session = None,
+        quality_profile: Optional["QualityProfile"] = None,
     ):
         """
         Initialize the self-correcting agent
@@ -297,9 +302,22 @@ class SelfCorrectingSQLAgent:
             enable_query_planning: Whether to enable query planning for complex queries
             learner_session: Database session for the learner (optional)
             planning_session: Database session for the query planner (optional, for learned mappings)
+            quality_profile: Optional quality profile for controlling agent behavior
         """
         self.generator = sql_generator
-        self.max_retries = max_retries
+        self.quality_profile = quality_profile
+
+        # Apply quality profile settings if provided
+        if quality_profile:
+            self.max_retries = quality_profile.max_retries
+            enable_result_verification = quality_profile.enable_result_verification
+            logger.info(
+                f"Applied quality profile: {quality_profile.level.value} "
+                f"(retries={self.max_retries}, verification={enable_result_verification})"
+            )
+        else:
+            self.max_retries = max_retries
+
         self.enable_diagnostics = enable_diagnostics
         self.enable_schema_fixes = enable_schema_fixes
         self.enable_result_verification = enable_result_verification
@@ -358,8 +376,12 @@ class SelfCorrectingSQLAgent:
                 self.enable_query_planning = False
 
         # Initialize tool-using agent for enhanced error correction
+        # Respect quality profile's enable_tool_exploration if provided
         self.tool_using_agent = None
-        self.enable_tool_using = TOOL_USING_AVAILABLE
+        tool_exploration_enabled = TOOL_USING_AVAILABLE
+        if quality_profile:
+            tool_exploration_enabled = quality_profile.enable_tool_exploration and TOOL_USING_AVAILABLE
+        self.enable_tool_using = tool_exploration_enabled
         if self.enable_tool_using:
             try:
                 self.tool_using_agent = ToolUsingAgent(
@@ -709,6 +731,7 @@ class SelfCorrectingSQLAgent:
         schema_inspector=None,  # NEW: SchemaInspector for tool-using agent
         schema_cache=None,  # NEW: SchemaCache for tool-using agent
         connection_id: Optional[int] = None,  # NEW: Connection ID for tool-using agent
+        row_limit: int = 100,  # NEW: Maximum rows to return
     ) -> Dict[str, Any]:
         """
         Generate SQL with automatic error correction and retry
@@ -723,6 +746,7 @@ class SelfCorrectingSQLAgent:
             schema_dict: Optional parsed schema dictionary
             use_parallel_corrections: Whether to enable parallel correction attempts
             connection_name: Optional connection name for applying learned mappings
+            row_limit: Maximum rows to return (default: 100)
 
         Returns:
             Dictionary with:
@@ -754,11 +778,14 @@ class SelfCorrectingSQLAgent:
         if self.enable_schema_fixes:
             try:
                 from src.llm.schema_aware_fixer import SchemaAwareFixer
-                import json
-                # Parse schema if it's a string
-                schema_dict = json.loads(schema) if isinstance(schema, str) else schema
-                self.schema_fixer = SchemaAwareFixer(schema_dict)
-                logger.info("Schema-aware fixer initialized with schema")
+                # Use passed schema_dict if available, otherwise it stays None
+                # (we don't try to parse formatted schema text as JSON)
+                if schema_dict:
+                    self.schema_fixer = SchemaAwareFixer(schema_dict)
+                    logger.info("Schema-aware fixer initialized with schema_dict")
+                else:
+                    logger.debug("No schema_dict available, schema-aware fixer not initialized")
+                    self.schema_fixer = None
             except Exception as e:
                 logger.warning(f"Failed to initialize schema-aware fixer: {e}")
                 self.schema_fixer = None
@@ -782,7 +809,8 @@ class SelfCorrectingSQLAgent:
                     sql_generator=self.generator,
                     model=model,
                     schema_dict=schema_dict,
-                    connection_name=connection_name
+                    connection_name=connection_name,
+                    quality_profile=self.quality_profile,
                 )
 
                 if planning_result.get("used_planning"):
@@ -858,10 +886,48 @@ class SelfCorrectingSQLAgent:
                             schema=enhanced_schema,  # Use enhanced schema with tool context
                             database_type=database_type,
                             allow_write=allow_write,
-                            model=model
+                            model=model,
+                            quality_profile=self.quality_profile,
+                            schema_dict=schema_dict,  # Pass for LocationMapper
+                            row_limit=row_limit,  # Pass row limit to LLM
                         )
+
+                        # Check if LLM says query cannot be answered
+                        if gen_result.get("cannot_answer"):
+                            reason = gen_result.get("cannot_answer_reason", "Query cannot be answered with current schema")
+                            trace.add_step("cannot_answer", f"Schema limitation: {reason}")
+                            logger.info(f"Query cannot be answered: {reason}")
+                            return {
+                                "success": False,
+                                "sql": "",
+                                "result": None,
+                                "error": f"This query cannot be answered with the current database schema. {reason}",
+                                "attempts": attempts,
+                                "self_corrected": False,
+                                "total_attempts": attempt_num,
+                                "agent_trace": trace.to_dict(),
+                                "cannot_answer": True,
+                                "cannot_answer_reason": reason,
+                            }
+
                         sql = gen_result["sql"]
                         trace.add_step("generation", f"Generated SQL: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql})
+
+                        # Validate that all tables in SQL exist in schema
+                        if schema_dict and 'tables' in schema_dict:
+                            from src.llm.sql_generator import SQLValidator
+                            schema_tables = list(schema_dict['tables'].keys())
+                            tables_valid, missing_tables = SQLValidator.validate_tables_exist(sql, schema_tables)
+                            if not tables_valid:
+                                # Tables don't exist - treat as error for retry
+                                last_error = (
+                                    f"SQL references non-existent tables: {', '.join(missing_tables)}. "
+                                    f"Available tables are: {', '.join(schema_tables)}. "
+                                    f"Regenerate using ONLY these tables."
+                                )
+                                logger.warning(f"Table validation failed: {last_error}")
+                                trace.add_step("validation", f"Table validation failed: {missing_tables}")
+                                continue  # Skip to next attempt
                     else:
                         trace.add_step("generation", "Using SQL from query plan")
                         logger.info(f"Attempt {attempt_num}/{self.max_retries}: Using SQL from query plan")

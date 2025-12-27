@@ -554,4 +554,170 @@ describe('QueryResults', () => {
       expect(allMetrics[1]).toBe(databaseMetrics);
     });
   });
+
+  describe('Pagination', () => {
+    // Generate 25 rows for pagination testing
+    const manyResults = Array.from({ length: 25 }, (_, i) => ({
+      id: i + 1,
+      name: `User ${i + 1}`,
+      age: 20 + i,
+    }));
+
+    const paginationProps = {
+      ...defaultProps,
+      results: manyResults,
+      rowCount: 25,
+    };
+
+    it('shows pagination controls when more than 10 rows', () => {
+      render(<QueryResults {...paginationProps} />);
+
+      expect(screen.getByText('Rows per page:')).toBeInTheDocument();
+      expect(screen.getByText('1-10 of 25')).toBeInTheDocument();
+    });
+
+    it('does not show pagination controls when 10 or fewer rows', () => {
+      const fewResults = manyResults.slice(0, 10);
+      render(<QueryResults {...defaultProps} results={fewResults} rowCount={10} />);
+
+      expect(screen.queryByText('Rows per page:')).not.toBeInTheDocument();
+    });
+
+    it('shows first 10 rows by default', () => {
+      render(<QueryResults {...paginationProps} />);
+
+      // First page should show User 1 through User 10
+      expect(screen.getByText('User 1')).toBeInTheDocument();
+      expect(screen.getByText('User 10')).toBeInTheDocument();
+      expect(screen.queryByText('User 11')).not.toBeInTheDocument();
+    });
+
+    it('can navigate to next page', async () => {
+      const user = userEvent.setup();
+      render(<QueryResults {...paginationProps} />);
+
+      // Click next page button
+      const nextButton = screen.getAllByRole('button').find(btn =>
+        btn.querySelector('svg.lucide-chevron-right')
+      );
+      expect(nextButton).toBeDefined();
+      await user.click(nextButton!);
+
+      // Should now show User 11 through User 20
+      await waitFor(() => {
+        expect(screen.getByText('User 11')).toBeInTheDocument();
+        expect(screen.getByText('User 20')).toBeInTheDocument();
+        expect(screen.queryByText('User 1')).not.toBeInTheDocument();
+        expect(screen.getByText('11-20 of 25')).toBeInTheDocument();
+      });
+    });
+
+    it('can navigate to previous page', async () => {
+      const user = userEvent.setup();
+      render(<QueryResults {...paginationProps} />);
+
+      // Navigate to page 2 first
+      const nextButton = screen.getAllByRole('button').find(btn =>
+        btn.querySelector('svg.lucide-chevron-right')
+      );
+      await user.click(nextButton!);
+
+      await waitFor(() => {
+        expect(screen.getByText('User 11')).toBeInTheDocument();
+      });
+
+      // Click previous page button
+      const prevButton = screen.getAllByRole('button').find(btn =>
+        btn.querySelector('svg.lucide-chevron-left')
+      );
+      await user.click(prevButton!);
+
+      // Should be back to page 1
+      await waitFor(() => {
+        expect(screen.getByText('User 1')).toBeInTheDocument();
+        expect(screen.getByText('1-10 of 25')).toBeInTheDocument();
+      });
+    });
+
+    it('disables previous button on first page', () => {
+      render(<QueryResults {...paginationProps} />);
+
+      const prevButton = screen.getAllByRole('button').find(btn =>
+        btn.querySelector('svg.lucide-chevron-left')
+      );
+
+      expect(prevButton).toBeDisabled();
+    });
+
+    it('disables next button on last page', async () => {
+      const user = userEvent.setup();
+      render(<QueryResults {...paginationProps} />);
+
+      // Navigate to last page (page 3 with 10 rows per page for 25 total)
+      const nextButton = screen.getAllByRole('button').find(btn =>
+        btn.querySelector('svg.lucide-chevron-right')
+      );
+      await user.click(nextButton!); // Page 2
+      await user.click(nextButton!); // Page 3
+
+      await waitFor(() => {
+        expect(screen.getByText('21-25 of 25')).toBeInTheDocument();
+        expect(nextButton).toBeDisabled();
+      });
+    });
+
+    it('can change page size', async () => {
+      const user = userEvent.setup();
+      render(<QueryResults {...paginationProps} />);
+
+      // Change to 25 rows per page
+      const pageSizeSelect = screen.getByRole('combobox');
+      await user.selectOptions(pageSizeSelect, '25');
+
+      await waitFor(() => {
+        // Should show all 25 rows on one page
+        expect(screen.getByText('User 1')).toBeInTheDocument();
+        expect(screen.getByText('User 25')).toBeInTheDocument();
+        expect(screen.getByText('1-25 of 25')).toBeInTheDocument();
+      });
+    });
+
+    it('resets to page 1 when page size changes', async () => {
+      const user = userEvent.setup();
+      render(<QueryResults {...paginationProps} />);
+
+      // Navigate to page 2
+      const nextButton = screen.getAllByRole('button').find(btn =>
+        btn.querySelector('svg.lucide-chevron-right')
+      );
+      await user.click(nextButton!);
+
+      await waitFor(() => {
+        expect(screen.getByText('11-20 of 25')).toBeInTheDocument();
+      });
+
+      // Change page size
+      const pageSizeSelect = screen.getByRole('combobox');
+      await user.selectOptions(pageSizeSelect, '50');
+
+      // Should reset to page 1
+      await waitFor(() => {
+        expect(screen.getByText('User 1')).toBeInTheDocument();
+        expect(screen.getByText('1-25 of 25')).toBeInTheDocument();
+      });
+    });
+
+    it('shows correct page size options', () => {
+      render(<QueryResults {...paginationProps} />);
+
+      const pageSizeSelect = screen.getByRole('combobox');
+      const options = pageSizeSelect.querySelectorAll('option');
+
+      expect(options).toHaveLength(4);
+      expect(options[0]).toHaveValue('10');
+      expect(options[1]).toHaveValue('25');
+      expect(options[2]).toHaveValue('50');
+      expect(options[3]).toHaveValue('100');
+    });
+  });
 });

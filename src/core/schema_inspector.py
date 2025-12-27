@@ -511,10 +511,18 @@ class SchemaInspector:
         Returns:
             Formatted string for LLM
         """
-        lines = ["Database Schema:\n"]
+        # Get table names for prominent display
+        table_names = list(schema["tables"].keys())
+
+        lines = ["=" * 50]
+        lines.append("AVAILABLE TABLES (USE ONLY THESE):")
+        lines.append(", ".join(table_names))
+        lines.append("=" * 50)
+        lines.append("")
+        lines.append("Database Schema:\n")
 
         # Add summary
-        lines.append(f"Tables: {schema['summary']['table_count']}")
+        lines.append(f"Table Count: {schema['summary']['table_count']}")
         lines.append(f"Total Columns: {schema['summary']['total_columns']}\n")
 
         # Add table details
@@ -552,5 +560,12 @@ class SchemaInspector:
                     f"  - {rel['from_table']}.{rel['from_column']} -> "
                     f"{rel['to_table']}.{rel['to_column']}"
                 )
+
+        # Add reminder at the end
+        lines.append("")
+        lines.append("=" * 50)
+        lines.append(f"REMINDER: Only use tables: {', '.join(table_names)}")
+        lines.append("DO NOT use tables from examples if they don't exist above!")
+        lines.append("=" * 50)
 
         return "\n".join(lines)

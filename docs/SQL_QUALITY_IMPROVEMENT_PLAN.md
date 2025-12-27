@@ -1,8 +1,41 @@
 # SQL Query Quality Improvement Plan
 
-**Status**: Planned (Ready for Future Implementation)
+**Status**: COMPLETE (Implemented December 26, 2025)
 **Date**: December 26, 2025
 **Scope**: System-wide quality slider (0-100%) + bug fixes + overall query improvement
+**Verified**: All root causes confirmed via codebase exploration
+**Tests**: 45 unit tests passing
+
+---
+
+## Design Decisions (Verified Dec 26, 2025)
+
+### Decision 1: Quality Level Storage
+**Choice**: Load from SystemSettings in endpoint, NOT per-request in QueryRequest
+
+**Rationale**:
+- Quality is a system-wide preference, not a per-query decision
+- Follows existing pattern (auto_learning_enabled, confidence_threshold)
+- Simpler implementation - no frontend changes to query submission
+
+### Decision 2: Quality Profile Location
+**Choice**: Create new file `src/llm/quality_profile.py`
+
+**Rationale**:
+- Cohesive, self-contained module (~100 lines)
+- Follows existing pattern (confidence_scorer.py, correction_learner.py)
+- Single-responsibility: profile definition + generation
+
+### Decision 3: Profile Threading
+**Choice**: Pass as constructor parameter to SelfCorrectingSQLAgent, then selectively to sub-agents
+
+**Flow**:
+```
+query.py → SelfCorrectingSQLAgent.__init__(quality_profile=...)
+         → Sets self.max_retries, self.enable_result_verification
+         → Passes to sql_generator.generate_sql(quality_profile=...)
+         → Passes to planning_agent.should_use_planning(quality_profile=...)
+```
 
 ---
 
@@ -21,70 +54,105 @@ Add a user-configurable quality slider (0-100%) to the Settings panel that contr
 
 ### Why "Products Shipped to New York" Fails
 
-#### Issue 1: Dead Code - LocationMapper Never Called (CRITICAL)
-**File**: `src/core/location_mapper.py` (line 199)
+#### Issue 1: Dead Code - LocationMapper Never Called (CRITICAL) ✅ VERIFIED
+**File**: `src/core/location_mapper.py` (lines 199-234)
 
 ```python
 # This method EXISTS but is NEVER called anywhere in the codebase!
-def enhance_query_with_location_hints(query, schema):
-    # Would convert "New York" → "NY" hints for the LLM
-    # But nobody calls this function
+def enhance_query_with_location_hints(cls, query: str, schema: Dict) -> str:
+    # Detects locations like "New York", "California"
+    # Checks schema for state column formats
+    # Returns enhanced query with hints
 ```
 
-**Evidence**: Grep found only 1 match (the definition itself) - no imports, no calls.
+**Evidence**: Grep search confirmed **zero callers** - only the definition itself appears. Not imported anywhere.
+**Method Details**: Lines 199-234, fully implemented with location detection logic.
 
 **Impact**: The LLM never receives hints like "New York should use code 'NY'" so it generates `WHERE state = 'New York'` instead of `WHERE state = 'NY'`.
 
 ---
 
-#### Issue 2: Missing Few-Shot Examples
+#### Issue 2: Missing Few-Shot Examples ✅ VERIFIED
 **File**: `src/llm/prompts.py` (lines 206-240)
 
-Current examples include:
-- Simple SELECTs
-- Basic aggregations
-- GROUP BY
+Current examples (7 total):
+1. Simple recent users
+2. Simple product list
+3. Product revenue with JOIN (only 1 JOIN example)
+4. Count active customers
+5. Show all orders
+6. Group orders by status
+7. Group products by category
 
 **Missing**:
-- Zero location query examples
-- Zero JOIN examples showing location filtering
+- Zero location query examples (no state = 'CA', state = 'NY')
+- Only 1 JOIN example (no location filtering with JOINs)
 - No state code normalization patterns
 
 **Impact**: The LLM has no patterns to learn from for location-based queries.
 
 ---
 
-#### Issue 3: SQL Generator Has No Location Context Parameter
+#### Issue 3: SQL Generator Has No Location Context Parameter ✅ VERIFIED
 **File**: `src/llm/sql_generator.py` (lines 167-312)
 
 ```python
-async def generate_sql(self, question, schema, database_type):
-    # No parameter for location hints!
-    # No parameter for quality settings!
+async def generate_sql(
+    self,
+    question: str,
+    schema: str,
+    database_type: str = "postgresql",
+    allow_write: bool = False,
+    use_few_shot: bool = True,
+    model: Optional[str] = None,
+    skip_cache: bool = False,
+    # NO quality_profile parameter!
+    # NO location_hints parameter!
+) -> Dict[str, Any]:
 ```
+
+**Callers Found**:
+- `src/api/endpoints/query.py:610`
+- `src/api/endpoints/multi_db_query.py:1017`
+- `src/llm/tool_using_agent.py:210`
 
 **Impact**: Even if LocationMapper hints were generated somewhere, there's no way to pass them to SQL generation.
 
 ---
 
-#### Issue 4: Schema Samples Not Emphasized
-**File**: `src/core/schema_inspector.py` (lines 533-535)
+#### Issue 4: Schema Samples Not Emphasized ✅ VERIFIED
+**File**: `src/core/schema_inspector.py` (lines 530-537)
 
-Schema samples ARE collected (e.g., `state: ['NY', 'CA', 'TX']`) but they're formatted as inline comments:
-```
-- state: VARCHAR(2)  // Examples: 'NY', 'CA', 'TX'
+```python
+# Current format (lines 531-535):
+sample_hint = ""
+if "sample_values" in col and col["sample_values"]:
+    samples = col["sample_values"]
+    sample_str = ", ".join(repr(s) for s in samples[:5])
+    sample_hint = f"  // Examples: {sample_str}"
+# Renders as: - state: VARCHAR(2)  // Examples: 'NY', 'CA', 'TX'
 ```
 
-**Impact**: The LLM may ignore these as comments rather than treating them as critical hints.
+**Sampling Logic** (lines 114-148): Smart keyword matching for 'state', 'country', 'city', 'status', etc.
+
+**Impact**: The LLM may ignore inline comments rather than treating them as critical hints.
 
 ---
 
-#### Issue 5: Planning Agent Generates Hints But Doesn't Enforce Them
+#### Issue 5: Planning Agent Generates Hints But Doesn't Enforce Them ✅ VERIFIED
 **File**: `src/llm/query_planning_agent.py`
 
-- Complexity scoring correctly identifies location queries (+0.5 weight) ✅
-- `_generate_location_hints()` creates good hints ✅
-- **BUT**: The hints aren't passed through to SQL generation ❌
+**Method `_generate_location_hints()`** (lines 1074-1141):
+- Detects locations in question ✅
+- Checks schema for state column format ✅
+- Returns formatted hints ✅
+- **BUT**: Hints only used in QueryPlanningAgent's own prompts ❌
+- **NOT passed to SQLGenerator** for general queries ❌
+
+**Hardcoded Threshold** (line 350):
+```python
+if complexity_score >= 0.5:  # HARDCODED - should be configurable
+```
 
 ---
 
@@ -140,28 +208,42 @@ At **Balanced (50%)** or higher, the system will:
 ### Phase 1: Database & API Changes
 
 #### 1.1 Add to SystemSettings Model
-**File**: `src/database/models.py` (line ~269)
+**File**: `src/database/models.py` (after line 258, after `max_audit_log_days`)
 
 ```python
-# Add after existing fields in SystemSettings class
+# Query Quality Settings (add after line 258)
 query_quality_level = Column(Integer, default=50, nullable=False)  # 0-100 scale
 ```
 
+**Pattern Reference**: Line 258 (`max_audit_log_days = Column(Integer, default=90, nullable=False)`)
+
 #### 1.2 Update Pydantic Schemas
-**File**: `src/models/schemas.py` (lines 432-462)
+**File**: `src/models/schemas.py`
 
+In `SystemSettingsResponse` (after line 444):
 ```python
-# Add to SystemSettingsResponse
 query_quality_level: int
+```
 
-# Add to SystemSettingsUpdateRequest
+In `SystemSettingsUpdateRequest` (after line 461):
+```python
 query_quality_level: Optional[int] = Field(None, ge=0, le=100)
 ```
+
+**Pattern Reference**: Lines 455 (`confidence_threshold`), 461 (`max_audit_log_days`)
 
 #### 1.3 Update Settings Endpoint Defaults
 **File**: `src/api/endpoints/settings.py`
 
-Add default `query_quality_level: 50` to `get_or_create_settings()` and `reset_settings()`
+In `get_or_create_settings()` (around line 33):
+```python
+query_quality_level=50,  # Balanced default
+```
+
+In `reset_settings()` (around line 133):
+```python
+settings.query_quality_level = 50
+```
 
 ---
 

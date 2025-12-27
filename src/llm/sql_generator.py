@@ -1,8 +1,12 @@
 """SQL Generator using Ollama LLM"""
 import logging
 import re
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, TYPE_CHECKING
 from src.llm.ollama_client import OllamaClient, get_ollama_client
+
+# Avoid circular import
+if TYPE_CHECKING:
+    from src.llm.quality_profile import QualityProfile
 from src.llm.prompts import (
     SYSTEM_PROMPT,
     build_sql_prompt,
@@ -130,6 +134,52 @@ class SQLValidator:
 
         return sql
 
+    @staticmethod
+    def extract_table_names(sql: str) -> List[str]:
+        """
+        Extract table names from SQL query.
+
+        Returns:
+            List of table names found in the query
+        """
+        tables = set()
+        sql_upper = sql.upper()
+
+        # Pattern for FROM clause (including JOINs)
+        # Matches: FROM table, JOIN table, FROM table AS alias, JOIN table alias
+        from_pattern = r'\b(?:FROM|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*)\b'
+        matches = re.findall(from_pattern, sql, re.IGNORECASE)
+        tables.update(m.lower() for m in matches)
+
+        # Remove common SQL keywords that might be mistakenly captured
+        sql_keywords = {'select', 'where', 'and', 'or', 'on', 'as', 'in', 'not',
+                       'null', 'is', 'like', 'between', 'exists', 'case', 'when',
+                       'then', 'else', 'end', 'inner', 'outer', 'left', 'right',
+                       'full', 'cross', 'natural', 'using', 'group', 'order',
+                       'having', 'limit', 'offset', 'union', 'intersect', 'except'}
+        tables = tables - sql_keywords
+
+        return list(tables)
+
+    @staticmethod
+    def validate_tables_exist(sql: str, schema_tables: List[str]) -> tuple[bool, List[str]]:
+        """
+        Validate that all tables in SQL exist in the schema.
+
+        Args:
+            sql: The SQL query
+            schema_tables: List of valid table names from schema
+
+        Returns:
+            (all_valid, list_of_missing_tables)
+        """
+        sql_tables = SQLValidator.extract_table_names(sql)
+        schema_tables_lower = [t.lower() for t in schema_tables]
+
+        missing = [t for t in sql_tables if t.lower() not in schema_tables_lower]
+
+        return len(missing) == 0, missing
+
 
 class SQLGenerator:
     """Generates SQL queries from natural language using LLM"""
@@ -173,18 +223,24 @@ class SQLGenerator:
         use_few_shot: bool = True,
         model: Optional[str] = None,
         skip_cache: bool = False,
+        quality_profile: Optional["QualityProfile"] = None,
+        schema_dict: Optional[Dict[str, Any]] = None,
+        row_limit: int = 100,
     ) -> Dict[str, Any]:
         """
         Generate SQL query from natural language question
 
         Args:
             question: Natural language question
-            schema: Database schema information
+            schema: Database schema information (formatted text for LLM)
             database_type: Type of database
             allow_write: Whether to allow write operations (INSERT, UPDATE, DELETE)
             use_few_shot: Whether to include few-shot examples
             model: Optional model name to use (overrides default)
             skip_cache: Skip LLM cache lookup (useful for retries)
+            quality_profile: Optional quality profile for controlling generation behavior
+            schema_dict: Optional parsed schema dictionary for LocationMapper
+            row_limit: Maximum rows to return in query (default: 100)
 
         Returns:
             Dictionary with:
@@ -200,6 +256,25 @@ class SQLGenerator:
             # Use specified model or default
             model_to_use = model or self.settings.OLLAMA_MODEL
             llm_cache_hit = False
+
+            # Apply location hints when enabled by quality profile
+            enhanced_question = question
+            if quality_profile and quality_profile.include_location_hints and schema_dict:
+                try:
+                    from src.core.location_mapper import LocationMapper
+                    # Use the passed schema_dict directly (no JSON parsing needed)
+                    if isinstance(schema_dict, dict):
+                        enhanced_question = LocationMapper.enhance_query_with_location_hints(
+                            question, schema_dict
+                        )
+                        if enhanced_question != question:
+                            logger.info(
+                                f"Applied location hints: '{question[:50]}' -> "
+                                f"'{enhanced_question[:80]}'"
+                            )
+                except Exception as e:
+                    logger.warning(f"Location hint enhancement failed: {e}")
+                    enhanced_question = question
 
             # Check LLM cache first (if enabled and not skipped)
             if self.use_llm_cache and self.llm_cache and not skip_cache:
@@ -244,21 +319,46 @@ class SQLGenerator:
                 except Exception as e:
                     logger.warning(f"LLM cache lookup failed: {e}")
 
-            # Build prompt
+            # Build prompt with enhanced question (includes location hints if enabled)
             examples = FEW_SHOT_EXAMPLES if use_few_shot else ""
             messages = build_chat_messages(
-                question=question,
+                question=enhanced_question,
                 schema=schema,
                 database_type=database_type,
+                row_limit=row_limit,
             )
 
+            # Determine temperature from quality profile or use default
+            temperature = 0.1  # Default
+            if quality_profile:
+                temperature = quality_profile.temperature
+
             # Generate SQL using LLM
-            logger.info(f"Generating SQL for: {question} (using model: {model_to_use})")
+            logger.info(f"Generating SQL for: {enhanced_question[:80]} (using model: {model_to_use})")
             raw_output = await self.ollama.chat(
                 messages=messages,
                 model=model_to_use,
-                temperature=0.1,  # Low temperature for more deterministic output
+                temperature=temperature,
             )
+
+            # Check for CANNOT_ANSWER response (query impossible with schema)
+            if raw_output.strip().upper().startswith("CANNOT_ANSWER"):
+                reason = raw_output.strip()
+                if ":" in reason:
+                    reason = reason.split(":", 1)[1].strip()
+                logger.info(f"LLM indicated query cannot be answered: {reason}")
+                return {
+                    "sql": "",
+                    "is_valid": False,
+                    "is_read_only": True,
+                    "warnings": [],
+                    "raw_output": raw_output,
+                    "question": question,
+                    "model_used": model_to_use,
+                    "llm_cache_hit": False,
+                    "cannot_answer": True,
+                    "cannot_answer_reason": reason,
+                }
 
             # Clean and extract SQL
             sql = self.validator.clean_sql_output(raw_output)

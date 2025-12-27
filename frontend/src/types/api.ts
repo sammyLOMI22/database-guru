@@ -14,6 +14,8 @@ export interface QueryRequest {
   enable_narratives?: boolean;
   /** User-requested chart type from natural language parsing */
   preferred_chart_type?: ChartType | null;
+  /** Maximum rows to return (1-10000, default: 100) */
+  row_limit?: number;
 }
 
 // Option 2: Observability Types
@@ -348,6 +350,8 @@ export interface MultiDatabaseQueryRequest {
   enable_narratives?: boolean;
   /** User-requested chart type from natural language parsing */
   preferred_chart_type?: ChartType | null;
+  /** Maximum rows to return (1-10000, default: 100) */
+  row_limit?: number;
 }
 
 export interface DatabaseQueryResult {

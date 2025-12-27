@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { MessageSquare, Copy, Check, Zap, Database } from 'lucide-react';
+import { MessageSquare, Copy, Check, Zap, Database, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DatabaseQueryResult, CacheInfo } from '../types/api';
 import { AgentTrace } from './AgentTrace';
 import { CorrectionHistory } from './CorrectionHistory';
@@ -49,6 +49,14 @@ export default function MultiDatabaseResults({
   // Per-database selected chart types (overrides auto-detection when set)
   const [selectedChartTypes, setSelectedChartTypes] = useState<Record<number, ChartType | null>>(() =>
     Object.fromEntries(results.map((r) => [r.connection_id, null]))
+  );
+
+  // Pagination state per database
+  const [currentPages, setCurrentPages] = useState<Record<number, number>>(() =>
+    Object.fromEntries(results.map((r) => [r.connection_id, 1]))
+  );
+  const [pageSizes, setPageSizes] = useState<Record<number, number>>(() =>
+    Object.fromEntries(results.map((r) => [r.connection_id, 10]))
   );
 
   // Memoized chart recommendations for each database
@@ -354,40 +362,104 @@ export default function MultiDatabaseResults({
                         />
                       ) : (
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                {Object.keys(result.results[0]).map((key) => (
-                                  <th
-                                    key={key}
-                                    className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
-                                  >
-                                    {key}
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {result.results.slice(0, 10).map((row, idx) => (
-                                <tr key={idx} className="hover:bg-gray-50">
-                                  {Object.values(row).map((value, vidx) => (
-                                    <td key={vidx} className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                                      {value === null ? (
-                                        <span className="text-gray-400 italic">null</span>
-                                      ) : (
-                                        String(value)
-                                      )}
-                                    </td>
-                                  ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          {result.row_count && result.row_count > 10 && (
-                            <p className="mt-2 text-xs text-gray-500 text-center">
-                              Showing 10 of {result.row_count} rows
-                            </p>
-                          )}
+                          {(() => {
+                            const pageSize = pageSizes[result.connection_id] || 10;
+                            const currentPage = currentPages[result.connection_id] || 1;
+                            const totalRows = result.results.length;
+                            const totalPages = Math.ceil(totalRows / pageSize);
+                            const startIdx = (currentPage - 1) * pageSize;
+                            const endIdx = Math.min(startIdx + pageSize, totalRows);
+                            const paginatedResults = result.results.slice(startIdx, endIdx);
+
+                            return (
+                              <>
+                                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                  <thead className="bg-gray-50">
+                                    <tr>
+                                      {Object.keys(result.results[0]).map((key) => (
+                                        <th
+                                          key={key}
+                                          className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
+                                        >
+                                          {key}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {paginatedResults.map((row, idx) => (
+                                      <tr key={startIdx + idx} className="hover:bg-gray-50">
+                                        {Object.values(row).map((value, vidx) => (
+                                          <td key={vidx} className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                                            {value === null ? (
+                                              <span className="text-gray-400 italic">null</span>
+                                            ) : (
+                                              String(value)
+                                            )}
+                                          </td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+
+                                {/* Pagination Controls */}
+                                {totalRows > 10 && (
+                                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-t border-gray-200">
+                                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                                      <span>Rows per page:</span>
+                                      <select
+                                        value={pageSize}
+                                        onChange={(e) => {
+                                          const newSize = parseInt(e.target.value);
+                                          setPageSizes((prev) => ({ ...prev, [result.connection_id]: newSize }));
+                                          setCurrentPages((prev) => ({ ...prev, [result.connection_id]: 1 }));
+                                        }}
+                                        className="border border-gray-300 rounded px-1 py-0.5 text-xs"
+                                      >
+                                        <option value={10}>10</option>
+                                        <option value={25}>25</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                      </select>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                                      <span>
+                                        {startIdx + 1}-{endIdx} of {totalRows}
+                                      </span>
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          onClick={() =>
+                                            setCurrentPages((prev) => ({
+                                              ...prev,
+                                              [result.connection_id]: Math.max(1, currentPage - 1),
+                                            }))
+                                          }
+                                          disabled={currentPage === 1}
+                                          className="p-1 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            setCurrentPages((prev) => ({
+                                              ...prev,
+                                              [result.connection_id]: Math.min(totalPages, currentPage + 1),
+                                            }))
+                                          }
+                                          disabled={currentPage === totalPages}
+                                          className="p-1 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>

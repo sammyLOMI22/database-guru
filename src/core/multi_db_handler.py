@@ -266,6 +266,7 @@ class MultiDatabaseHandler:
         combined_schema_data: Dict[str, Any],
         allow_write: bool = False,
         model_used: str = "unknown",
+        row_limit: int = 100,
     ) -> Dict[str, Any]:
         """
         Internal helper method to execute a single database query with self-correction
@@ -306,6 +307,7 @@ class MultiDatabaseHandler:
                 allow_write=allow_write,
                 schema_dict=db_schema_dict,
                 model=model_used,
+                row_limit=row_limit,
             )
 
             # Return result with connection metadata
@@ -344,6 +346,7 @@ class MultiDatabaseHandler:
         max_retries: int = 3,
         schema_dict: Optional[Dict] = None,
         model: Optional[str] = None,
+        row_limit: int = 100,
     ) -> Dict[str, Any]:
         """
         Execute a SQL query on a specific database WITH self-correction
@@ -360,6 +363,7 @@ class MultiDatabaseHandler:
             max_retries: Maximum number of retry attempts
             schema_dict: Optional schema dict for location normalization
             model: Optional model name to use for SQL generation
+            row_limit: Maximum rows for SQL LIMIT clause (1-10000, default 100)
 
         Returns:
             Dict with execution results including correction attempts
@@ -401,6 +405,7 @@ class MultiDatabaseHandler:
                         model=model,
                         schema_inspector=self.schema_inspector,  # Pass for tool-using agent
                         connection_id=connection.id,  # Pass for tool-using agent
+                        row_limit=row_limit,
                     )
 
                 # Add connection metadata

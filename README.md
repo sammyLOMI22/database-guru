@@ -209,6 +209,8 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Multi-database queries** - Query multiple databases simultaneously with parallel execution
 - ✅ **Advanced Visualization (NEW!)** - 10 chart types (Bar, Line, Pie, Scatter, Area, Histogram, Box Plot, Treemap, Sunburst, Bubble) with intelligent auto-detection, manual override, export to CSV/JSON/ZIP
 - ✅ **Cross-Database Comparison Charts** - Visual comparison across databases with auto-detection
+- ✅ **Configurable Row Limits (NEW!)** - Select from 10 to 10,000 rows per query via dropdown
+- ✅ **Result Table Pagination (NEW!)** - Navigate through large result sets with 10/25/50/100 rows per page
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
@@ -1240,6 +1242,53 @@ All improvements maintain the existing color scheme and design language for cons
 
 ---
 
+## 📊 Row Limits & Result Pagination (NEW!)
+
+Database Guru now gives you full control over query result sizes with configurable row limits and paginated result tables.
+
+### Row Limit Selector
+
+Choose how many rows to return per query with a convenient dropdown:
+
+| Option | Use Case |
+|--------|----------|
+| **10 rows** | Quick preview, testing |
+| **25 rows** | Small datasets |
+| **50 rows** | Medium datasets |
+| **100 rows** (default) | Standard queries |
+| **250 rows** | Larger analysis |
+| **500 rows** | Detailed exploration |
+| **1,000 rows** | Comprehensive data |
+| **5,000 rows** | Large exports |
+| **10,000 rows** | Maximum data retrieval |
+
+The selected limit is passed to the SQL generation, which includes an appropriate `LIMIT` clause (unless doing aggregations like `COUNT`/`SUM`/`AVG`).
+
+### Result Table Pagination
+
+Navigate through large result sets with built-in pagination:
+
+- **Rows per page**: 10, 25, 50, or 100 rows per page
+- **Navigation**: Previous/Next buttons to cycle through pages
+- **Range indicator**: "1-10 of 250" shows current position
+- **Independent pagination**: Each database result in multi-database queries has its own pagination
+- **Page size memory**: Selection persists while viewing results
+
+### Example:
+```
+Query: "Show me all products" with 500 row limit
+
+Result: 487 rows returned
+Table shows: 1-10 of 487
+[Rows per page: 10 ▼]  [< Prev] [1-10 of 487] [Next >]
+
+Change to 50 rows per page:
+Table shows: 1-50 of 487
+[Rows per page: 50 ▼]  [< Prev] [1-50 of 487] [Next >]
+```
+
+---
+
 ## 📊 Advanced Visualization (NEW!)
 
 Database Guru now includes **intelligent chart visualization** with automatic chart type detection and manual override capabilities!
@@ -1310,9 +1359,9 @@ Scatter plots require **minimum 10 data points** to avoid spurious correlations 
 Database Guru has comprehensive test coverage with automated testing for all major components.
 
 ### Quick Test Status
-![Tests](https://img.shields.io/badge/tests-180%2B%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-200%2B%20passing-brightgreen)
 ![Backend Tests](https://img.shields.io/badge/backend-80%20tests-brightgreen)
-![Frontend Tests](https://img.shields.io/badge/frontend-103%20tests-brightgreen)
+![Frontend Tests](https://img.shields.io/badge/frontend-120%20tests-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-55%25-yellow)
 ![Components](https://img.shields.io/badge/components-fully%20tested-brightgreen)
 
@@ -1346,6 +1395,9 @@ open htmlcov/index.html
 - ✅ **Semantic Cache UI**: 43/43 tests (100% coverage) - NEW!
   - Backend cache endpoints: 9 tests
   - Frontend cache components: 34 tests (SemanticCachePanel, CacheOverview, CacheStatistics, RecentCachedQueries, QueryResults badge)
+- ✅ **Row Limit & Pagination**: 26/26 tests (100% coverage) - NEW!
+  - QueryResults pagination: 10 tests (navigation, page size, boundary conditions)
+  - MultiDatabaseResults pagination: 16 tests (per-database controls, independent navigation)
 - ✅ Confidence Scoring: 31/31 tests (100% coverage)
 - ✅ Result Verification Agent: 14/14 tests (89% coverage)
 - ✅ Correction Learner: 13/13 tests (87% coverage)

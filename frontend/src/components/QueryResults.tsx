@@ -1,4 +1,4 @@
-import { Copy, Check, MessageSquare, Zap, Database } from 'lucide-react';
+import { Copy, Check, MessageSquare, Zap, Database, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import {
   AgentTrace as AgentTraceType,
@@ -77,6 +77,15 @@ export default function QueryResults({
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [selectedChartType, setSelectedChartType] = useState<ChartType | null>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset pagination when results change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [results]);
 
   // Auto-select chart type and view mode when preferred chart type is provided
   useEffect(() => {
@@ -287,43 +296,99 @@ export default function QueryResults({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    {Object.keys(results[0]).map((column) => (
-                      <th
-                        key={column}
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
-                      >
-                        {column}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {results.map((row, rowIndex) => (
-                    <tr
-                      key={rowIndex}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      {Object.values(row).map((value, colIndex) => (
-                        <td
-                          key={colIndex}
-                          className="px-4 py-3 text-sm text-gray-900 font-mono"
-                        >
-                          {value === null ? (
-                            <span className="text-gray-400 italic">null</span>
-                          ) : typeof value === 'object' ? (
-                            JSON.stringify(value)
-                          ) : (
-                            String(value)
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {(() => {
+                const totalRows = results.length;
+                const totalPages = Math.ceil(totalRows / pageSize);
+                const startIdx = (currentPage - 1) * pageSize;
+                const endIdx = Math.min(startIdx + pageSize, totalRows);
+                const paginatedResults = results.slice(startIdx, endIdx);
+
+                return (
+                  <>
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          {Object.keys(results[0]).map((column) => (
+                            <th
+                              key={column}
+                              className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
+                            >
+                              {column}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {paginatedResults.map((row, rowIndex) => (
+                          <tr
+                            key={startIdx + rowIndex}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
+                            {Object.values(row).map((value, colIndex) => (
+                              <td
+                                key={colIndex}
+                                className="px-4 py-3 text-sm text-gray-900 font-mono"
+                              >
+                                {value === null ? (
+                                  <span className="text-gray-400 italic">null</span>
+                                ) : typeof value === 'object' ? (
+                                  JSON.stringify(value)
+                                ) : (
+                                  String(value)
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {/* Pagination Controls */}
+                    {totalRows > 10 && (
+                      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-200">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <span>Rows per page:</span>
+                          <select
+                            value={pageSize}
+                            onChange={(e) => {
+                              setPageSize(parseInt(e.target.value));
+                              setCurrentPage(1);
+                            }}
+                            className="border border-gray-300 rounded px-2 py-1 text-sm"
+                          >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-sm text-gray-600">
+                          <span>
+                            {startIdx + 1}-{endIdx} of {totalRows}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                              disabled={currentPage === 1}
+                              className="p-1 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <ChevronLeft className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                              disabled={currentPage === totalPages}
+                              className="p-1 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <ChevronRight className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>

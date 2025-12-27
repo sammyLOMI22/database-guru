@@ -602,7 +602,7 @@ class TestQueryIntegration:
 
         # Fetch first page
         response1 = client.get("/api/query/history?limit=5&offset=0")
-        assert response.status_code == 200
+        assert response1.status_code == 200
         page1 = response1.json()
         assert len(page1) == 5
 

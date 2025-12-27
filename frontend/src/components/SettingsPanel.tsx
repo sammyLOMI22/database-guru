@@ -9,6 +9,7 @@ interface SystemSettings {
   test_before_learning: boolean;
   enable_audit_log: boolean;
   max_audit_log_days: number;
+  query_quality_level: number;  // 0-100 scale
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +59,7 @@ export function SettingsPanel() {
           test_before_learning: settings.test_before_learning,
           enable_audit_log: settings.enable_audit_log,
           max_audit_log_days: settings.max_audit_log_days,
+          query_quality_level: settings.query_quality_level,
         }),
       });
 
@@ -169,6 +171,73 @@ export function SettingsPanel() {
 
         {/* Settings Form */}
         <div className="p-6 space-y-8">
+          {/* Query Quality Section */}
+          <div className="space-y-4 pb-6 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+              <span>🎯 Query Quality</span>
+            </h3>
+
+            <div className="p-4 bg-gradient-to-r from-green-50 via-blue-50 to-purple-50 border border-gray-200 rounded-lg">
+              <label className="block font-semibold text-gray-900 mb-2">
+                Quality Level: {settings.query_quality_level}%
+              </label>
+              <p className="text-sm text-gray-600 mb-4">
+                Balance between query speed and accuracy
+              </p>
+
+              <div className="flex items-center space-x-4">
+                <span className="text-xs font-medium text-green-600">Fast</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={settings.query_quality_level}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    query_quality_level: parseInt(e.target.value)
+                  })}
+                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <span className="text-xs font-medium text-purple-600">Thorough</span>
+              </div>
+
+              {/* Mode Description */}
+              <div className="mt-4 p-3 bg-white border border-gray-200 rounded text-sm">
+                {settings.query_quality_level <= 30 && (
+                  <div className="text-green-700">
+                    <strong className="block">Fast Mode (0-30%)</strong>
+                    <ul className="mt-1 ml-4 list-disc text-xs">
+                      <li>Minimal query planning</li>
+                      <li>Basic prompts, 1 retry max</li>
+                      <li>Best for simple queries</li>
+                    </ul>
+                  </div>
+                )}
+                {settings.query_quality_level > 30 && settings.query_quality_level <= 70 && (
+                  <div className="text-blue-700">
+                    <strong className="block">Balanced Mode (31-70%) - Recommended</strong>
+                    <ul className="mt-1 ml-4 list-disc text-xs">
+                      <li>Smart query planning for complex queries</li>
+                      <li>Location-aware hints (NY, CA, etc.)</li>
+                      <li>Result verification, 3 retries</li>
+                    </ul>
+                  </div>
+                )}
+                {settings.query_quality_level > 70 && (
+                  <div className="text-purple-700">
+                    <strong className="block">Thorough Mode (71-100%)</strong>
+                    <ul className="mt-1 ml-4 list-disc text-xs">
+                      <li>Full planning for all queries</li>
+                      <li>Rich context, tool exploration</li>
+                      <li>Maximum retries, best accuracy</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Auto-Learning Section */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
