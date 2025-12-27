@@ -222,6 +222,7 @@ async def process_query(
             schema_inspector = SchemaInspector()
 
             # Get actual database schema from USER's database
+            schema_data = None  # Will be set if auto-introspected (needed for LocationMapper)
             if request.schema:
                 # Use provided schema
                 schema = request.schema
@@ -262,6 +263,7 @@ async def process_query(
                 database_type=database_type,
                 allow_write=request.allow_write,
                 model=request.model,
+                schema_dict=schema_data,  # Pass for LocationMapper (location hints)
                 connection_name=active_connection.name,  # Pass connection name for learned mappings
                 schema_inspector=schema_inspector,  # Pass for tool-using agent
                 connection_id=active_connection.id,  # Pass for tool-using agent
