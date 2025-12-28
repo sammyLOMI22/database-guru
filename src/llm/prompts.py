@@ -186,6 +186,7 @@ def build_chat_messages(
     database_type: str = "postgresql",
     conversation_history: list = None,
     row_limit: int = 100,
+    examples: str = "",
 ) -> list:
     """
     Build chat messages for conversation-based SQL generation
@@ -196,6 +197,7 @@ def build_chat_messages(
         database_type: Type of database
         conversation_history: Previous conversation messages
         row_limit: Maximum rows to return (default: 100)
+        examples: Optional few-shot examples to include
 
     Returns:
         List of message dictionaries
@@ -208,8 +210,10 @@ def build_chat_messages(
     if conversation_history:
         messages.extend(conversation_history)
 
-    # Add current question with row limit
-    user_message = build_sql_prompt(question, schema, database_type, row_limit=row_limit)
+    # Add current question with row limit and examples
+    user_message = build_sql_prompt(
+        question, schema, database_type, examples=examples, row_limit=row_limit
+    )
     messages.append({"role": "user", "content": user_message})
 
     return messages
@@ -277,6 +281,47 @@ Example 11 (Simple filter - use columns that exist in schema):
 Question: Find products in a specific category
 SQL: SELECT * FROM products WHERE category_id = (SELECT id FROM categories WHERE name LIKE '%search_term%') LIMIT 100
 """
+
+
+def build_few_shot_examples(
+    schema_dict: dict = None,
+    intent=None,
+    row_limit: int = 10
+) -> str:
+    """Build few-shot examples - dynamic if schema provided, else static.
+
+    When a schema dictionary is provided, generates examples using the ACTUAL
+    table and column names from that schema. This prevents the LLM from copying
+    example table names (like "users", "products") that may not exist.
+
+    Args:
+        schema_dict: Parsed schema dictionary from SchemaInspector
+        intent: Optional QueryIntent to prioritize relevant examples
+        row_limit: Default LIMIT clause value for examples
+
+    Returns:
+        Formatted string of examples for inclusion in prompt
+    """
+    if schema_dict:
+        try:
+            from src.llm.dynamic_example_generator import DynamicExampleGenerator
+            generator = DynamicExampleGenerator(schema_dict)
+
+            if intent:
+                # Intent-specific examples
+                return generator.get_intent_specific_examples(intent, row_limit)
+            else:
+                # General examples
+                return generator.generate_examples(row_limit=row_limit)
+        except Exception as e:
+            # Fallback to static examples on error
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Dynamic example generation failed, using static: {e}"
+            )
+
+    # Fallback: use static examples with disclaimer
+    return FEW_SHOT_EXAMPLES
 
 
 NARRATIVE_GENERATION_PROMPT = """You are a data analyst explaining query results to a user in plain English.

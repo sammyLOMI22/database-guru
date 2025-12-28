@@ -12,6 +12,7 @@ from src.llm.prompts import (
     build_sql_prompt,
     build_chat_messages,
     FEW_SHOT_EXAMPLES,
+    build_few_shot_examples,
     MULTI_DATABASE_SYSTEM_PROMPT,
     MULTI_DATABASE_QUERY_TEMPLATE,
 )
@@ -320,12 +321,29 @@ class SQLGenerator:
                     logger.warning(f"LLM cache lookup failed: {e}")
 
             # Build prompt with enhanced question (includes location hints if enabled)
-            examples = FEW_SHOT_EXAMPLES if use_few_shot else ""
+            # Use dynamic examples if schema_dict is available and quality profile enables it
+            examples = ""
+            if use_few_shot:
+                use_dynamic = (
+                    quality_profile and
+                    quality_profile.use_dynamic_examples and
+                    schema_dict
+                )
+                if use_dynamic:
+                    # Generate schema-specific examples
+                    examples = build_few_shot_examples(schema_dict=schema_dict, row_limit=row_limit)
+                    logger.debug("Using dynamic schema-specific examples")
+                else:
+                    # Fall back to static examples
+                    examples = FEW_SHOT_EXAMPLES
+                    logger.debug("Using static few-shot examples")
+
             messages = build_chat_messages(
                 question=enhanced_question,
                 schema=schema,
                 database_type=database_type,
                 row_limit=row_limit,
+                examples=examples,
             )
 
             # Determine temperature from quality profile or use default

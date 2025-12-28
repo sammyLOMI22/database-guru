@@ -835,6 +835,60 @@ class SelfCorrectingSQLAgent:
                 trace.add_step("warning", f"Query planning failed: {str(e)[:100]}")
                 logger.warning(f"Query planning failed, falling back to direct generation: {e}")
 
+        # === PRE-GENERATION: Query Intent Classification ===
+        # Detect impossible queries BEFORE wasting an LLM call
+        intent_result = None
+        if schema_dict and self.quality_profile and self.quality_profile.enable_intent_classification:
+            try:
+                from src.llm.query_intent_classifier import QueryIntentClassifier, QueryIntent
+
+                classifier = QueryIntentClassifier(schema_dict)
+                intent_result = classifier.classify(question)
+
+                trace.add_step(
+                    "intent_classification",
+                    f"Query intent: {intent_result.intent.value} (confidence: {intent_result.confidence:.2f})",
+                    metadata={
+                        "intent": intent_result.intent.value,
+                        "confidence": intent_result.confidence,
+                        "entities_found": len(intent_result.extracted_entities),
+                        "tables_required": list(intent_result.required_tables),
+                        "can_answer": intent_result.can_answer(),
+                    }
+                )
+                logger.info(
+                    f"🎯 Query intent: {intent_result.intent.value} "
+                    f"(confidence: {intent_result.confidence:.2f}, "
+                    f"entities: {len(intent_result.extracted_entities)})"
+                )
+
+                # Early exit for IMPOSSIBLE queries
+                if not intent_result.can_answer():
+                    logger.info(f"❌ Query cannot be answered: {intent_result.impossible_reason}")
+                    trace.add_step(
+                        "cannot_answer",
+                        f"Pre-generation validation: {intent_result.impossible_reason}",
+                        metadata={"suggestions": intent_result.suggestions}
+                    )
+                    return {
+                        "success": False,
+                        "sql": "",
+                        "result": None,
+                        "error": f"Cannot answer this query. {intent_result.impossible_reason}",
+                        "attempts": [],
+                        "self_corrected": False,
+                        "total_attempts": 0,
+                        "agent_trace": trace.to_dict(),
+                        "cannot_answer": True,
+                        "cannot_answer_reason": intent_result.impossible_reason,
+                        "suggestions": intent_result.suggestions,
+                        "intent_classification": intent_result.to_dict(),
+                    }
+
+            except Exception as e:
+                logger.warning(f"Intent classification failed (continuing): {e}")
+                trace.add_step("warning", f"Intent classification skipped: {str(e)[:100]}")
+
         for attempt_num in range(1, self.max_retries + 1):
             try:
                 trace.add_step("attempt_start", f"Starting attempt {attempt_num}/{self.max_retries}")

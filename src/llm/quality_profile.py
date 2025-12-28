@@ -60,6 +60,11 @@ class QualityProfile:
 
         # Tools
         enable_tool_exploration: Use tools to explore schema before SQL generation
+
+        # Pre-Generation Semantic Understanding (NEW)
+        enable_intent_classification: Classify query intent before SQL generation
+        enable_pre_validation: Validate schema can satisfy query before LLM call
+        use_dynamic_examples: Generate schema-specific few-shot examples
     """
     level: QualityLevel
     raw_value: int
@@ -88,6 +93,11 @@ class QualityProfile:
 
     # Tools
     enable_tool_exploration: bool
+
+    # Pre-Generation Semantic Understanding (NEW)
+    enable_intent_classification: bool
+    enable_pre_validation: bool
+    use_dynamic_examples: bool
 
     def __str__(self) -> str:
         return f"QualityProfile({self.level.value}, {self.raw_value}%)"
@@ -153,6 +163,10 @@ def get_quality_profile(quality_level: int) -> QualityProfile:
             enable_result_verification=False,
             # Tools - disabled
             enable_tool_exploration=False,
+            # Pre-Generation - disabled for speed
+            enable_intent_classification=False,
+            enable_pre_validation=False,
+            use_dynamic_examples=False,
         )
     elif quality_level <= 70:
         # BALANCED: Good accuracy with reasonable speed
@@ -179,6 +193,10 @@ def get_quality_profile(quality_level: int) -> QualityProfile:
             enable_result_verification=True,
             # Tools - disabled for speed
             enable_tool_exploration=False,
+            # Pre-Generation - enabled for better accuracy
+            enable_intent_classification=True,
+            enable_pre_validation=True,
+            use_dynamic_examples=True,
         )
     else:
         # THOROUGH: Maximum accuracy
@@ -205,6 +223,10 @@ def get_quality_profile(quality_level: int) -> QualityProfile:
             enable_result_verification=True,
             # Tools - enabled for exploration
             enable_tool_exploration=True,
+            # Pre-Generation - enabled for maximum accuracy
+            enable_intent_classification=True,
+            enable_pre_validation=True,
+            use_dynamic_examples=True,
         )
 
 
