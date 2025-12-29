@@ -40,6 +40,14 @@ except ImportError:
     CONFIDENCE_SCORING_AVAILABLE = False
     logger.warning("Confidence scorer not available - confidence scoring disabled")
 
+# Import Semantic Validator (Phase 3)
+try:
+    from src.llm.sql_semantic_validator import SQLSemanticValidator, SemanticMismatchType
+    SEMANTIC_VALIDATION_AVAILABLE = True
+except ImportError:
+    SEMANTIC_VALIDATION_AVAILABLE = False
+    logger.warning("Semantic validator not available - semantic validation disabled")
+
 
 class AgentTrace:
     """
@@ -1165,6 +1173,67 @@ class SelfCorrectingSQLAgent:
                 # Validate SQL before executing
                 if not gen_result.get("is_valid", True) if attempt_num == 1 else True:
                     logger.warning(f"Generated SQL failed validation: {gen_result.get('warnings')}")
+
+                # === POST-GENERATION: Semantic Validation (Phase 3) ===
+                # Validate that SQL matches the detected intent BEFORE execution
+                if (SEMANTIC_VALIDATION_AVAILABLE and
+                    intent_result is not None and
+                    self.quality_profile and
+                    self.quality_profile.enable_semantic_validation and
+                    attempt_num == 1):  # Only validate on first attempt
+                    try:
+                        semantic_validator = SQLSemanticValidator()
+                        validation_result = semantic_validator.validate(
+                            sql=sql,
+                            intent_result=intent_result,
+                            question=question
+                        )
+
+                        trace.add_step(
+                            "semantic_validation",
+                            f"Semantic validation: {'passed' if validation_result.is_valid else 'failed'} "
+                            f"(confidence: {validation_result.confidence:.2f})",
+                            metadata={
+                                "is_valid": validation_result.is_valid,
+                                "confidence": validation_result.confidence,
+                                "mismatch_type": validation_result.mismatch_type.value,
+                                "details": validation_result.mismatch_details[:3],
+                                "validation_time_ms": validation_result.validation_time_ms,
+                            }
+                        )
+
+                        if not validation_result.is_valid:
+                            # SQL doesn't match intent - use hints for regeneration
+                            logger.warning(
+                                f"❌ Semantic validation failed: {validation_result.mismatch_type.value} - "
+                                f"{', '.join(validation_result.mismatch_details[:2])}"
+                            )
+
+                            # Build regeneration context
+                            regen_hints = validation_result.get_regeneration_hints()
+                            last_error = f"Semantic validation: {regen_hints}"
+
+                            # Record as failed attempt and continue to retry
+                            attempt = CorrectionAttempt(
+                                attempt_number=attempt_num,
+                                sql=sql,
+                                error=last_error,
+                                error_type=ErrorType.SEMANTIC_ERROR if hasattr(ErrorType, 'SEMANTIC_ERROR') else ErrorType.UNKNOWN,
+                                success=False,
+                                execution_time_ms=0.0,
+                                row_count=0,
+                                confidence_score=None
+                            )
+                            attempts.append(attempt)
+                            continue  # Skip to next attempt with hints
+
+                        logger.info(
+                            f"✅ Semantic validation passed (confidence: {validation_result.confidence:.2f})"
+                        )
+
+                    except Exception as e:
+                        logger.warning(f"Semantic validation failed (continuing): {e}")
+                        trace.add_step("warning", f"Semantic validation skipped: {str(e)[:100]}")
 
                 # Execute SQL
                 trace.add_step("execution", f"Executing SQL query")

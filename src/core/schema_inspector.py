@@ -5,6 +5,8 @@ from sqlalchemy import text, inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.engine import Inspector
 
+from src.core.column_semantics import ColumnSemanticsDetector, ColumnSemanticType
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,7 +17,7 @@ class SchemaInspector:
 
     def __init__(self):
         """Initialize schema inspector"""
-        pass
+        self.semantics_detector = ColumnSemanticsDetector()
 
     async def _execute_query(self, session, query, params=None):
         """
@@ -134,10 +136,12 @@ class SchemaInspector:
                 # Get indexes
                 indexes = await self.get_indexes(session, table_name, schema_name)
 
-                # Sample values for key columns
+                # Sample values for key columns and detect semantic types
                 if include_samples:
                     for column in columns:
                         col_name = column.get("name", "").lower()
+                        col_type = column.get("type", "")
+
                         # Check if this is a column we should sample
                         if any(keyword in col_name for keyword in sample_column_keywords):
                             samples = await self.sample_column_values(
@@ -146,6 +150,23 @@ class SchemaInspector:
                             if samples:
                                 column["sample_values"] = samples
                                 logger.info(f"📊 Sampled {table_name}.{column['name']}: {samples}")
+
+                                # Detect semantic type based on name, type, and sample values
+                                semantics = self.semantics_detector.detect(
+                                    column["name"], col_type, samples
+                                )
+                                column["semantic_type"] = semantics.semantic_type.value
+                                if semantics.location_subtype:
+                                    column["location_subtype"] = semantics.location_subtype
+                                if semantics.value_format:
+                                    column["value_format"] = semantics.value_format
+                                column["semantic_confidence"] = semantics.confidence
+
+                                logger.info(
+                                    f"🧠 Detected {table_name}.{column['name']}: "
+                                    f"{semantics.semantic_type.value} "
+                                    f"(format={semantics.value_format}, conf={semantics.confidence:.2f})"
+                                )
 
                 schema["tables"][table_name] = {
                     "columns": columns,
@@ -535,6 +556,23 @@ class SchemaInspector:
                 nullable = "NULL" if col["nullable"] else "NOT NULL"
                 pk_marker = " [PK]" if col["name"] in table_info["primary_keys"] else ""
 
+                # Add semantic type hint if detected (helps LLM understand column purpose)
+                semantic_hint = ""
+                if col.get("semantic_type"):
+                    sem_type = col["semantic_type"]
+                    if sem_type == "location":
+                        # Provide location-specific guidance
+                        fmt = col.get("value_format", "unknown")
+                        subtype = col.get("location_subtype", "")
+                        if fmt == "code":
+                            semantic_hint = f" [LOCATION:{subtype} - use 2-letter codes like 'CA', 'NY']"
+                        elif fmt == "full_name":
+                            semantic_hint = f" [LOCATION:{subtype} - use full names like 'California', 'New York']"
+                        else:
+                            semantic_hint = f" [LOCATION:{subtype}]"
+                    elif sem_type == "categorical":
+                        semantic_hint = " [CATEGORICAL - use exact enum values]"
+
                 # Add sample values if available (helps LLM understand format)
                 sample_hint = ""
                 if "sample_values" in col and col["sample_values"]:
@@ -542,7 +580,7 @@ class SchemaInspector:
                     sample_str = ", ".join(repr(s) for s in samples[:5])
                     sample_hint = f"  // Examples: {sample_str}"
 
-                lines.append(f"    - {col['name']}: {col['type']} {nullable}{pk_marker}{sample_hint}")
+                lines.append(f"    - {col['name']}: {col['type']} {nullable}{pk_marker}{semantic_hint}{sample_hint}")
 
             # Foreign keys
             if table_info["foreign_keys"]:

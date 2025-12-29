@@ -255,10 +255,10 @@ class QueryIntentClassifier:
         # Ranking/comparison words
         'top', 'bottom', 'highest', 'lowest', 'best', 'worst', 'most',
         'least', 'maximum', 'minimum', 'average', 'mean', 'median',
-        # Location words (these are detected separately)
-        'california', 'texas', 'new', 'york', 'florida', 'illinois',
-        'ohio', 'georgia', 'carolina', 'virginia', 'state', 'city',
-        'country', 'region', 'location', 'address',
+        # NOTE: Location words (california, texas, new york, etc.) are NOT in STOP_WORDS
+        # They are detected separately by LocationMapper and excluded dynamically
+        # to avoid breaking multi-word locations like "New York"
+        'state', 'city', 'country', 'region', 'location', 'address',
         # Other common words
         'there', 'here', 'dollars', 'price', 'revenue', 'cost', 'sales',
         'priced', 'order', 'ordered', 'product', 'item', 'record',
@@ -422,16 +422,26 @@ class QueryIntentClassifier:
         entities = []
         question_lower = question.lower()
 
-        # Extract location entities (reuse LocationMapper)
-        entities.extend(self._extract_locations(question))
+        # Step 1: Extract location entities FIRST (reuse LocationMapper)
+        # This ensures multi-word locations like "New York" are detected before
+        # individual words get filtered as table/column candidates
+        location_entities = self._extract_locations(question)
+        entities.extend(location_entities)
 
-        # Extract table-like words
-        entities.extend(self._extract_table_entities(question_lower))
+        # Build set of words that are part of detected locations
+        # These should NOT be treated as table or column names
+        location_words = set()
+        for loc_entity in location_entities:
+            # Split multi-word locations (e.g., "New York" -> {"new", "york"})
+            location_words.update(loc_entity.original_text.lower().split())
 
-        # Extract column-like words
-        entities.extend(self._extract_column_entities(question_lower))
+        # Step 2: Extract table-like words, excluding location words
+        entities.extend(self._extract_table_entities(question_lower, exclude_words=location_words))
 
-        # Extract numeric values
+        # Step 3: Extract column-like words, excluding location words
+        entities.extend(self._extract_column_entities(question_lower, exclude_words=location_words))
+
+        # Step 4: Extract numeric values
         entities.extend(self._extract_value_entities(question))
 
         return entities
@@ -455,10 +465,16 @@ class QueryIntentClassifier:
             logger.debug("LocationMapper not available")
         return entities
 
-    def _extract_table_entities(self, question: str) -> List[ExtractedEntity]:
-        """Extract potential table references."""
+    def _extract_table_entities(self, question: str, exclude_words: Set[str] = None) -> List[ExtractedEntity]:
+        """Extract potential table references.
+
+        Args:
+            question: The question text (lowercase)
+            exclude_words: Words to exclude (e.g., detected location words like "new", "york")
+        """
         entities = []
         seen = set()
+        exclude = exclude_words or set()
 
         # Use table patterns
         for pattern in self.TABLE_PATTERNS:
@@ -467,9 +483,9 @@ class QueryIntentClassifier:
                 if isinstance(match, tuple):
                     # Take the capturing group that looks like a table name
                     for m in match:
-                        if m and m.lower() not in self.STOP_WORDS and m not in seen:
+                        if m and m.lower() not in self.STOP_WORDS and m.lower() not in exclude and m not in seen:
                             self._add_table_entity(entities, m, seen)
-                elif match and match.lower() not in self.STOP_WORDS and match not in seen:
+                elif match and match.lower() not in self.STOP_WORDS and match.lower() not in exclude and match not in seen:
                     self._add_table_entity(entities, match, seen)
 
         # Also check individual words that look like table names
@@ -477,6 +493,7 @@ class QueryIntentClassifier:
         for word in words:
             if (len(word) > 3 and
                 word not in self.STOP_WORDS and
+                word not in exclude and
                 word not in seen and
                 self._looks_like_table(word)):
                 self._add_table_entity(entities, word, seen)
@@ -496,19 +513,25 @@ class QueryIntentClassifier:
             schema_match=match
         ))
 
-    def _extract_column_entities(self, question: str) -> List[ExtractedEntity]:
-        """Extract potential column references."""
+    def _extract_column_entities(self, question: str, exclude_words: Set[str] = None) -> List[ExtractedEntity]:
+        """Extract potential column references.
+
+        Args:
+            question: The question text (lowercase)
+            exclude_words: Words to exclude (e.g., detected location words like "new", "york")
+        """
         entities = []
         seen = set()
+        exclude = exclude_words or set()
 
         for pattern in self.COLUMN_PATTERNS:
             matches = re.findall(pattern, question, re.IGNORECASE)
             for match in matches:
                 if isinstance(match, tuple):
                     for m in match:
-                        if m and m.lower() not in self.STOP_WORDS and m not in seen:
+                        if m and m.lower() not in self.STOP_WORDS and m.lower() not in exclude and m not in seen:
                             self._add_column_entity(entities, m, seen)
-                elif match and match.lower() not in self.STOP_WORDS and match not in seen:
+                elif match and match.lower() not in self.STOP_WORDS and match.lower() not in exclude and match not in seen:
                     self._add_column_entity(entities, match, seen)
 
         return entities

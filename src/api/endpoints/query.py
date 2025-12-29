@@ -23,7 +23,7 @@ from src.llm.sql_generator import SQLGenerator
 from src.llm.self_correcting_agent import SelfCorrectingSQLAgent, AgentTrace
 from src.llm.conversational_memory_agent import get_memory_agent
 from src.llm.result_narrator import ResultNarrator
-from src.llm.quality_profile import get_quality_profile
+from src.llm.quality_profile import get_quality_profile, get_quality_profile_with_settings
 from src.api.endpoints.settings import get_or_create_settings
 from src.cache.redis_client import RedisCache
 from src.cache.semantic_cache import SemanticCache
@@ -240,9 +240,16 @@ async def process_query(
                 schema = schema_inspector.format_schema_for_llm(schema_data)
                 logger.debug(f"Using schema with {len(schema_data['tables'])} tables")
 
-            # Load system settings and create quality profile
+            # Load system settings and create quality profile with semantic settings
             settings_record = await get_or_create_settings(db)
-            quality_profile = get_quality_profile(settings_record.query_quality_level)
+            quality_profile = get_quality_profile_with_settings(
+                settings_record.query_quality_level,
+                system_settings={
+                    'enable_intent_classification': settings_record.enable_intent_classification,
+                    'enable_dynamic_examples': settings_record.enable_dynamic_examples,
+                    'enable_semantic_validation': settings_record.enable_semantic_validation,
+                }
+            )
             logger.info(f"Using quality profile: {quality_profile.level.value} (level={settings_record.query_quality_level})")
 
             # Use Self-Correcting Agent for automatic error recovery

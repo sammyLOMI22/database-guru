@@ -132,10 +132,10 @@ class RequiredDataDetector:
         # Ranking/comparison words
         'top', 'bottom', 'highest', 'lowest', 'best', 'worst', 'most',
         'least', 'maximum', 'minimum', 'average', 'mean', 'median',
-        # Location words (detected separately via LocationMapper)
-        'california', 'texas', 'new', 'york', 'florida', 'illinois',
-        'ohio', 'georgia', 'carolina', 'virginia', 'state', 'city',
-        'country', 'region', 'location', 'address',
+        # NOTE: Location words (california, texas, new york, etc.) are NOT in STOP_WORDS
+        # They are detected separately by LocationMapper and excluded dynamically
+        # to avoid breaking multi-word locations like "New York"
+        'state', 'city', 'country', 'region', 'location', 'address',
         # Other common words
         'there', 'here', 'dollars', 'price', 'revenue', 'cost', 'sales',
         'priced', 'order', 'ordered', 'product', 'item', 'record',
@@ -175,9 +175,9 @@ class RequiredDataDetector:
         """Main entry point: detect what data is needed.
 
         Analyzes the question to extract:
-        1. Table references
-        2. Column references
-        3. Location mentions
+        1. Location mentions (FIRST - to exclude from table/column matching)
+        2. Table references
+        3. Column references
         4. Filter values
 
         Then validates all against the schema.
@@ -190,14 +190,25 @@ class RequiredDataDetector:
         """
         question_lower = question.lower()
 
-        # Step 1: Extract potential table references
-        table_candidates = self._extract_table_references(question_lower)
-
-        # Step 2: Extract potential column references
-        column_candidates = self._extract_column_references(question_lower)
-
-        # Step 3: Detect locations (uses LocationMapper)
+        # Step 1: Detect locations FIRST (uses LocationMapper)
+        # This ensures multi-word locations like "New York" are detected before
+        # individual words get filtered as table/column candidates
         locations = self._detect_locations(question)
+
+        # Build set of words that are part of detected locations
+        # These should NOT be treated as table or column names
+        location_words = set()
+        for loc in locations:
+            # Split multi-word locations (e.g., "New York" -> {"new", "york"})
+            original = loc.get('original', '')
+            if original:
+                location_words.update(original.lower().split())
+
+        # Step 2: Extract potential table references, excluding location words
+        table_candidates = self._extract_table_references(question_lower, exclude_words=location_words)
+
+        # Step 3: Extract potential column references, excluding location words
+        column_candidates = self._extract_column_references(question_lower, exclude_words=location_words)
 
         # Step 4: Extract values (for filters)
         values = self._extract_values(question)
@@ -215,14 +226,19 @@ class RequiredDataDetector:
 
         return result
 
-    def _extract_table_references(self, question: str) -> List[str]:
+    def _extract_table_references(self, question: str, exclude_words: Set[str] = None) -> List[str]:
         """Extract potential table names from question.
 
         Uses regex patterns to find words that might be table names,
         then filters out common stop words.
+
+        Args:
+            question: The question text (lowercase)
+            exclude_words: Words to exclude (e.g., detected location words like "new", "york")
         """
         candidates = []
         seen = set()
+        exclude = exclude_words or set()
 
         # Apply patterns
         for pattern in self.TABLE_PATTERNS:
@@ -231,10 +247,10 @@ class RequiredDataDetector:
                 if isinstance(match, tuple):
                     # Add non-stop-word groups
                     for m in match:
-                        if m and m.lower() not in self.STOP_WORDS and m.lower() not in seen:
+                        if m and m.lower() not in self.STOP_WORDS and m.lower() not in exclude and m.lower() not in seen:
                             candidates.append(m)
                             seen.add(m.lower())
-                elif match and match.lower() not in self.STOP_WORDS and match.lower() not in seen:
+                elif match and match.lower() not in self.STOP_WORDS and match.lower() not in exclude and match.lower() not in seen:
                     candidates.append(match)
                     seen.add(match.lower())
 
@@ -244,6 +260,7 @@ class RequiredDataDetector:
             word_lower = word.lower()
             if (len(word) > 3 and
                 word_lower not in self.STOP_WORDS and
+                word_lower not in exclude and
                 word_lower not in seen and
                 self._looks_like_entity_name(word)):
                 candidates.append(word)
@@ -251,20 +268,26 @@ class RequiredDataDetector:
 
         return candidates
 
-    def _extract_column_references(self, question: str) -> List[str]:
-        """Extract potential column names from question."""
+    def _extract_column_references(self, question: str, exclude_words: Set[str] = None) -> List[str]:
+        """Extract potential column names from question.
+
+        Args:
+            question: The question text (lowercase)
+            exclude_words: Words to exclude (e.g., detected location words like "new", "york")
+        """
         candidates = []
         seen = set()
+        exclude = exclude_words or set()
 
         for pattern in self.COLUMN_PATTERNS:
             matches = re.findall(pattern, question, re.IGNORECASE)
             for match in matches:
                 if isinstance(match, tuple):
                     for m in match:
-                        if m and m.lower() not in self.STOP_WORDS and m.lower() not in seen:
+                        if m and m.lower() not in self.STOP_WORDS and m.lower() not in exclude and m.lower() not in seen:
                             candidates.append(m)
                             seen.add(m.lower())
-                elif match and match.lower() not in self.STOP_WORDS and match.lower() not in seen:
+                elif match and match.lower() not in self.STOP_WORDS and match.lower() not in exclude and match.lower() not in seen:
                     candidates.append(match)
                     seen.add(match.lower())
 
