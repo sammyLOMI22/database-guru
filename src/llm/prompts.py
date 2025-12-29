@@ -27,6 +27,16 @@ CRITICAL FOR MULTI-TABLE QUERIES:
 - If using table aliases, you MUST define them: FROM customers c JOIN orders o (not just using c, o without definition)
 - Either use full table names (customers.id) OR define aliases (FROM customers c ... WHERE c.id)
 
+JOIN REASONING (for complex queries involving 2+ tables):
+Before writing the SQL, mentally plan the join path:
+1. Identify the SOURCE table (where the data comes from)
+2. Identify the TARGET table (where the filter/grouping applies)
+3. Find the PATH: Are they directly connected via FK? If not, what bridge table(s) connect them?
+4. Verify each JOIN condition uses matching column types (e.g., id = id, not id = name)
+5. ALWAYS qualify columns with table names when multiple tables are involved to avoid ambiguity
+   - GOOD: SELECT customers.name, orders.total FROM customers JOIN orders
+   - BAD: SELECT name, total FROM customers JOIN orders (ambiguous if both have 'name')
+
 ADDITIONAL RULES:
 11. Generate ONLY the SQL query - no explanations, no markdown, no extra text
 12. Use proper SQL syntax for the specified database type
@@ -37,12 +47,23 @@ ADDITIONAL RULES:
 17. ALWAYS include the table name in SELECT statements (e.g., SELECT * FROM table_name LIMIT 10)
 18. Database names (like "ECommerceTestDB") are NOT table names
 
-LOCATION HANDLING:
-- "New York state" or "state of New York" = use state column with 'NY' (2-letter code)
-- "New York city" = use city column with 'New York' (full name)
-- When queries mention US states (California, Texas, New York, etc.), use 2-letter codes: CA, TX, NY
-- Look for [LOCATION:us_state] hint in schema - these columns use 2-letter codes
-- Look for [CATEGORICAL] hint - these columns use exact values from the examples
+LOCATION HANDLING - DYNAMIC (adapt to actual schema):
+- Look for [LOCATION:us_state] hint in schema - these columns use 2-letter codes (CA, NY, TX)
+- Look for [LOCATION:city] or similar hints - these use full names
+- When query mentions a location (state, city, country), find the table with that location column in the schema
+- If the location column is in a different table than your target data, use JOIN paths from the Foreign Keys section
+- NEVER assume location is in a specific table - CHECK THE SCHEMA for which table has [LOCATION] columns
+
+DYNAMIC JOIN PATH DISCOVERY:
+1. Identify which table has the column you need to filter on (check schema for [LOCATION] or column names)
+2. Find the join path using Foreign Keys section - follow the FK relationships
+3. Use the EXACT column names shown in the schema (id vs customer_id, etc.)
+
+CRITICAL SQL SYNTAX RULES:
+- Column references are: table_name.column_name (e.g., orders.customer_id)
+- NEVER use nested dots like: table.other_table.column - this is INVALID SQL!
+- When joining tables, use the EXACT column names from the schema Foreign Keys section
+- Different databases may have different column names (id vs customer_id) - USE WHAT'S IN THE SCHEMA
 
 Output format: Return ONLY the SQL query, OR "CANNOT_ANSWER: reason" if impossible."""
 
@@ -330,19 +351,33 @@ Example 7:
 Question: Show products grouped by category
 SQL: SELECT category, COUNT(*) as product_count FROM products GROUP BY category
 
-Example 8 (Location filtering pattern - adapt table/column names from schema):
+Example 8 (Location filtering - DYNAMIC based on schema):
 Question: Show me records from California
-SQL: SELECT * FROM [table_with_state_column] WHERE state = 'CA' LIMIT 100
-Note: Use 2-letter state codes (CA, TX, NY) - check schema for which table has state column
+SQL: SELECT * FROM [table_with_state_column] WHERE [state_column] = 'CA' LIMIT 100
+Note: Find the table with [LOCATION:us_state] hint in schema. Use 2-letter codes for US states.
 
-Example 9 (JOIN pattern - use actual table names from schema):
+Example 9 (Multi-table JOIN with location filter - DYNAMIC):
+Question: What items are associated with a specific location?
+Pattern:
+1. Find which table has the location column (look for [LOCATION] hint in schema)
+2. Find the JOIN path from your target table to the location table using Foreign Keys
+3. Build JOINs following the FK relationships with EXACT column names from schema
+SQL Pattern:
+SELECT DISTINCT target.*
+FROM target_table target
+JOIN bridge_table bridge ON target.[pk] = bridge.[fk_to_target]
+JOIN ... (follow FK chain to location table)
+WHERE location_table.[location_column] = 'VALUE'
+Note: Column names vary by database (id vs customer_id, etc.) - USE EXACT NAMES FROM SCHEMA!
+
+Example 10 (JOIN pattern - use actual table names from schema):
 Question: Show products with their categories
 SQL: SELECT p.name, c.name as category_name
 FROM products p
 JOIN categories c ON p.category_id = c.id
 LIMIT 100
 
-Example 10 (Aggregation with GROUP BY):
+Example 11 (Aggregation with GROUP BY):
 Question: Get order totals by product
 SQL: SELECT p.name, SUM(oi.quantity * oi.price) as total_sales
 FROM products p
@@ -350,7 +385,7 @@ JOIN order_items oi ON p.id = oi.product_id
 GROUP BY p.id, p.name
 ORDER BY total_sales DESC LIMIT 10
 
-Example 11 (Simple filter - use columns that exist in schema):
+Example 12 (Simple filter - use columns that exist in schema):
 Question: Find products in a specific category
 SQL: SELECT * FROM products WHERE category_id = (SELECT id FROM categories WHERE name LIKE '%search_term%') LIMIT 100
 """

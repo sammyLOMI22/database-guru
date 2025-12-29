@@ -922,6 +922,39 @@ class SelfCorrectingSQLAgent:
                 logger.warning(f"Intent classification failed (continuing): {e}")
                 trace.add_step("warning", f"Intent classification skipped: {str(e)[:100]}")
 
+        # === SCHEMA FILTERING: Reduce schema to relevant tables only ===
+        # This addresses PR review: "For large databases, passing full schema hits context limits"
+        # Only filter if we have a schema_dict and more than 10 tables
+        filtered_schema = schema
+        if schema_dict and len(schema_dict.get("tables", {})) > 10:
+            try:
+                from src.core.schema_inspector import SchemaInspector
+                inspector = SchemaInspector()
+                filtered_schema_dict = inspector.filter_schema_for_query(
+                    schema_dict, question, include_neighbors=True, max_neighbor_hops=1
+                )
+                # Only use filtered schema if it's smaller but still has tables
+                if (0 < len(filtered_schema_dict.get("tables", {})) < len(schema_dict.get("tables", {}))):
+                    filtered_schema = inspector.format_schema_for_llm(filtered_schema_dict)
+                    trace.add_step(
+                        "schema_filtering",
+                        f"Filtered schema: {len(filtered_schema_dict['tables'])} tables "
+                        f"(from {len(schema_dict['tables'])} total)",
+                        metadata={
+                            "filtered_tables": list(filtered_schema_dict["tables"].keys()),
+                            "original_count": len(schema_dict["tables"]),
+                            "filtered_count": len(filtered_schema_dict["tables"]),
+                        }
+                    )
+                    logger.info(
+                        f"📉 Schema filtered: {len(filtered_schema_dict['tables'])} tables "
+                        f"from {len(schema_dict['tables'])} total"
+                    )
+                    # Update schema for generation
+                    schema = filtered_schema
+            except Exception as e:
+                logger.debug(f"Schema filtering skipped: {e}")
+
         for attempt_num in range(1, self.max_retries + 1):
             try:
                 trace.add_step("attempt_start", f"Starting attempt {attempt_num}/{self.max_retries}")
@@ -1015,6 +1048,47 @@ class SelfCorrectingSQLAgent:
                                 logger.warning(f"Table validation failed: {last_error}")
                                 trace.add_step("validation", f"Table validation failed: {missing_tables}")
                                 continue  # Skip to next attempt
+
+                            # NEW: Validate column qualification in multi-table queries
+                            # This catches ambiguous column references before execution
+                            try:
+                                from src.llm.sql_semantic_validator import SQLSemanticValidator
+                                semantic_validator = SQLSemanticValidator()
+                                qual_result = semantic_validator.validate_column_qualification(sql, schema_dict)
+                                if not qual_result.is_valid:
+                                    # Ambiguous columns detected - provide hints for regeneration
+                                    hints_text = qual_result.get_regeneration_hints()
+                                    last_error = (
+                                        f"Ambiguous column references in multi-table query. "
+                                        f"{hints_text}"
+                                    )
+                                    logger.warning(f"Column qualification validation failed: {qual_result.mismatch_details}")
+                                    trace.add_step(
+                                        "validation",
+                                        f"Column qualification failed: {qual_result.mismatch_details}",
+                                        metadata={"suggestions": qual_result.suggestions}
+                                    )
+                                    continue  # Skip to next attempt for regeneration
+
+                                # NEW: Validate WHERE clause columns exist in queried tables
+                                # This catches: SELECT * FROM orders WHERE state = 'NY'
+                                # when state is in customers table, not orders
+                                where_result = semantic_validator.validate_where_columns_exist(sql, schema_dict)
+                                if not where_result.is_valid:
+                                    hints_text = where_result.get_regeneration_hints()
+                                    last_error = (
+                                        f"WHERE clause references column not in queried tables. "
+                                        f"{hints_text}"
+                                    )
+                                    logger.warning(f"WHERE column validation failed: {where_result.mismatch_details}")
+                                    trace.add_step(
+                                        "validation",
+                                        f"WHERE column validation failed: {where_result.mismatch_details}",
+                                        metadata={"suggestions": where_result.suggestions}
+                                    )
+                                    continue  # Skip to next attempt for regeneration
+                            except Exception as e:
+                                logger.debug(f"Column validation check skipped: {e}")
                     else:
                         trace.add_step("generation", "Using SQL from query plan")
                         logger.info(f"Attempt {attempt_num}/{self.max_retries}: Using SQL from query plan")
@@ -1127,76 +1201,127 @@ class SelfCorrectingSQLAgent:
 
                             logger.info(f"Generated corrected SQL: {sql[:100]}...")
 
-                    # Calculate confidence score for this correction attempt
-                    if CONFIDENCE_SCORING_AVAILABLE and attempt_num > 1:  # Only for corrections, not first attempt
-                        try:
-                            scorer = get_confidence_scorer()
-                            # Get historical success rate for this error type
-                            stats = scorer.get_stats()
-                            historical_rate = None
-                            if error_type.value in stats:
-                                historical_rate = stats[error_type.value].get("success_rate")
-
-                            # Get previous SQL for comparison
-                            previous_sql = attempts[-1].sql if attempts else sql
-
-                            confidence_prediction = scorer.predict_success_probability(
-                                error_type=error_type.value,
-                                original_sql=previous_sql,
-                                correction_sql=sql,
-                                schema=schema_dict,
-                                historical_success_rate=historical_rate,
-                                error_message=last_error,
-                                context={"database_type": database_type}
+                # Validate fixed SQL before execution (applies to all retry paths)
+                if schema_dict and attempt_num > 1:
+                    try:
+                        from src.llm.sql_semantic_validator import SQLSemanticValidator
+                        retry_validator = SQLSemanticValidator()
+                        retry_where_result = retry_validator.validate_where_columns_exist(sql, schema_dict)
+                        if not retry_where_result.is_valid:
+                            # Fixed SQL still has invalid WHERE columns - build hints for next retry
+                            hints_text = retry_where_result.get_regeneration_hints()
+                            last_error = (
+                                f"Fixed SQL still references columns not in queried tables. "
+                                f"{hints_text}"
                             )
-
+                            logger.warning(f"Retry WHERE validation failed: {retry_where_result.mismatch_details}")
                             trace.add_step(
-                                "planning",
-                                f"Confidence prediction: {confidence_prediction.get_level()} ({confidence_prediction.overall:.1%})",
-                                metadata={
-                                    "confidence": confidence_prediction.overall,
-                                    "level": confidence_prediction.get_level(),
-                                    "recommendation": confidence_prediction.recommendation,
-                                    "reasoning": confidence_prediction.reasoning
-                                }
+                                "validation",
+                                f"Retry WHERE validation failed: {retry_where_result.mismatch_details}",
+                                metadata={"suggestions": retry_where_result.suggestions}
                             )
+                            continue  # Skip to next attempt
+                    except Exception as e:
+                        logger.debug(f"Retry WHERE validation skipped: {e}")
 
-                            logger.info(
-                                f"📊 Confidence: {confidence_prediction.get_level()} "
-                                f"({confidence_prediction.overall:.1%}) - {confidence_prediction.reasoning}"
+                # Calculate confidence score for this correction attempt
+                if CONFIDENCE_SCORING_AVAILABLE and attempt_num > 1:  # Only for corrections, not first attempt
+                    try:
+                        scorer = get_confidence_scorer()
+                        # Get historical success rate for this error type
+                        stats = scorer.get_stats()
+                        historical_rate = None
+                        if error_type.value in stats:
+                            historical_rate = stats[error_type.value].get("success_rate")
+
+                        # Get previous SQL for comparison
+                        previous_sql = attempts[-1].sql if attempts else sql
+
+                        confidence_prediction = scorer.predict_success_probability(
+                            error_type=error_type.value,
+                            original_sql=previous_sql,
+                            correction_sql=sql,
+                            schema=schema_dict,
+                            historical_success_rate=historical_rate,
+                            error_message=last_error,
+                            context={"database_type": database_type}
+                        )
+
+                        trace.add_step(
+                            "planning",
+                            f"Confidence prediction: {confidence_prediction.get_level()} ({confidence_prediction.overall:.1%})",
+                            metadata={
+                                "confidence": confidence_prediction.overall,
+                                "level": confidence_prediction.get_level(),
+                                "recommendation": confidence_prediction.recommendation,
+                                "reasoning": confidence_prediction.reasoning
+                            }
+                        )
+
+                        logger.info(
+                            f"📊 Confidence: {confidence_prediction.get_level()} "
+                            f"({confidence_prediction.overall:.1%}) - {confidence_prediction.reasoning}"
+                        )
+
+                        # Skip execution if confidence is very low (< 0.2)
+                        if confidence_prediction.overall < 0.2:
+                            logger.warning(
+                                f"⚠️ Very low confidence ({confidence_prediction.overall:.1%}), "
+                                f"skipping execution to save resources"
                             )
+                            trace.add_step(
+                                "warning",
+                                f"Skipping execution due to very low confidence ({confidence_prediction.overall:.1%})"
+                            )
+                            # Record failed attempt without execution
+                            attempt = CorrectionAttempt(
+                                attempt_number=attempt_num,
+                                sql=sql,
+                                error="Skipped due to very low confidence score",
+                                error_type=error_type,
+                                success=False,
+                                execution_time_ms=0,
+                                row_count=0,
+                                confidence_score=confidence_prediction.to_dict() if confidence_prediction else None
+                            )
+                            attempts.append(attempt)
+                            continue  # Skip to next attempt
 
-                            # Skip execution if confidence is very low (< 0.2)
-                            if confidence_prediction.overall < 0.2:
-                                logger.warning(
-                                    f"⚠️ Very low confidence ({confidence_prediction.overall:.1%}), "
-                                    f"skipping execution to save resources"
-                                )
-                                trace.add_step(
-                                    "warning",
-                                    f"Skipping execution due to very low confidence ({confidence_prediction.overall:.1%})"
-                                )
-                                # Record failed attempt without execution
-                                attempt = CorrectionAttempt(
-                                    attempt_number=attempt_num,
-                                    sql=sql,
-                                    error="Skipped due to very low confidence score",
-                                    error_type=error_type,
-                                    success=False,
-                                    execution_time_ms=0,
-                                    row_count=0,
-                                    confidence_score=confidence_prediction.to_dict() if confidence_prediction else None
-                                )
-                                attempts.append(attempt)
-                                continue  # Skip to next attempt
+                    except Exception as e:
+                        logger.warning(f"Failed to calculate confidence score: {e}")
+                        confidence_prediction = None
 
-                        except Exception as e:
-                            logger.warning(f"Failed to calculate confidence score: {e}")
-                            confidence_prediction = None
+                # Validate SQL before executing - CRITICAL: must prevent execution if invalid!
+                if attempt_num == 1 and not gen_result.get("is_valid", True):
+                    validation_warnings = gen_result.get('warnings', [])
+                    logger.warning(f"Generated SQL failed validation: {validation_warnings}")
 
-                # Validate SQL before executing
-                if not gen_result.get("is_valid", True) if attempt_num == 1 else True:
-                    logger.warning(f"Generated SQL failed validation: {gen_result.get('warnings')}")
+                    # Build error message with hints for regeneration
+                    last_error = f"SQL validation failed: {'; '.join(validation_warnings)}"
+
+                    # Include WHERE validation hints if available (for location column issues)
+                    if gen_result.get("where_validation_hints"):
+                        last_error += f" {gen_result['where_validation_hints']}"
+
+                    trace.add_step(
+                        "validation",
+                        f"SQL failed pre-execution validation: {validation_warnings}",
+                        metadata={"hints": gen_result.get("where_validation_hints")}
+                    )
+
+                    # Record as failed attempt and retry with hints
+                    attempt = CorrectionAttempt(
+                        attempt_number=attempt_num,
+                        sql=sql,
+                        error=last_error,
+                        error_type=ErrorType.SEMANTIC_ERROR if hasattr(ErrorType, 'SEMANTIC_ERROR') else ErrorType.UNKNOWN,
+                        success=False,
+                        execution_time_ms=0.0,
+                        row_count=0,
+                        confidence_score=None
+                    )
+                    attempts.append(attempt)
+                    continue  # Skip to next attempt for regeneration with hints
 
                 # === POST-GENERATION: Semantic Validation (Phase 3) ===
                 # Validate that SQL matches the detected intent BEFORE execution

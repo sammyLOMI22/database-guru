@@ -117,6 +117,12 @@ class DynamicExampleGenerator:
         # Add filter examples with sample values
         examples.extend(self._generate_filter_examples(row_limit))
 
+        # Add location-based JOIN example if schema has location columns
+        # This helps with "products from California" type queries
+        location_example = self._generate_location_join_example(row_limit)
+        if location_example:
+            examples.append(location_example)
+
         # If intent specified, prioritize those examples
         if intent:
             examples = self._prioritize_by_intent(examples, intent)
@@ -252,6 +258,75 @@ class DynamicExampleGenerator:
                     break
 
         return examples
+
+    def _generate_location_join_example(self, row_limit: int) -> Optional[SQLExample]:
+        """Generate a location-based JOIN example using semantic type hints.
+
+        This creates a dynamic example showing how to JOIN to find the table
+        with location data, using the actual schema's table/column names.
+        """
+        # Find table with location column (using semantic_type hint)
+        location_table = None
+        location_column = None
+        location_samples = None
+
+        for table_name, table_info in self.schema.get("tables", {}).items():
+            for col in table_info.get("columns", []):
+                semantic_type = col.get("semantic_type", "")
+                if semantic_type == "location" or "state" in col.get("name", "").lower():
+                    location_table = table_name
+                    location_column = col.get("name")
+                    location_samples = col.get("sample_values", [])
+                    break
+            if location_table:
+                break
+
+        if not location_table or not location_column:
+            return None
+
+        # Find a table that can JOIN to the location table
+        for rel in self.relationships:
+            # Check if this relationship connects to the location table
+            if rel.get("to_table") == location_table:
+                source_table = rel.get("from_table")
+                source_col = rel.get("from_column")
+                target_col = rel.get("to_column")
+
+                sample_value = location_samples[0] if location_samples else "VALUE"
+
+                return SQLExample(
+                    question=f"Show {source_table} for a specific location",
+                    sql=f"""SELECT s.*
+FROM {source_table} s
+JOIN {location_table} loc ON s.{source_col} = loc.{target_col}
+WHERE loc.{location_column} = '{sample_value}'
+LIMIT {row_limit}""",
+                    note=f"Location column '{location_column}' is in '{location_table}' table. "
+                         f"Sample values: {', '.join(str(v) for v in location_samples[:3]) if location_samples else 'check schema'}",
+                    intent=QueryIntent.RELATIONSHIP
+                )
+
+            # Check reverse direction
+            elif rel.get("from_table") == location_table:
+                target_table = rel.get("to_table")
+                source_col = rel.get("from_column")
+                target_col = rel.get("to_column")
+
+                sample_value = location_samples[0] if location_samples else "VALUE"
+
+                return SQLExample(
+                    question=f"Show {target_table} for a specific location",
+                    sql=f"""SELECT t.*
+FROM {target_table} t
+JOIN {location_table} loc ON t.{target_col} = loc.{source_col}
+WHERE loc.{location_column} = '{sample_value}'
+LIMIT {row_limit}""",
+                    note=f"Location column '{location_column}' is in '{location_table}' table. "
+                         f"Sample values: {', '.join(str(v) for v in location_samples[:3]) if location_samples else 'check schema'}",
+                    intent=QueryIntent.RELATIONSHIP
+                )
+
+        return None
 
     def _prioritize_by_intent(
         self,

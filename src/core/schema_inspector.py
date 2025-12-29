@@ -715,3 +715,146 @@ class SchemaInspector:
                 parts.append(f"JOIN {table} ON {prev_table}.{from_col} = {table}.{to_col}")
 
         return " -> ".join([path[0][0]] + [p[0] for p in path[1:]]) + f"\n    ({' '.join(parts[1:])})"
+
+    def filter_schema_for_query(
+        self,
+        schema: Dict[str, Any],
+        question: str,
+        include_neighbors: bool = True,
+        max_neighbor_hops: int = 1,
+    ) -> Dict[str, Any]:
+        """
+        Filter schema to only include tables relevant to the query.
+
+        This addresses the PR review feedback about schema context optimization:
+        For large databases, passing the full schema hits context limits and
+        confuses the LLM. This method filters to only relevant tables + neighbors.
+
+        Args:
+            schema: Full schema dictionary from get_full_schema()
+            question: Natural language question to analyze
+            include_neighbors: Include tables connected via foreign keys
+            max_neighbor_hops: How many FK hops to include (1 = direct neighbors only)
+
+        Returns:
+            Filtered schema dictionary with only relevant tables
+        """
+        try:
+            from src.llm.required_data_detector import RequiredDataDetector
+
+            # Detect required tables from the question
+            detector = RequiredDataDetector(schema)
+            result = detector.detect_required_data(question)
+
+            # Start with detected tables
+            relevant_tables = set(result.tables_required)
+
+            # If no tables detected, include all tables (fallback)
+            if not relevant_tables:
+                logger.debug("No specific tables detected, using full schema")
+                return schema
+
+            # Add neighbor tables if enabled (for potential JOINs)
+            if include_neighbors:
+                neighbors = self._find_neighbor_tables(
+                    schema, relevant_tables, max_hops=max_neighbor_hops
+                )
+                relevant_tables.update(neighbors)
+                logger.debug(
+                    f"Added {len(neighbors)} neighbor tables: {neighbors}"
+                )
+
+            # Build filtered schema
+            filtered_schema = {
+                "tables": {},
+                "relationships": [],
+                "summary": {
+                    "table_count": len(relevant_tables),
+                    "total_columns": 0,
+                    "filtered_from": len(schema.get("tables", {})),
+                },
+            }
+
+            # Copy relevant tables
+            for table_name in relevant_tables:
+                if table_name in schema.get("tables", {}):
+                    table_info = schema["tables"][table_name]
+                    filtered_schema["tables"][table_name] = table_info
+                    filtered_schema["summary"]["total_columns"] += len(
+                        table_info.get("columns", [])
+                    )
+
+            # Copy relevant relationships
+            for rel in schema.get("relationships", []):
+                if (rel["from_table"] in relevant_tables or
+                    rel["to_table"] in relevant_tables):
+                    filtered_schema["relationships"].append(rel)
+
+            logger.info(
+                f"Filtered schema: {len(relevant_tables)} tables from "
+                f"{len(schema.get('tables', {}))} total "
+                f"(question: '{question[:50]}...')"
+            )
+
+            return filtered_schema
+
+        except ImportError:
+            logger.warning("RequiredDataDetector not available, using full schema")
+            return schema
+        except Exception as e:
+            logger.warning(f"Schema filtering failed: {e}, using full schema")
+            return schema
+
+    def _find_neighbor_tables(
+        self,
+        schema: Dict[str, Any],
+        seed_tables: set,
+        max_hops: int = 1,
+    ) -> set:
+        """
+        Find tables connected to seed tables via foreign keys.
+
+        Uses BFS to find neighbors up to max_hops away.
+
+        Args:
+            schema: Schema dictionary
+            seed_tables: Starting set of tables
+            max_hops: Maximum FK hops to traverse
+
+        Returns:
+            Set of neighbor table names (excluding seed tables)
+        """
+        if not schema.get("relationships"):
+            return set()
+
+        # Build adjacency graph
+        graph = {}
+        for rel in schema["relationships"]:
+            from_table = rel["from_table"]
+            to_table = rel["to_table"]
+
+            if from_table not in graph:
+                graph[from_table] = set()
+            graph[from_table].add(to_table)
+
+            if to_table not in graph:
+                graph[to_table] = set()
+            graph[to_table].add(from_table)
+
+        # BFS to find neighbors
+        neighbors = set()
+        current_level = set(seed_tables)
+
+        for hop in range(max_hops):
+            next_level = set()
+            for table in current_level:
+                if table in graph:
+                    for neighbor in graph[table]:
+                        if neighbor not in seed_tables and neighbor not in neighbors:
+                            next_level.add(neighbor)
+                            neighbors.add(neighbor)
+            current_level = next_level
+            if not current_level:
+                break
+
+        return neighbors

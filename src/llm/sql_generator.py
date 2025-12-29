@@ -254,6 +254,11 @@ class SQLGenerator:
                 - llm_cache_hit: Whether result came from LLM cache
         """
         try:
+            # DEBUG: Log entry point
+            logger.warning(f"🚀 generate_sql CALLED: question={question[:50]}..., schema_dict={schema_dict is not None}")
+            if schema_dict:
+                logger.warning(f"🚀 schema_dict has {len(schema_dict.get('tables', {}))} tables: {list(schema_dict.get('tables', {}).keys())}")
+
             # Use specified model or default
             model_to_use = model or self.settings.OLLAMA_MODEL
             llm_cache_hit = False
@@ -306,7 +311,26 @@ class SQLGenerator:
                         if dangerous_ops:
                             warnings.append(f"Dangerous operations: {', '.join(dangerous_ops)}")
 
-                        return {
+                        # CRITICAL: Also validate WHERE columns for cached SQL
+                        where_validation_hints = ""
+                        if schema_dict and is_valid:
+                            try:
+                                from src.llm.sql_semantic_validator import SQLSemanticValidator
+                                semantic_validator = SQLSemanticValidator()
+                                where_result = semantic_validator.validate_where_columns_exist(sql, schema_dict)
+                                if not where_result.is_valid:
+                                    is_valid = False
+                                    where_validation_hints = where_result.get_regeneration_hints()
+                                    warnings.append(
+                                        f"WHERE column validation: {'; '.join(where_result.mismatch_details)}"
+                                    )
+                                    logger.warning(
+                                        f"❌ Cached SQL WHERE validation FAILED: {where_result.mismatch_details}"
+                                    )
+                            except Exception as e:
+                                logger.warning(f"Cached SQL WHERE validation exception: {e}")
+
+                        result = {
                             "sql": sql,
                             "is_valid": is_valid,
                             "is_read_only": is_read_only,
@@ -317,6 +341,9 @@ class SQLGenerator:
                             "llm_cache_hit": True,
                             "llm_cache_similarity": cached.similarity,
                         }
+                        if where_validation_hints:
+                            result["where_validation_hints"] = where_validation_hints
+                        return result
                 except Exception as e:
                     logger.warning(f"LLM cache lookup failed: {e}")
 
@@ -397,9 +424,36 @@ class SQLGenerator:
             if dangerous_ops:
                 warnings.append(f"Dangerous operations detected: {', '.join(dangerous_ops)}")
 
+            # Validate WHERE clause columns exist in queried tables
+            # This catches: SELECT * FROM orders WHERE state = 'NY' when state is in customers
+            where_validation_failed = False
+            where_validation_hints = ""
+            logger.warning(f"🔍 WHERE validation check: schema_dict={schema_dict is not None}, is_valid={is_valid}, sql={sql[:80]}...")
+            if schema_dict and is_valid:
+                try:
+                    from src.llm.sql_semantic_validator import SQLSemanticValidator
+                    semantic_validator = SQLSemanticValidator()
+                    logger.warning(f"🔍 Running WHERE column validation with {len(schema_dict.get('tables', {}))} tables")
+                    where_result = semantic_validator.validate_where_columns_exist(sql, schema_dict)
+                    logger.warning(f"🔍 WHERE validation result: is_valid={where_result.is_valid}, details={where_result.mismatch_details}")
+                    if not where_result.is_valid:
+                        where_validation_failed = True
+                        where_validation_hints = where_result.get_regeneration_hints()
+                        warnings.append(
+                            f"WHERE column validation: {'; '.join(where_result.mismatch_details)}"
+                        )
+                        logger.warning(
+                            f"❌ WHERE column validation FAILED: {where_result.mismatch_details}. "
+                            f"Suggestions: {where_result.suggestions}"
+                        )
+                except Exception as e:
+                    logger.warning(f"WHERE column validation EXCEPTION: {e}", exc_info=True)
+            else:
+                logger.warning(f"⚠️ WHERE validation SKIPPED: schema_dict={schema_dict is not None}, is_valid={is_valid}")
+
             result = {
                 "sql": sql,
-                "is_valid": is_valid,
+                "is_valid": is_valid and not where_validation_failed,
                 "is_read_only": is_read_only,
                 "warnings": warnings,
                 "raw_output": raw_output,
@@ -408,7 +462,11 @@ class SQLGenerator:
                 "llm_cache_hit": False,
             }
 
-            logger.info(f"Generated SQL: {sql[:100]}... (model: {model_to_use})")
+            # Add validation hints for regeneration if WHERE validation failed
+            if where_validation_failed:
+                result["where_validation_hints"] = where_validation_hints
+
+            logger.warning(f"🏁 RETURNING: sql={sql[:60]}..., is_valid={result['is_valid']}, where_failed={where_validation_failed}")
             if warnings:
                 logger.warning(f"Warnings: {warnings}")
 

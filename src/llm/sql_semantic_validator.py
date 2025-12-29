@@ -526,6 +526,97 @@ class SQLSemanticValidator:
             confidence=1.0,
         )
 
+    def validate_where_columns_exist(
+        self,
+        sql: str,
+        schema_dict: dict
+    ) -> SemanticValidationResult:
+        """Validate that WHERE clause columns exist in the queried tables.
+
+        This catches errors like:
+        - SELECT * FROM orders WHERE state = 'NY' (when state is in customers, not orders)
+
+        Args:
+            sql: SQL query to validate
+            schema_dict: Schema dictionary with table/column information
+
+        Returns:
+            SemanticValidationResult with suggestions if columns are in wrong table
+        """
+        details = []
+        suggestions = []
+
+        # Extract tables from FROM/JOIN clauses
+        tables_in_query = self._extract_table_references(sql)
+        if not tables_in_query:
+            return SemanticValidationResult(is_valid=True, confidence=1.0)
+
+        # Extract WHERE clause
+        where_match = re.search(r'\bWHERE\s+(.+?)(?:\bGROUP\b|\bORDER\b|\bLIMIT\b|$)', sql, re.IGNORECASE | re.DOTALL)
+        if not where_match:
+            return SemanticValidationResult(is_valid=True, confidence=1.0)
+
+        where_clause = where_match.group(1)
+
+        # Extract column names from WHERE clause (handle various formats)
+        # Matches: column = value, column LIKE value, column ILIKE value, etc.
+        column_pattern = re.compile(r'\b(\w+)\s*(?:=|<|>|<=|>=|<>|!=|LIKE|ILIKE|IN|IS)\s*', re.IGNORECASE)
+        where_columns = set(column_pattern.findall(where_clause))
+
+        # Remove SQL keywords that might be caught
+        sql_keywords = {'and', 'or', 'not', 'null', 'true', 'false', 'between'}
+        where_columns = {c.lower() for c in where_columns if c.lower() not in sql_keywords}
+
+        # Build set of columns available in queried tables
+        available_columns = set()
+        for table in tables_in_query:
+            table_info = schema_dict.get("tables", {}).get(table, {})
+            if not table_info:
+                # Try case-insensitive match
+                for t_name, t_info in schema_dict.get("tables", {}).items():
+                    if t_name.lower() == table.lower():
+                        table_info = t_info
+                        break
+
+            for col in table_info.get("columns", []):
+                available_columns.add(col.get("name", "").lower())
+
+        # Check each WHERE column exists in queried tables
+        for col in where_columns:
+            if col not in available_columns:
+                # Find which table has this column
+                tables_with_col = []
+                for t_name, t_info in schema_dict.get("tables", {}).items():
+                    for c in t_info.get("columns", []):
+                        if c.get("name", "").lower() == col:
+                            tables_with_col.append(t_name)
+
+                if tables_with_col:
+                    details.append(
+                        f"Column '{col}' not found in queried tables ({', '.join(tables_in_query)})"
+                    )
+                    # Build explicit JOIN instruction with pattern
+                    target_table = tables_with_col[0]
+                    tables_list = list(tables_in_query)
+                    source_table = tables_list[0] if tables_list else "your_table"
+                    suggestions.append(
+                        f"CRITICAL: Column '{col}' exists in '{target_table}', NOT in '{source_table}'. "
+                        f"You MUST add a JOIN like: "
+                        f"'{source_table} JOIN {target_table} ON {source_table}.<id_column> = {target_table}.<foreign_key>' "
+                        f"and reference the column as '{target_table}.{col}' in WHERE clause."
+                    )
+
+        if details:
+            return SemanticValidationResult(
+                is_valid=False,
+                confidence=0.90,
+                mismatch_type=SemanticMismatchType.COLUMN_NOT_REFERENCED,
+                mismatch_details=details,
+                suggestions=suggestions,
+            )
+
+        return SemanticValidationResult(is_valid=True, confidence=0.95)
+
     def _find_similar(self, name: str, candidates: Set[str], max_results: int = 3) -> List[str]:
         """Find similar names using fuzzy matching.
 
@@ -552,6 +643,207 @@ class SQLSemanticValidator:
         # Sort by similarity and return top matches
         scored.sort(key=lambda x: x[1], reverse=True)
         return [name for name, _ in scored[:max_results]]
+
+    def validate_column_qualification(
+        self,
+        sql: str,
+        schema_dict: dict
+    ) -> SemanticValidationResult:
+        """Validate that column references are properly qualified in multi-table queries.
+
+        This addresses a common issue where LLMs generate SQL with ambiguous column
+        references in JOINs, causing "ambiguous column name" errors at execution time.
+
+        Example issues caught:
+        - SELECT name, customer_id FROM orders JOIN customers ON ...
+          (if both tables have 'name', this fails)
+
+        Args:
+            sql: SQL query to validate
+            schema_dict: Schema dictionary with table/column information
+
+        Returns:
+            SemanticValidationResult with warnings if columns need qualification
+        """
+        details = []
+        suggestions = []
+
+        # Only validate multi-table queries
+        if not self._is_multi_table_query(sql):
+            return SemanticValidationResult(is_valid=True, confidence=1.0)
+
+        # Extract table references to know which tables are in the query
+        tables_in_query = self._extract_table_references(sql)
+        if len(tables_in_query) < 2:
+            return SemanticValidationResult(is_valid=True, confidence=1.0)
+
+        # Find columns that exist in multiple tables being joined
+        ambiguous_columns = self._find_ambiguous_columns(
+            tables_in_query, schema_dict
+        )
+
+        if not ambiguous_columns:
+            return SemanticValidationResult(is_valid=True, confidence=1.0)
+
+        # Check for unqualified column references in SELECT clause
+        select_match = re.search(
+            r'\bSELECT\s+(.+?)\s+FROM\b',
+            sql,
+            re.IGNORECASE | re.DOTALL
+        )
+
+        if select_match:
+            select_clause = select_match.group(1)
+            unqualified = self._find_unqualified_references(
+                select_clause, ambiguous_columns, tables_in_query
+            )
+
+            if unqualified:
+                for col in unqualified:
+                    tables_with_col = [
+                        t for t, cols in ambiguous_columns.items()
+                        if col.lower() in [c.lower() for c in cols]
+                    ]
+                    details.append(
+                        f"Ambiguous column '{col}' exists in multiple tables: "
+                        f"{', '.join(tables_with_col)}"
+                    )
+                    suggestions.append(
+                        f"Qualify '{col}' with table name: "
+                        f"{tables_with_col[0]}.{col}"
+                    )
+
+        if details:
+            return SemanticValidationResult(
+                is_valid=False,  # Mark as invalid to trigger regeneration
+                confidence=0.85,
+                mismatch_type=SemanticMismatchType.COLUMN_NOT_REFERENCED,
+                mismatch_details=details,
+                suggestions=suggestions,
+            )
+
+        return SemanticValidationResult(is_valid=True, confidence=0.95)
+
+    def _is_multi_table_query(self, sql: str) -> bool:
+        """Check if SQL involves multiple tables."""
+        has_join = bool(self.JOIN_PATTERN.search(sql))
+        # Also check for comma-separated tables: FROM t1, t2
+        comma_tables = re.search(
+            r'\bFROM\s+\w+\s*,\s*\w+',
+            sql,
+            re.IGNORECASE
+        )
+        return has_join or bool(comma_tables)
+
+    def _extract_table_references(self, sql: str) -> Set[str]:
+        """Extract all table names referenced in SQL."""
+        tables = set()
+
+        # FROM clause
+        from_match = re.search(r'\bFROM\s+(\w+)', sql, re.IGNORECASE)
+        if from_match:
+            tables.add(from_match.group(1).lower())
+
+        # JOIN clauses
+        join_pattern = re.compile(r'\bJOIN\s+(\w+)', re.IGNORECASE)
+        tables.update(m.lower() for m in join_pattern.findall(sql))
+
+        # Comma-separated tables: FROM t1, t2
+        comma_match = re.search(
+            r'\bFROM\s+(\w+)\s*,\s*(\w+)',
+            sql,
+            re.IGNORECASE
+        )
+        if comma_match:
+            tables.add(comma_match.group(1).lower())
+            tables.add(comma_match.group(2).lower())
+
+        return tables
+
+    def _find_ambiguous_columns(
+        self,
+        tables_in_query: Set[str],
+        schema_dict: dict
+    ) -> dict:
+        """Find columns that exist in multiple tables being queried.
+
+        Returns:
+            Dict mapping table names to their columns that are ambiguous
+        """
+        # Build column -> tables mapping
+        column_tables = {}  # column_name -> [tables that have it]
+
+        for table in tables_in_query:
+            table_info = schema_dict.get("tables", {}).get(table, {})
+            if not table_info:
+                # Try case-insensitive match
+                for t_name, t_info in schema_dict.get("tables", {}).items():
+                    if t_name.lower() == table.lower():
+                        table_info = t_info
+                        break
+
+            for col in table_info.get("columns", []):
+                col_name = col.get("name", "").lower()
+                if col_name not in column_tables:
+                    column_tables[col_name] = []
+                column_tables[col_name].append(table)
+
+        # Find columns in multiple tables
+        ambiguous = {}
+        for col_name, tables in column_tables.items():
+            if len(tables) > 1:
+                for table in tables:
+                    if table not in ambiguous:
+                        ambiguous[table] = []
+                    ambiguous[table].append(col_name)
+
+        return ambiguous
+
+    def _find_unqualified_references(
+        self,
+        select_clause: str,
+        ambiguous_columns: dict,
+        tables_in_query: Set[str]
+    ) -> List[str]:
+        """Find unqualified references to ambiguous columns."""
+        unqualified = []
+
+        # Get all ambiguous column names
+        all_ambiguous = set()
+        for cols in ambiguous_columns.values():
+            all_ambiguous.update(c.lower() for c in cols)
+
+        # Parse SELECT clause for column references
+        # Pattern: match column names that are NOT preceded by table. or table_
+        # e.g., "name" is unqualified, but "customers.name" is qualified
+
+        # Split by comma to get individual selections
+        selections = re.split(r'\s*,\s*', select_clause)
+
+        for selection in selections:
+            selection = selection.strip()
+
+            # Skip if it's a * or table.* or aggregate function
+            if selection in ('*', ) or re.match(r'\w+\.\*', selection):
+                continue
+
+            # Extract the column name (handle aliases with AS)
+            col_match = re.search(r'^(\w+)(?:\s|$)', selection)
+            if col_match:
+                col_name = col_match.group(1).lower()
+
+                # Check if it's ambiguous and unqualified
+                if col_name in all_ambiguous:
+                    # Check if it's qualified (table.column or alias.column)
+                    qualified_pattern = re.compile(
+                        r'(\w+)\.(' + re.escape(col_name) + r')\b',
+                        re.IGNORECASE
+                    )
+                    if not qualified_pattern.search(selection):
+                        # Not qualified - this will cause ambiguity
+                        unqualified.append(col_name)
+
+        return unqualified
 
 
 # Convenience function

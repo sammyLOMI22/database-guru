@@ -222,21 +222,22 @@ async def process_query(
             schema_inspector = SchemaInspector()
 
             # Get actual database schema from USER's database
-            schema_data = None  # Will be set if auto-introspected (needed for LocationMapper)
+            # ALWAYS get schema_data for validation, even if request.schema is provided
+            from src.core.schema_cache import SchemaCache
+
+            schema_data = await SchemaCache.get_schema(
+                connection_id=active_connection.id,
+                connection_name=active_connection.name,
+                user_db_session=user_db,
+                force_refresh=request.force_schema_refresh
+            )
+            logger.debug(f"Got schema_data with {len(schema_data.get('tables', {}))} tables for validation")
+
             if request.schema:
-                # Use provided schema
+                # Use provided schema for LLM prompt
                 schema = request.schema
             else:
-                # Auto-introspect schema from user's database (with caching)
-                from src.core.schema_cache import SchemaCache
-
-                schema_data = await SchemaCache.get_schema(
-                    connection_id=active_connection.id,
-                    connection_name=active_connection.name,
-                    user_db_session=user_db,
-                    force_refresh=request.force_schema_refresh
-                )
-
+                # Auto-introspect schema from user's database
                 schema = schema_inspector.format_schema_for_llm(schema_data)
                 logger.debug(f"Using schema with {len(schema_data['tables'])} tables")
 

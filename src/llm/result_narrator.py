@@ -731,8 +731,14 @@ class ResultNarrator:
         }
 
         try:
+            # Ensure results are dicts, not lists/tuples
+            first_result = results[0]
+            if not isinstance(first_result, dict):
+                logger.debug("Results are not dicts, skipping anomaly detection")
+                return anomalies
+
             # Process each numeric column for outliers
-            for key in results[0].keys():
+            for key in first_result.keys():
                 values = []
                 valid_indices = []
 
@@ -917,7 +923,12 @@ class ResultNarrator:
         try:
             from datetime import datetime
 
-            for key in results[0].keys():
+            # Ensure results are dicts
+            first_result = results[0]
+            if not isinstance(first_result, dict):
+                return []
+
+            for key in first_result.keys():
                 # Sample first 3 non-null values
                 sample_values = []
                 for row in results:
@@ -979,11 +990,16 @@ class ResultNarrator:
             from datetime import datetime
             import math
 
+            # Ensure results are dicts
+            first_result = results[0]
+            if not isinstance(first_result, dict):
+                return {"trends_found": False, "trends": []}
+
             for temporal_col in temporal_columns[:1]:  # Process first temporal column only
                 # Find numeric columns to analyze trends for
                 numeric_cols = []
 
-                for key in results[0].keys():
+                for key in first_result.keys():
                     if key == temporal_col:
                         continue
 
@@ -1190,10 +1206,15 @@ class ResultNarrator:
         }
 
         try:
+            # Ensure results are dicts
+            first_result = results[0]
+            if not isinstance(first_result, dict):
+                return correlations
+
             # Extract numeric columns
             numeric_columns = {}
 
-            for key in results[0].keys():
+            for key in first_result.keys():
                 values = []
 
                 for row in results:
