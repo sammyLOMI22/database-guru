@@ -236,13 +236,18 @@ class ErrorDiagnostics:
         return context
 
     @staticmethod
-    def generate_fix_hints(error_type: ErrorType, context: Dict[str, Any]) -> str:
+    def generate_fix_hints(
+        error_type: ErrorType,
+        context: Dict[str, Any],
+        schema_dict: Optional[Dict[str, Any]] = None
+    ) -> str:
         """
         Generate helpful hints for fixing the error
 
         Args:
             error_type: Type of error
             context: Error context
+            schema_dict: Optional schema dictionary for schema-aware hints
 
         Returns:
             Hints for fixing the error
@@ -254,12 +259,31 @@ class ErrorDiagnostics:
             hints.append("Table names may be case-sensitive.")
             if "missing_table" in context:
                 hints.append(f"Could not find table: {context['missing_table']}")
+            if schema_dict and "tables" in schema_dict:
+                available = ", ".join(schema_dict["tables"].keys())
+                hints.append(f"Available tables: {available}")
 
         elif error_type == ErrorType.COLUMN_NOT_FOUND:
-            hints.append("Check the schema for the correct column name.")
-            hints.append("Make sure you're referencing the right table.")
-            if "missing_column" in context:
-                hints.append(f"Could not find column: {context['missing_column']}")
+            missing_col = context.get("missing_column", "")
+            hints.append("The column may be on a DIFFERENT table than you're using.")
+            hints.append("Check which table actually has this column in the schema.")
+
+            if missing_col:
+                hints.append(f"Could not find column: {missing_col}")
+
+            # Schema-aware: find which tables actually have this column
+            if schema_dict and "tables" in schema_dict and missing_col:
+                tables_with_col = []
+                for table_name, table_info in schema_dict["tables"].items():
+                    for col in table_info.get("columns", []):
+                        if col.get("name", "").lower() == missing_col.lower():
+                            tables_with_col.append(table_name)
+                if tables_with_col:
+                    hints.append(f"IMPORTANT: '{missing_col}' column is on table(s): {', '.join(tables_with_col)}")
+                    hints.append(f"You need to JOIN to {tables_with_col[0]} to use this column!")
+                else:
+                    # Column doesn't exist at all
+                    hints.append(f"Column '{missing_col}' does not exist in any table.")
 
         elif error_type == ErrorType.SYNTAX_ERROR:
             hints.append("Check for missing commas, parentheses, or keywords.")
@@ -535,12 +559,13 @@ class SelfCorrectingSQLAgent:
         async def try_llm_fix():
             """Try LLM-based fix"""
             try:
-                enhanced_error = f"{last_error}\n\nHints:\n{hints}"
+                # Pass correction hints as separate parameter (addresses PR review)
                 fix_result = await self.generator.fix_sql_error(
                     sql=sql,
-                    error=enhanced_error,
+                    error=last_error,
                     schema=schema,
-                    database_type=database_type
+                    database_type=database_type,
+                    correction_hints=hints  # Explicit hints forwarding
                 )
                 return {
                     "sql": fix_result["sql"],
@@ -632,12 +657,12 @@ class SelfCorrectingSQLAgent:
             )
 
             # Fallback to direct LLM fix
-            enhanced_error = f"{last_error}\n\nHints:\n{hints}"
             fix_result = await self.generator.fix_sql_error(
                 sql=sql,
-                error=enhanced_error,
+                error=last_error,
                 schema=schema,
-                database_type=database_type
+                database_type=database_type,
+                correction_hints=hints  # Explicit hints forwarding (addresses PR review)
             )
 
             metrics["winning_strategy"] = "llm_fallback_timeout"
@@ -710,12 +735,12 @@ class SelfCorrectingSQLAgent:
 
             logger.warning("⚠️ All parallel fix strategies failed, falling back to sequential LLM fix")
             trace.add_step("warning", "All parallel fixes failed, using fallback LLM fix", metadata=metrics)
-            enhanced_error = f"{last_error}\n\nHints:\n{hints}"
             fix_result = await self.generator.fix_sql_error(
                 sql=sql,
-                error=enhanced_error,
+                error=last_error,
                 schema=schema,
-                database_type=database_type
+                database_type=database_type,
+                correction_hints=hints  # Explicit hints forwarding (addresses PR review)
             )
             return {
                 "sql": fix_result["sql"],
@@ -1001,7 +1026,8 @@ class SelfCorrectingSQLAgent:
                     # Categorize error
                     error_type = self.diagnostics.categorize_error(last_error)
                     error_context = self.diagnostics.extract_error_context(last_error, error_type)
-                    hints = self.diagnostics.generate_fix_hints(error_type, error_context)
+                    # Pass schema_dict for schema-aware hints (addresses PR review)
+                    hints = self.diagnostics.generate_fix_hints(error_type, error_context, schema_dict)
 
                     # Use parallel or sequential corrections based on flag
                     if use_parallel_corrections:
@@ -1084,9 +1110,6 @@ class SelfCorrectingSQLAgent:
                                     # Add learned correction to hints
                                     hints += f"\n\nLearned correction available: {learned_correction['correction_description']}"
 
-                            # Add hints to error message for better correction
-                            enhanced_error = f"{last_error}\n\nHints:\n{hints}"
-
                             # Generate corrected SQL using LLM
                             # Track fix method for observability (if not already tracked by learned correction)
                             if attempt_num not in self.fix_methods:
@@ -1094,9 +1117,10 @@ class SelfCorrectingSQLAgent:
                             trace.add_step("llm_fix", "Generating corrected SQL using LLM")
                             fix_result = await self.generator.fix_sql_error(
                                 sql=sql,
-                                error=enhanced_error,
+                                error=last_error,
                                 schema=schema,
-                                database_type=database_type
+                                database_type=database_type,
+                                correction_hints=hints  # Explicit hints forwarding (addresses PR review)
                             )
                             sql = fix_result["sql"]
                             trace.add_step("llm_fix", f"LLM generated fix: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql})
@@ -1554,16 +1578,14 @@ class SelfCorrectingSQLAgent:
                 error_context = self.diagnostics.extract_error_context(last_error, error_type)
                 hints = self.diagnostics.generate_fix_hints(error_type, error_context)
 
-                # Add hints to error message
-                enhanced_error = f"{last_error}\n\nHints:\n{hints}"
-
-                # Generate corrected SQL
+                # Generate corrected SQL with explicit hints (addresses PR review)
                 fix_result = await self.generator.fix_sql_error(
                     sql=current_sql,
-                    error=enhanced_error,
+                    error=last_error,
                     schema=schema,
                     database_type=database_type,
                     model=model,
+                    correction_hints=hints  # Explicit hints forwarding
                 )
                 current_sql = fix_result["sql"]
 

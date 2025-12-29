@@ -485,6 +485,7 @@ Provide a clear, non-technical explanation."""
         schema: str,
         database_type: str = "postgresql",
         model: Optional[str] = None,
+        correction_hints: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Attempt to fix a SQL query that resulted in an error
@@ -495,11 +496,26 @@ Provide a clear, non-technical explanation."""
             schema: Database schema
             database_type: Type of database
             model: Optional model name to use
+            correction_hints: Optional hints from ErrorDiagnostics (addresses PR review)
 
         Returns:
             Result dictionary with corrected SQL
         """
         try:
+            # Build correction hints section if provided (addresses PR review: forward hints)
+            hints_section = ""
+            if correction_hints:
+                hints_section = f"""
+CORRECTION HINTS (from error analysis):
+{correction_hints}
+
+"""
+
+            # Get dialect-specific rules (addresses PR review: dialect specificity)
+            from src.llm.prompts import get_dialect_rules
+            dialect_rules = get_dialect_rules(database_type)
+            dialect_section = f"\n{dialect_rules}\n" if dialect_rules else ""
+
             prompt = f"""This SQL query resulted in an error. Fix it:
 
 Query:
@@ -507,11 +523,17 @@ Query:
 
 Error:
 {error}
-
+{hints_section}
 Schema:
 {schema}
 
 Database type: {database_type}
+{dialect_section}
+IMPORTANT:
+- Focus on fixing the specific error mentioned above
+- Use ONLY table/column names from the schema
+- Verify all referenced tables and columns exist
+- Check data types for comparisons
 
 Provide the corrected SQL query ONLY."""
 

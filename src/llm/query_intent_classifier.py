@@ -19,9 +19,16 @@ Usage:
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Any, Set, Tuple
-from difflib import SequenceMatcher
 import re
 import logging
+
+# Import centralized FuzzyMatcher (addresses PR review: code duplication)
+try:
+    from src.core.fuzzy_matcher import FuzzyMatcher, FuzzyMatchResult
+    FUZZY_MATCHER_AVAILABLE = True
+except ImportError:
+    FUZZY_MATCHER_AVAILABLE = False
+    from difflib import SequenceMatcher  # Fallback
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +72,40 @@ class ExtractedEntity:
     confidence: float = 0.0
     mapped_to_schema: bool = False
     schema_match: Optional[str] = None
+
+
+@dataclass
+class RequirementValidationResult:
+    """Result of validating extracted requirements against schema.
+
+    This dataclass addresses PR review feedback about type safety -
+    replacing raw Dict[str, Any] with a properly typed structure.
+
+    Attributes:
+        can_satisfy: Whether the query can be satisfied by the schema
+        matched_tables: Set of validated table names found in schema
+        missing_tables: List of table names not found in schema
+        missing_columns: List of column names not found in schema
+        reason: Human-readable explanation if query cannot be satisfied
+        suggestions: List of helpful suggestions (e.g., "Did you mean...?")
+    """
+    can_satisfy: bool
+    matched_tables: Set[str] = field(default_factory=set)
+    missing_tables: List[str] = field(default_factory=list)
+    missing_columns: List[str] = field(default_factory=list)
+    reason: Optional[str] = None
+    suggestions: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for backward compatibility."""
+        return {
+            "can_satisfy": self.can_satisfy,
+            "matched_tables": self.matched_tables,
+            "missing_tables": self.missing_tables,
+            "missing_columns": self.missing_columns,
+            "reason": self.reason,
+            "suggestions": self.suggestions
+        }
 
 
 @dataclass
@@ -289,6 +330,16 @@ class QueryIntentClassifier:
         self.columns_by_table = self._build_column_index()
         self.all_columns = self._build_all_columns()
 
+        # Initialize FuzzyMatcher for optimized matching (addresses PR review: O(N*M) performance)
+        if FUZZY_MATCHER_AVAILABLE:
+            self._fuzzy_matcher = FuzzyMatcher(
+                tables=list(self.tables),
+                columns=self.columns_by_table,
+                default_threshold=0.7
+            )
+        else:
+            self._fuzzy_matcher = None
+
     def _build_column_index(self) -> Dict[str, Set[str]]:
         """Build table -> columns mapping."""
         result = {}
@@ -342,10 +393,10 @@ class QueryIntentClassifier:
 
         # Step 8: Merge tables found from question text into matched_tables
         # _identify_required_tables may find tables not captured as entities
-        final_tables = validation.get("matched_tables", set()) | required_tables
+        final_tables = validation.matched_tables | required_tables
 
         # Step 9: Determine final intent based on validation
-        if not validation["can_satisfy"]:
+        if not validation.can_satisfy:
             intent = QueryIntent.IMPOSSIBLE
             confidence = 0.9
 
@@ -358,8 +409,8 @@ class QueryIntentClassifier:
             required_values={},
             aggregations=aggregations,
             filters=filters,
-            impossible_reason=validation.get("reason"),
-            suggestions=validation.get("suggestions", [])
+            impossible_reason=validation.reason,
+            suggestions=validation.suggestions
         )
 
     def _classify_by_patterns(self, question: str) -> Tuple[QueryIntent, float]:
@@ -686,67 +737,65 @@ class QueryIntentClassifier:
         required_tables: Set[str],
         required_columns: Dict[str, Set[str]],
         entities: List[ExtractedEntity]
-    ) -> Dict[str, Any]:
+    ) -> RequirementValidationResult:
         """Validate extracted requirements against schema.
 
         Returns:
-            Dictionary with:
-            - can_satisfy: bool
-            - matched_tables: Set of validated table names
-            - reason: Why query is impossible (if applicable)
-            - suggestions: Helpful suggestions
+            RequirementValidationResult with type-safe fields (addresses PR review: type safety)
         """
-        result = {
-            "can_satisfy": True,
-            "matched_tables": set(),
-            "missing_tables": [],
-            "missing_columns": [],
-            "reason": None,
-            "suggestions": []
-        }
+        result = RequirementValidationResult(can_satisfy=True)
 
         # Check unmatched table entities
         for entity in entities:
             if entity.entity_type == 'table':
                 if entity.mapped_to_schema:
-                    result["matched_tables"].add(entity.schema_match)
+                    result.matched_tables.add(entity.schema_match)
                 else:
                     # Only flag as missing if it really looks like a table reference
                     if len(entity.original_text) > 3 and self._looks_like_table(entity.original_text):
-                        result["missing_tables"].append(entity.original_text)
+                        result.missing_tables.append(entity.original_text)
 
         # Check location entities without location columns
         location_entities = [e for e in entities if e.entity_type == 'location']
         if location_entities and not self._has_location_column():
-            result["can_satisfy"] = False
-            result["missing_columns"].append("state/city/location column")
+            result.can_satisfy = False
+            result.missing_columns.append("state/city/location column")
 
         # Build failure reason
-        if result["missing_tables"] or result["missing_columns"]:
-            if result["missing_tables"]:
-                result["can_satisfy"] = False
-                result["reason"] = f"Tables not found: {', '.join(result['missing_tables'])}"
+        if result.missing_tables or result.missing_columns:
+            if result.missing_tables:
+                result.can_satisfy = False
+                result.reason = f"Tables not found: {', '.join(result.missing_tables)}"
                 # Add suggestions for similar tables
-                for mt in result["missing_tables"]:
+                for mt in result.missing_tables:
                     similar = self._find_similar_tables(mt)
                     if similar:
-                        result["suggestions"].append(f"Did you mean: {', '.join(similar)}?")
+                        result.suggestions.append(f"Did you mean: {', '.join(similar)}?")
 
-            if result["missing_columns"]:
-                if result["reason"]:
-                    result["reason"] += f"; Columns not found: {', '.join(result['missing_columns'])}"
+            if result.missing_columns:
+                if result.reason:
+                    result.reason += f"; Columns not found: {', '.join(result.missing_columns)}"
                 else:
-                    result["can_satisfy"] = False
-                    result["reason"] = f"Columns not found: {', '.join(result['missing_columns'])}"
+                    result.can_satisfy = False
+                    result.reason = f"Columns not found: {', '.join(result.missing_columns)}"
 
         # Add available tables as suggestion
-        if not result["can_satisfy"] and self.tables:
-            result["suggestions"].append(f"Available tables: {', '.join(sorted(self.tables))}")
+        if not result.can_satisfy and self.tables:
+            result.suggestions.append(f"Available tables: {', '.join(sorted(self.tables))}")
 
         return result
 
     def _fuzzy_match_table(self, candidate: str, threshold: float = 0.7) -> Optional[str]:
-        """Fuzzy match table name against schema."""
+        """Fuzzy match table name against schema.
+
+        Uses centralized FuzzyMatcher for optimized performance (addresses PR review).
+        """
+        # Use FuzzyMatcher if available (10x faster with rapidfuzz)
+        if self._fuzzy_matcher:
+            result = self._fuzzy_matcher.find_table(candidate, threshold)
+            return result.match if result.is_match(threshold) else None
+
+        # Fallback to original logic if FuzzyMatcher not available
         candidate_lower = candidate.lower()
 
         # Exact match
@@ -763,7 +812,7 @@ class QueryIntentClassifier:
             if plural in self.tables_lower:
                 return self.tables_lower[plural]
 
-        # Fuzzy match
+        # Fuzzy match (fallback with SequenceMatcher)
         best_match = None
         best_score = 0.0
         for table in self.tables:
@@ -777,9 +826,19 @@ class QueryIntentClassifier:
     def _find_column_in_schema(self, candidate: str) -> Tuple[Optional[str], Optional[str]]:
         """Find which table contains this column.
 
+        Uses centralized FuzzyMatcher for optimized performance (addresses PR review).
+
         Returns:
             Tuple of (table_name, column_name) or (None, None)
         """
+        # Use FuzzyMatcher if available (10x faster with rapidfuzz)
+        if self._fuzzy_matcher:
+            table, col, score = self._fuzzy_matcher.find_column(candidate, threshold=0.8)
+            if score >= 0.8:
+                return table, col
+            return None, None
+
+        # Fallback to original logic if FuzzyMatcher not available
         candidate_lower = candidate.lower()
 
         for table, columns in self.columns_by_table.items():
@@ -793,7 +852,18 @@ class QueryIntentClassifier:
         return None, None
 
     def _find_similar_tables(self, candidate: str, limit: int = 3) -> List[str]:
-        """Find similar table names for suggestions."""
+        """Find similar table names for suggestions.
+
+        Uses centralized FuzzyMatcher for optimized performance (addresses PR review).
+        """
+        # Use FuzzyMatcher if available
+        if self._fuzzy_matcher:
+            similar = self._fuzzy_matcher.find_similar(
+                candidate, self.tables, max_results=limit, threshold=0.4
+            )
+            return [t for t, _ in similar]
+
+        # Fallback to original logic
         scores = []
         candidate_lower = candidate.lower()
 

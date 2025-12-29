@@ -592,18 +592,126 @@ class SchemaInspector:
 
         # Add relationships summary
         if schema["relationships"]:
-            lines.append("\nRelationships:")
+            lines.append("\nRelationships (Foreign Keys):")
             for rel in schema["relationships"]:
                 lines.append(
                     f"  - {rel['from_table']}.{rel['from_column']} -> "
                     f"{rel['to_table']}.{rel['to_column']}"
                 )
 
+        # Add common join paths for multi-hop relationships
+        # This helps LLMs understand how to connect tables that aren't directly related
+        join_paths = self._build_join_paths(schema)
+        if join_paths:
+            lines.append("\nCOMMON JOIN PATHS (use these for multi-table queries):")
+            for path in join_paths:
+                lines.append(f"  {path}")
+
         # Add reminder at the end
         lines.append("")
         lines.append("=" * 50)
         lines.append(f"REMINDER: Only use tables: {', '.join(table_names)}")
         lines.append("DO NOT use tables from examples if they don't exist above!")
+        lines.append("For multi-table queries, use the JOIN PATHS above!")
         lines.append("=" * 50)
 
         return "\n".join(lines)
+
+    def _build_join_paths(self, schema: Dict[str, Any]) -> List[str]:
+        """
+        Build common join paths from relationships.
+
+        This helps LLMs understand multi-hop joins like:
+        products -> order_items -> orders -> customers
+
+        Args:
+            schema: Schema dictionary with relationships
+
+        Returns:
+            List of join path descriptions
+        """
+        if not schema.get("relationships"):
+            return []
+
+        # Build adjacency graph from relationships
+        graph = {}  # table -> [(related_table, from_col, to_col), ...]
+        for rel in schema["relationships"]:
+            from_table = rel["from_table"]
+            to_table = rel["to_table"]
+            from_col = rel["from_column"]
+            to_col = rel["to_column"]
+
+            if from_table not in graph:
+                graph[from_table] = []
+            graph[from_table].append((to_table, from_col, to_col))
+
+            # Also add reverse for bidirectional traversal
+            if to_table not in graph:
+                graph[to_table] = []
+            graph[to_table].append((from_table, to_col, from_col))
+
+        paths = []
+        tables = list(schema["tables"].keys())
+
+        # Find paths between common table pairs (2-3 hops)
+        for start in tables:
+            for end in tables:
+                if start >= end:  # Avoid duplicates
+                    continue
+
+                # Find path using BFS (max 4 hops for complex schemas)
+                path = self._find_join_path(graph, start, end, max_hops=4)
+                if path and len(path) > 2:  # Only show multi-hop paths
+                    path_str = self._format_join_path(path)
+                    if path_str:
+                        paths.append(path_str)
+
+        return paths[:15]  # Limit to avoid overwhelming the prompt
+
+    def _find_join_path(
+        self,
+        graph: Dict[str, List],
+        start: str,
+        end: str,
+        max_hops: int = 3
+    ) -> List[tuple]:
+        """BFS to find shortest path between two tables."""
+        from collections import deque
+
+        if start not in graph:
+            return []
+
+        queue = deque([(start, [(start, None, None)])])
+        visited = {start}
+
+        while queue:
+            current, path = queue.popleft()
+
+            if current == end:
+                return path
+
+            if len(path) > max_hops:
+                continue
+
+            for neighbor, from_col, to_col in graph.get(current, []):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    new_path = path + [(neighbor, from_col, to_col)]
+                    queue.append((neighbor, new_path))
+
+        return []
+
+    def _format_join_path(self, path: List[tuple]) -> str:
+        """Format a join path for display."""
+        if len(path) < 2:
+            return ""
+
+        parts = []
+        for i, (table, from_col, to_col) in enumerate(path):
+            if i == 0:
+                parts.append(table)
+            else:
+                prev_table = path[i-1][0]
+                parts.append(f"JOIN {table} ON {prev_table}.{from_col} = {table}.{to_col}")
+
+        return " -> ".join([path[0][0]] + [p[0] for p in path[1:]]) + f"\n    ({' '.join(parts[1:])})"

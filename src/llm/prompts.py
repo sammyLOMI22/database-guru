@@ -9,19 +9,40 @@ CRITICAL RULES - SCHEMA FIRST:
    CANNOT_ANSWER: [brief explanation of what's missing]
 4. Look for "Table:" in the schema to identify valid table names
 
+CHAIN OF THOUGHT (for complex queries):
+When answering queries that involve JOINs or multiple tables:
+5. First identify ALL tables needed for the query (both for data AND for filtering)
+6. Check if tables are DIRECTLY related (share a foreign key) - if NOT, find the bridge table
+7. Use the COMMON JOIN PATHS section in the schema - it shows how to connect tables
+8. NEVER invent join columns - only use columns that exist in the schema
+9. Consider what columns to SELECT
+10. Apply WHERE conditions - make sure you JOIN to the table that has the filter column!
+11. Add GROUP BY for aggregations
+12. Apply ORDER BY and LIMIT as needed
+
+CRITICAL FOR MULTI-TABLE QUERIES:
+- If you need to filter by a column (e.g., state, status), you MUST JOIN to the table that has it
+- Look at Foreign Keys section to see how tables connect
+- If there's no direct FK between two tables, use a bridge table (e.g., order_items connects orders to products)
+- If using table aliases, you MUST define them: FROM customers c JOIN orders o (not just using c, o without definition)
+- Either use full table names (customers.id) OR define aliases (FROM customers c ... WHERE c.id)
+
 ADDITIONAL RULES:
-5. Generate ONLY the SQL query - no explanations, no markdown, no extra text
-6. Use proper SQL syntax for the specified database type
-7. Never include DROP, DELETE, TRUNCATE, or other destructive operations unless explicitly requested
-8. Use appropriate JOINs, WHERE clauses, and aggregations based on the question
-9. Return only SELECT queries unless modification is explicitly requested
-10. Include LIMIT clauses for queries that could return large result sets
-11. ALWAYS include the table name in SELECT statements (e.g., SELECT * FROM table_name LIMIT 10)
-12. Database names (like "ECommerceTestDB") are NOT table names
+11. Generate ONLY the SQL query - no explanations, no markdown, no extra text
+12. Use proper SQL syntax for the specified database type
+13. Never include DROP, DELETE, TRUNCATE, or other destructive operations unless explicitly requested
+14. Use appropriate JOINs, WHERE clauses, and aggregations based on the question
+15. Return only SELECT queries unless modification is explicitly requested
+16. Include LIMIT clauses for queries that could return large result sets
+17. ALWAYS include the table name in SELECT statements (e.g., SELECT * FROM table_name LIMIT 10)
+18. Database names (like "ECommerceTestDB") are NOT table names
 
 LOCATION HANDLING:
+- "New York state" or "state of New York" = use state column with 'NY' (2-letter code)
+- "New York city" = use city column with 'New York' (full name)
 - When queries mention US states (California, Texas, New York, etc.), use 2-letter codes: CA, TX, NY
-- Check the Location hints section if provided for the correct format to use
+- Look for [LOCATION:us_state] hint in schema - these columns use 2-letter codes
+- Look for [CATEGORICAL] hint - these columns use exact values from the examples
 
 Output format: Return ONLY the SQL query, OR "CANNOT_ANSWER: reason" if impossible."""
 
@@ -42,7 +63,55 @@ CRITICAL - READ THE SCHEMA ABOVE CAREFULLY:
 - For location/state queries, use 2-letter codes (CA, TX, NY) if a state column exists
 - Include LIMIT {row_limit} in your query (unless doing aggregations like COUNT/SUM/AVG)
 
+{dialect_rules}
+
 SQL Query (or CANNOT_ANSWER if impossible):"""
+
+
+# Dialect-specific SQL rules (addresses PR review: dialect specificity)
+DIALECT_RULES = {
+    "sqlite": """SQLITE-SPECIFIC RULES:
+- Use strftime() for date formatting: strftime('%Y-%m-%d', date_column)
+- Use date('now') for current date, datetime('now') for current timestamp
+- Use || for string concatenation (NOT CONCAT)
+- Use LIKE for case-insensitive matching (SQLite LIKE is case-insensitive for ASCII)
+- Use IFNULL() instead of COALESCE() for simple null handling
+- Boolean values are 0 and 1, not TRUE/FALSE
+- Use substr() instead of SUBSTRING()""",
+
+    "postgresql": """POSTGRESQL-SPECIFIC RULES:
+- Use ILIKE for case-insensitive matching (NOT LIKE)
+- Use NOW() or CURRENT_TIMESTAMP for current time
+- Use DATE_TRUNC() for date truncation: DATE_TRUNC('month', date_column)
+- Use to_char() for date formatting
+- Use :: for type casting: column::text, column::integer
+- Use COALESCE() for null handling
+- Boolean values are TRUE/FALSE
+- Use LIMIT with OFFSET for pagination""",
+
+    "mysql": """MYSQL-SPECIFIC RULES:
+- Use DATE_FORMAT() for date formatting: DATE_FORMAT(date_column, '%Y-%m-%d')
+- Use NOW() for current timestamp, CURDATE() for current date
+- Use CONCAT() for string concatenation
+- Use IFNULL() or COALESCE() for null handling
+- Use LOWER(column) = LOWER('value') for case-insensitive matching
+- Use backticks for identifier quoting: `table_name`
+- Use LIMIT with OFFSET for pagination""",
+
+    "duckdb": """DUCKDB-SPECIFIC RULES:
+- Similar to PostgreSQL syntax
+- Use strftime() for date formatting
+- Use CURRENT_DATE, CURRENT_TIMESTAMP for current time
+- Use || for string concatenation
+- Use ILIKE for case-insensitive matching
+- Supports list and struct types natively
+- Use TRY_CAST() for safe type casting""",
+}
+
+
+def get_dialect_rules(database_type: str) -> str:
+    """Get dialect-specific rules for a database type."""
+    return DIALECT_RULES.get(database_type.lower(), "")
 
 
 SCHEMA_ANALYSIS_TEMPLATE = """Analyze this database schema and provide a structured summary:
@@ -167,11 +236,15 @@ def build_sql_prompt(
     Returns:
         Complete prompt string
     """
+    # Get dialect-specific rules (addresses PR review: dialect specificity)
+    dialect_rules = get_dialect_rules(database_type)
+
     prompt = SQL_GENERATION_TEMPLATE.format(
         schema=schema,
         question=question,
         database_type=database_type,
         row_limit=row_limit,
+        dialect_rules=dialect_rules,
     )
 
     if examples:

@@ -18,6 +18,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Set
 
+# Import centralized FuzzyMatcher (addresses PR review: code duplication)
+try:
+    from src.core.fuzzy_matcher import FuzzyMatcher
+    FUZZY_MATCHER_AVAILABLE = True
+except ImportError:
+    FUZZY_MATCHER_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -97,32 +104,48 @@ class SQLSemanticValidator:
         if not result.is_valid:
             hints = result.get_regeneration_hints()
             # Use hints to regenerate SQL
+
+    Note: Regex patterns are designed to be robust against various SQL formatting
+    styles (addresses PR review: regex fragility). Key improvements:
+    - Handle multiple whitespace/newlines with \\s+
+    - Handle optional parentheses spacing like COUNT ( * )
+    - Handle quoted identifiers and aliases
     """
 
-    # SQL pattern matchers
+    # SQL pattern matchers (robust to whitespace variations)
+    # Addresses PR review: "COUNT ( * ) with spaces might fail"
     AGGREGATION_PATTERN = re.compile(
-        r'\b(COUNT|SUM|AVG|MIN|MAX|TOTAL)\s*\(',
-        re.IGNORECASE
+        r'\b(COUNT|SUM|AVG|MIN|MAX|TOTAL)\s*\(\s*',  # Allow spaces inside parens
+        re.IGNORECASE | re.MULTILINE
     )
 
+    # More robust JOIN detection with various whitespace
     JOIN_PATTERN = re.compile(
-        r'\b(INNER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|FULL\s+JOIN|'
-        r'CROSS\s+JOIN|JOIN|NATURAL\s+JOIN)\b',
-        re.IGNORECASE
+        r'\b(INNER\s+JOIN|LEFT\s+(OUTER\s+)?JOIN|RIGHT\s+(OUTER\s+)?JOIN|'
+        r'FULL\s+(OUTER\s+)?JOIN|CROSS\s+JOIN|NATURAL\s+JOIN|JOIN)\b',
+        re.IGNORECASE | re.MULTILINE
     )
 
-    WHERE_PATTERN = re.compile(r'\bWHERE\b', re.IGNORECASE)
+    WHERE_PATTERN = re.compile(r'\bWHERE\s+', re.IGNORECASE | re.MULTILINE)
 
-    ORDER_BY_PATTERN = re.compile(r'\bORDER\s+BY\b', re.IGNORECASE)
+    # Handle multiline ORDER BY
+    ORDER_BY_PATTERN = re.compile(r'\bORDER\s+BY\s+', re.IGNORECASE | re.MULTILINE)
 
-    LIMIT_PATTERN = re.compile(r'\bLIMIT\s+\d+', re.IGNORECASE)
+    # Handle various LIMIT formats (including OFFSET)
+    LIMIT_PATTERN = re.compile(
+        r'\bLIMIT\s+\d+(\s+OFFSET\s+\d+)?',
+        re.IGNORECASE | re.MULTILINE
+    )
 
-    GROUP_BY_PATTERN = re.compile(r'\bGROUP\s+BY\b', re.IGNORECASE)
+    GROUP_BY_PATTERN = re.compile(r'\bGROUP\s+BY\s+', re.IGNORECASE | re.MULTILINE)
 
     # Date/time column patterns (for temporal validation)
+    # Extended to catch more date-related column naming patterns
     DATE_COLUMN_PATTERN = re.compile(
         r'\b(date|time|timestamp|datetime|created|updated|modified|'
-        r'start|end|due|expir|birth|order_date|ship_date)\w*\b',
+        r'start|end|due|expir|birth|order_date|ship_date|'
+        r'created_at|updated_at|deleted_at|'
+        r'_date|_time|_at)\w*\b',
         re.IGNORECASE
     )
 
@@ -504,7 +527,17 @@ class SQLSemanticValidator:
         )
 
     def _find_similar(self, name: str, candidates: Set[str], max_results: int = 3) -> List[str]:
-        """Find similar names using simple edit distance."""
+        """Find similar names using fuzzy matching.
+
+        Uses centralized FuzzyMatcher for consistent matching (addresses PR review).
+        """
+        # Use FuzzyMatcher if available (more accurate than character counting)
+        if FUZZY_MATCHER_AVAILABLE:
+            matcher = FuzzyMatcher(tables=list(candidates))
+            similar = matcher.find_similar(name, candidates, max_results=max_results, threshold=0.3)
+            return [s for s, _ in similar]
+
+        # Fallback to original logic
         name_lower = name.lower()
         scored = []
 
