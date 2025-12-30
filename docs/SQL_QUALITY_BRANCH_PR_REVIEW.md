@@ -626,3 +626,56 @@ If WHERE validation causes issues:
 1. **Disable validation:** In `sql_generator.py`, change `if schema_dict and is_valid:` to `if False:`
 2. **Skip in cache:** Remove WHERE validation block in cache hit path
 3. **Revert schema fetching:** Restore conditional `schema_data` fetch in `query.py`
+
+### Phase 2 Review Findings (December 29, 2025)
+
+I have performed a manual review and testing of the changes implemented in this branch. Below are my findings and recommendations.
+
+#### 1. WHERE Column Validation Successes
+- **Simple Validation:** The validator successfully catches when a column exists in a related table but not the primary table (e.g., `state` in `orders` table).
+- **Self-Correction UI:** The "Self-Correction" indicator correctly shows that multiple attempts were made, and the system correctly retries when validation fails.
+- **Cache Validation:** Validating cached queries is a critical addition that prevents stale or incorrect cached SQL from being served.
+
+#### 2. Identified Bugs & Issues in Validation Logic
+
+> [!WARNING]
+> **False Positives in Subqueries**
+> The validator currently flags columns in subqueries as missing if they are not in the top-level tables.
+> **Example:** `SELECT * FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE city = 'LA')`
+> The validator flags `city` as missing from `orders`, even though it is correctly scoped to `customers` in the subquery.
+> **Technical Cause:** `_extract_table_references` only finds top-level `FROM` and `JOIN` tables, but `column_pattern` extracts all columns in the `WHERE` clause regardless of scope.
+
+> [!IMPORTANT]
+> **JOIN Decision Failures**
+> In some cases, the LLM still fails to identify that a JOIN is needed, even after validation failure.
+> **Example:** For "What orders shipped to New York state", the LLM tried to filter `shipped_date` as if it were a location string instead of joining to `customers`.
+> **Recommendation:** The validation hint should be more explicit when a semantic mismatch is detected between the column purpose (detected via `semantics_detector`) and the actual query.
+
+#### 3. DuckDB & Multi-DB Improvements
+- **Schema Introspection:** The updates to `schema_inspector.py` correctly handle DuckDB's `information_schema.key_column_usage` for primary and foreign keys.
+- **Column Name Mapping:** Sampling column values (like `shipped_date` vs `order_date`) is working and correctly surfaced in the LLM prompt. This significantly reduces "hallucinated" column names in DuckDB queries.
+
+#### 4. Critical Feedback for PR Approval
+1. **Fix Subquery Parsing:** `SQLSemanticValidator` needs to be aware of subquery scopes to avoid false positives.
+2. **Handle Multi-Table Validations:** The current `available_columns` logic is too simple for complex JOINs.
+3. **Log Enhancement:** Add the full validation result (is_valid, mismatch_details) to the permanent query logs for easier debugging of "silent" failures.
+
+#### 5. Multi-DB Flow Findings
+
+Testing the parallel multi-database execution flow revealed several unique behaviors:
+
+> [!NOTE]
+> **Parallel Self-Correction**
+> The system correctly triggers independent self-correction loops for each database concurrently. For a 2-database session, the UI successfully tracks the "Attempts" count per database.
+
+> [!CAUTION]
+> **Inconsistent Dialect Handling**
+> In the query *"What orders shipped to New York state"*, the LLM correctly generated a JOIN for SQLite but failed to do so for DuckDB (missing column `state`). 
+> **Observation:** The validation logic ran for both, but the DuckDB failure was caught at execution time (`Binder Error`) rather than by the `SQLSemanticValidator` prior to execution. This suggests the validator might be missing dialect-specific schema mapping in the multi-query path.
+
+> [!TIP]
+> **UI Integration**
+> The unified summary and status indicators (✓/✗) for multi-DB queries provide excellent feedback, though the "Agent Execution Trace" logs for each parallel run can become cluttered in the UI.
+
+---
+*Reviewer: Antigravity AI*
