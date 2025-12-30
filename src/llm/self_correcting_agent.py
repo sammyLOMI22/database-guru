@@ -1212,6 +1212,21 @@ class SelfCorrectingSQLAgent:
 
                 # Validate fixed SQL before execution (applies to all retry paths)
                 if schema_dict and attempt_num > 1:
+                    # First validate that all tables exist (same as first attempt)
+                    from src.llm.sql_generator import SQLValidator
+                    schema_tables = list(schema_dict['tables'].keys())
+                    tables_valid, missing_tables = SQLValidator.validate_tables_exist(sql, schema_tables)
+                    if not tables_valid:
+                        last_error = (
+                            f"SQL still references non-existent tables: {', '.join(missing_tables)}. "
+                            f"Available tables are: {', '.join(schema_tables)}. "
+                            f"Regenerate using ONLY these tables."
+                        )
+                        logger.warning(f"Retry table validation failed: {missing_tables}")
+                        trace.add_step("validation", f"Retry table validation failed: {missing_tables}")
+                        continue  # Skip to next attempt
+
+                    # Then validate WHERE columns
                     try:
                         from src.llm.sql_semantic_validator import SQLSemanticValidator
                         retry_validator = SQLSemanticValidator()

@@ -636,7 +636,233 @@ class SQLSemanticValidator:
                 suggestions=suggestions,
             )
 
+        # NEW: Also validate subqueries (they have their own table context)
+        subquery_result = self._validate_subqueries(sql, schema_dict)
+        if not subquery_result.is_valid:
+            return subquery_result
+
         return SemanticValidationResult(is_valid=True, confidence=0.95)
+
+    def _validate_subqueries(
+        self,
+        sql: str,
+        schema_dict: dict
+    ) -> SemanticValidationResult:
+        """Validate columns in subqueries against their table context.
+
+        Subqueries have their own FROM clause and table context, so we need
+        to validate their columns separately.
+
+        For example, in:
+            SELECT * FROM orders WHERE customer_id IN (
+                SELECT id FROM products WHERE state = 'NY'
+            )
+
+        This validates that 'products' has 'id' and 'state' columns.
+
+        Args:
+            sql: Full SQL query potentially containing subqueries
+            schema_dict: Schema dictionary with table/column information
+
+        Returns:
+            SemanticValidationResult with errors if invalid columns found
+        """
+        details = []
+        suggestions = []
+
+        # Extract subqueries
+        subqueries = self._extract_subqueries(sql)
+
+        for subquery in subqueries:
+            # Get tables in this subquery
+            subquery_tables = self._extract_table_references(subquery)
+            if not subquery_tables:
+                continue
+
+            # Build set of columns available in subquery's tables
+            available_columns = set()
+            available_columns_by_table = {}
+            for table in subquery_tables:
+                table_info = schema_dict.get("tables", {}).get(table, {})
+                if not table_info:
+                    # Try case-insensitive match
+                    for t_name, t_info in schema_dict.get("tables", {}).items():
+                        if t_name.lower() == table.lower():
+                            table_info = t_info
+                            table = t_name  # Use correct case
+                            break
+
+                if not table_info:
+                    # Table doesn't exist
+                    details.append(
+                        f"Subquery references non-existent table: '{table}'"
+                    )
+                    all_tables = list(schema_dict.get("tables", {}).keys())
+                    suggestions.append(
+                        f"Table '{table}' does not exist. Available tables: {', '.join(all_tables)}"
+                    )
+                    continue
+
+                cols = {col.get("name", "").lower() for col in table_info.get("columns", [])}
+                available_columns.update(cols)
+                available_columns_by_table[table] = cols
+
+            # Extract columns from SELECT and WHERE in subquery
+            subquery_columns = self._extract_columns_from_query(subquery)
+
+            # Check each column exists
+            for col in subquery_columns:
+                if col.lower() not in available_columns:
+                    # Column doesn't exist in subquery's tables
+                    tables_str = ", ".join(subquery_tables)
+
+                    # Find which table actually has this column
+                    tables_with_col = []
+                    for t_name, t_info in schema_dict.get("tables", {}).items():
+                        for c in t_info.get("columns", []):
+                            if c.get("name", "").lower() == col.lower():
+                                tables_with_col.append(t_name)
+
+                    details.append(
+                        f"Subquery column '{col}' not found in table(s): {tables_str}"
+                    )
+
+                    if tables_with_col:
+                        suggestions.append(
+                            f"Column '{col}' exists in table(s): {', '.join(tables_with_col)}, "
+                            f"not in {tables_str}. Fix the subquery to use the correct table."
+                        )
+                    else:
+                        # Find similar column names
+                        similar = self._find_similar(col, available_columns)
+                        if similar:
+                            suggestions.append(
+                                f"Column '{col}' does not exist. Did you mean: {', '.join(similar)}?"
+                            )
+                        else:
+                            suggestions.append(
+                                f"Column '{col}' does not exist in any table."
+                            )
+
+        if details:
+            return SemanticValidationResult(
+                is_valid=False,
+                confidence=0.85,
+                mismatch_type=SemanticMismatchType.COLUMN_NOT_REFERENCED,
+                mismatch_details=details,
+                suggestions=suggestions,
+            )
+
+        return SemanticValidationResult(is_valid=True, confidence=0.95)
+
+    def _extract_subqueries(self, sql: str) -> List[str]:
+        """Extract all subqueries from SQL.
+
+        Args:
+            sql: SQL query potentially containing subqueries
+
+        Returns:
+            List of subquery strings (without outer parentheses)
+        """
+        subqueries = []
+        text = sql
+        max_iterations = 20
+
+        for _ in range(max_iterations):
+            # Find (SELECT pattern
+            subquery_start = re.search(r'\(\s*SELECT\b', text, re.IGNORECASE)
+            if not subquery_start:
+                break
+
+            start_pos = subquery_start.start()
+
+            # Find matching closing parenthesis
+            depth = 0
+            end_pos = None
+            in_string = False
+            string_char = None
+
+            for i in range(start_pos, len(text)):
+                char = text[i]
+
+                if char in ('"', "'") and (i == 0 or text[i-1] != '\\'):
+                    if not in_string:
+                        in_string = True
+                        string_char = char
+                    elif char == string_char:
+                        in_string = False
+                        string_char = None
+                    continue
+
+                if in_string:
+                    continue
+
+                if char == '(':
+                    depth += 1
+                elif char == ')':
+                    depth -= 1
+                    if depth == 0:
+                        end_pos = i + 1
+                        break
+
+            if end_pos is None:
+                break
+
+            # Extract subquery content (without outer parentheses)
+            subquery_content = text[start_pos + 1:end_pos - 1].strip()
+            subqueries.append(subquery_content)
+
+            # Replace with placeholder to find next subquery
+            text = text[:start_pos] + '__SUBQUERY__' + text[end_pos:]
+
+        return subqueries
+
+    def _extract_columns_from_query(self, sql: str) -> Set[str]:
+        """Extract column references from a SQL query.
+
+        Finds columns in SELECT list and WHERE clause.
+
+        Args:
+            sql: SQL query
+
+        Returns:
+            Set of column names found
+        """
+        columns = set()
+        sql_keywords = {'select', 'from', 'where', 'and', 'or', 'not', 'null',
+                       'true', 'false', 'between', 'in', 'like', 'is', 'as',
+                       'join', 'on', 'order', 'by', 'group', 'having', 'limit',
+                       'offset', 'distinct', 'count', 'sum', 'avg', 'max', 'min',
+                       'asc', 'desc', 'inner', 'left', 'right', 'outer', 'case',
+                       'when', 'then', 'else', 'end', 'cast', 'coalesce', 'nullif'}
+
+        # Extract from SELECT clause
+        select_match = re.search(r'\bSELECT\s+(.+?)\s+FROM\b', sql, re.IGNORECASE | re.DOTALL)
+        if select_match:
+            select_part = select_match.group(1)
+            # Remove table prefixes (table.column -> column)
+            select_part = re.sub(r'\w+\.', '', select_part)
+            # Find word tokens
+            tokens = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', select_part)
+            for token in tokens:
+                if token.lower() not in sql_keywords and token != '*':
+                    columns.add(token.lower())
+
+        # Extract from WHERE clause
+        where_match = re.search(r'\bWHERE\s+(.+?)(?:\bGROUP\b|\bORDER\b|\bLIMIT\b|$)', sql, re.IGNORECASE | re.DOTALL)
+        if where_match:
+            where_part = where_match.group(1)
+            # Remove subqueries first
+            where_part = self._remove_subqueries(where_part)
+            # Remove table prefixes
+            where_part = re.sub(r'\w+\.', '', where_part)
+            # Find word tokens before operators
+            tokens = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', where_part)
+            for token in tokens:
+                if token.lower() not in sql_keywords:
+                    columns.add(token.lower())
+
+        return columns
 
     def _find_similar(self, name: str, candidates: Set[str], max_results: int = 3) -> List[str]:
         """Find similar names using fuzzy matching.

@@ -594,9 +594,43 @@ class SchemaInspector:
         # Get table names for prominent display
         table_names = list(schema["tables"].keys())
 
+        # Collect all columns for summary
+        all_columns = set()
+        table_columns = {}
+        for table_name, table_info in schema["tables"].items():
+            cols = [col["name"] for col in table_info.get("columns", [])]
+            table_columns[table_name] = cols
+            all_columns.update(cols)
+
         lines = ["=" * 50]
         lines.append("AVAILABLE TABLES (USE ONLY THESE):")
         lines.append(", ".join(table_names))
+        lines.append("=" * 50)
+
+        # Add compact column summary - helps LLM see at a glance what exists
+        lines.append("")
+        lines.append("QUICK COLUMN REFERENCE (table.column):")
+        for table_name in table_names:
+            cols = table_columns.get(table_name, [])
+            col_list = ", ".join(cols[:8])  # Limit to first 8 for readability
+            if len(cols) > 8:
+                col_list += f", ... ({len(cols)} total)"
+            lines.append(f"  {table_name}: {col_list}")
+
+        # Check for commonly expected columns that DON'T exist
+        common_missing = []
+        expected_columns = ['state', 'city', 'country', 'address', 'location', 'region', 'zip', 'postal_code']
+        for col in expected_columns:
+            if col not in all_columns and col.lower() not in [c.lower() for c in all_columns]:
+                common_missing.append(col)
+
+        if common_missing:
+            lines.append("")
+            lines.append("⚠️ NOTE: These commonly expected columns DO NOT EXIST in this database:")
+            lines.append(f"   {', '.join(common_missing)}")
+            lines.append("   If the query requires these columns, respond with CANNOT_ANSWER.")
+
+        lines.append("")
         lines.append("=" * 50)
         lines.append("")
         lines.append("Database Schema:\n")
