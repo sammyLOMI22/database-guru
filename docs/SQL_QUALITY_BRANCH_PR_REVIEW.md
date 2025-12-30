@@ -365,3 +365,264 @@ If issues are discovered post-merge:
 | **Pagination** | ✅ Verified | Pagination controls appear for >10 rows. Navigation works correctly. |
 | **Quality Settings** | ✅ Verified | Slider in Settings tab works. "Fast" mode logic executes successfully. |
 | **Stability** | ✅ Verified | No UI crashes or console errors observed during testing. |
+
+---
+
+## SQL Quality Improvement V2 - WHERE Column Validation (December 29, 2025)
+
+### Overview
+
+This update adds **WHERE column validation** to catch SQL queries that reference columns not present in the queried tables. This is a critical fix for location-based queries like "orders shipped to New York" where the LLM incorrectly filters on `orders.state` when `state` actually exists in the `customers` table.
+
+### Problem Statement
+
+The LLM was generating invalid SQL like:
+```sql
+-- BAD: 'state' column doesn't exist in 'orders' table
+SELECT * FROM orders WHERE state = 'NY' LIMIT 100
+
+-- BAD: 'city' column doesn't exist in 'orders' table
+SELECT * FROM orders WHERE city = 'New York' LIMIT 100
+```
+
+The correct SQL requires a JOIN:
+```sql
+-- GOOD: JOIN to customers table which has 'state' column
+SELECT o.* FROM orders o
+JOIN customers c ON o.customer_id = c.id
+WHERE c.state = 'NY' LIMIT 100
+```
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `src/llm/sql_semantic_validator.py` | Added `validate_where_columns_exist()` method with JOIN suggestions |
+| `src/llm/sql_generator.py` | Added WHERE validation to both fresh generation AND cached results |
+| `src/llm/self_correcting_agent.py` | Fixed validation bypass bug - now properly skips execution when `is_valid=False` |
+| `src/api/endpoints/query.py` | Always fetch `schema_data` for validation (was `None` if `request.schema` provided) |
+| `src/api/endpoints/multi_db_query.py` | Always fetch full schema for streaming endpoint validation |
+| `src/core/multi_db_handler.py` | Fixed `_execute_single_query_task` to fetch fresh schema; Fixed `_format_single_db_schema` to handle both dict and list formats |
+| `src/llm/prompts.py` | Enhanced location handling with dynamic JOIN instructions |
+| `src/llm/dynamic_example_generator.py` | Added `_generate_location_join_example()` for schema-aware examples |
+
+### Key Bug Fixes
+
+#### 1. Validation Bypass Bug (`self_correcting_agent.py:1272`)
+**Before:** Validation only logged a warning but didn't prevent execution
+```python
+# BUG: Falls through to execution anyway!
+if not gen_result.get("is_valid", True):
+    logger.warning(f"Generated SQL failed validation...")
+```
+
+**After:** Properly skips execution and retries with hints
+```python
+if not gen_result.get("is_valid", True):
+    logger.warning(f"Generated SQL failed validation...")
+    last_error = f"SQL validation failed: {warnings}"
+    continue  # Skip to next attempt with hints
+```
+
+#### 2. `schema_dict` Always `None` (`query.py:225`)
+**Before:** `schema_data` only set when `request.schema` not provided
+```python
+schema_data = None
+if request.schema:
+    schema = request.schema  # schema_data stays None!
+```
+
+**After:** Always fetch schema for validation
+```python
+schema_data = await SchemaCache.get_schema(...)  # Always get it
+if request.schema:
+    schema = request.schema
+```
+
+#### 3. LLM Cache Bypass (`sql_generator.py:288-341`)
+**Before:** Cached SQL returned without WHERE validation
+**After:** WHERE validation runs on cached SQL too, marks `is_valid=False` if columns don't exist
+
+#### 4. Multi-DB Schema Format Mismatch (`multi_db_handler.py:467`)
+**Before:** `_format_single_db_schema` expected list format `[{"name": "orders"}, ...]`
+**After:** Handles both dict format `{"orders": {...}}` and list format
+
+### Validation Logic
+
+The `validate_where_columns_exist()` method:
+
+1. Parses SQL to extract tables in FROM/JOIN clauses
+2. Extracts columns referenced in WHERE clause
+3. Checks if each WHERE column exists in the queried tables
+4. If not found, suggests which table has that column
+5. Returns explicit JOIN instructions for regeneration
+
+**Example Output:**
+```
+CRITICAL: Column 'state' exists in 'customers', NOT in 'orders'.
+You MUST add a JOIN like: 'orders JOIN customers ON orders.<id_column> = customers.<foreign_key>'
+and reference the column as 'customers.state' in WHERE clause.
+```
+
+### Test Queries for Verification
+
+Run these queries to verify the WHERE column validation is working:
+
+#### Test 1: Location Filter on Orders (Should Require JOIN)
+```
+Query: "What orders shipped to New York state"
+Database: SQLite or DuckDB eCommerce
+
+Expected Behavior:
+1. First attempt generates: SELECT * FROM orders WHERE state = 'NY'
+2. Validation detects: 'state' not in 'orders' table
+3. Validation suggests: JOIN to 'customers' table
+4. Retry generates: SELECT o.* FROM orders o JOIN customers c ON o.customer_id = c.id WHERE c.state = 'NY'
+
+Look for in logs:
+- "🔍 WHERE validation result: is_valid=False"
+- "❌ WHERE column validation FAILED"
+- "CRITICAL: Column 'state' exists in 'customers'"
+```
+
+#### Test 2: City Filter (Similar Pattern)
+```
+Query: "Show orders to customers in Los Angeles"
+Database: Any with orders + customers tables
+
+Expected Behavior:
+- Should NOT generate: SELECT * FROM orders WHERE city = 'Los Angeles'
+- Should generate JOIN query accessing customers.city
+```
+
+#### Test 3: Valid Single-Table Query (Should Pass)
+```
+Query: "Show all orders with status pending"
+Database: Any with orders table that has status column
+
+Expected Behavior:
+- Validation passes (status IS in orders table)
+- No retry needed
+- Look for: "🔍 WHERE validation result: is_valid=True"
+```
+
+#### Test 4: Multi-Database Query
+```
+Query: "What orders went to California"
+Databases: SQLite + DuckDB (both selected)
+
+Expected Behavior:
+- Each database should independently validate
+- Each should get proper JOIN if needed
+- Look for schema fetch logs for BOTH databases
+```
+
+#### Test 5: Products by Category (Different Tables)
+```
+Query: "Show products in the Electronics category"
+Database: Any with products + categories tables
+
+Expected Behavior:
+- If category_name is in categories table (not products)
+- Should generate JOIN: products JOIN categories ON products.category_id = categories.id
+- WHERE categories.name = 'Electronics'
+```
+
+### Backend Log Indicators
+
+When testing, look for these log messages to verify validation is running:
+
+```
+✅ Good - Validation Running:
+🚀 generate_sql CALLED: question=..., schema_dict=True
+🔍 Running WHERE column validation with 5 tables
+🔍 WHERE validation result: is_valid=False, details=[...]
+❌ WHERE column validation FAILED: [...]
+🏁 RETURNING: sql=..., is_valid=False, where_failed=True
+
+❌ Bad - Validation Skipped:
+🚀 generate_sql CALLED: question=..., schema_dict=False
+⚠️ WHERE validation SKIPPED: schema_dict=False
+```
+
+### Automated Test
+
+```bash
+# Test the WHERE column validator directly
+source venv/bin/activate
+python3 << 'EOF'
+from src.llm.sql_semantic_validator import SQLSemanticValidator
+
+schema = {
+    "tables": {
+        "orders": {
+            "columns": [
+                {"name": "id", "type": "INTEGER"},
+                {"name": "customer_id", "type": "INTEGER"},
+                {"name": "status", "type": "VARCHAR"},
+            ]
+        },
+        "customers": {
+            "columns": [
+                {"name": "id", "type": "INTEGER"},
+                {"name": "state", "type": "VARCHAR"},
+                {"name": "city", "type": "VARCHAR"},
+            ]
+        },
+    }
+}
+
+validator = SQLSemanticValidator()
+
+# This should FAIL - state not in orders
+sql1 = "SELECT * FROM orders WHERE state = 'NY'"
+result1 = validator.validate_where_columns_exist(sql1, schema)
+print(f"Test 1 (should fail): is_valid={result1.is_valid}")
+print(f"  Details: {result1.mismatch_details}")
+
+# This should PASS - status IS in orders
+sql2 = "SELECT * FROM orders WHERE status = 'pending'"
+result2 = validator.validate_where_columns_exist(sql2, schema)
+print(f"Test 2 (should pass): is_valid={result2.is_valid}")
+
+# This should PASS - JOIN includes customers
+sql3 = "SELECT * FROM orders o JOIN customers c ON o.customer_id = c.id WHERE c.state = 'NY'"
+result3 = validator.validate_where_columns_exist(sql3, schema)
+print(f"Test 3 (should pass): is_valid={result3.is_valid}")
+EOF
+```
+
+### PR Review Checklist - V2 Changes
+
+#### Validation Logic
+- [ ] `validate_where_columns_exist()` correctly parses FROM/JOIN tables
+- [ ] WHERE columns extracted correctly (handles aliases, functions)
+- [ ] Suggestions include correct JOIN syntax
+- [ ] Both dict and list schema formats handled
+
+#### Integration Points
+- [ ] `sql_generator.py` validates BOTH fresh and cached SQL
+- [ ] `self_correcting_agent.py` properly skips execution on `is_valid=False`
+- [ ] `query.py` always fetches `schema_data` for validation
+- [ ] `multi_db_handler.py` fetches fresh schema per-database
+
+#### Edge Cases
+- [ ] Subqueries don't cause false positives
+- [ ] Table aliases (o, c) handled correctly
+- [ ] Column aliases don't break validation
+- [ ] ILIKE/LIKE operators parsed correctly
+
+### Known Limitations
+
+1. **Complex Subqueries:** Validation may not catch all issues in deeply nested subqueries
+2. **Dynamic Column References:** Columns built via CONCAT or expressions may not validate
+3. **Schema Changes:** If schema changes between cache hit and validation, may get false results
+4. **Performance:** Each query now does schema introspection - adds ~10-50ms latency
+
+### Rollback Plan
+
+If WHERE validation causes issues:
+
+1. **Disable validation:** In `sql_generator.py`, change `if schema_dict and is_valid:` to `if False:`
+2. **Skip in cache:** Remove WHERE validation block in cache hit path
+3. **Revert schema fetching:** Restore conditional `schema_data` fetch in `query.py`
