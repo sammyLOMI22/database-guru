@@ -679,3 +679,90 @@ Testing the parallel multi-database execution flow revealed several unique behav
 
 ---
 *Reviewer: Antigravity AI*
+
+---
+
+### Phase 2 Fix Implementation (December 29, 2025)
+
+All critical feedback items from Phase 2 Review have been addressed:
+
+#### 1. ✅ Fixed Subquery False Positives
+
+**Issue:** Validator flagged columns in subqueries as missing from outer table.
+
+**Solution:** Implemented balanced parentheses parsing in `_remove_subqueries()` method:
+- Uses iterative depth counting instead of regex `[^()]*` pattern
+- Handles nested subqueries at any depth
+- Handles string literals with parentheses (e.g., `'Test (Inc)'`)
+- Replaces entire subquery with `__SUBQUERY__` placeholder before column extraction
+
+**Test Cases Verified:**
+```sql
+-- Test 1: Simple subquery - PASS ✓
+SELECT * FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE city = 'LA')
+-- 'city' correctly NOT flagged
+
+-- Test 2: Nested subquery - PASS ✓
+SELECT * FROM orders WHERE customer_id IN (
+    SELECT id FROM customers WHERE city IN (SELECT name FROM cities WHERE state = 'NY')
+)
+-- 'city' and 'state' correctly NOT flagged
+
+-- Test 3: Mixed valid outer + subquery - PASS ✓
+SELECT * FROM orders WHERE state = 'NY' AND customer_id IN (SELECT id FROM customers WHERE city = 'LA')
+-- 'state' correctly flagged (outer scope), 'city' NOT flagged (subquery scope)
+```
+
+#### 2. ✅ Improved JOIN Hint Specificity
+
+**Issue:** JOIN hints used generic placeholders like `<id_column>` and `<foreign_key>`.
+
+**Solution:** Added `_find_join_path()` method that:
+- Looks up actual foreign key relationships from schema
+- Generates specific JOIN conditions with real column names
+- Supports direct relationships (A -> B)
+- Supports reverse relationships (B -> A via FK)
+- Provides fallback to generic hints when no FK relationship exists
+
+**Before:**
+```
+You MUST add a JOIN like: 'orders JOIN customers ON orders.<id_column> = customers.<foreign_key>'
+```
+
+**After:**
+```
+You MUST add this exact JOIN: 'orders JOIN customers ON orders.customer_id = customers.id'
+```
+
+#### 3. ✅ Added Validation Results to Query Logs
+
+**Issue:** Validation failures weren't persisted to query history, making debugging difficult.
+
+**Solution:** Updated query logging in both endpoints:
+- `src/api/endpoints/query.py`: Stores validation warnings in `error_message` field when `is_valid=False`
+- `src/api/endpoints/multi_db_query.py`: Collects validation warnings and execution errors per database
+
+**Log Format:**
+```
+error_message = "Validation failed: WHERE column validation: Column 'state' not found in queried tables (orders)"
+```
+
+#### Verification Test Queries
+
+Use these queries to verify the fixes:
+
+1. **Subquery handling:**
+   ```
+   "Show me orders from customers in California"
+   ```
+   Expected: No false positive for subquery columns
+
+2. **JOIN hints:**
+   ```
+   "What orders shipped to New York state"
+   ```
+   Expected: Specific JOIN hint like `orders JOIN customers ON orders.customer_id = customers.id`
+
+3. **Query log verification:**
+   - Check `query_history` table after failed validation
+   - Verify `error_message` contains validation details

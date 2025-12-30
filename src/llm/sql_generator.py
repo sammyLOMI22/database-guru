@@ -347,6 +347,32 @@ class SQLGenerator:
                 except Exception as e:
                     logger.warning(f"LLM cache lookup failed: {e}")
 
+            # PRE-GENERATION ANALYSIS: Detect required JOINs before generating SQL
+            # This prevents errors like "SELECT * FROM orders WHERE state = 'NY'" when state is in customers
+            join_instructions = ""
+            if schema_dict:
+                try:
+                    from src.llm.sql_semantic_validator import SQLSemanticValidator
+                    pre_gen_validator = SQLSemanticValidator()
+                    pre_gen_analysis = pre_gen_validator.analyze_pre_generation_requirements(
+                        question=question,
+                        schema_dict=schema_dict,
+                    )
+                    if pre_gen_analysis.get("join_instructions"):
+                        join_instructions = pre_gen_analysis["join_instructions"]
+                        logger.info(
+                            f"🔗 Pre-generation analysis detected required JOINs: "
+                            f"{[j['to_table'] for j in pre_gen_analysis.get('required_joins', [])]}"
+                        )
+                except Exception as e:
+                    logger.warning(f"Pre-generation analysis failed: {e}")
+
+            # Enhance question with JOIN instructions if detected
+            final_question = enhanced_question
+            if join_instructions:
+                final_question = f"{enhanced_question}\n\n{join_instructions}"
+                logger.info(f"Enhanced question with JOIN instructions")
+
             # Build prompt with enhanced question (includes location hints if enabled)
             # Use dynamic examples if schema_dict is available and quality profile enables it
             examples = ""
@@ -366,7 +392,7 @@ class SQLGenerator:
                     logger.debug("Using static few-shot examples")
 
             messages = build_chat_messages(
-                question=enhanced_question,
+                question=final_question,
                 schema=schema,
                 database_type=database_type,
                 row_limit=row_limit,
@@ -379,7 +405,8 @@ class SQLGenerator:
                 temperature = quality_profile.temperature
 
             # Generate SQL using LLM
-            logger.info(f"Generating SQL for: {enhanced_question[:80]} (using model: {model_to_use})")
+            has_join_hints = bool(join_instructions)
+            logger.info(f"Generating SQL for: {question[:80]}... (model: {model_to_use}, join_hints: {has_join_hints})")
             raw_output = await self.ollama.chat(
                 messages=messages,
                 model=model_to_use,
@@ -544,6 +571,7 @@ Provide a clear, non-technical explanation."""
         database_type: str = "postgresql",
         model: Optional[str] = None,
         correction_hints: Optional[str] = None,
+        schema_dict: Optional[Dict[str, Any]] = None,  # For WHERE column validation
     ) -> Dict[str, Any]:
         """
         Attempt to fix a SQL query that resulted in an error
@@ -555,6 +583,7 @@ Provide a clear, non-technical explanation."""
             database_type: Type of database
             model: Optional model name to use
             correction_hints: Optional hints from ErrorDiagnostics (addresses PR review)
+            schema_dict: Optional schema dict for WHERE column validation
 
         Returns:
             Result dictionary with corrected SQL
@@ -605,12 +634,36 @@ Provide the corrected SQL query ONLY."""
             corrected_sql = self.validator.clean_sql_output(raw_output)
             is_valid, validation_error = self.validator.validate_sql_syntax(corrected_sql)
 
-            return {
+            warnings = [validation_error] if validation_error else []
+
+            # Validate WHERE columns if schema_dict provided
+            where_validation_hints = ""
+            if schema_dict and is_valid:
+                try:
+                    from src.llm.sql_semantic_validator import SQLSemanticValidator
+                    semantic_validator = SQLSemanticValidator()
+                    where_result = semantic_validator.validate_where_columns_exist(corrected_sql, schema_dict)
+                    if not where_result.is_valid:
+                        is_valid = False
+                        where_validation_hints = where_result.get_regeneration_hints()
+                        warnings.append(
+                            f"WHERE column validation: {'; '.join(where_result.mismatch_details)}"
+                        )
+                        logger.warning(
+                            f"❌ Fixed SQL WHERE validation FAILED: {where_result.mismatch_details}"
+                        )
+                except Exception as e:
+                    logger.warning(f"Fixed SQL WHERE validation exception: {e}")
+
+            result = {
                 "sql": corrected_sql,
                 "is_valid": is_valid,
-                "warnings": [validation_error] if validation_error else [],
+                "warnings": warnings,
                 "raw_output": raw_output,
             }
+            if where_validation_hints:
+                result["where_validation_hints"] = where_validation_hints
+            return result
 
         except Exception as e:
             logger.error(f"SQL error correction failed: {e}")

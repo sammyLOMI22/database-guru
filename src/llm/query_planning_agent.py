@@ -689,7 +689,8 @@ Reasoning:
             question=enhanced_question,
             schema=schema,
             database_type=database_type,
-            model=model
+            model=model,
+            schema_dict=schema_dict,  # Pass for WHERE column validation
         )
 
         # Apply learned mappings to generated SQL (if db_session and connection_name available)

@@ -327,6 +327,15 @@ async def process_query(
             if agent_result.get("verification_warnings"):
                 warnings.extend(agent_result["verification_warnings"])
 
+        # Build error message: include validation warnings OR execution errors
+        error_msg = None
+        if not is_valid and warnings:
+            # Store validation failures in error_message for debugging
+            error_msg = f"Validation failed: {'; '.join(warnings)}"
+            logger.info(f"Storing validation failure in query log: {error_msg[:100]}...")
+        elif execution_result and not execution_result.get("success"):
+            error_msg = execution_result.get("error")
+
         # Save to query history
         query_record = QueryHistory(
             natural_language_query=request.question,  # Save original question, not enhanced
@@ -335,7 +344,7 @@ async def process_query(
             executed=execution_result is not None and execution_result.get("success", False),
             execution_time_ms=execution_result.get("execution_time_ms") if execution_result else None,
             result_count=execution_result.get("row_count") if execution_result else None,
-            error_message=execution_result.get("error") if execution_result and not execution_result.get("success") else None,
+            error_message=error_msg,
             database_type=database_type,  # Use detected database type from active connection
             model_used=model_used,  # Use actual model that was used
         )
@@ -617,12 +626,12 @@ async def stream_query_results(
 
             # Connect to user's database
             async with UserDatabaseConnector.get_user_db_session(active_connection) as user_db:
-                # Get schema
+                # Get schema - ALWAYS fetch for WHERE column validation
                 schema_inspector = SchemaInspector()
+                schema_data = await schema_inspector.get_full_schema(user_db)
                 if request.schema:
                     schema = request.schema
                 else:
-                    schema_data = await schema_inspector.get_full_schema(user_db)
                     schema = schema_inspector.format_schema_for_llm(schema_data)
 
                 # Generate SQL (without execution yet)
@@ -631,6 +640,7 @@ async def stream_query_results(
                     schema=schema,
                     database_type=database_type,
                     model=request.model or settings.OLLAMA_MODEL,
+                    schema_dict=schema_data,  # Pass for WHERE column validation
                 )
 
                 logger.info(f"[Stream] Generated SQL: {sql[:100]}...")

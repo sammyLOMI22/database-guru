@@ -467,6 +467,7 @@ class SelfCorrectingSQLAgent:
         schema_inspector=None,  # SchemaInspector for tool-using agent
         schema_cache=None,  # SchemaCache for tool-using agent
         connection_id: Optional[int] = None,  # Connection ID for tool-using agent
+        schema_dict: Optional[Dict] = None,  # For WHERE column validation
     ) -> Dict[str, Any]:
         """
         Try multiple fix strategies in parallel and return the first successful one
@@ -565,7 +566,8 @@ class SelfCorrectingSQLAgent:
                     error=last_error,
                     schema=schema,
                     database_type=database_type,
-                    correction_hints=hints  # Explicit hints forwarding
+                    correction_hints=hints,  # Explicit hints forwarding
+                    schema_dict=schema_dict,  # Pass for WHERE column validation
                 )
                 return {
                     "sql": fix_result["sql"],
@@ -595,6 +597,7 @@ class SelfCorrectingSQLAgent:
                     connection_id=connection_id,
                     use_tools=True,
                     trace=trace,  # Pass trace for UI visibility
+                    schema_dict=schema_dict,  # Pass for WHERE column validation
                 )
 
                 if tool_result.success and tool_result.sql:
@@ -662,7 +665,8 @@ class SelfCorrectingSQLAgent:
                 error=last_error,
                 schema=schema,
                 database_type=database_type,
-                correction_hints=hints  # Explicit hints forwarding (addresses PR review)
+                correction_hints=hints,  # Explicit hints forwarding (addresses PR review)
+                schema_dict=schema_dict,  # Pass for WHERE column validation
             )
 
             metrics["winning_strategy"] = "llm_fallback_timeout"
@@ -740,7 +744,8 @@ class SelfCorrectingSQLAgent:
                 error=last_error,
                 schema=schema,
                 database_type=database_type,
-                correction_hints=hints  # Explicit hints forwarding (addresses PR review)
+                correction_hints=hints,  # Explicit hints forwarding (addresses PR review)
+                schema_dict=schema_dict,  # Pass for WHERE column validation
             )
             return {
                 "sql": fix_result["sql"],
@@ -982,6 +987,7 @@ class SelfCorrectingSQLAgent:
                                     connection_id=connection_id,
                                     use_tools=True,
                                     trace=trace,
+                                    schema_dict=schema_dict,  # Pass for WHERE column validation
                                 )
                                 if tool_result.success and tool_result.enriched_context:
                                     enhanced_schema = f"{schema}\n\n{tool_result.enriched_context}"
@@ -1119,6 +1125,7 @@ class SelfCorrectingSQLAgent:
                             schema_inspector=schema_inspector,
                             schema_cache=schema_cache,
                             connection_id=connection_id,
+                            schema_dict=schema_dict,  # Pass for WHERE column validation
                         )
                         sql = fix_result["sql"]
                         self.fix_methods[attempt_num] = fix_result["fix_method"]
@@ -1194,7 +1201,8 @@ class SelfCorrectingSQLAgent:
                                 error=last_error,
                                 schema=schema,
                                 database_type=database_type,
-                                correction_hints=hints  # Explicit hints forwarding (addresses PR review)
+                                correction_hints=hints,  # Explicit hints forwarding (addresses PR review)
+                                schema_dict=schema_dict,  # Pass for WHERE column validation
                             )
                             sql = fix_result["sql"]
                             trace.add_step("llm_fix", f"LLM generated fix: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql})
@@ -1616,6 +1624,7 @@ class SelfCorrectingSQLAgent:
         question: str,
         allow_write: bool = False,
         model: Optional[str] = None,
+        schema_dict: Optional[Dict] = None,  # For WHERE column validation
     ) -> Dict[str, Any]:
         """
         Execute pre-generated SQL with automatic error correction and retry
@@ -1710,7 +1719,8 @@ class SelfCorrectingSQLAgent:
                     schema=schema,
                     database_type=database_type,
                     model=model,
-                    correction_hints=hints  # Explicit hints forwarding
+                    correction_hints=hints,  # Explicit hints forwarding
+                    schema_dict=schema_dict,  # Pass for WHERE column validation
                 )
                 current_sql = fix_result["sql"]
 

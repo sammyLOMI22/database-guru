@@ -293,7 +293,7 @@ class MultiDatabaseHandler:
                 schema_data = await self.schema_inspector.get_full_schema(user_db)
                 db_schema_dict = schema_data  # Full schema for WHERE column validation
                 db_schema = self._format_single_db_schema(schema_data)
-                logger.debug(f"Got schema for {connection.name} with {len(schema_data.get('tables', {}))} tables for validation")
+                logger.info(f"🔍 [SCHEMA_DEBUG] Got schema for {connection.name} with {len(schema_data.get('tables', {}))} tables, schema_dict is not None: {db_schema_dict is not None}")
 
             # Execute query with self-correction
             exec_result = await self.execute_query_with_self_correction(
@@ -366,6 +366,7 @@ class MultiDatabaseHandler:
         Returns:
             Dict with execution results including correction attempts
         """
+        logger.info(f"🔍 [SCHEMA_DEBUG] execute_query_with_self_correction received schema_dict is not None: {schema_dict is not None}")
         try:
             async with UserDatabaseConnector.get_user_db_session(connection) as user_db:
                 # Get schema for this specific database if not provided
@@ -390,6 +391,7 @@ class MultiDatabaseHandler:
                         database_type=connection.database_type,
                         question=question,
                         model=model,
+                        schema_dict=schema_dict,  # Pass for WHERE column validation
                     )
                 else:
                     # Generate SQL and execute with retry

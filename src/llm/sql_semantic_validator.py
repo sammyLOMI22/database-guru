@@ -558,10 +558,16 @@ class SQLSemanticValidator:
 
         where_clause = where_match.group(1)
 
+        # IMPORTANT: Remove subqueries before extracting columns
+        # This prevents false positives like flagging 'city' in:
+        # SELECT * FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE city = 'LA')
+        # Without this, 'city' would be flagged as missing from 'orders' table
+        where_clause_no_subquery = self._remove_subqueries(where_clause)
+
         # Extract column names from WHERE clause (handle various formats)
         # Matches: column = value, column LIKE value, column ILIKE value, etc.
         column_pattern = re.compile(r'\b(\w+)\s*(?:=|<|>|<=|>=|<>|!=|LIKE|ILIKE|IN|IS)\s*', re.IGNORECASE)
-        where_columns = set(column_pattern.findall(where_clause))
+        where_columns = set(column_pattern.findall(where_clause_no_subquery))
 
         # Remove SQL keywords that might be caught
         sql_keywords = {'and', 'or', 'not', 'null', 'true', 'false', 'between'}
@@ -595,16 +601,31 @@ class SQLSemanticValidator:
                     details.append(
                         f"Column '{col}' not found in queried tables ({', '.join(tables_in_query)})"
                     )
-                    # Build explicit JOIN instruction with pattern
+                    # Build explicit JOIN instruction with actual foreign key info
                     target_table = tables_with_col[0]
                     tables_list = list(tables_in_query)
                     source_table = tables_list[0] if tables_list else "your_table"
-                    suggestions.append(
-                        f"CRITICAL: Column '{col}' exists in '{target_table}', NOT in '{source_table}'. "
-                        f"You MUST add a JOIN like: "
-                        f"'{source_table} JOIN {target_table} ON {source_table}.<id_column> = {target_table}.<foreign_key>' "
-                        f"and reference the column as '{target_table}.{col}' in WHERE clause."
+
+                    # Look up actual foreign key relationship from schema
+                    join_condition = self._find_join_path(
+                        schema_dict, source_table, target_table
                     )
+
+                    if join_condition:
+                        suggestions.append(
+                            f"CRITICAL: Column '{col}' exists in '{target_table}', NOT in '{source_table}'. "
+                            f"You MUST add this exact JOIN: "
+                            f"'{join_condition}' "
+                            f"Then use '{target_table}.{col}' in WHERE clause."
+                        )
+                    else:
+                        # Fallback to generic hint if no FK found
+                        suggestions.append(
+                            f"CRITICAL: Column '{col}' exists in '{target_table}', NOT in '{source_table}'. "
+                            f"You MUST add a JOIN like: "
+                            f"'{source_table} JOIN {target_table} ON {source_table}.<id_column> = {target_table}.<foreign_key>' "
+                            f"and reference the column as '{target_table}.{col}' in WHERE clause."
+                        )
 
         if details:
             return SemanticValidationResult(
@@ -735,6 +756,143 @@ class SQLSemanticValidator:
         )
         return has_join or bool(comma_tables)
 
+    def _remove_subqueries(self, text: str) -> str:
+        """Remove subqueries (SELECT statements in parentheses) from text.
+
+        This is used to prevent false positives in WHERE column validation.
+        For example, in:
+            customer_id IN (SELECT id FROM customers WHERE city = 'LA')
+
+        We want to validate customer_id (outer scope) but NOT city (subquery scope).
+
+        Uses balanced parentheses counting to handle nested subqueries correctly.
+        For nested queries like:
+            customer_id IN (SELECT id FROM customers WHERE city IN (SELECT name FROM cities))
+
+        This replaces the entire outer subquery (including nested ones) with a placeholder.
+
+        Args:
+            text: SQL text potentially containing subqueries
+
+        Returns:
+            Text with subquery content replaced by placeholder
+        """
+        result = text
+        max_iterations = 20  # Prevent infinite loops
+
+        for _ in range(max_iterations):
+            # Find (SELECT pattern (case insensitive)
+            subquery_start = re.search(r'\(\s*SELECT\b', result, re.IGNORECASE)
+            if not subquery_start:
+                break  # No more subqueries
+
+            start_pos = subquery_start.start()
+
+            # Find matching closing parenthesis using balanced counting
+            depth = 0
+            end_pos = None
+            in_string = False
+            string_char = None
+
+            for i in range(start_pos, len(result)):
+                char = result[i]
+
+                # Handle string literals to avoid counting parens inside strings
+                if char in ('"', "'") and (i == 0 or result[i-1] != '\\'):
+                    if not in_string:
+                        in_string = True
+                        string_char = char
+                    elif char == string_char:
+                        in_string = False
+                        string_char = None
+                    continue
+
+                if in_string:
+                    continue
+
+                if char == '(':
+                    depth += 1
+                elif char == ')':
+                    depth -= 1
+                    if depth == 0:
+                        end_pos = i + 1
+                        break
+
+            if end_pos is None:
+                # Unbalanced parentheses, stop to avoid infinite loop
+                break
+
+            # Replace the subquery with placeholder
+            result = result[:start_pos] + '__SUBQUERY__' + result[end_pos:]
+
+        return result
+
+    def _find_join_path(
+        self, schema_dict: dict, source_table: str, target_table: str
+    ) -> Optional[str]:
+        """Find the JOIN path between two tables using foreign key relationships.
+
+        Searches the schema's relationships array to find a direct or indirect
+        join path from source_table to target_table.
+
+        Args:
+            schema_dict: Schema dictionary with relationships
+            source_table: The table currently in the query (e.g., 'orders')
+            target_table: The table containing the missing column (e.g., 'customers')
+
+        Returns:
+            A specific JOIN clause string, or None if no relationship found.
+            Example: "orders JOIN customers ON orders.customer_id = customers.id"
+        """
+        relationships = schema_dict.get("relationships", [])
+        if not relationships:
+            return None
+
+        source_lower = source_table.lower()
+        target_lower = target_table.lower()
+
+        # Try direct relationship: source -> target
+        for rel in relationships:
+            from_t = rel.get("from_table", "").lower()
+            to_t = rel.get("to_table", "").lower()
+            from_col = rel.get("from_column", "")
+            to_col = rel.get("to_column", "")
+
+            if from_t == source_lower and to_t == target_lower:
+                # source has FK to target: source.fk_col -> target.pk_col
+                return f"{source_table} JOIN {target_table} ON {source_table}.{from_col} = {target_table}.{to_col}"
+
+            if from_t == target_lower and to_t == source_lower:
+                # target has FK to source: target.fk_col -> source.pk_col
+                # Need to join target to source in reverse
+                return f"{source_table} JOIN {target_table} ON {source_table}.{to_col} = {target_table}.{from_col}"
+
+        # Try indirect relationship via intermediate table (one hop)
+        for rel1 in relationships:
+            from_t1 = rel1.get("from_table", "").lower()
+            to_t1 = rel1.get("to_table", "").lower()
+            from_col1 = rel1.get("from_column", "")
+            to_col1 = rel1.get("to_column", "")
+
+            if from_t1 == source_lower:
+                # source -> intermediate
+                intermediate = to_t1
+                for rel2 in relationships:
+                    from_t2 = rel2.get("from_table", "").lower()
+                    to_t2 = rel2.get("to_table", "").lower()
+                    from_col2 = rel2.get("from_column", "")
+                    to_col2 = rel2.get("to_column", "")
+
+                    if from_t2 == intermediate and to_t2 == target_lower:
+                        # Found: source -> intermediate -> target
+                        int_table = rel1.get("to_table", intermediate)
+                        return (
+                            f"{source_table} JOIN {int_table} ON {source_table}.{from_col1} = {int_table}.{to_col1} "
+                            f"JOIN {target_table} ON {int_table}.{from_col2} = {target_table}.{to_col2}"
+                        )
+
+        return None
+
     def _extract_table_references(self, sql: str) -> Set[str]:
         """Extract all table names referenced in SQL."""
         tables = set()
@@ -844,6 +1002,166 @@ class SQLSemanticValidator:
                         unqualified.append(col_name)
 
         return unqualified
+
+
+    def analyze_pre_generation_requirements(
+        self,
+        question: str,
+        schema_dict: dict,
+        primary_table: Optional[str] = None
+    ) -> dict:
+        """Analyze question BEFORE SQL generation to identify required JOINs.
+
+        This method detects filter values in the question (state codes, status values, etc.)
+        and determines which tables contain the corresponding columns. If a filter column
+        is in a different table than the primary query table, it generates explicit JOIN hints.
+
+        This prevents errors like:
+        - "Show orders from NY" → generating `WHERE orders.state = 'NY'` when state is in customers
+
+        Args:
+            question: Natural language question
+            schema_dict: Schema dictionary with table/column information
+            primary_table: Optional primary table the query is about (e.g., 'orders')
+
+        Returns:
+            Dictionary with:
+                - required_joins: List of explicit JOIN requirements
+                - filter_column_hints: Dict mapping detected filters to their table locations
+                - join_instructions: Formatted string for prompt injection
+        """
+        result = {
+            "required_joins": [],
+            "filter_column_hints": {},
+            "join_instructions": "",
+        }
+
+        if not schema_dict or not question:
+            return result
+
+        question_lower = question.lower()
+
+        # Build column-to-table mapping from schema
+        column_to_tables = {}  # column_name -> [(table_name, column_info), ...]
+        for table_name, table_info in schema_dict.get("tables", {}).items():
+            for col in table_info.get("columns", []):
+                col_name = col.get("name", "").lower()
+                if col_name not in column_to_tables:
+                    column_to_tables[col_name] = []
+                column_to_tables[col_name].append((table_name, col))
+
+        # Detect state/location filters
+        state_patterns = [
+            # US state codes
+            (r'\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\b', 'state'),
+            # Full state names
+            (r'\b(california|texas|new york|florida|illinois|pennsylvania|ohio|georgia|north carolina|michigan|new jersey|virginia|washington|arizona|massachusetts|tennessee|indiana|missouri|maryland|wisconsin|colorado|minnesota|south carolina|alabama|louisiana|kentucky|oregon|oklahoma|connecticut|utah|iowa|nevada|arkansas|kansas|mississippi|nebraska|new mexico|west virginia|idaho|hawaii|maine|new hampshire|rhode island|montana|delaware|south dakota|north dakota|alaska|vermont|wyoming)\b', 'state'),
+            # Common phrases indicating state filter
+            (r'\b(?:from|in|to|shipped to|delivered to|located in)\s+([\w\s]+?)(?:\s+state)?\s*$', 'state'),
+        ]
+
+        # Detect status filters
+        status_patterns = [
+            (r'\b(pending|processing|shipped|delivered|cancelled|completed|active|inactive)\b', 'status'),
+        ]
+
+        # Detect category filters
+        category_patterns = [
+            (r'\b(electronics?|clothing|food|beverages?|books?|toys?|furniture|home|garden|sports?|health|beauty)\b', 'category'),
+        ]
+
+        detected_filters = []
+        seen_columns = set()  # Prevent duplicate detections
+
+        # Check state patterns
+        for pattern, col_type in state_patterns:
+            matches = re.findall(pattern, question_lower, re.IGNORECASE)
+            for match in matches:
+                if "state" not in seen_columns:
+                    detected_filters.append(("state", match, col_type))
+                    seen_columns.add("state")
+                    break  # One match per column type is enough
+
+        # Check status patterns
+        for pattern, col_type in status_patterns:
+            matches = re.findall(pattern, question_lower, re.IGNORECASE)
+            for match in matches:
+                if "status" not in seen_columns:
+                    detected_filters.append(("status", match, col_type))
+                    seen_columns.add("status")
+                    break
+
+        # Check category patterns
+        for pattern, col_type in category_patterns:
+            matches = re.findall(pattern, question_lower, re.IGNORECASE)
+            for match in matches:
+                if "category" not in seen_columns:
+                    detected_filters.append(("category", match, col_type))
+                    seen_columns.add("category")
+                    break
+
+        # Detect primary table from question if not provided
+        if not primary_table:
+            table_names = list(schema_dict.get("tables", {}).keys())
+            for table in table_names:
+                # Check if table name (or singular form) is mentioned
+                table_lower = table.lower()
+                singular = table_lower.rstrip('s')  # Simple singular form
+                if table_lower in question_lower or singular in question_lower:
+                    primary_table = table
+                    break
+
+        if not primary_table or not detected_filters:
+            return result
+
+        # Check if filter columns are in a different table than primary
+        primary_columns = set()
+        primary_table_info = schema_dict.get("tables", {}).get(primary_table, {})
+        for col in primary_table_info.get("columns", []):
+            primary_columns.add(col.get("name", "").lower())
+
+        join_hints = []
+        for col_name, value, col_type in detected_filters:
+            if col_name not in primary_columns:
+                # Column is not in primary table - find which table has it
+                if col_name in column_to_tables:
+                    for table_name, col_info in column_to_tables[col_name]:
+                        if table_name.lower() != primary_table.lower():
+                            # Need to JOIN to this table
+                            join_path = self._find_join_path(
+                                schema_dict, primary_table, table_name
+                            )
+
+                            result["filter_column_hints"][col_name] = {
+                                "table": table_name,
+                                "value_detected": value,
+                            }
+
+                            if join_path:
+                                result["required_joins"].append({
+                                    "from_table": primary_table,
+                                    "to_table": table_name,
+                                    "column": col_name,
+                                    "join_clause": join_path,
+                                })
+                                join_hints.append(
+                                    f"CRITICAL JOIN REQUIRED: To filter by '{col_name}' (value: '{value}'), "
+                                    f"you MUST JOIN '{primary_table}' to '{table_name}' because '{col_name}' "
+                                    f"is in '{table_name}', NOT in '{primary_table}'.\n"
+                                    f"  → Use: {join_path}\n"
+                                    f"  → Then filter with: {table_name}.{col_name} = '{value}'"
+                                )
+                            else:
+                                join_hints.append(
+                                    f"CRITICAL: Column '{col_name}' (for value '{value}') is in table "
+                                    f"'{table_name}', NOT in '{primary_table}'. You must JOIN to '{table_name}'."
+                                )
+                            break  # Found the table, stop looking
+
+        if join_hints:
+            result["join_instructions"] = "\n\n".join(join_hints)
+
+        return result
 
 
 # Convenience function

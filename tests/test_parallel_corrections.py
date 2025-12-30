@@ -28,7 +28,7 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()  # Add missing ollama client
 
         # Mock LLM fix (slow - 1 second)
-        async def mock_fix_sql_error(sql, error, schema, database_type):
+        async def mock_fix_sql_error(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
             await asyncio.sleep(1.0)  # Simulate LLM call
             return {"sql": "SELECT * FROM products_fixed"}
 
@@ -96,7 +96,7 @@ class TestParallelCorrections:
         # Verify result
         assert result is not None
         assert result["sql"] is not None
-        assert result["fix_method"] in ["quick_fix", "learned", "llm"]
+        assert result["fix_method"] in ["quick_fix", "learned", "llm", "tool_using"]
 
         # Verify parallel speedup
         # Sequential would take: 0.1 (quick) + 0.5 (learned) + 1.0 (llm) = 1.6s
@@ -115,7 +115,7 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()
 
         # Mock LLM fix (slowest but successful)
-        async def mock_llm_fix(sql, error, schema, database_type):
+        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
             await asyncio.sleep(1.0)
             return {"sql": "SELECT * FROM products -- LLM fix"}
 
@@ -173,7 +173,7 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()
 
         # All strategies fail initially
-        async def mock_llm_fix(sql, error, schema, database_type):
+        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
             return {"sql": "SELECT * FROM products -- Fallback LLM"}
 
         sql_generator.fix_sql_error = mock_llm_fix
@@ -216,9 +216,9 @@ class TestParallelCorrections:
             trace=trace,
         )
 
-        # Verify LLM was used (either parallel or fallback)
+        # Verify LLM or tool_using was used (either parallel or fallback)
         assert result is not None
-        assert result["fix_method"] in ["llm", "llm_fallback"]
+        assert result["fix_method"] in ["llm", "llm_fallback", "tool_using"]
         assert "products" in result["sql"].lower()
 
     @pytest.mark.asyncio
@@ -230,7 +230,7 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()
 
         # LLM fix succeeds
-        async def mock_llm_fix(sql, error, schema, database_type):
+        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
             return {"sql": "SELECT * FROM products"}
 
         sql_generator.fix_sql_error = mock_llm_fix
@@ -262,9 +262,9 @@ class TestParallelCorrections:
             trace=trace,
         )
 
-        # Verify LLM fix was used despite other failures
+        # Verify LLM or tool_using fix was used despite other failures
         assert result is not None
-        assert result["fix_method"] in ["llm", "llm_fallback"]
+        assert result["fix_method"] in ["llm", "llm_fallback", "tool_using"]
         assert result["sql"] == "SELECT * FROM products"
 
     @pytest.mark.asyncio
@@ -295,7 +295,7 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()
 
         # Mock LLM fix (takes longer than timeout - will be used as fallback)
-        async def mock_llm_fix(sql, error, schema, database_type):
+        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
             # This should be called as the fallback after timeout
             return {"sql": "SELECT * FROM products -- Fallback after timeout"}
 
@@ -373,7 +373,7 @@ class TestParallelCorrections:
             assert "metrics" in result
             metrics = result["metrics"]
             assert metrics["timed_out"] is True
-            assert metrics["strategies_timed_out"] == 3
+            assert metrics["strategies_timed_out"] == 4  # quick, learned, llm, tool_using
             assert metrics["winning_strategy"] == "llm_fallback_timeout"
 
             print(f"\n✓ Timeout protection works: {elapsed:.2f}s (expected ~1s)")
@@ -387,7 +387,7 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()
 
         # Mock LLM fix
-        async def mock_llm_fix(sql, error, schema, database_type):
+        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
             return {"sql": "SELECT * FROM products -- LLM"}
 
         sql_generator.fix_sql_error = mock_llm_fix
@@ -446,7 +446,7 @@ class TestParallelCorrections:
         assert "timed_out" in metrics
 
         # Verify values
-        assert metrics["strategies_attempted"] == 3  # quick, learned, llm
+        assert metrics["strategies_attempted"] == 4  # quick, learned, llm, tool_using
         assert metrics["strategies_succeeded"] >= 1  # At least quick fix succeeded
         assert metrics["winning_strategy"] == "quick_fix"  # Quick fix won
         assert metrics["timed_out"] is False  # No timeout

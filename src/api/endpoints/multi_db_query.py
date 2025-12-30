@@ -589,14 +589,25 @@ async def process_multi_database_query(
         # For multi-database queries, we store the first SQL or a summary
         primary_sql = queries_with_connections[0].get("sql", "") if queries_with_connections else ""
 
+        # Collect validation and execution errors for debugging
+        all_validated = all(q.get("is_valid", False) for q in queries)
+        error_messages = []
+        for result in database_results:
+            if not result.success and result.error:
+                error_messages.append(f"[{result.connection_name}] {result.error}")
+        # Also capture validation warnings from queries
+        for q in queries:
+            if not q.get("is_valid", True) and q.get("warnings"):
+                error_messages.append(f"[Validation] {'; '.join(q['warnings'])}")
+
         query_record = QueryHistory(
             natural_language_query=request.question,
             generated_sql=primary_sql,
-            sql_validated=all(q.get("is_valid", False) for q in queries),
+            sql_validated=all_validated,
             executed=any(r.success for r in database_results),
             execution_time_ms=total_execution_time,
             result_count=total_rows,
-            error_message=None,
+            error_message="; ".join(error_messages) if error_messages else None,
             database_type=f"multi_db_{len(connections)}",
             model_used=model_used,
         )
