@@ -508,3 +508,197 @@ LIMIT {row_limit}""",
                     return examples  # One example is enough
 
         return examples
+
+    # ========================================================================
+    # PHASE 4: Enhanced Dynamic Examples for Complex Queries
+    # ========================================================================
+
+    def _detect_bridge_tables(self) -> List[Dict[str, Any]]:
+        """Detect bridge/junction tables for many-to-many relationships.
+
+        Bridge tables typically have:
+        - 2+ foreign keys pointing to other tables
+        - Few or no columns besides the FK columns
+        """
+        bridge_tables = []
+
+        for table_name, table_info in self.schema.get("tables", {}).items():
+            fks = table_info.get("foreign_keys", [])
+            columns = table_info.get("columns", [])
+
+            if len(fks) < 2:
+                continue
+
+            # Count non-FK, non-PK columns
+            fk_cols = {fk.get("column") for fk in fks if fk.get("column")}
+            pk_cols = set(table_info.get("primary_keys", []))
+            audit_cols = {"id", "created_at", "updated_at", "created_by", "updated_by"}
+
+            other_cols = [
+                c for c in columns
+                if c["name"] not in fk_cols
+                and c["name"] not in pk_cols
+                and c["name"].lower() not in audit_cols
+            ]
+
+            if len(other_cols) <= 3:
+                referred_tables = [fk.get("referred_table") for fk in fks if fk.get("referred_table")]
+                bridge_tables.append({
+                    "bridge": table_name,
+                    "connects": referred_tables,
+                    "fks": fks,
+                    "extra_cols": [c["name"] for c in other_cols]
+                })
+
+        return bridge_tables
+
+    def _generate_bridge_table_examples(self, row_limit: int) -> List[SQLExample]:
+        """Generate examples for many-to-many queries using bridge tables.
+
+        These are crucial for queries like:
+        - "Show products in order X" (orders -> order_items -> products)
+        - "Which categories have product Y" (products -> product_categories -> categories)
+        """
+        examples = []
+        bridge_tables = self._detect_bridge_tables()
+
+        for bt in bridge_tables[:2]:  # Limit to 2 bridge examples
+            bridge = bt["bridge"]
+            connects = bt["connects"]
+
+            if len(connects) < 2:
+                continue
+
+            table_a, table_b = connects[0], connects[1]
+
+            # Find the FK columns for each connected table
+            fk_a, fk_b = None, None
+            for fk in bt["fks"]:
+                if fk.get("referred_table") == table_a:
+                    fk_a = fk
+                elif fk.get("referred_table") == table_b:
+                    fk_b = fk
+
+            if not fk_a or not fk_b:
+                continue
+
+            # Generate a 3-table join example
+            col_a = fk_a.get("column", "")
+            ref_col_a = fk_a.get("referred_column", "id")
+            col_b = fk_b.get("column", "")
+            ref_col_b = fk_b.get("referred_column", "id")
+
+            # Extra columns like quantity, price in bridge table
+            extra_cols = bt.get("extra_cols", [])
+            extra_select = ", ".join([f"{bridge}.{c}" for c in extra_cols]) if extra_cols else ""
+
+            examples.append(SQLExample(
+                question=f"Show {table_a} with their {table_b} (via {bridge})",
+                sql=(
+                    f"SELECT {table_a}.*, {table_b}.*{', ' + extra_select if extra_select else ''}\n"
+                    f"FROM {table_a}\n"
+                    f"JOIN {bridge} ON {table_a}.{ref_col_a} = {bridge}.{col_a}\n"
+                    f"JOIN {table_b} ON {bridge}.{col_b} = {table_b}.{ref_col_b}\n"
+                    f"LIMIT {row_limit}"
+                ),
+                note=f"Bridge table '{bridge}' connects {table_a} and {table_b} (many-to-many)",
+                intent=QueryIntent.RELATIONSHIP
+            ))
+
+        return examples
+
+    def _generate_multi_table_aggregation_examples(self) -> List[SQLExample]:
+        """Generate aggregation examples that span multiple tables.
+
+        These demonstrate:
+        - COUNT with GROUP BY after JOIN
+        - SUM/AVG across related tables
+        """
+        examples = []
+
+        # Find a good FK relationship
+        for fk in self.foreign_keys[:3]:
+            from_table = fk.get("from_table")
+            to_table = fk.get("to_table")
+            from_col = fk.get("from_column")
+            to_col = fk.get("to_column")
+
+            if not all([from_table, to_table, from_col, to_col]):
+                continue
+
+            # Find a groupable column in the "to" table (e.g., category name, status)
+            to_groupable = self._find_groupable_column(to_table)
+            # Find a numeric column in the "from" table
+            from_numeric = self._find_numeric_column(from_table)
+
+            if to_groupable:
+                examples.append(SQLExample(
+                    question=f"Count {from_table} grouped by {to_table}.{to_groupable}",
+                    sql=(
+                        f"SELECT {to_table}.{to_groupable}, COUNT({from_table}.*) as count\n"
+                        f"FROM {from_table}\n"
+                        f"JOIN {to_table} ON {from_table}.{from_col} = {to_table}.{to_col}\n"
+                        f"GROUP BY {to_table}.{to_groupable}"
+                    ),
+                    intent=QueryIntent.AGGREGATION
+                ))
+
+            if to_groupable and from_numeric:
+                examples.append(SQLExample(
+                    question=f"Total {from_numeric} by {to_table}.{to_groupable}",
+                    sql=(
+                        f"SELECT {to_table}.{to_groupable}, SUM({from_table}.{from_numeric}) as total\n"
+                        f"FROM {from_table}\n"
+                        f"JOIN {to_table} ON {from_table}.{from_col} = {to_table}.{to_col}\n"
+                        f"GROUP BY {to_table}.{to_groupable}\n"
+                        f"ORDER BY total DESC"
+                    ),
+                    intent=QueryIntent.AGGREGATION
+                ))
+                break  # One good example is enough
+
+        return examples[:2]
+
+    def generate_enhanced_examples(
+        self,
+        intent: Optional[QueryIntent] = None,
+        row_limit: int = 10
+    ) -> str:
+        """Generate enhanced examples including bridge tables and multi-table aggregations.
+
+        This is Phase 4's enhanced version that better supports complex queries.
+        """
+        examples = []
+
+        # Always include basic table examples
+        examples.extend(self._generate_table_examples(row_limit))
+
+        # Add relationship examples if we have FKs
+        if self.foreign_keys:
+            examples.extend(self._generate_relationship_examples(row_limit))
+
+        # Phase 4: Add bridge table examples for many-to-many
+        bridge_examples = self._generate_bridge_table_examples(row_limit)
+        examples.extend(bridge_examples)
+
+        # Phase 4: Add multi-table aggregation examples
+        if intent in (QueryIntent.AGGREGATION, None):
+            multi_agg_examples = self._generate_multi_table_aggregation_examples()
+            examples.extend(multi_agg_examples)
+
+        # Add aggregation examples
+        examples.extend(self._generate_aggregation_examples())
+
+        # Add filter examples with sample values
+        examples.extend(self._generate_filter_examples(row_limit))
+
+        # Add location-based JOIN example if schema has location columns
+        location_example = self._generate_location_join_example(row_limit)
+        if location_example:
+            examples.append(location_example)
+
+        # If intent specified, prioritize those examples
+        if intent:
+            examples = self._prioritize_by_intent(examples, intent)
+
+        return self._format_examples(examples[:8])  # Limit to 8 examples

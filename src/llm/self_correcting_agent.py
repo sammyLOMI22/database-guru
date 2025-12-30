@@ -1016,6 +1016,7 @@ class SelfCorrectingSQLAgent:
                             quality_profile=self.quality_profile,
                             schema_dict=schema_dict,  # Pass for LocationMapper
                             row_limit=row_limit,  # Pass row limit to LLM
+                            intent_result=intent_result,  # Phase 1: Intent-driven prompting
                         )
 
                         # Check if LLM says query cannot be answered
@@ -1300,9 +1301,10 @@ class SelfCorrectingSQLAgent:
                         confidence_prediction = None
 
                 # Validate SQL before executing - CRITICAL: must prevent execution if invalid!
-                if attempt_num == 1 and not gen_result.get("is_valid", True):
+                # Check for ALL attempts, not just first (Phase 1-4 fix)
+                if not gen_result.get("is_valid", True):
                     validation_warnings = gen_result.get('warnings', [])
-                    logger.warning(f"Generated SQL failed validation: {validation_warnings}")
+                    logger.warning(f"🚫 [ATTEMPT {attempt_num}] Generated SQL failed validation: {validation_warnings}")
 
                     # Build error message with hints for regeneration
                     last_error = f"SQL validation failed: {'; '.join(validation_warnings)}"

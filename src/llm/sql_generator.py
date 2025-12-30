@@ -227,6 +227,7 @@ class SQLGenerator:
         quality_profile: Optional["QualityProfile"] = None,
         schema_dict: Optional[Dict[str, Any]] = None,
         row_limit: int = 100,
+        intent_result: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Generate SQL query from natural language question
@@ -242,6 +243,7 @@ class SQLGenerator:
             quality_profile: Optional quality profile for controlling generation behavior
             schema_dict: Optional parsed schema dictionary for LocationMapper
             row_limit: Maximum rows to return in query (default: 100)
+            intent_result: Optional QueryIntentResult for intent-driven prompting (Phase 1)
 
         Returns:
             Dictionary with:
@@ -262,6 +264,15 @@ class SQLGenerator:
             # Use specified model or default
             model_to_use = model or self.settings.OLLAMA_MODEL
             llm_cache_hit = False
+
+            # Log intent-driven prompting status (Phase 1)
+            if intent_result:
+                logger.info(
+                    f"🎯 Intent-driven prompting active: {intent_result.intent.value} "
+                    f"(confidence: {intent_result.confidence:.2f}, "
+                    f"tables: {list(intent_result.required_tables)}, "
+                    f"aggregations: {intent_result.aggregations})"
+                )
 
             # Apply location hints when enabled by quality profile
             enhanced_question = question
@@ -293,7 +304,7 @@ class SQLGenerator:
                     if cached:
                         logger.info(
                             f"LLM cache hit (similarity={cached.similarity:.3f}): "
-                            f"Returning cached SQL"
+                            f"Cached SQL: {cached.sql[:100]}..."
                         )
                         llm_cache_hit = True
 
@@ -311,45 +322,69 @@ class SQLGenerator:
                         if dangerous_ops:
                             warnings.append(f"Dangerous operations: {', '.join(dangerous_ops)}")
 
-                        # CRITICAL: Also validate WHERE columns for cached SQL
-                        where_validation_hints = ""
+                        # CRITICAL: Validate WHERE columns for cached SQL
+                        # If validation fails, SKIP cache and generate fresh SQL with JOIN hints
+                        logger.info(f"🔍 DEBUG: schema_dict present: {schema_dict is not None}, is_valid: {is_valid}")
                         if schema_dict and is_valid:
                             try:
                                 from src.llm.sql_semantic_validator import SQLSemanticValidator
                                 semantic_validator = SQLSemanticValidator()
                                 where_result = semantic_validator.validate_where_columns_exist(sql, schema_dict)
+                                logger.info(f"🔍 DEBUG: WHERE validation result: is_valid={where_result.is_valid}, details={where_result.mismatch_details}")
                                 if not where_result.is_valid:
-                                    is_valid = False
-                                    where_validation_hints = where_result.get_regeneration_hints()
-                                    warnings.append(
-                                        f"WHERE column validation: {'; '.join(where_result.mismatch_details)}"
-                                    )
+                                    # DON'T return invalid cached SQL - fall through to regenerate
                                     logger.warning(
-                                        f"❌ Cached SQL WHERE validation FAILED: {where_result.mismatch_details}"
+                                        f"❌ Cached SQL WHERE validation FAILED: {where_result.mismatch_details}. "
+                                        f"Skipping cache to regenerate with proper JOINs."
                                     )
+                                    # Don't return - continue to fresh generation below
+                                else:
+                                    # Cache is valid - return it
+                                    return {
+                                        "sql": sql,
+                                        "is_valid": is_valid,
+                                        "is_read_only": is_read_only,
+                                        "warnings": warnings,
+                                        "raw_output": cached.raw_output,
+                                        "question": question,
+                                        "model_used": cached.entry.model_used,
+                                        "llm_cache_hit": True,
+                                        "llm_cache_similarity": cached.similarity,
+                                    }
                             except Exception as e:
                                 logger.warning(f"Cached SQL WHERE validation exception: {e}")
-
-                        result = {
-                            "sql": sql,
-                            "is_valid": is_valid,
-                            "is_read_only": is_read_only,
-                            "warnings": warnings,
-                            "raw_output": cached.raw_output,
-                            "question": question,
-                            "model_used": cached.entry.model_used,
-                            "llm_cache_hit": True,
-                            "llm_cache_similarity": cached.similarity,
-                        }
-                        if where_validation_hints:
-                            result["where_validation_hints"] = where_validation_hints
-                        return result
+                                # On exception, still return cached (fail-safe)
+                                return {
+                                    "sql": sql,
+                                    "is_valid": is_valid,
+                                    "is_read_only": is_read_only,
+                                    "warnings": warnings,
+                                    "raw_output": cached.raw_output,
+                                    "question": question,
+                                    "model_used": cached.entry.model_used,
+                                    "llm_cache_hit": True,
+                                    "llm_cache_similarity": cached.similarity,
+                                }
+                        else:
+                            # No schema_dict to validate - return cached
+                            return {
+                                "sql": sql,
+                                "is_valid": is_valid,
+                                "is_read_only": is_read_only,
+                                "warnings": warnings,
+                                "raw_output": cached.raw_output,
+                                "question": question,
+                                "model_used": cached.entry.model_used,
+                                "llm_cache_hit": True,
+                                "llm_cache_similarity": cached.similarity,
+                            }
                 except Exception as e:
                     logger.warning(f"LLM cache lookup failed: {e}")
 
             # PRE-GENERATION ANALYSIS: Detect required JOINs before generating SQL
             # This prevents errors like "SELECT * FROM orders WHERE state = 'NY'" when state is in customers
             join_instructions = ""
+            location_warning = ""
             if schema_dict:
                 try:
                     from src.llm.sql_semantic_validator import SQLSemanticValidator
@@ -364,13 +399,36 @@ class SQLGenerator:
                             f"🔗 Pre-generation analysis detected required JOINs: "
                             f"{[j['to_table'] for j in pre_gen_analysis.get('required_joins', [])]}"
                         )
+
+                    # Phase 1-4 Enhancement: Build explicit location column warning
+                    # Find all tables that have location columns (state, city, country)
+                    location_tables = {}
+                    for table_name, table_info in schema_dict.get("tables", {}).items():
+                        for col in table_info.get("columns", []):
+                            col_name = col.get("name", "").lower()
+                            if col_name in ("state", "city", "country", "region", "zip", "zipcode"):
+                                if col_name not in location_tables:
+                                    location_tables[col_name] = []
+                                location_tables[col_name].append(table_name)
+
+                    if location_tables:
+                        warning_lines = ["⚠️ LOCATION COLUMN MAPPING (critical for correct JOINs):"]
+                        for col, tables in location_tables.items():
+                            warning_lines.append(f"   - '{col}' column is ONLY in: {', '.join(tables)}")
+                        warning_lines.append("   If filtering by location but querying a different table, you MUST JOIN!")
+                        location_warning = "\n".join(warning_lines)
+                        logger.info(f"📍 Location columns detected: {location_tables}")
+
                 except Exception as e:
                     logger.warning(f"Pre-generation analysis failed: {e}")
 
-            # Enhance question with JOIN instructions if detected
+            # Enhance question with JOIN instructions and location warnings if detected
             final_question = enhanced_question
+            if location_warning:
+                final_question = f"{location_warning}\n\n{final_question}"
+                logger.info(f"Enhanced question with location column mapping")
             if join_instructions:
-                final_question = f"{enhanced_question}\n\n{join_instructions}"
+                final_question = f"{final_question}\n\n{join_instructions}"
                 logger.info(f"Enhanced question with JOIN instructions")
 
             # Build prompt with enhanced question (includes location hints if enabled)
@@ -397,6 +455,7 @@ class SQLGenerator:
                 database_type=database_type,
                 row_limit=row_limit,
                 examples=examples,
+                intent_result=intent_result,  # Phase 1: Intent-driven prompting
             )
 
             # Determine temperature from quality profile or use default

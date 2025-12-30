@@ -135,6 +135,158 @@ def get_dialect_rules(database_type: str) -> str:
     return DIALECT_RULES.get(database_type.lower(), "")
 
 
+# ============================================================================
+# INTENT-DRIVEN PROMPTING (Phase 1 - SQL Quality Enhancement)
+# ============================================================================
+# Intent-specific SQL requirements that MUST be followed based on query type.
+# This prevents common errors like missing GROUP BY for aggregations,
+# missing JOINs for relationship queries, etc.
+
+INTENT_SQL_REQUIREMENTS = {
+    "lookup": """QUERY TYPE: SIMPLE LOOKUP
+Your SQL should:
+- Use a simple SELECT statement
+- Include appropriate columns (not just SELECT *)
+- Add LIMIT clause for large tables
+- No aggregation or GROUP BY needed""",
+
+    "aggregation": """QUERY TYPE: AGGREGATION (COUNT/SUM/AVG/etc.)
+CRITICAL REQUIREMENTS:
+- You MUST include an aggregation function: COUNT(), SUM(), AVG(), MIN(), MAX()
+- If selecting non-aggregated columns, you MUST include GROUP BY for those columns
+- Do NOT include LIMIT when returning aggregated results (one row per group)
+- Common patterns:
+  * COUNT(*) for totals
+  * COUNT(DISTINCT column) for unique counts
+  * SUM(column), AVG(column) for numeric analysis
+  * GROUP BY for per-category/per-group breakdowns""",
+
+    "comparison": """QUERY TYPE: COMPARISON/FILTERING
+Your SQL should:
+- Include appropriate WHERE clause with comparison operators
+- Use proper data types in comparisons (strings in quotes, numbers without)
+- Consider NULL handling (IS NULL, IS NOT NULL, COALESCE)
+- For range queries, use BETWEEN or >= AND <=
+- For pattern matching, use LIKE or ILIKE""",
+
+    "relationship": """QUERY TYPE: RELATIONSHIP (Multiple Tables)
+CRITICAL REQUIREMENTS:
+- You MUST use JOIN to connect related tables
+- Check the Foreign Keys section in the schema for exact join columns
+- Use appropriate JOIN type:
+  * INNER JOIN for matching records in both tables
+  * LEFT JOIN when the right table may not have matches
+- ALWAYS qualify column names with table names to avoid ambiguity
+- If two tables aren't directly related, look for a bridge table""",
+
+    "temporal": """QUERY TYPE: TEMPORAL (Date/Time Filtering)
+Your SQL should:
+- Use date functions appropriate for the database type
+- For "last N days": date_column >= CURRENT_DATE - INTERVAL 'N days'
+- For "this month/year": Extract and compare month/year
+- Consider timezone implications if applicable
+- Sort by date if showing recent records (ORDER BY date_column DESC)""",
+
+    "ranking": """QUERY TYPE: RANKING (Top N / Bottom N)
+Your SQL should:
+- Include ORDER BY clause with the ranking criteria
+- Use LIMIT N for top/bottom N results
+- For aggregated rankings, combine with GROUP BY and aggregation functions
+- Consider ties: multiple records with same value
+- Pattern: SELECT ... ORDER BY column DESC/ASC LIMIT N""",
+}
+
+
+def build_intent_instructions(
+    intent_result: "QueryIntentResult" = None,
+    include_entities: bool = True
+) -> str:
+    """Build intent-specific instructions to guide SQL generation.
+
+    This is the core of Phase 1 - Intent-Driven Prompting. By telling the LLM
+    exactly what type of query is needed and what SQL constructs are required,
+    we dramatically improve first-attempt accuracy for complex queries.
+
+    Args:
+        intent_result: The classified query intent from QueryIntentClassifier
+        include_entities: Whether to include extracted entities information
+
+    Returns:
+        Formatted string with intent-specific instructions to add to the prompt
+    """
+    if not intent_result:
+        return ""
+
+    sections = []
+
+    # 1. Intent type requirements
+    intent_key = intent_result.intent.value
+    if intent_key in INTENT_SQL_REQUIREMENTS:
+        sections.append(INTENT_SQL_REQUIREMENTS[intent_key])
+
+    # 2. Required tables (if identified)
+    if intent_result.required_tables:
+        tables_list = ", ".join(sorted(intent_result.required_tables))
+        sections.append(f"""TABLES YOU SHOULD USE:
+The query involves these tables: {tables_list}
+- Verify these tables exist in the schema above
+- If using multiple tables, check Foreign Keys for how they connect""")
+
+    # 3. Required aggregations
+    if intent_result.aggregations:
+        agg_list = ", ".join(intent_result.aggregations)
+        sections.append(f"""AGGREGATIONS REQUIRED:
+You MUST include these functions: {agg_list}
+- Remember to add GROUP BY for any non-aggregated columns in SELECT""")
+
+    # 4. Filter conditions extracted
+    if intent_result.filters:
+        filter_info = []
+        for f in intent_result.filters:
+            op = f.get("operator", "=")
+            val = f.get("value", "?")
+            filter_info.append(f"  - {op} {val}")
+        if filter_info:
+            sections.append(f"""FILTER CONDITIONS DETECTED:
+Apply these filters in your WHERE clause:
+{chr(10).join(filter_info)}""")
+
+    # 5. Entity mentions (optional - helps with debugging)
+    if include_entities and intent_result.extracted_entities:
+        # Group by type
+        tables = [e for e in intent_result.extracted_entities if e.entity_type == "table" and e.mapped_to_schema]
+        columns = [e for e in intent_result.extracted_entities if e.entity_type == "column" and e.mapped_to_schema]
+        locations = [e for e in intent_result.extracted_entities if e.entity_type == "location"]
+
+        entity_notes = []
+        if tables:
+            entity_notes.append(f"Tables mentioned: {', '.join(e.schema_match for e in tables)}")
+        if columns:
+            entity_notes.append(f"Columns mentioned: {', '.join(e.schema_match for e in columns)}")
+        if locations:
+            loc_info = [f"{e.original_text}→{e.normalized_value}" for e in locations if e.normalized_value]
+            if loc_info:
+                entity_notes.append(f"Locations: {', '.join(loc_info)}")
+
+        if entity_notes:
+            sections.append(f"""ENTITIES IDENTIFIED IN QUESTION:
+{chr(10).join('- ' + note for note in entity_notes)}""")
+
+    if not sections:
+        return ""
+
+    # Wrap in clear delimiters
+    return f"""
+═══════════════════════════════════════════════════════════════
+QUERY INTENT ANALYSIS (Confidence: {intent_result.confidence:.0%})
+═══════════════════════════════════════════════════════════════
+
+{chr(10).join(sections)}
+
+═══════════════════════════════════════════════════════════════
+"""
+
+
 SCHEMA_ANALYSIS_TEMPLATE = """Analyze this database schema and provide a structured summary:
 
 {schema}
@@ -281,6 +433,7 @@ def build_chat_messages(
     conversation_history: list = None,
     row_limit: int = 100,
     examples: str = "",
+    intent_result: "QueryIntentResult" = None,
 ) -> list:
     """
     Build chat messages for conversation-based SQL generation
@@ -292,6 +445,7 @@ def build_chat_messages(
         conversation_history: Previous conversation messages
         row_limit: Maximum rows to return (default: 100)
         examples: Optional few-shot examples to include
+        intent_result: Optional classified query intent for intent-driven prompting
 
     Returns:
         List of message dictionaries
@@ -304,10 +458,20 @@ def build_chat_messages(
     if conversation_history:
         messages.extend(conversation_history)
 
-    # Add current question with row limit and examples
+    # Build intent instructions if available (Phase 1 - Intent-Driven Prompting)
+    intent_instructions = ""
+    if intent_result:
+        intent_instructions = build_intent_instructions(intent_result)
+
+    # Add current question with row limit, examples, and intent instructions
     user_message = build_sql_prompt(
         question, schema, database_type, examples=examples, row_limit=row_limit
     )
+
+    # Prepend intent instructions to the user message if available
+    if intent_instructions:
+        user_message = f"{intent_instructions}\n{user_message}"
+
     messages.append({"role": "user", "content": user_message})
 
     return messages
@@ -394,7 +558,8 @@ SQL: SELECT * FROM products WHERE category_id = (SELECT id FROM categories WHERE
 def build_few_shot_examples(
     schema_dict: dict = None,
     intent=None,
-    row_limit: int = 10
+    row_limit: int = 10,
+    use_enhanced: bool = True
 ) -> str:
     """Build few-shot examples - dynamic if schema provided, else static.
 
@@ -406,6 +571,7 @@ def build_few_shot_examples(
         schema_dict: Parsed schema dictionary from SchemaInspector
         intent: Optional QueryIntent to prioritize relevant examples
         row_limit: Default LIMIT clause value for examples
+        use_enhanced: If True, use Phase 4 enhanced examples with bridge tables
 
     Returns:
         Formatted string of examples for inclusion in prompt
@@ -418,6 +584,9 @@ def build_few_shot_examples(
             if intent:
                 # Intent-specific examples
                 return generator.get_intent_specific_examples(intent, row_limit)
+            elif use_enhanced:
+                # Phase 4: Use enhanced examples with bridge tables and multi-table aggregations
+                return generator.generate_enhanced_examples(intent=intent, row_limit=row_limit)
             else:
                 # General examples
                 return generator.generate_examples(row_limit=row_limit)
