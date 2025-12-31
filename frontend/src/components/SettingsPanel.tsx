@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Save, RotateCcw, Info } from 'lucide-react';
+import { ModelConfigPanel } from './ModelConfigPanel';
 
 interface SystemSettings {
   id: number;
@@ -14,6 +15,17 @@ interface SystemSettings {
   enable_intent_classification: boolean;  // Phase 1: Detect impossible queries
   enable_dynamic_examples: boolean;       // Phase 2: Schema-specific examples
   enable_semantic_validation: boolean;    // Phase 3: Post-generation validation
+  // Per-Task Model Configuration (Small Model Optimization)
+  model_sql_generation: string | null;
+  model_narratives: string | null;
+  model_query_planning: string | null;
+  model_error_correction: string | null;
+  timeout_sql_generation: number;
+  timeout_narratives: number;
+  timeout_query_planning: number;
+  timeout_error_correction: number;
+  enable_query_templates: boolean;
+  enable_location_preprocessing: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +80,17 @@ export function SettingsPanel() {
           enable_intent_classification: settings.enable_intent_classification,
           enable_dynamic_examples: settings.enable_dynamic_examples,
           enable_semantic_validation: settings.enable_semantic_validation,
+          // Per-Task Model Configuration
+          model_sql_generation: settings.model_sql_generation,
+          model_narratives: settings.model_narratives,
+          model_query_planning: settings.model_query_planning,
+          model_error_correction: settings.model_error_correction,
+          timeout_sql_generation: settings.timeout_sql_generation,
+          timeout_narratives: settings.timeout_narratives,
+          timeout_query_planning: settings.timeout_query_planning,
+          timeout_error_correction: settings.timeout_error_correction,
+          enable_query_templates: settings.enable_query_templates,
+          enable_location_preprocessing: settings.enable_location_preprocessing,
         }),
       });
 
@@ -329,6 +352,26 @@ export function SettingsPanel() {
                 Override here to customize behavior.
               </span>
             </div>
+          </div>
+
+          {/* Per-Task Model Configuration Section */}
+          <div className="space-y-4 pb-6 border-b border-gray-200">
+            <ModelConfigPanel
+              config={{
+                model_sql_generation: settings.model_sql_generation,
+                model_narratives: settings.model_narratives,
+                model_query_planning: settings.model_query_planning,
+                model_error_correction: settings.model_error_correction,
+                timeout_sql_generation: settings.timeout_sql_generation,
+                timeout_narratives: settings.timeout_narratives,
+                timeout_query_planning: settings.timeout_query_planning,
+                timeout_error_correction: settings.timeout_error_correction,
+                enable_query_templates: settings.enable_query_templates,
+                enable_location_preprocessing: settings.enable_location_preprocessing,
+              }}
+              onChange={(modelConfig) => setSettings({ ...settings, ...modelConfig })}
+              disabled={saving}
+            />
           </div>
 
           {/* Auto-Learning Section */}

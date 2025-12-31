@@ -453,6 +453,23 @@ class SystemSettingsResponse(BaseModel):
     enable_intent_classification: bool  # Phase 1: Detect impossible queries
     enable_dynamic_examples: bool  # Phase 2: Schema-specific examples
     enable_semantic_validation: bool  # Phase 3: Post-generation validation
+
+    # Per-Task Model Configuration (Small Model Optimization)
+    model_sql_generation: Optional[str] = None  # Model for SQL generation
+    model_narratives: Optional[str] = None  # Model for result narratives
+    model_query_planning: Optional[str] = None  # Model for query planning
+    model_error_correction: Optional[str] = None  # Model for error correction
+
+    # Per-Task Timeout Configuration (seconds)
+    timeout_sql_generation: int = 30
+    timeout_narratives: int = 15
+    timeout_query_planning: int = 20
+    timeout_error_correction: int = 15
+
+    # Small Model Optimization Feature Flags
+    enable_query_templates: bool = True  # Bypass LLM for simple patterns
+    enable_location_preprocessing: bool = True  # Normalize locations before LLM
+
     created_at: datetime
     updated_at: datetime
 
@@ -475,3 +492,19 @@ class SystemSettingsUpdateRequest(BaseModel):
     enable_intent_classification: Optional[bool] = None  # Phase 1
     enable_dynamic_examples: Optional[bool] = None  # Phase 2
     enable_semantic_validation: Optional[bool] = None  # Phase 3
+
+    # Per-Task Model Configuration (Small Model Optimization)
+    model_sql_generation: Optional[str] = None  # Model for SQL generation
+    model_narratives: Optional[str] = None  # Model for result narratives
+    model_query_planning: Optional[str] = None  # Model for query planning
+    model_error_correction: Optional[str] = None  # Model for error correction
+
+    # Per-Task Timeout Configuration (seconds)
+    timeout_sql_generation: Optional[int] = Field(None, ge=1, le=300)
+    timeout_narratives: Optional[int] = Field(None, ge=1, le=300)
+    timeout_query_planning: Optional[int] = Field(None, ge=1, le=300)
+    timeout_error_correction: Optional[int] = Field(None, ge=1, le=300)
+
+    # Small Model Optimization Feature Flags
+    enable_query_templates: Optional[bool] = None  # Bypass LLM for simple patterns
+    enable_location_preprocessing: Optional[bool] = None  # Normalize locations before LLM

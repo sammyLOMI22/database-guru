@@ -265,6 +265,23 @@ class SystemSettings(Base):
     enable_dynamic_examples = Column(Boolean, default=True, nullable=False)  # Phase 2: Schema-specific examples
     enable_semantic_validation = Column(Boolean, default=True, nullable=False)  # Phase 3: Post-generation validation
 
+    # Per-Task Model Configuration (Phase: Small Model Optimization)
+    # If None, uses the default OLLAMA_MODEL from settings
+    model_sql_generation = Column(String(100), nullable=True)  # Model for SQL generation
+    model_narratives = Column(String(100), nullable=True)  # Model for result narratives
+    model_query_planning = Column(String(100), nullable=True)  # Model for query planning
+    model_error_correction = Column(String(100), nullable=True)  # Model for error correction
+
+    # Per-Task Timeout Configuration (seconds)
+    timeout_sql_generation = Column(Integer, default=30, nullable=False)
+    timeout_narratives = Column(Integer, default=15, nullable=False)
+    timeout_query_planning = Column(Integer, default=20, nullable=False)
+    timeout_error_correction = Column(Integer, default=15, nullable=False)
+
+    # Small Model Optimization Feature Flags
+    enable_query_templates = Column(Boolean, default=True, nullable=False)  # Bypass LLM for simple patterns
+    enable_location_preprocessing = Column(Boolean, default=True, nullable=False)  # Normalize locations before LLM
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

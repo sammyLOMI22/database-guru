@@ -42,7 +42,8 @@ class ResultNarrator:
         enable_statistics: bool = True,
         max_sample_rows: int = 20,
         timeout_seconds: int = 5,
-        db_session=None
+        db_session=None,
+        model: Optional[str] = None
     ):
         """
         Initialize the result narrator agent
@@ -53,12 +54,14 @@ class ResultNarrator:
             max_sample_rows: Maximum rows to analyze (sample large results)
             timeout_seconds: Timeout for LLM calls
             db_session: Optional database session for historical lookups
+            model: Optional model override for narrative generation (per-task routing)
         """
         self.ollama = ollama_client
         self.enable_statistics = enable_statistics
         self.max_sample_rows = max_sample_rows
         self.timeout_seconds = timeout_seconds
         self.db_session = db_session
+        self.model = model  # Per-task model routing support
 
     async def generate_narrative(
         self,
@@ -153,7 +156,7 @@ class ResultNarrator:
                     self.ollama.generate(
                         prompt=prompt,
                         temperature=0.3,
-                        model=None  # Use default model
+                        model=self.model  # Use per-task model if configured
                     ),
                     timeout=self.timeout_seconds
                 )
