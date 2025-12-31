@@ -55,10 +55,18 @@ async def list_models(
         # Get available models
         models = await sql_generator.ollama.list_models()
 
+        # Filter out embedding models
+        generative_models = []
+        for name in models:
+            # Skip if 'embed' is in the name
+            if "embed" in name.lower():
+                continue
+            generative_models.append(name)
+
         return ModelListResponse(
-            models=models,
+            models=generative_models,
             default_model=settings.OLLAMA_MODEL,
-            count=len(models),
+            count=len(generative_models),
         )
 
     except Exception as e:
@@ -89,11 +97,23 @@ async def get_model_details(
         response.raise_for_status()
         data = response.json()
 
-        # Parse model information
+        # Parse model information and filter out embedding models
         model_infos = []
         for model in data.get("models", []):
+            name = model.get("name", "unknown")
+            family = model.get("details", {}).get("family", "")
+            families = model.get("details", {}).get("families", []) or []
+
+            # Skip if 'embed' is in the name or it belongs to an embedding family
+            if "embed" in name.lower() or family in ["bert", "nomic-bert"] or "bert" in family.lower():
+                continue
+            
+            # Additional check for families list
+            if any("bert" in f.lower() for f in families):
+                continue
+
             model_infos.append(ModelInfo(
-                name=model.get("name", "unknown"),
+                name=name,
                 size=_format_size(model.get("size", 0)),
                 modified=model.get("modified_at", "unknown"),
                 available=True,
