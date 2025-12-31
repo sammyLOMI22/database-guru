@@ -798,3 +798,58 @@ The code changes are solid and the logic is correct. The test failures observed 
 
 ---
 *Reviewer: Antigravity AI*
+
+---
+
+## LLM Model Dropdown Issue - Settings Tab (December 30, 2025)
+
+### Problem Description
+The LLM models are not being populated in the dropdowns for the **Per-Task Model Configuration** section in the **Settings** tab. The dropdowns show several blank/empty options instead of the available model names.
+
+### Root Cause Analysis
+The issue is a **data structure mismatch** between the backend API response and the frontend component's expectation.
+
+1.  **Backend API**: The endpoint `http://localhost:8000/api/models/` returns a `ModelListResponse` which contains a `models` field as an **array of strings** (e.g., `["llama3.2:latest", "gemma3:4b", ...]`).
+2.  **Frontend Component**: In `ModelConfigPanel.tsx`, the component defines an `AvailableModel` interface as an object and expects the `availableModels` state to be an array of these objects:
+    ```typescript
+    interface AvailableModel {
+      name: string;
+      modified_at: string;
+      size: number;
+    }
+    const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
+    ```
+3.  **The Failure**: When the component fetches from `/api/models/` and performs `setAvailableModels(data.models || [])`, it populates the state with strings. However, the render logic attempts to access `.name` on these strings:
+    ```typescript
+    {availableModels.map((model) => (
+      <option key={model.name} value={model.name}>
+        {model.name}
+      </option>
+    ))}
+    ```
+    Since `string.name` is `undefined`, the options are rendered with empty labels and internal values.
+
+### Recommended Fixes
+Multiple approaches can resolve this inconsistency:
+
+1.  **Use the Detailed Endpoint (Recommended)**:
+    Change the fetch URL in `ModelConfigPanel.tsx` from `/api/models/` to `/api/models/details`. This endpoint returns a list of `ModelInfo` objects that match the expected structure of `AvailableModel`.
+    
+2.  **Handle Strings in Frontend**:
+    Update `ModelConfigPanel.tsx` to handle the string array by either rendering the string directly or mapping the strings to a minimal object wrapper:
+    ```typescript
+    {availableModels.map((model: any) => {
+      const modelName = typeof model === 'string' ? model : model.name;
+      return (
+        <option key={modelName} value={modelName}>
+          {modelName}
+        </option>
+      );
+    })}
+    ```
+
+3.  **Standardize via Hooks**:
+    Utilize the existing `useModels` or `useModelDetails` hooks from `src/hooks/useModels.ts` instead of manual `fetch` calls. This ensures consistent data handling across the application (similar to how `EnhancedChatInterface.tsx` correctly handles the model list).
+
+---
+*Reviewer: Antigravity AI*

@@ -99,7 +99,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
     try {
       setLoadingModels(true);
       setModelsError(null);
-      const response = await fetch('http://localhost:8000/api/models/');
+      const response = await fetch('http://localhost:8000/api/models/details');
       if (!response.ok) throw new Error('Failed to fetch models');
       const data = await response.json();
       setAvailableModels(data.models || []);
@@ -264,14 +264,12 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
           <button
             onClick={() => handleToggleChange('enable_query_templates', !config.enable_query_templates)}
             disabled={disabled}
-            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors disabled:opacity-50 ${
-              config.enable_query_templates ? 'bg-blue-600' : 'bg-gray-300'
-            }`}
+            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors disabled:opacity-50 ${config.enable_query_templates ? 'bg-blue-600' : 'bg-gray-300'
+              }`}
           >
             <span
-              className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                config.enable_query_templates ? 'translate-x-7' : 'translate-x-1'
-              }`}
+              className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${config.enable_query_templates ? 'translate-x-7' : 'translate-x-1'
+                }`}
             />
           </button>
         </div>
@@ -287,14 +285,12 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
           <button
             onClick={() => handleToggleChange('enable_location_preprocessing', !config.enable_location_preprocessing)}
             disabled={disabled}
-            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors disabled:opacity-50 ${
-              config.enable_location_preprocessing ? 'bg-blue-600' : 'bg-gray-300'
-            }`}
+            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors disabled:opacity-50 ${config.enable_location_preprocessing ? 'bg-blue-600' : 'bg-gray-300'
+              }`}
           >
             <span
-              className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                config.enable_location_preprocessing ? 'translate-x-7' : 'translate-x-1'
-              }`}
+              className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${config.enable_location_preprocessing ? 'translate-x-7' : 'translate-x-1'
+                }`}
             />
           </button>
         </div>
