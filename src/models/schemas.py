@@ -449,6 +449,10 @@ class SystemSettingsResponse(BaseModel):
     enable_audit_log: bool
     max_audit_log_days: int
     query_quality_level: int  # 0-100 scale
+    # Semantic Understanding Settings
+    enable_intent_classification: bool  # Phase 1: Detect impossible queries
+    enable_dynamic_examples: bool  # Phase 2: Schema-specific examples
+    enable_semantic_validation: bool  # Phase 3: Post-generation validation
     created_at: datetime
     updated_at: datetime
 
@@ -467,3 +471,7 @@ class SystemSettingsUpdateRequest(BaseModel):
     enable_audit_log: Optional[bool] = None
     max_audit_log_days: Optional[int] = Field(None, ge=1, le=365)
     query_quality_level: Optional[int] = Field(None, ge=0, le=100)
+    # Semantic Understanding Settings
+    enable_intent_classification: Optional[bool] = None  # Phase 1
+    enable_dynamic_examples: Optional[bool] = None  # Phase 2
+    enable_semantic_validation: Optional[bool] = None  # Phase 3

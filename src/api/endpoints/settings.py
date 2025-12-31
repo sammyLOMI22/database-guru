@@ -31,6 +31,10 @@ async def get_or_create_settings(db: AsyncSession) -> SystemSettings:
             enable_audit_log=True,
             max_audit_log_days=90,
             query_quality_level=50,  # Balanced default (0-100 scale)
+            # Semantic Understanding Settings (all enabled by default)
+            enable_intent_classification=True,  # Phase 1
+            enable_dynamic_examples=True,  # Phase 2
+            enable_semantic_validation=True,  # Phase 3
         )
         db.add(settings)
         await db.commit()
@@ -120,6 +124,9 @@ async def reset_settings(db: AsyncSession = Depends(get_db)):
     - enable_audit_log: true
     - max_audit_log_days: 90
     - query_quality_level: 50
+    - enable_intent_classification: true
+    - enable_dynamic_examples: true
+    - enable_semantic_validation: true
     """
     try:
         settings = await get_or_create_settings(db)
@@ -134,6 +141,10 @@ async def reset_settings(db: AsyncSession = Depends(get_db)):
         settings.enable_audit_log = True
         settings.max_audit_log_days = 90
         settings.query_quality_level = 50
+        # Semantic Understanding Settings
+        settings.enable_intent_classification = True
+        settings.enable_dynamic_examples = True
+        settings.enable_semantic_validation = True
 
         await db.commit()
         await db.refresh(settings)

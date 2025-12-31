@@ -260,6 +260,11 @@ class SystemSettings(Base):
     # Query Quality Settings
     query_quality_level = Column(Integer, default=50, nullable=False)  # 0-100 scale
 
+    # Semantic Understanding Settings (Phase 1, 2, 3)
+    enable_intent_classification = Column(Boolean, default=True, nullable=False)  # Phase 1: Detect impossible queries
+    enable_dynamic_examples = Column(Boolean, default=True, nullable=False)  # Phase 2: Schema-specific examples
+    enable_semantic_validation = Column(Boolean, default=True, nullable=False)  # Phase 3: Post-generation validation
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

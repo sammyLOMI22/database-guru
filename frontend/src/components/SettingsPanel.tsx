@@ -10,6 +10,10 @@ interface SystemSettings {
   enable_audit_log: boolean;
   max_audit_log_days: number;
   query_quality_level: number;  // 0-100 scale
+  // Semantic Understanding Settings (Phase 1, 2, 3)
+  enable_intent_classification: boolean;  // Phase 1: Detect impossible queries
+  enable_dynamic_examples: boolean;       // Phase 2: Schema-specific examples
+  enable_semantic_validation: boolean;    // Phase 3: Post-generation validation
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +64,10 @@ export function SettingsPanel() {
           enable_audit_log: settings.enable_audit_log,
           max_audit_log_days: settings.max_audit_log_days,
           query_quality_level: settings.query_quality_level,
+          // Semantic Understanding Settings
+          enable_intent_classification: settings.enable_intent_classification,
+          enable_dynamic_examples: settings.enable_dynamic_examples,
+          enable_semantic_validation: settings.enable_semantic_validation,
         }),
       });
 
@@ -235,6 +243,91 @@ export function SettingsPanel() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* SQL Generation Intelligence Section */}
+          <div className="space-y-4 pb-6 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+              <span>🧠 SQL Generation Intelligence</span>
+            </h3>
+            <p className="text-sm text-gray-600">
+              Advanced features that improve SQL generation accuracy. Disable for faster responses.
+            </p>
+
+            {/* Intent Classification Toggle */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex-1">
+                <label className="font-semibold text-gray-900">Intent Classification</label>
+                <p className="text-sm text-gray-600 mt-1">
+                  Detect impossible queries before SQL generation (e.g., "Show me data we don't have")
+                </p>
+              </div>
+              <button
+                onClick={() => setSettings({ ...settings, enable_intent_classification: !settings.enable_intent_classification })}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                  settings.enable_intent_classification ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                    settings.enable_intent_classification ? 'translate-x-7' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Dynamic Examples Toggle */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex-1">
+                <label className="font-semibold text-gray-900">Dynamic Examples</label>
+                <p className="text-sm text-gray-600 mt-1">
+                  Generate schema-specific few-shot examples for better SQL accuracy
+                </p>
+              </div>
+              <button
+                onClick={() => setSettings({ ...settings, enable_dynamic_examples: !settings.enable_dynamic_examples })}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                  settings.enable_dynamic_examples ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                    settings.enable_dynamic_examples ? 'translate-x-7' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Semantic Validation Toggle */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex-1">
+                <label className="font-semibold text-gray-900">Semantic Validation</label>
+                <p className="text-sm text-gray-600 mt-1">
+                  Validate that generated SQL matches your question's intent before execution
+                </p>
+              </div>
+              <button
+                onClick={() => setSettings({ ...settings, enable_semantic_validation: !settings.enable_semantic_validation })}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                  settings.enable_semantic_validation ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                    settings.enable_semantic_validation ? 'translate-x-7' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Info box */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+              <Info className="w-4 h-4 inline mr-2 text-blue-500" />
+              <span className="text-blue-800">
+                These features are automatically enabled for Balanced and Thorough quality levels.
+                Override here to customize behavior.
+              </span>
             </div>
           </div>
 

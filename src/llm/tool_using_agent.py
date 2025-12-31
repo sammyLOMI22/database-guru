@@ -107,6 +107,7 @@ class ToolUsingAgent:
         connection_id: Optional[int] = None,
         use_tools: bool = True,
         trace=None,  # Optional AgentTrace for UI visibility
+        schema_dict: Optional[Dict[str, Any]] = None,  # For WHERE column validation
     ) -> ToolUsingResult:
         """
         Process a question using tools to gather context.
@@ -211,6 +212,7 @@ class ToolUsingAgent:
                     question=question,
                     schema=enhanced_schema,
                     database_type=database_type,
+                    schema_dict=schema_dict,  # Pass for WHERE column validation
                 )
 
                 sql = sql_result.get("sql")

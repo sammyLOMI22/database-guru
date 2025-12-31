@@ -589,14 +589,25 @@ async def process_multi_database_query(
         # For multi-database queries, we store the first SQL or a summary
         primary_sql = queries_with_connections[0].get("sql", "") if queries_with_connections else ""
 
+        # Collect validation and execution errors for debugging
+        all_validated = all(q.get("is_valid", False) for q in queries)
+        error_messages = []
+        for result in database_results:
+            if not result.success and result.error:
+                error_messages.append(f"[{result.connection_name}] {result.error}")
+        # Also capture validation warnings from queries
+        for q in queries:
+            if not q.get("is_valid", True) and q.get("warnings"):
+                error_messages.append(f"[Validation] {'; '.join(q['warnings'])}")
+
         query_record = QueryHistory(
             natural_language_query=request.question,
             generated_sql=primary_sql,
-            sql_validated=all(q.get("is_valid", False) for q in queries),
+            sql_validated=all_validated,
             executed=any(r.success for r in database_results),
             execution_time_ms=total_execution_time,
             result_count=total_rows,
-            error_message=None,
+            error_message="; ".join(error_messages) if error_messages else None,
             database_type=f"multi_db_{len(connections)}",
             model_used=model_used,
         )
@@ -998,22 +1009,15 @@ async def stream_multi_database_query(
                         "database_index": db_index,
                     })
 
-                    # Get individual schema for this database
-                    db_schema = None
-                    db_schema_dict = None
-                    for db_info in combined_schema_data.get("databases", []):
-                        if db_info.get("connection_id") == connection.id:
-                            db_schema_dict = {"tables": db_info.get("tables", {})}
-                            db_schema = multi_db_handler._format_single_db_schema(db_schema_dict)
-                            break
-
                     # Connect to database
                     async with UserDatabaseConnector.get_user_db_session(connection) as user_db:
-                        # Get schema if not found in combined
-                        if not db_schema:
-                            schema_inspector = SchemaInspector()
-                            schema_data = await schema_inspector.get_full_schema(user_db)
-                            db_schema = multi_db_handler._format_single_db_schema(schema_data)
+                        # ALWAYS get full schema from database for accurate validation
+                        # The cached combined_schema might not have columns in the right format
+                        schema_inspector = SchemaInspector()
+                        schema_data = await schema_inspector.get_full_schema(user_db)
+                        db_schema = multi_db_handler._format_single_db_schema(schema_data)
+                        db_schema_dict = schema_data  # Keep for WHERE column validation
+                        logger.debug(f"[Multi-Stream] DB '{connection.name}': Got schema with {len(schema_data.get('tables', {}))} tables for validation")
 
                         # Generate SQL for this specific database
                         sql_result = await sql_generator.generate_sql(
@@ -1021,10 +1025,32 @@ async def stream_multi_database_query(
                             schema=db_schema,
                             database_type=connection.database_type,
                             model=request.model or settings.OLLAMA_MODEL,
+                            schema_dict=db_schema_dict,  # Pass for WHERE column validation
                         )
 
                         sql = sql_result.get("sql", "")
+                        is_valid = sql_result.get("is_valid", True)
                         logger.info(f"[Multi-Stream] DB '{connection.name}': Generated SQL: {sql[:100]}...")
+                        logger.info(f"[Multi-Stream] DB '{connection.name}': is_valid={is_valid}, warnings={sql_result.get('warnings', [])}")
+
+                        # Check if SQL validation failed (e.g., WHERE column not in queried tables)
+                        if not is_valid:
+                            warnings = sql_result.get("warnings", [])
+                            hints = sql_result.get("where_validation_hints", "")
+                            error_msg = f"SQL validation failed: {'; '.join(warnings)}"
+                            if hints:
+                                error_msg += f" Hints: {hints}"
+                            logger.warning(f"[Multi-Stream] DB '{connection.name}': {error_msg}")
+
+                            # Send error event for this database
+                            await event_queue.put({
+                                "event_type": "error",
+                                "connection_id": connection.id,
+                                "connection_name": connection.name,
+                                "database_type": connection.database_type,
+                                "error": error_msg,
+                            })
+                            return  # Exit this database's processing
 
                         # Create individual QueryHistory record
                         query_record = QueryHistory(

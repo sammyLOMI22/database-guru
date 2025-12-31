@@ -286,16 +286,14 @@ class MultiDatabaseHandler:
             Dict with execution results and metadata (NOT including QueryHistory record)
         """
         try:
-            # Get individual schema for this database
-            db_schema = None
+            # ALWAYS get full schema directly from database for accurate WHERE validation
+            # The combined_schema_data may not have columns in the right format
             db_schema_dict = None
-            for db_info in combined_schema_data.get("databases", []):
-                if db_info.get("connection_id") == connection.id:
-                    # Store schema dict for location normalization
-                    db_schema_dict = {"tables": db_info.get("tables", {})}
-                    # Format schema for this specific database
-                    db_schema = self._format_single_db_schema(db_schema_dict)
-                    break
+            async with UserDatabaseConnector.get_user_db_session(connection) as user_db:
+                schema_data = await self.schema_inspector.get_full_schema(user_db)
+                db_schema_dict = schema_data  # Full schema for WHERE column validation
+                db_schema = self._format_single_db_schema(schema_data)
+                logger.info(f"🔍 [SCHEMA_DEBUG] Got schema for {connection.name} with {len(schema_data.get('tables', {}))} tables, schema_dict is not None: {db_schema_dict is not None}")
 
             # Execute query with self-correction
             exec_result = await self.execute_query_with_self_correction(
@@ -368,6 +366,7 @@ class MultiDatabaseHandler:
         Returns:
             Dict with execution results including correction attempts
         """
+        logger.info(f"🔍 [SCHEMA_DEBUG] execute_query_with_self_correction received schema_dict is not None: {schema_dict is not None}")
         try:
             async with UserDatabaseConnector.get_user_db_session(connection) as user_db:
                 # Get schema for this specific database if not provided
@@ -392,6 +391,7 @@ class MultiDatabaseHandler:
                         database_type=connection.database_type,
                         question=question,
                         model=model,
+                        schema_dict=schema_dict,  # Pass for WHERE column validation
                     )
                 else:
                     # Generate SQL and execute with retry
@@ -467,28 +467,58 @@ class MultiDatabaseHandler:
             }
 
     def _format_single_db_schema(self, schema_data: Dict[str, Any]) -> str:
-        """Format schema data for a single database for LLM consumption"""
-        lines = []
-        for table in schema_data.get("tables", []):
-            lines.append(f"Table: {table['name']}")
-            for col in table.get("columns", []):
-                col_def = f"  - {col['name']} ({col['type']})"
-                if col.get("nullable") is False:
-                    col_def += " NOT NULL"
-                if col.get("primary_key"):
-                    col_def += " PRIMARY KEY"
+        """Format schema data for a single database for LLM consumption
 
-                # Add sample values if available (helps LLM understand format)
-                if "sample_values" in col and col["sample_values"]:
-                    samples = col["sample_values"]
-                    sample_str = ", ".join(repr(s) for s in samples[:5])
-                    col_def += f"  // Examples: {sample_str}"
+        Handles both formats:
+        - Dict format: {"tables": {"orders": {...}, "customers": {...}}}
+        - List format: {"tables": [{"name": "orders", ...}, {"name": "customers", ...}]}
+        """
+        lines = []
+        tables_data = schema_data.get("tables", {})
+
+        # Handle both dict and list formats for tables
+        if isinstance(tables_data, dict):
+            # Dict format from get_full_schema: {"orders": {...}, "customers": {...}}
+            table_items = [(name, info) for name, info in tables_data.items()]
+        else:
+            # List format: [{"name": "orders", ...}, {"name": "customers", ...}]
+            table_items = [(t.get("name", "unknown"), t) for t in tables_data]
+
+        for table_name, table_info in table_items:
+            lines.append(f"Table: {table_name}")
+
+            # Handle columns - can be list or dict
+            columns = table_info.get("columns", [])
+            if isinstance(columns, dict):
+                # Dict format: {"id": {"type": "INTEGER"}, ...}
+                col_items = [(name, info) for name, info in columns.items()]
+            else:
+                # List format: [{"name": "id", "type": "INTEGER"}, ...]
+                col_items = [(c.get("name", "unknown"), c) for c in columns]
+
+            for col_name, col_info in col_items:
+                col_type = col_info.get("type", "UNKNOWN") if isinstance(col_info, dict) else str(col_info)
+                col_def = f"  - {col_name} ({col_type})"
+
+                if isinstance(col_info, dict):
+                    if col_info.get("nullable") is False:
+                        col_def += " NOT NULL"
+                    if col_info.get("primary_key"):
+                        col_def += " PRIMARY KEY"
+
+                    # Add sample values if available (helps LLM understand format)
+                    if "sample_values" in col_info and col_info["sample_values"]:
+                        samples = col_info["sample_values"]
+                        sample_str = ", ".join(repr(s) for s in samples[:5])
+                        col_def += f"  // Examples: {sample_str}"
 
                 lines.append(col_def)
 
-            if table.get("foreign_keys"):
+            # Handle foreign keys
+            fks = table_info.get("foreign_keys", [])
+            if fks:
                 lines.append("  Foreign Keys:")
-                for fk in table["foreign_keys"]:
+                for fk in fks:
                     # Handle both old format (constrained_columns) and new format (column)
                     from_col = fk.get('column') or fk.get('constrained_columns', 'unknown')
                     to_col = fk.get('referred_column') or fk.get('referred_columns', 'unknown')

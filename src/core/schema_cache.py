@@ -9,6 +9,11 @@ Performance Impact:
 - Eliminates 61+ database queries per request
 - Expected cache hit rate: 99%+ (schemas rarely change)
 
+Schema Fingerprinting (NEW - Dec 2025):
+- Detects when database structure changes between requests
+- Auto-invalidates cache when fingerprint mismatch detected
+- Prevents stale schema data from being served after DB file replacement
+
 Usage:
     from src.core.schema_cache import SchemaCache
 
@@ -25,6 +30,7 @@ Usage:
 """
 
 import logging
+import hashlib
 from typing import Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,9 +48,71 @@ class SchemaCache:
     Schemas are cached per connection with a default TTL of 30 minutes.
 
     Cache Key Format: "schema:{connection_id}:{connection_name}"
+    Fingerprint Key Format: "schema_fp:{connection_id}:{connection_name}"
+
+    Schema Fingerprinting:
+    - Creates a hash of table names + column names to detect schema changes
+    - On cache hit, validates fingerprint against current DB structure
+    - Auto-invalidates if fingerprint mismatch (DB was replaced/modified)
     """
 
     DEFAULT_TTL = 1800  # 30 minutes (schemas rarely change)
+
+    @staticmethod
+    def create_fingerprint_from_schema_dict(schema_data: Dict[str, Any]) -> str:
+        """
+        Create a fingerprint from schema dictionary.
+
+        The fingerprint is a hash of sorted table names and their column names.
+        This ensures cache invalidation when:
+        - Tables are added/removed
+        - Columns are added/removed/renamed
+
+        Args:
+            schema_data: Schema dictionary from SchemaInspector.get_full_schema()
+
+        Returns:
+            16-character hex fingerprint string
+        """
+        tables = schema_data.get("tables", {})
+        fingerprint_parts = []
+
+        for table_name in sorted(tables.keys()):
+            table_info = tables[table_name]
+            columns = table_info.get("columns", [])
+            # Sort columns by name for consistency
+            col_names = sorted([col.get("name", "") for col in columns])
+            fingerprint_parts.append(f"{table_name}:{','.join(col_names)}")
+
+        fingerprint_data = "|".join(fingerprint_parts)
+        return hashlib.sha256(fingerprint_data.encode()).hexdigest()[:16]
+
+    @staticmethod
+    async def get_quick_fingerprint(user_db_session) -> str:
+        """
+        Get a quick fingerprint from database without full introspection.
+
+        This is a lightweight check that only queries table/column names,
+        avoiding the expensive sample data and foreign key queries.
+
+        Args:
+            user_db_session: Database session (async or sync)
+
+        Returns:
+            16-character hex fingerprint string
+        """
+        try:
+            # Use lightweight schema inspection
+            inspector = SchemaInspector()
+            # Get just table names and columns (no samples, no FK analysis)
+            schema_data = await inspector.get_full_schema(
+                session=user_db_session,
+                include_samples=False  # Skip expensive sampling
+            )
+            return SchemaCache.create_fingerprint_from_schema_dict(schema_data)
+        except Exception as e:
+            logger.warning(f"Quick fingerprint failed: {e}")
+            return ""  # Empty fingerprint will force cache miss
 
     @staticmethod
     async def get_schema(
@@ -53,7 +121,8 @@ class SchemaCache:
         user_db_session,  # Can be AsyncSession or sync session (DuckDB)
         force_refresh: bool = False,
         include_samples: bool = True,
-        ttl: Optional[int] = None
+        ttl: Optional[int] = None,
+        validate_fingerprint: bool = True
     ) -> Dict[str, Any]:
         """
         Get database schema from cache or introspect if not cached
@@ -65,6 +134,8 @@ class SchemaCache:
             force_refresh: If True, bypass cache and re-introspect
             include_samples: Whether to include sample column values
             ttl: Cache TTL in seconds (default: 1800 = 30 minutes)
+            validate_fingerprint: If True, validate cached schema against current DB
+                                  structure (detects DB file replacement)
 
         Returns:
             Schema data dictionary from SchemaInspector.get_full_schema()
@@ -80,20 +151,55 @@ class SchemaCache:
         """
         cache = get_mapping_cache()
         cache_key = f"schema:{connection_id}:{connection_name}"
+        fingerprint_key = f"schema_fp:{connection_id}:{connection_name}"
         ttl = ttl if ttl is not None else SchemaCache.DEFAULT_TTL
 
         # Try cache first (unless force refresh requested)
         if not force_refresh:
             cached_schema = cache.get(cache_key)
+            cached_fingerprint = cache.get(fingerprint_key)
 
             if cached_schema is not None:
-                logger.info(
-                    f"✅ Schema cache HIT for '{connection_name}' "
-                    f"(connection_id={connection_id})"
-                )
-                return cached_schema
+                # Validate fingerprint if enabled (detects DB replacement)
+                if validate_fingerprint and cached_fingerprint:
+                    try:
+                        current_fingerprint = await SchemaCache.get_quick_fingerprint(
+                            user_db_session
+                        )
+                        if current_fingerprint and current_fingerprint != cached_fingerprint:
+                            # Fingerprint mismatch - DB structure changed!
+                            logger.warning(
+                                f"⚠️  Schema fingerprint MISMATCH for '{connection_name}' "
+                                f"(cached: {cached_fingerprint[:8]}..., "
+                                f"current: {current_fingerprint[:8]}...) - "
+                                f"DB structure changed, invalidating cache"
+                            )
+                            # Invalidate stale cache
+                            cache.delete(cache_key)
+                            cache.delete(fingerprint_key)
+                            # Fall through to re-introspect
+                        else:
+                            logger.info(
+                                f"✅ Schema cache HIT for '{connection_name}' "
+                                f"(connection_id={connection_id}, fingerprint validated)"
+                            )
+                            return cached_schema
+                    except Exception as e:
+                        logger.debug(f"Fingerprint validation skipped: {e}")
+                        # On validation error, still return cached data
+                        logger.info(
+                            f"✅ Schema cache HIT for '{connection_name}' "
+                            f"(connection_id={connection_id}, fingerprint check skipped)"
+                        )
+                        return cached_schema
+                else:
+                    logger.info(
+                        f"✅ Schema cache HIT for '{connection_name}' "
+                        f"(connection_id={connection_id})"
+                    )
+                    return cached_schema
 
-        # Cache MISS or force refresh - introspect
+        # Cache MISS or force refresh or fingerprint mismatch - introspect
         logger.info(
             f"❌ Schema cache MISS for '{connection_name}' "
             f"(connection_id={connection_id}), introspecting..."
@@ -106,15 +212,20 @@ class SchemaCache:
             include_samples=include_samples
         )
 
-        # Cache the result
+        # Create and cache fingerprint
+        fingerprint = SchemaCache.create_fingerprint_from_schema_dict(schema_data)
+
+        # Cache the result and fingerprint
         cache.set(cache_key, schema_data, ttl=ttl)
+        cache.set(fingerprint_key, fingerprint, ttl=ttl)
 
         table_count = schema_data.get('summary', {}).get('table_count', 0)
         total_columns = schema_data.get('summary', {}).get('total_columns', 0)
 
         logger.info(
             f"💾 Cached schema for '{connection_name}': "
-            f"{table_count} tables, {total_columns} columns (TTL: {ttl}s)"
+            f"{table_count} tables, {total_columns} columns "
+            f"(TTL: {ttl}s, fingerprint: {fingerprint[:8]}...)"
         )
 
         return schema_data
@@ -137,15 +248,20 @@ class SchemaCache:
             True if schema was cached and invalidated, False otherwise
         """
         cache = get_mapping_cache()
-        cache_key_pattern = f"schema:{connection_id}:*"
 
-        count = cache.invalidate_pattern(cache_key_pattern)
+        # Invalidate both schema data and fingerprint
+        schema_pattern = f"schema:{connection_id}:*"
+        fingerprint_pattern = f"schema_fp:{connection_id}:*"
 
-        if count > 0:
+        schema_count = cache.invalidate_pattern(schema_pattern)
+        fingerprint_count = cache.invalidate_pattern(fingerprint_pattern)
+        total_count = schema_count + fingerprint_count
+
+        if total_count > 0:
             logger.info(
                 f"🗑️  Invalidated schema cache for connection_id={connection_id} "
                 f"{f'({connection_name})' if connection_name else ''} "
-                f"({count} entries removed)"
+                f"({total_count} entries removed: {schema_count} schema, {fingerprint_count} fingerprint)"
             )
             return True
         else:
@@ -157,7 +273,7 @@ class SchemaCache:
     @staticmethod
     def invalidate_all_schemas():
         """
-        Invalidate all cached schemas
+        Invalidate all cached schemas and fingerprints
 
         Use sparingly - typically you want to invalidate specific connections.
 
@@ -165,7 +281,9 @@ class SchemaCache:
             Number of cache entries invalidated
         """
         cache = get_mapping_cache()
-        count = cache.invalidate_pattern("schema:*")
+        schema_count = cache.invalidate_pattern("schema:*")
+        fingerprint_count = cache.invalidate_pattern("schema_fp:*")
+        count = schema_count + fingerprint_count
 
         logger.info(f"🗑️  Invalidated ALL schema caches ({count} entries)")
 

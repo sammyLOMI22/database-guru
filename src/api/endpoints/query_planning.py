@@ -267,6 +267,7 @@ async def create_plan_and_generate_sql(
 
         # Get active connection if database_type not specified
         database_type = request.database_type
+        schema_data = None  # For WHERE column validation
         if not database_type:
             result_conn = await db.execute(
                 select(DatabaseConnection).where(DatabaseConnection.is_active == True)
@@ -310,7 +311,8 @@ async def create_plan_and_generate_sql(
             schema=schema,
             database_type=database_type,
             sql_generator=sql_generator,
-            model=request.model
+            model=request.model,
+            schema_dict=schema_data,  # Pass for WHERE column validation (may be None)
         )
 
         # Format response

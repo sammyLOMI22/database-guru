@@ -23,7 +23,7 @@ from src.llm.sql_generator import SQLGenerator
 from src.llm.self_correcting_agent import SelfCorrectingSQLAgent, AgentTrace
 from src.llm.conversational_memory_agent import get_memory_agent
 from src.llm.result_narrator import ResultNarrator
-from src.llm.quality_profile import get_quality_profile
+from src.llm.quality_profile import get_quality_profile, get_quality_profile_with_settings
 from src.api.endpoints.settings import get_or_create_settings
 from src.cache.redis_client import RedisCache
 from src.cache.semantic_cache import SemanticCache
@@ -222,27 +222,35 @@ async def process_query(
             schema_inspector = SchemaInspector()
 
             # Get actual database schema from USER's database
-            schema_data = None  # Will be set if auto-introspected (needed for LocationMapper)
+            # ALWAYS get schema_data for validation, even if request.schema is provided
+            from src.core.schema_cache import SchemaCache
+
+            schema_data = await SchemaCache.get_schema(
+                connection_id=active_connection.id,
+                connection_name=active_connection.name,
+                user_db_session=user_db,
+                force_refresh=request.force_schema_refresh
+            )
+            logger.debug(f"Got schema_data with {len(schema_data.get('tables', {}))} tables for validation")
+
             if request.schema:
-                # Use provided schema
+                # Use provided schema for LLM prompt
                 schema = request.schema
             else:
-                # Auto-introspect schema from user's database (with caching)
-                from src.core.schema_cache import SchemaCache
-
-                schema_data = await SchemaCache.get_schema(
-                    connection_id=active_connection.id,
-                    connection_name=active_connection.name,
-                    user_db_session=user_db,
-                    force_refresh=request.force_schema_refresh
-                )
-
+                # Auto-introspect schema from user's database
                 schema = schema_inspector.format_schema_for_llm(schema_data)
                 logger.debug(f"Using schema with {len(schema_data['tables'])} tables")
 
-            # Load system settings and create quality profile
+            # Load system settings and create quality profile with semantic settings
             settings_record = await get_or_create_settings(db)
-            quality_profile = get_quality_profile(settings_record.query_quality_level)
+            quality_profile = get_quality_profile_with_settings(
+                settings_record.query_quality_level,
+                system_settings={
+                    'enable_intent_classification': settings_record.enable_intent_classification,
+                    'enable_dynamic_examples': settings_record.enable_dynamic_examples,
+                    'enable_semantic_validation': settings_record.enable_semantic_validation,
+                }
+            )
             logger.info(f"Using quality profile: {quality_profile.level.value} (level={settings_record.query_quality_level})")
 
             # Use Self-Correcting Agent for automatic error recovery
@@ -319,6 +327,15 @@ async def process_query(
             if agent_result.get("verification_warnings"):
                 warnings.extend(agent_result["verification_warnings"])
 
+        # Build error message: include validation warnings OR execution errors
+        error_msg = None
+        if not is_valid and warnings:
+            # Store validation failures in error_message for debugging
+            error_msg = f"Validation failed: {'; '.join(warnings)}"
+            logger.info(f"Storing validation failure in query log: {error_msg[:100]}...")
+        elif execution_result and not execution_result.get("success"):
+            error_msg = execution_result.get("error")
+
         # Save to query history
         query_record = QueryHistory(
             natural_language_query=request.question,  # Save original question, not enhanced
@@ -327,7 +344,7 @@ async def process_query(
             executed=execution_result is not None and execution_result.get("success", False),
             execution_time_ms=execution_result.get("execution_time_ms") if execution_result else None,
             result_count=execution_result.get("row_count") if execution_result else None,
-            error_message=execution_result.get("error") if execution_result and not execution_result.get("success") else None,
+            error_message=error_msg,
             database_type=database_type,  # Use detected database type from active connection
             model_used=model_used,  # Use actual model that was used
         )
@@ -609,12 +626,12 @@ async def stream_query_results(
 
             # Connect to user's database
             async with UserDatabaseConnector.get_user_db_session(active_connection) as user_db:
-                # Get schema
+                # Get schema - ALWAYS fetch for WHERE column validation
                 schema_inspector = SchemaInspector()
+                schema_data = await schema_inspector.get_full_schema(user_db)
                 if request.schema:
                     schema = request.schema
                 else:
-                    schema_data = await schema_inspector.get_full_schema(user_db)
                     schema = schema_inspector.format_schema_for_llm(schema_data)
 
                 # Generate SQL (without execution yet)
@@ -623,6 +640,7 @@ async def stream_query_results(
                     schema=schema,
                     database_type=database_type,
                     model=request.model or settings.OLLAMA_MODEL,
+                    schema_dict=schema_data,  # Pass for WHERE column validation
                 )
 
                 logger.info(f"[Stream] Generated SQL: {sql[:100]}...")
