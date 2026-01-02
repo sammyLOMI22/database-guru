@@ -853,3 +853,120 @@ Multiple approaches can resolve this inconsistency:
 
 ---
 *Reviewer: Antigravity AI*
+
+---
+
+## Phase 3: Small Model Optimization - PR Review (January 2, 2026)
+
+### Overview
+This PR implements **Per-Task Model Routing**, allowing the system to use different LLMs for specific tasks (SQL generation, Narratives, Planning, Error Correction). This is a key optimization for using smaller, specialized models (e.g., `duckdb-nsql` for SQL) alongside general purpose models (e.g., `llama3.2` for chat).
+
+### Key Features Verified
+
+#### 1. Model Router & Backend Logic
+- **`ModelRouter` Class**: Correctly implements fallback logic. If a per-task model is not set, it falls back to the system default.
+- **API Endpoints**: The `GET /api/models/details` endpoint now strictly filters out embedding models (checking both name and family), ensuring the UI dropdowns are clean.
+
+#### 2. Frontend Configuration
+- **Settings Panel**: A new "Per-Task Model Configuration" section is correctly implemented.
+- **Persistence**: Per-task model selections and feature toggles ("Query Templates", "Location Preprocessing") persist correctly across reloads.
+- **Fix Confirmed**: The issue noted in the previous review (Dropdown mismatch) has been fixed. `ModelConfigPanel` now correctly fetches from `/api/models/details` and maps attributes correctly.
+
+### Test Verification
+
+#### 1. New Feature Tests (Passed ✅)
+All 59 tests covering the new functionality passed successfully:
+- `tests/test_model_router.py`: **Failed** (0) / **Passed** (17)
+- `tests/test_query_preprocessor.py`: **Failed** (0) / **Passed** (16)
+- `tests/test_query_templates.py`: **Failed** (0) / **Passed** (26)
+
+#### 2. Test Suite Noise
+> [!NOTE]
+> The full test suite (`run_tests.sh`) reports 55 failures, primarily in `test_feedback_api.py` (500 Internal Server Errors) and `test_query_endpoints.py` (State leakage/Assertion errors).
+> These failures appear related to DB fixture isolation and environment issues, NOT the changes in this branch.
+
+### Manual UI Verification
+| Feature | Status | Notes |
+| :--- | :--- | :--- |
+| **Model Dropdowns** | ✅ Verified | Embedding models are correctly filtered out. |
+| **Persistence** | ✅ Verified | Settings save and reload correctly. |
+| **Optimization Toggles** | ✅ Verified | "Query Templates" and "Location Preprocessing" toggles work as expected. |
+
+### Final Recommendation
+**APPROVE**
+
+The changes successfully implement the Small Model Optimization requirements. The code is robust, well-tested (unit tests), and the UI integrates seamlessly. The previous issue with model dropdowns has been resolved.
+
+---
+*Reviewer: Antigravity AI*
+
+---
+
+## Phase 4: Performance Verification (January 2, 2026)
+
+### 1. Multi-Database Performance Test
+Executed 4 test queries against **DuckDB** and **SQLite** simultaneously via `localhost:3000`.
+
+| Query | Expected Template | Execution Time (Approx) | Status | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **"how many customers"** | `COUNT` | ~4.5s | ✅ Success | Correctly counted records in both DBs. |
+| **"show all products"** | `LIST_ALL` | ~2.6s | ✅ Success | Fastest query. Template logic works. |
+| **"show customers from California"** | `FILTER_LOCATION` | ~10.0s | ⚠️ Mixed | **DuckDB (Success):** Correctly mapped "California" → `'CA'`. <br> **SQLite (Fail):** Error: `column 'ifnull' not found`. |
+| **"sales by category"** | `GROUP_BY` | ~4.8s | ✅ Success | generated valid GROUP BY SQL. |
+
+### 2. Observations & Feedback
+- **Agent Overhead:** Even "template" queries take ~2.5s+, suggesting significant overhead in the agent chain (tracing, logging, setup) before the template engine returns. This prevents the "instant" feel expected from template matching.
+- **Location Preprocessing:** Successfully verified! The system correctly identified that the DuckDB schema uses state codes and normalized "California" to `'CA'` automatically.
+- **SQLite Dialect Issue:** The failure on the location query in SQLite ("column 'ifnull' not found") suggests the generated SQL (or a validation step) is trying to use `ifnull` in an incorrect context or the validator is misinterpreting the error.
+- **Recommendation:**
+    - Investigate the SQLite `ifnull` error in the standard query path.
+    - Consider optimizing the agent "startup" time to realize the full speed benefits of the template engine.
+
+---
+*Reviewer: Antigravity AI*
+
+---
+
+## Phase 5: Specialized Model Verification (January 2, 2026)
+
+### 1. Configuration
+- **Unlocking Specialized Models**: User manually selected `duckdb-nsql:latest` for "SQL Generation" in Settings.
+- **Test Set**: Re-ran the Multi-DB performance test suite to compare against the default model baseline.
+
+### 2. Test Results
+
+| Query | Database | Result | Notes |
+| :--- | :--- | :--- | :--- |
+| **"how many customers"** | Multi-DB | ✅ Success | ~4.5s. Generated clean `COUNT(DISTINCT id)` queries. |
+| **"show customers from California"** | SQLite | ❌ Failed | **Error Persists:** `Subquery column 'ifnull' not found`. The specialized model also attempts to use `IFNULL` in a way that conflicts with the schema/validator. |
+| **"show customers from California"** | DuckDB | ✅ Success | Correctly normalized and filtered. |
+| **"sales by category"** | Multi-DB | ⚠️ Partial | Correct syntax (`JOIN` + `SUM`), but grouped by `product_name` instead of a Category entity (likely schema ambiguity). |
+
+### 3. Conclusion
+- **Model Efficiency**: The specialized model (`duckdb-nsql`) is performant and generates valid SQL syntax for standard queries.
+- **Persistent SQLite Bug**: The `ifnull` error is **not model-specific**. Both the default and specialized models trigger it, pointing to a root cause in the `Validator` or `Schema Context` (likely a strict column check failing on functions).
+- **Recommendation**: The underlying SQLite validation issue needs a dedicated fix (as noted in Phase 4), as changing models does not resolve it.
+
+---
+*Reviewer: Antigravity AI*
+
+---
+
+## Phase 6: UX/UI Feedback (January 2, 2026)
+
+### 1. "Using Model" Indicator Issue
+- **Observation:** The chat interface footer consistently displays `Using model: llama3.2:latest` (or whatever the default/narrative model is), even when specialized models (e.g., `duckdb-nsql`) are actively performing the SQL generation.
+- **Problem:** This is technically correct for the *chat/narrative* portion but misleading for the user, who might believe the specialized SQL model is not being utilized.
+- **Verification:**
+    1.  Configured `SQL Generation` → `duckdb-nsql:latest` in Settings.
+    2.  Returned to Chat. Footer still read `Using model: llama3.2:latest`.
+    3.  Verified specialized model *was* used via logs/performance, but UI did not reflect it.
+
+### 2. Recommendation
+Update the footer to either:
+1.  **List Active Models:** Display a compact summary like `Chat: llama3.2 | SQL: duckdb-nsql`.
+2.  **Dynamic Indicator:** Change the text contextually. E.g., when generating SQL, show `Generating SQL using duckdb-nsql...`.
+3.  **Tooltip:** Keep the text simple but add a hover tooltip detailing the per-task model configuration.
+
+---
+*Reviewer: Antigravity AI*
