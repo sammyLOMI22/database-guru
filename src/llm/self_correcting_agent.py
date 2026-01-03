@@ -48,6 +48,22 @@ except ImportError:
     SEMANTIC_VALIDATION_AVAILABLE = False
     logger.warning("Semantic validator not available - semantic validation disabled")
 
+# Import Query Template Engine (Phase: Small Model Optimization)
+try:
+    from src.llm.query_templates import TemplateEngine, TemplateMatch
+    TEMPLATE_ENGINE_AVAILABLE = True
+except ImportError:
+    TEMPLATE_ENGINE_AVAILABLE = False
+    logger.debug("Query template engine not available")
+
+# Import Query Preprocessor (Phase: Small Model Optimization)
+try:
+    from src.llm.query_preprocessor import QueryPreprocessor, PreprocessedQuery
+    PREPROCESSOR_AVAILABLE = True
+except ImportError:
+    PREPROCESSOR_AVAILABLE = False
+    logger.debug("Query preprocessor not available")
+
 
 class AgentTrace:
     """
@@ -805,6 +821,87 @@ class SelfCorrectingSQLAgent:
             metadata={"database_type": database_type, "model": model or self.generator.settings.OLLAMA_MODEL}
         )
 
+        # === TEMPLATE MATCHING: Bypass LLM for simple query patterns ===
+        # Check if the question matches a known template (e.g., "show all customers", "count products")
+        # This is part of Small Model Optimization to reduce LLM calls for simple queries
+        if TEMPLATE_ENGINE_AVAILABLE and schema_dict:
+            # Check if template matching is enabled via quality profile
+            enable_templates = True
+            if self.quality_profile:
+                enable_templates = getattr(self.quality_profile, 'enable_query_templates', True)
+
+            if enable_templates:
+                try:
+                    template_engine = TemplateEngine(schema_dict, default_limit=row_limit)
+                    template_match = template_engine.try_match(question)
+
+                    if template_match:
+                        trace.add_step(
+                            "template_match",
+                            f"Matched template: {template_match.template_type.value} (confidence: {template_match.confidence:.2f})",
+                            metadata={
+                                "template": template_match.template_type.value,
+                                "confidence": template_match.confidence,
+                                "table": template_match.matched_table,
+                                "sql": template_match.sql,
+                            },
+                            icon="⚡"
+                        )
+                        logger.info(
+                            f"⚡ Template matched: {template_match.template_type.value} "
+                            f"-> {template_match.sql[:80]}... (bypassing LLM)"
+                        )
+
+                        # Execute the template SQL directly
+                        executor = SQLExecutor(
+                            max_rows=row_limit,
+                            timeout_seconds=30,
+                            allow_write=allow_write
+                        )
+                        exec_result = await executor.execute(session, template_match.sql)
+
+                        if exec_result["success"]:
+                            trace.add_step(
+                                "success",
+                                f"Template query executed successfully ({exec_result.get('row_count', 0)} rows)",
+                                icon="✅"
+                            )
+                            logger.info(
+                                f"✅ Template query succeeded: {exec_result.get('row_count', 0)} rows "
+                                f"(bypassed LLM entirely)"
+                            )
+                            return {
+                                "success": True,
+                                "sql": template_match.sql,
+                                "result": exec_result,
+                                "attempts": [],
+                                "self_corrected": False,
+                                "total_attempts": 0,
+                                "question": question,
+                                "model_used": "template",  # Indicate no LLM was used
+                                "template_matched": True,
+                                "template_type": template_match.template_type.value,
+                                "template_confidence": template_match.confidence,
+                                "agent_trace": trace.to_dict(),
+                                "verification_warnings": [],
+                                "used_planning": False,
+                                "query_plan": None,
+                            }
+                        else:
+                            # Template SQL failed - log and fall through to normal processing
+                            trace.add_step(
+                                "warning",
+                                f"Template SQL failed: {exec_result.get('error', 'Unknown error')[:100]}",
+                                icon="⚠️"
+                            )
+                            logger.warning(
+                                f"Template SQL failed, falling back to LLM: {exec_result.get('error', '')[:100]}"
+                            )
+                            # Continue with normal flow
+
+                except Exception as e:
+                    logger.debug(f"Template matching failed (continuing with LLM): {e}")
+
         # Reset fix methods tracking for this query
         self.fix_methods = {}
 
@@ -971,6 +1068,44 @@ class SelfCorrectingSQLAgent:
                 if attempt_num == 1:
                     # First attempt: generate from scratch (or use plan-based SQL)
                     if sql is None:  # Only generate if not already generated by planner
+                        # === LOCATION PREPROCESSING: Normalize locations before LLM ===
+                        # This is part of Small Model Optimization to help smaller models
+                        # handle location queries correctly (e.g., "California" -> "CA")
+                        question_for_llm = question
+                        preprocessed_context = ""
+                        if PREPROCESSOR_AVAILABLE and schema_dict:
+                            enable_preprocessing = True
+                            if self.quality_profile:
+                                enable_preprocessing = getattr(
+                                    self.quality_profile, 'enable_location_preprocessing', True
+                                )
+
+                            if enable_preprocessing:
+                                try:
+                                    preprocessor = QueryPreprocessor(schema_dict)
+                                    preprocessed = preprocessor.preprocess(question)
+
+                                    if preprocessed.detected_locations:
+                                        question_for_llm = preprocessed.normalized
+                                        preprocessed_context = preprocessed.enhanced_context
+                                        trace.add_step(
+                                            "preprocessing",
+                                            f"Normalized locations: {', '.join(f'{l.original}→{l.normalized}' for l in preprocessed.detected_locations)}",
+                                            metadata={
+                                                "original": question,
+                                                "normalized": question_for_llm,
+                                                "locations": [l.original for l in preprocessed.detected_locations],
+                                                "db_format": preprocessed.location_format_hint,
+                                            },
+                                            icon="🗺️"
+                                        )
+                                        logger.info(
+                                            f"🗺️ Preprocessed query: {len(preprocessed.detected_locations)} locations normalized "
+                                            f"(format: {preprocessed.location_format_hint})"
+                                        )
+                                except Exception as e:
+                                    logger.debug(f"Query preprocessing failed (continuing): {e}")
+
                         # NEW: Use tool-using agent to gather schema context BEFORE generation
                         enhanced_schema = schema
                         if self.enable_tool_using and self.tool_using_agent:
@@ -1005,11 +1140,15 @@ class SelfCorrectingSQLAgent:
                                 logger.warning(f"Tool exploration failed (continuing without): {e}")
                                 trace.add_step("warning", f"Tool exploration failed: {str(e)[:100]}")
 
+                        # Add preprocessed context to enhanced schema if available
+                        if preprocessed_context:
+                            enhanced_schema = f"{enhanced_schema}\n\n{preprocessed_context}"
+
                         trace.add_step("generation", "Generating initial SQL query")
-                        logger.info(f"Attempt {attempt_num}/{self.max_retries}: Generating SQL for: {question}")
+                        logger.info(f"Attempt {attempt_num}/{self.max_retries}: Generating SQL for: {question_for_llm}")
                         gen_result = await self.generator.generate_sql(
-                            question=question,
-                            schema=enhanced_schema,  # Use enhanced schema with tool context
+                            question=question_for_llm,  # Use preprocessed question with normalized locations
+                            schema=enhanced_schema,  # Use enhanced schema with tool context + preprocessing hints
                             database_type=database_type,
                             allow_write=allow_write,
                             model=model,

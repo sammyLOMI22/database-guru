@@ -33,6 +33,29 @@ User Question
      │
      ▼
 ┌─────────────────────────────────────────────────────────────────┐
+│              ⚡ TEMPLATE MATCHING (NEW - Jan 2026)               │
+├─────────────────────────────────────────────────────────────────┤
+│  TemplateEngine tries to match simple patterns:                  │
+│  - "show all products" → SELECT * FROM products LIMIT 100       │
+│  - "count customers" → SELECT COUNT(*) FROM customers           │
+│  - "top 5 by price" → SELECT * FROM X ORDER BY Y DESC LIMIT 5  │
+│  If matched: Execute directly, bypass LLM entirely!             │
+│  If not matched: Continue to Query Planning                      │
+└─────────────────────────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              🗺️ QUERY PREPROCESSING (NEW - Jan 2026)            │
+├─────────────────────────────────────────────────────────────────┤
+│  QueryPreprocessor normalizes inputs before LLM:                 │
+│  - Bidirectional location normalization (California ↔ CA)       │
+│  - Entity detection (tables, columns mentioned)                  │
+│  - Schema validation (early impossible query detection)          │
+│  - Enhanced context building for LLM                             │
+└─────────────────────────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────────┐
 │                     QUERY PLANNING (Optional)                    │
 ├─────────────────────────────────────────────────────────────────┤
 │  QueryPlanningAgent analyzes complexity                          │
@@ -44,10 +67,11 @@ User Question
 ┌─────────────────────────────────────────────────────────────────┐
 │                     SQL GENERATION                               │
 ├─────────────────────────────────────────────────────────────────┤
-│  1. Tool-Using Agent (optional) explores schema                  │
-│  2. LLM generates SQL via Ollama                                 │
-│  3. "CANNOT_ANSWER" detection for impossible queries             │
-│  4. Table validation (reject SQL with non-existent tables)       │
+│  1. Model Router selects per-task model (NEW - Jan 2026)         │
+│  2. Tool-Using Agent (optional) explores schema                  │
+│  3. LLM generates SQL via Ollama                                 │
+│  4. "CANNOT_ANSWER" detection for impossible queries             │
+│  5. Table validation (reject SQL with non-existent tables)       │
 └─────────────────────────────────────────────────────────────────┘
      │
      ▼
@@ -146,7 +170,76 @@ When quality >= 31% and schema_dict is available:
 - Adds hints: `"'texas' should use code: 'TX'"`
 - Enhances question before sending to LLM
 
+### 2.5 Template Matching (NEW - January 2026)
+
+#### Template Engine (`src/llm/query_templates.py`)
+Bypasses LLM entirely for simple, common query patterns:
+
+| Pattern | Example Question | Generated SQL |
+|---------|-----------------|---------------|
+| `list_all` | "show all products" | `SELECT * FROM products LIMIT 100` |
+| `count` | "how many customers" | `SELECT COUNT(*) FROM customers` |
+| `top_n` | "top 5 by price" | `SELECT * FROM X ORDER BY Y DESC LIMIT 5` |
+| `filter_location` | "orders from California" | `SELECT * FROM orders WHERE state = 'CA'` |
+| `filter_value` | "customers where status is active" | `SELECT * FROM customers WHERE status = 'active'` |
+| `sum_total` | "total revenue" | `SELECT SUM(revenue) FROM orders` |
+| `average` | "average price" | `SELECT AVG(price) FROM products` |
+| `group_by` | "sales by category" | `SELECT category, COUNT(*) FROM X GROUP BY category` |
+
+**Key Features:**
+- Returns `TemplateMatch` with SQL, confidence score (0.9-0.95), and explanation
+- Table alias handling (singular/plural, abbreviations: cust → customers)
+- Column variation matching (price → unit_price, name → product_name)
+- If matched: Execute directly, skip all LLM processing
+- If not matched: Continue to preprocessing and LLM generation
+
+### 2.6 Query Preprocessing (NEW - January 2026)
+
+#### Query Preprocessor (`src/llm/query_preprocessor.py`)
+Pre-processes natural language before LLM generation:
+
+**Bidirectional Location Normalization:**
+```
+Database uses codes (CA, NY, TX):
+  "California" → "CA"  (normalize to match DB)
+
+Database uses full names:
+  "CA" → "California"  (expand to match DB)
+```
+
+**Entity Detection:**
+- Extracts table/column mentions from question
+- Validates against actual schema
+- Detects impossible queries early
+
+**Enhanced Context:**
+- Builds LLM hints: `"'California' → 'CA' (state column uses codes)"`
+- Provides format guidance based on sample values
+
+**Output:** `PreprocessedQuery` dataclass with:
+- `normalized`: Question with locations converted
+- `detected_locations`: List of normalized locations
+- `detected_entities`: Tables/columns mentioned
+- `enhanced_context`: Hints for LLM
+- `validation_warnings`: Early error detection
+
 ### 3. SQL Generation
+
+#### Model Router (`src/llm/model_router.py`) (NEW - January 2026)
+Routes different LLM tasks to specialized models:
+
+| Task Type | Recommended Model | Default Timeout |
+|-----------|-------------------|-----------------|
+| `SQL_GENERATION` | duckdb-nsql, sqlcoder | 30s |
+| `NARRATIVES` | llama3.2, gemma | 15s |
+| `QUERY_PLANNING` | Reasoning-capable models | 20s |
+| `ERROR_CORRECTION` | Code-focused models | 15s |
+
+**Key Features:**
+- Per-task model configuration stored in `SystemSettings`
+- Falls back to default `OLLAMA_MODEL` if per-task model not set
+- Per-task timeout configuration
+- UI configuration via `ModelConfigPanel`
 
 #### LLM Prompts (`src/llm/prompts.py`)
 Key instructions in system prompt:
@@ -155,11 +248,12 @@ Key instructions in system prompt:
 - **Location Handling**: Use 2-letter state codes (CA, TX, NY)
 
 #### SQL Generator (`src/llm/sql_generator.py`)
-1. Applies location hints to question
-2. Checks LLM cache for similar queries
-3. Sends prompt to Ollama
-4. Detects `CANNOT_ANSWER` responses
-5. Cleans and validates SQL output
+1. Model Router selects appropriate model for task (NEW)
+2. Applies location hints to question
+3. Checks LLM cache for similar queries
+4. Sends prompt to Ollama with per-task timeout
+5. Detects `CANNOT_ANSWER` responses
+6. Cleans and validates SQL output
 
 #### Table Validation (NEW)
 After SQL generation, validates all referenced tables exist:
@@ -238,80 +332,48 @@ Parallel correction strategies:
 
 ## Planned Quality Improvements
 
-### Phase 1: Semantic Understanding (Priority: High)
+### Phase 1: Semantic Understanding (Priority: High) ✅ IMPLEMENTED
 
-#### 1.1 Query Intent Classification
-Before SQL generation, classify the query intent:
-- **Lookup**: "Show all products" → Simple SELECT
-- **Aggregation**: "Total sales by category" → GROUP BY
-- **Comparison**: "Products cheaper than $50" → WHERE with comparison
-- **Relationship**: "Orders with their products" → JOIN
-- **Impossible**: "Customer locations" (no customer table) → CANNOT_ANSWER
+#### 1.1 Query Intent Classification ✅ IMPLEMENTED (January 2026)
+Implemented via `QueryPreprocessor` and `TemplateEngine`:
+- **Lookup**: "Show all products" → Template match → `SELECT * FROM products LIMIT 100`
+- **Aggregation**: "Total sales by category" → Template match → `SELECT category, SUM(...) GROUP BY`
+- **Comparison**: Handled by entity detection in QueryPreprocessor
+- **Impossible**: Early detection via schema validation in QueryPreprocessor
 
-**Implementation**:
-```python
-class QueryIntentClassifier:
-    def classify(self, question: str, schema: Dict) -> QueryIntent:
-        # Analyze question against available schema
-        # Return intent + required tables/columns
-        pass
-```
+**Implementation**: `src/llm/query_preprocessor.py` and `src/llm/query_templates.py`
 
-#### 1.2 Required Data Detection
-Before generation, identify what data is needed:
-```python
-required = {
-    "tables": ["orders", "products"],
-    "columns": {"orders": ["total"], "products": ["name"]},
-    "filters": [{"column": "state", "value": "TX"}]
-}
+#### 1.2 Required Data Detection ✅ IMPLEMENTED (January 2026)
+Implemented in `QueryPreprocessor._validate_schema_requirements()`:
+- Detects tables/columns mentioned in question
+- Validates against actual schema
+- Returns `validation_warnings` for impossible queries
 
-# Check if schema can satisfy requirements
-missing = schema_validator.find_missing(required, schema)
-if missing:
-    return f"CANNOT_ANSWER: Missing {missing}"
-```
-
-### Phase 2: Schema-Aware Generation (Priority: High)
+### Phase 2: Schema-Aware Generation (Priority: High) ✅ PARTIALLY IMPLEMENTED
 
 #### 2.1 Dynamic Few-Shot Examples
-Generate examples based on ACTUAL schema:
+🔄 Existing in Query Planning Agent, enhanced by Template Engine for simple cases.
+
+#### 2.2 Column Value Awareness ✅ IMPLEMENTED (January 2026)
+Implemented via `QueryPreprocessor`:
+- Detects location columns from schema sample values
+- Bidirectional normalization: California ↔ CA based on what DB stores
+- Format hints provided to LLM: "Database uses 2-letter state codes"
+
+**Implementation**: `src/llm/query_preprocessor.py:_detect_location_format()`
+
+### Phase 3: Validation Improvements (Priority: Medium) ✅ PARTIALLY IMPLEMENTED
+
+#### 3.1 Pre-Generation Validation ✅ IMPLEMENTED (January 2026)
+Implemented in `QueryPreprocessor`:
 ```python
-def generate_schema_specific_examples(schema: Dict) -> str:
-    examples = []
-    for table in schema['tables']:
-        # Generate example query for this specific table
-        example = f"Question: Show all {table}\nSQL: SELECT * FROM {table} LIMIT 10"
-        examples.append(example)
-    return "\n\n".join(examples)
-```
-
-#### 2.2 Column Value Awareness
-When schema includes sample values, use them in prompts:
-```
-Table: products
-  - state: VARCHAR  // Actual values: 'TX', 'CA', 'NY', 'FL'
-
-For query "products from Texas", note that state column uses codes like 'TX'
-```
-
-### Phase 3: Validation Improvements (Priority: Medium)
-
-#### 3.1 Pre-Generation Validation
-Check if query CAN be answered before asking LLM:
-```python
-def can_answer_query(question: str, schema: Dict) -> tuple[bool, str]:
-    # Extract entities from question
-    entities = extract_entities(question)  # ["customers", "Texas"]
-
-    # Check if schema supports these entities
-    if "customers" in entities and "customers" not in schema["tables"]:
-        return False, "No customers table in this database"
-
-    if "Texas" in entities and not has_location_column(schema):
-        return False, "No location/state column in this database"
-
-    return True, ""
+# From query_preprocessor.py
+def _validate_schema_requirements(self, result: PreprocessedQuery):
+    # Check if required tables exist
+    for table in result.required_tables:
+        if table.lower() not in tables_lower:
+            result.schema_validation_passed = False
+            result.validation_warnings.append(f"Table '{table}' not found")
 ```
 
 #### 3.2 SQL Semantic Validation
@@ -409,6 +471,10 @@ System: "This database doesn't have location data. Did you mean:
 | Location Mapper | `src/core/location_mapper.py` | `enhance_query_with_location_hints()` |
 | Prompts | `src/llm/prompts.py` | `SYSTEM_PROMPT`, `SQL_GENERATION_TEMPLATE` |
 | Result Narrator | `src/llm/result_narrator.py` | `generate_narrative()` |
+| **Model Router (NEW)** | `src/llm/model_router.py` | `get_model_for_task()`, `get_timeout_for_task()` |
+| **Template Engine (NEW)** | `src/llm/query_templates.py` | `try_match()`, `TemplateMatch` |
+| **Query Preprocessor (NEW)** | `src/llm/query_preprocessor.py` | `preprocess()`, `PreprocessedQuery` |
+| **Model Config UI (NEW)** | `frontend/src/components/ModelConfigPanel.tsx` | Per-task model configuration |
 
 ---
 
@@ -420,9 +486,26 @@ The SQL generation pipeline has evolved to include:
 3. **Location intelligence** for state code normalization
 4. **Graceful failure** with CANNOT_ANSWER for impossible queries
 5. **Self-correction** with parallel fix strategies
+6. **Template matching (NEW - Jan 2026)** - Bypass LLM for simple query patterns
+7. **Query preprocessing (NEW - Jan 2026)** - Bidirectional location normalization
+8. **Per-task model routing (NEW - Jan 2026)** - Specialized models for different tasks
 
 Future improvements focus on:
-- Pre-generation intent classification
-- Schema-specific example generation
-- Semantic validation of generated SQL
-- Continuous learning from successful queries
+- ~~Pre-generation intent classification~~ ✅ Implemented via TemplateEngine
+- ~~Schema-specific example generation~~ ✅ Partially implemented via templates
+- Semantic validation of generated SQL (planned)
+- Continuous learning from successful queries (existing via CorrectionLearner)
+- Integration tests for per-task model routing
+- Performance benchmarks for template matching
+
+### Phase 2 Planned Improvements
+
+See [SMALL_MODEL_OPTIMIZATION_PHASE2.md](SMALL_MODEL_OPTIMIZATION_PHASE2.md) for detailed planning:
+
+| Improvement | Description | Expected Impact |
+|-------------|-------------|-----------------|
+| **Database Dialect Support** | Dialect-specific SQL generation (PostgreSQL, MySQL, SQLite, DuckDB) | 90% dialect accuracy (up from 60%) |
+| **Prompt Optimization** | Token budgets, schema compression, model-specific templates | 40% token reduction |
+| **Advanced Preprocessing** | Date, boolean, status, currency normalization | 90% date query accuracy |
+| **Pattern Learning** | Learn successful patterns from executed queries | +15% template match rate |
+| **Model Performance Tracking** | Track and optimize model selection per task | Auto-selection of best models |

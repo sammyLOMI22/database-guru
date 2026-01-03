@@ -1,10 +1,18 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import { Send, ChevronDown } from 'lucide-react';
 
+interface PerTaskModels {
+  sql: string | null;
+  narratives: string | null;
+  planning: string | null;
+  correction: string | null;
+}
+
 interface QueryInputProps {
   onSubmit: (question: string, rowLimit: number) => void;
   isLoading: boolean;
   selectedModel?: string;
+  perTaskModels?: PerTaskModels | null;  // All per-task models from Settings
 }
 
 const ROW_LIMIT_OPTIONS = [
@@ -19,7 +27,7 @@ const ROW_LIMIT_OPTIONS = [
   { value: 10000, label: '10,000 rows' },
 ];
 
-export default function QueryInput({ onSubmit, isLoading, selectedModel }: QueryInputProps) {
+export default function QueryInput({ onSubmit, isLoading, selectedModel, perTaskModels }: QueryInputProps) {
   const [question, setQuestion] = useState('');
   const [rowLimit, setRowLimit] = useState(100);
   const [showLimitDropdown, setShowLimitDropdown] = useState(false);
@@ -143,9 +151,38 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel }: Query
         {/* Hints */}
         <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
           <span>Press Ctrl+Enter to send</span>
-          {selectedModel && (
-            <span>Using model: <strong>{selectedModel}</strong></span>
-          )}
+          <div className="flex items-center gap-1 flex-wrap justify-end">
+            {(() => {
+              // Build list of per-task overrides (only those different from main model)
+              const overrides: { label: string; model: string }[] = [];
+              if (perTaskModels?.sql && perTaskModels.sql !== selectedModel) {
+                overrides.push({ label: 'SQL', model: perTaskModels.sql });
+              }
+              if (perTaskModels?.narratives && perTaskModels.narratives !== selectedModel) {
+                overrides.push({ label: 'Narratives', model: perTaskModels.narratives });
+              }
+              if (perTaskModels?.planning && perTaskModels.planning !== selectedModel) {
+                overrides.push({ label: 'Planning', model: perTaskModels.planning });
+              }
+              if (perTaskModels?.correction && perTaskModels.correction !== selectedModel) {
+                overrides.push({ label: 'Correction', model: perTaskModels.correction });
+              }
+
+              const hasOverrides = overrides.length > 0;
+              const label = hasOverrides ? 'Models:' : 'Model:';
+
+              return (
+                <>
+                  <span>{label} <strong>{selectedModel}</strong></span>
+                  {overrides.map((o) => (
+                    <span key={o.label} className="text-blue-600">
+                      | {o.label} → <strong>{o.model}</strong>
+                    </span>
+                  ))}
+                </>
+              );
+            })()}
+          </div>
         </div>
       </div>
     </div>

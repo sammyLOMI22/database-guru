@@ -35,6 +35,19 @@ async def get_or_create_settings(db: AsyncSession) -> SystemSettings:
             enable_intent_classification=True,  # Phase 1
             enable_dynamic_examples=True,  # Phase 2
             enable_semantic_validation=True,  # Phase 3
+            # Per-Task Model Configuration (defaults to None = use default model)
+            model_sql_generation=None,
+            model_narratives=None,
+            model_query_planning=None,
+            model_error_correction=None,
+            # Per-Task Timeouts (seconds)
+            timeout_sql_generation=30,
+            timeout_narratives=15,
+            timeout_query_planning=20,
+            timeout_error_correction=15,
+            # Small Model Optimization Feature Flags
+            enable_query_templates=True,
+            enable_location_preprocessing=True,
         )
         db.add(settings)
         await db.commit()
@@ -97,6 +110,16 @@ async def update_settings(
         await db.commit()
         await db.refresh(settings)
 
+        # Invalidate model router cache if model settings changed
+        model_fields = ['model_sql_generation', 'model_narratives',
+                        'model_query_planning', 'model_error_correction',
+                        'timeout_sql_generation', 'timeout_narratives',
+                        'timeout_query_planning', 'timeout_error_correction']
+        if any(field in update_data for field in model_fields):
+            from src.llm.model_router import invalidate_model_router
+            invalidate_model_router()
+            logger.info("Invalidated model router cache due to settings change")
+
         logger.info(f"Updated system settings: {update_data}")
         return settings
 
@@ -145,6 +168,23 @@ async def reset_settings(db: AsyncSession = Depends(get_db)):
         settings.enable_intent_classification = True
         settings.enable_dynamic_examples = True
         settings.enable_semantic_validation = True
+        # Per-Task Model Configuration (reset to defaults)
+        settings.model_sql_generation = None
+        settings.model_narratives = None
+        settings.model_query_planning = None
+        settings.model_error_correction = None
+        # Per-Task Timeouts
+        settings.timeout_sql_generation = 30
+        settings.timeout_narratives = 15
+        settings.timeout_query_planning = 20
+        settings.timeout_error_correction = 15
+        # Small Model Optimization Feature Flags
+        settings.enable_query_templates = True
+        settings.enable_location_preprocessing = True
+
+        # Invalidate model router cache
+        from src.llm.model_router import invalidate_model_router
+        invalidate_model_router()
 
         await db.commit()
         await db.refresh(settings)

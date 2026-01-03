@@ -13,6 +13,13 @@ interface ChatMessage {
   queryResponse?: QueryResponse;
 }
 
+interface PerTaskModelSettings {
+  model_sql_generation: string | null;
+  model_narratives: string | null;
+  model_query_planning: string | null;
+  model_error_correction: string | null;
+}
+
 export default function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -22,6 +29,7 @@ export default function ChatInterface() {
     },
   ]);
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [perTaskModels, setPerTaskModels] = useState<PerTaskModelSettings | null>(null);
   const [enableNarratives, setEnableNarratives] = useState<boolean>(() => {
     // Load from localStorage, default to true
     const stored = localStorage.getItem('enableNarratives');
@@ -38,6 +46,27 @@ export default function ChatInterface() {
       setSelectedModel(modelsData.default_model);
     }
   }, [modelsData, selectedModel]);
+
+  // Fetch per-task model settings on mount
+  useEffect(() => {
+    const fetchPerTaskModels = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/settings/');
+        if (response.ok) {
+          const settings = await response.json();
+          setPerTaskModels({
+            model_sql_generation: settings.model_sql_generation,
+            model_narratives: settings.model_narratives,
+            model_query_planning: settings.model_query_planning,
+            model_error_correction: settings.model_error_correction,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch per-task model settings:', error);
+      }
+    };
+    fetchPerTaskModels();
+  }, []);
 
   // Save narratives preference to localStorage
   useEffect(() => {
@@ -173,6 +202,12 @@ export default function ChatInterface() {
         onSubmit={handleSubmit}
         isLoading={queryMutation.isPending}
         selectedModel={selectedModel}
+        perTaskModels={perTaskModels ? {
+          sql: perTaskModels.model_sql_generation,
+          narratives: perTaskModels.model_narratives,
+          planning: perTaskModels.model_query_planning,
+          correction: perTaskModels.model_error_correction,
+        } : null}
       />
     </div>
   );

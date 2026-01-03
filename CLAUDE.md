@@ -185,6 +185,44 @@ The system uses a multi-agent architecture with specialized agents that work tog
     - **Test Coverage**: 52 unit tests + 11 performance tests + 12 E2E tests (75 total)
     - Key methods: `generate_narrative()`, `_extract_json_object()`, `_detect_anomalies()`, `_detect_trends()`, `_calculate_correlations()`
 
+13. **Model Router** (`src/llm/model_router.py`) **NEW - January 2, 2026**
+    - Routes LLM tasks to appropriate models based on task type and user configuration
+    - Enables using specialized models (e.g., `duckdb-nsql` for SQL) while using general-purpose models for other tasks
+    - **Per-Task Model Configuration**: Assign different models for:
+      - SQL Generation: Use specialized SQL models (duckdb-nsql, sqlcoder)
+      - Narratives: Use general-purpose models (llama3.2, gemma)
+      - Query Planning: Use reasoning-capable models
+      - Error Correction: Use code-focused models
+    - **Per-Task Timeouts**: Configurable timeout per task type (SQL: 30s, Narratives: 15s, Planning: 20s, Correction: 15s)
+    - Falls back to default model when per-task model is not configured
+    - Key methods: `get_model_for_task()`, `get_timeout_for_task()`, `get_config_for_task()`
+
+14. **Query Template Engine** (`src/llm/query_templates.py`) **NEW - January 2, 2026**
+    - Template-based SQL generation that bypasses LLM for simple query patterns
+    - Improves response time and reduces errors for straightforward requests
+    - **Supported Patterns**:
+      - `list_all`: "show all products" → `SELECT * FROM products LIMIT 100`
+      - `count`: "how many customers" → `SELECT COUNT(*) FROM customers`
+      - `top_n`: "top 5 by price" → `SELECT * FROM X ORDER BY Y DESC LIMIT 5`
+      - `filter_location`: "orders from California" → `SELECT * FROM orders WHERE state = 'CA'`
+      - `filter_value`: "customers where status is active" → `SELECT * FROM customers WHERE status = 'active'`
+      - `sum_total`, `average`, `group_by`: Aggregation patterns
+    - Table alias handling (singular/plural, abbreviations)
+    - Column variation matching (price → unit_price, name → product_name)
+    - Returns `TemplateMatch` with SQL, confidence score, and explanation
+    - Key method: `try_match()` - returns `TemplateMatch` or None
+
+15. **Query Preprocessor** (`src/llm/query_preprocessor.py`) **NEW - January 2, 2026**
+    - Pre-processes natural language queries before LLM generation
+    - **Bidirectional Location Normalization**: Detects DB format and converts accordingly
+      - If DB uses codes (CA, NY): "California" → "CA"
+      - If DB uses full names: "CA" → "California"
+      - Works for US states, cities, countries
+    - **Entity Detection**: Extracts tables, columns, and values from questions
+    - **Schema Validation**: Early detection of impossible queries
+    - **Enhanced Context**: Builds LLM hints with matched entities and format guidance
+    - Key method: `preprocess()` - returns `PreprocessedQuery` with normalized question and metadata
+
 ### Tool System (`src/tools/`)
 
 The tool system provides 10 specialized tools across 4 categories for schema exploration and query validation:
@@ -329,7 +367,7 @@ The system maintains its own metadata database (`database_guru.db`):
 - `learned_corrections` - Patterns learned from successful fixes
 - `confidence_scores` - Historical confidence predictions
 - `user_feedback` - User-submitted corrections and reports
-- `system_settings` - Configuration for auto-learning and validation
+- `system_settings` - Configuration for auto-learning, validation, and per-task model settings (NEW: model_sql_generation, model_narratives, model_query_planning, model_error_correction, per-task timeouts, enable_query_templates, enable_location_preprocessing)
 - `column_mappings` - Learned column name corrections (NEW - Nov 10, 2025)
 - `table_mappings` - Learned table name corrections (NEW - Nov 10, 2025)
 - `result_validation_patterns` - Learned result validation patterns (NEW - Nov 10, 2025)
@@ -443,6 +481,16 @@ Located in `frontend/src/`:
 - Total: **~2,100 lines** of new UI code for Semantic Cache management
 - Backend Tests: `test_cache_endpoints.py` with 9 tests
 - Frontend Tests: `SemanticCachePanel.test.tsx` with 34 tests
+
+**Small Model Optimization UI Components (NEW - January 2, 2026):**
+- `ModelConfigPanel.tsx` (310 lines) - Per-task model configuration with:
+  - 4 task cards: SQL Generation, Narratives, Query Planning, Error Correction
+  - Model dropdown for each task (fetches from Ollama)
+  - Timeout slider (5-120s) with default indicators
+  - Optimization feature toggles: Query Templates, Location Preprocessing
+  - Color-coded task cards (blue, green, purple, orange)
+- `SettingsPanel.tsx` - Updated to include ModelConfigPanel integration
+- `QueryInput.tsx` - Row limit integration with per-task settings
 
 ### LLM Prompts
 
@@ -596,6 +644,19 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `frontend/src/components/visualization/ChartToggle.tsx` - Table/chart toggle with type selector
   - `frontend/tests/AdvancedCharts.test.tsx` - 61 comprehensive tests
   - `frontend/tests/chartIntelligence.test.ts` - Pattern detection tests
+- **Small Model Optimization (NEW - Jan 2, 2026)**:
+  - `src/llm/model_router.py` - Per-task model routing (246 lines)
+  - `src/llm/query_templates.py` - Template-based SQL for simple patterns (724 lines)
+  - `src/llm/query_preprocessor.py` - Location normalization and preprocessing (504 lines)
+  - `src/llm/self_correcting_agent.py` - Template matching + preprocessing integration (lines 821-907, 1068-1111)
+  - `src/database/models.py` - Per-task model/timeout fields in SystemSettings
+  - `src/api/endpoints/settings.py` - Model configuration API endpoints
+  - `src/api/endpoints/models.py` - Filter embedding models from model list
+  - `frontend/src/components/ModelConfigPanel.tsx` - Per-task model configuration UI (310 lines)
+  - `frontend/src/components/SettingsPanel.tsx` - Updated with ModelConfigPanel integration
+  - `tests/test_model_router.py` - 220 lines of model router tests
+  - `tests/test_query_preprocessor.py` - 264 lines of preprocessor tests
+  - `tests/test_query_templates.py` - 252 lines of template engine tests
 
 ## Documentation
 

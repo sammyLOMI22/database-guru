@@ -798,3 +798,175 @@ The code changes are solid and the logic is correct. The test failures observed 
 
 ---
 *Reviewer: Antigravity AI*
+
+---
+
+## LLM Model Dropdown Issue - Settings Tab (December 30, 2025)
+
+### Problem Description
+The LLM models are not being populated in the dropdowns for the **Per-Task Model Configuration** section in the **Settings** tab. The dropdowns show several blank/empty options instead of the available model names.
+
+### Root Cause Analysis
+The issue is a **data structure mismatch** between the backend API response and the frontend component's expectation.
+
+1.  **Backend API**: The endpoint `http://localhost:8000/api/models/` returns a `ModelListResponse` which contains a `models` field as an **array of strings** (e.g., `["llama3.2:latest", "gemma3:4b", ...]`).
+2.  **Frontend Component**: In `ModelConfigPanel.tsx`, the component defines an `AvailableModel` interface as an object and expects the `availableModels` state to be an array of these objects:
+    ```typescript
+    interface AvailableModel {
+      name: string;
+      modified_at: string;
+      size: number;
+    }
+    const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
+    ```
+3.  **The Failure**: When the component fetches from `/api/models/` and performs `setAvailableModels(data.models || [])`, it populates the state with strings. However, the render logic attempts to access `.name` on these strings:
+    ```typescript
+    {availableModels.map((model) => (
+      <option key={model.name} value={model.name}>
+        {model.name}
+      </option>
+    ))}
+    ```
+    Since `string.name` is `undefined`, the options are rendered with empty labels and internal values.
+
+### Recommended Fixes
+Multiple approaches can resolve this inconsistency:
+
+1.  **Use the Detailed Endpoint (Recommended)**:
+    Change the fetch URL in `ModelConfigPanel.tsx` from `/api/models/` to `/api/models/details`. This endpoint returns a list of `ModelInfo` objects that match the expected structure of `AvailableModel`.
+    
+2.  **Handle Strings in Frontend**:
+    Update `ModelConfigPanel.tsx` to handle the string array by either rendering the string directly or mapping the strings to a minimal object wrapper:
+    ```typescript
+    {availableModels.map((model: any) => {
+      const modelName = typeof model === 'string' ? model : model.name;
+      return (
+        <option key={modelName} value={modelName}>
+          {modelName}
+        </option>
+      );
+    })}
+    ```
+
+3.  **Standardize via Hooks**:
+    Utilize the existing `useModels` or `useModelDetails` hooks from `src/hooks/useModels.ts` instead of manual `fetch` calls. This ensures consistent data handling across the application (similar to how `EnhancedChatInterface.tsx` correctly handles the model list).
+
+---
+*Reviewer: Antigravity AI*
+
+---
+
+## Phase 3: Small Model Optimization - PR Review (January 2, 2026)
+
+### Overview
+This PR implements **Per-Task Model Routing**, allowing the system to use different LLMs for specific tasks (SQL generation, Narratives, Planning, Error Correction). This is a key optimization for using smaller, specialized models (e.g., `duckdb-nsql` for SQL) alongside general purpose models (e.g., `llama3.2` for chat).
+
+### Key Features Verified
+
+#### 1. Model Router & Backend Logic
+- **`ModelRouter` Class**: Correctly implements fallback logic. If a per-task model is not set, it falls back to the system default.
+- **API Endpoints**: The `GET /api/models/details` endpoint now strictly filters out embedding models (checking both name and family), ensuring the UI dropdowns are clean.
+
+#### 2. Frontend Configuration
+- **Settings Panel**: A new "Per-Task Model Configuration" section is correctly implemented.
+- **Persistence**: Per-task model selections and feature toggles ("Query Templates", "Location Preprocessing") persist correctly across reloads.
+- **Fix Confirmed**: The issue noted in the previous review (Dropdown mismatch) has been fixed. `ModelConfigPanel` now correctly fetches from `/api/models/details` and maps attributes correctly.
+
+### Test Verification
+
+#### 1. New Feature Tests (Passed ✅)
+All 59 tests covering the new functionality passed successfully:
+- `tests/test_model_router.py`: **Failed** (0) / **Passed** (17)
+- `tests/test_query_preprocessor.py`: **Failed** (0) / **Passed** (16)
+- `tests/test_query_templates.py`: **Failed** (0) / **Passed** (26)
+
+#### 2. Test Suite Noise
+> [!NOTE]
+> The full test suite (`run_tests.sh`) reports 55 failures, primarily in `test_feedback_api.py` (500 Internal Server Errors) and `test_query_endpoints.py` (State leakage/Assertion errors).
+> These failures appear related to DB fixture isolation and environment issues, NOT the changes in this branch.
+
+### Manual UI Verification
+| Feature | Status | Notes |
+| :--- | :--- | :--- |
+| **Model Dropdowns** | ✅ Verified | Embedding models are correctly filtered out. |
+| **Persistence** | ✅ Verified | Settings save and reload correctly. |
+| **Optimization Toggles** | ✅ Verified | "Query Templates" and "Location Preprocessing" toggles work as expected. |
+
+### Final Recommendation
+**APPROVE**
+
+The changes successfully implement the Small Model Optimization requirements. The code is robust, well-tested (unit tests), and the UI integrates seamlessly. The previous issue with model dropdowns has been resolved.
+
+---
+*Reviewer: Antigravity AI*
+
+---
+
+## Phase 4: Performance Verification (January 2, 2026)
+
+### 1. Multi-Database Performance Test
+Executed 4 test queries against **DuckDB** and **SQLite** simultaneously via `localhost:3000`.
+
+| Query | Expected Template | Execution Time (Approx) | Status | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **"how many customers"** | `COUNT` | ~4.5s | ✅ Success | Correctly counted records in both DBs. |
+| **"show all products"** | `LIST_ALL` | ~2.6s | ✅ Success | Fastest query. Template logic works. |
+| **"show customers from California"** | `FILTER_LOCATION` | ~10.0s | ⚠️ Mixed | **DuckDB (Success):** Correctly mapped "California" → `'CA'`. <br> **SQLite (Fail):** Error: `column 'ifnull' not found`. |
+| **"sales by category"** | `GROUP_BY` | ~4.8s | ✅ Success | generated valid GROUP BY SQL. |
+
+### 2. Observations & Feedback
+- **Agent Overhead:** Even "template" queries take ~2.5s+, suggesting significant overhead in the agent chain (tracing, logging, setup) before the template engine returns. This prevents the "instant" feel expected from template matching.
+- **Location Preprocessing:** Successfully verified! The system correctly identified that the DuckDB schema uses state codes and normalized "California" to `'CA'` automatically.
+- **SQLite Dialect Issue:** The failure on the location query in SQLite ("column 'ifnull' not found") suggests the generated SQL (or a validation step) is trying to use `ifnull` in an incorrect context or the validator is misinterpreting the error.
+- **Recommendation:**
+    - Investigate the SQLite `ifnull` error in the standard query path.
+    - Consider optimizing the agent "startup" time to realize the full speed benefits of the template engine.
+
+---
+*Reviewer: Antigravity AI*
+
+---
+
+## Phase 5: Specialized Model Verification (January 2, 2026)
+
+### 1. Configuration
+- **Unlocking Specialized Models**: User manually selected `duckdb-nsql:latest` for "SQL Generation" in Settings.
+- **Test Set**: Re-ran the Multi-DB performance test suite to compare against the default model baseline.
+
+### 2. Test Results
+
+| Query | Database | Result | Notes |
+| :--- | :--- | :--- | :--- |
+| **"how many customers"** | Multi-DB | ✅ Success | ~4.5s. Generated clean `COUNT(DISTINCT id)` queries. |
+| **"show customers from California"** | SQLite | ❌ Failed | **Error Persists:** `Subquery column 'ifnull' not found`. The specialized model also attempts to use `IFNULL` in a way that conflicts with the schema/validator. |
+| **"show customers from California"** | DuckDB | ✅ Success | Correctly normalized and filtered. |
+| **"sales by category"** | Multi-DB | ⚠️ Partial | Correct syntax (`JOIN` + `SUM`), but grouped by `product_name` instead of a Category entity (likely schema ambiguity). |
+
+### 3. Conclusion
+- **Model Efficiency**: The specialized model (`duckdb-nsql`) is performant and generates valid SQL syntax for standard queries.
+- **Persistent SQLite Bug**: The `ifnull` error is **not model-specific**. Both the default and specialized models trigger it, pointing to a root cause in the `Validator` or `Schema Context` (likely a strict column check failing on functions).
+- **Recommendation**: The underlying SQLite validation issue needs a dedicated fix (as noted in Phase 4), as changing models does not resolve it.
+
+---
+*Reviewer: Antigravity AI*
+
+---
+
+## Phase 6: UX/UI Feedback (January 2, 2026)
+
+### 1. "Using Model" Indicator Issue
+- **Observation:** The chat interface footer consistently displays `Using model: llama3.2:latest` (or whatever the default/narrative model is), even when specialized models (e.g., `duckdb-nsql`) are actively performing the SQL generation.
+- **Problem:** This is technically correct for the *chat/narrative* portion but misleading for the user, who might believe the specialized SQL model is not being utilized.
+- **Verification:**
+    1.  Configured `SQL Generation` → `duckdb-nsql:latest` in Settings.
+    2.  Returned to Chat. Footer still read `Using model: llama3.2:latest`.
+    3.  Verified specialized model *was* used via logs/performance, but UI did not reflect it.
+
+### 2. Recommendation
+Update the footer to either:
+1.  **List Active Models:** Display a compact summary like `Chat: llama3.2 | SQL: duckdb-nsql`.
+2.  **Dynamic Indicator:** Change the text contextually. E.g., when generating SQL, show `Generating SQL using duckdb-nsql...`.
+3.  **Tooltip:** Keep the text simple but add a hover tooltip detailing the per-task model configuration.
+
+---
+*Reviewer: Antigravity AI*

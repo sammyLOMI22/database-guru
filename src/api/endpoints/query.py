@@ -494,6 +494,8 @@ async def process_query(
             "result_analysis": result_analysis,
             # Chart Intent (Phase 8: Chart Intelligence)
             "preferred_chart_type": request.preferred_chart_type,
+            # Model tracking (Phase: Small Model Optimization)
+            "model_used": model_used,
         }
 
         # Cache the result (both exact and semantic)

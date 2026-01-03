@@ -343,36 +343,38 @@ class SchemaEnhancer:
 
 ## Implementation Phases
 
-### Phase 1: Core Infrastructure (Priority: High)
-- [ ] Create ModelSettings database table
-- [ ] Implement ModelRouter service
-- [ ] Add per-task model configuration to settings API
-- [ ] Database migration
+### Phase 1: Core Infrastructure (Priority: High) ✅ COMPLETE
+- [x] Create ModelSettings database table → Added to `SystemSettings` in `src/database/models.py`
+- [x] Implement ModelRouter service → `src/llm/model_router.py` (246 lines)
+- [x] Add per-task model configuration to settings API → `src/api/endpoints/settings.py`
+- [x] Database migration → Fields added to SystemSettings model
 
-### Phase 2: Pre-Processing Pipeline (Priority: High)
-- [ ] Create QueryPreprocessor class
-- [ ] Integrate LocationMapper into pre-processing
-- [ ] Add sample value extraction to SchemaInspector
-- [ ] Create SchemaEnhancer for richer context
+### Phase 2: Pre-Processing Pipeline (Priority: High) ✅ COMPLETE
+- [x] Create QueryPreprocessor class → `src/llm/query_preprocessor.py` (504 lines)
+- [x] Integrate LocationMapper into pre-processing → Bidirectional normalization (CA↔California)
+- [x] Add sample value extraction to SchemaInspector → Already exists, used by preprocessor
+- [x] Create SchemaEnhancer for richer context → Enhanced context in `PreprocessedQuery.enhanced_context`
 
-### Phase 3: Query Templates (Priority: Medium)
-- [ ] Implement TemplateEngine
-- [ ] Add common query pattern templates
-- [ ] Integrate with SQL generation flow
-- [ ] Add template match tracking/metrics
+### Phase 3: Query Templates (Priority: Medium) ✅ COMPLETE
+- [x] Implement TemplateEngine → `src/llm/query_templates.py` (724 lines)
+- [x] Add common query pattern templates → 10 template types (list_all, count, top_n, filter_location, etc.)
+- [x] Integrate with SQL generation flow → `self_correcting_agent.py:821-907`
+- [x] Add template match tracking/metrics → `TemplateMatch` with confidence scores in response
 
-### Phase 4: UI Components (Priority: Medium)
-- [ ] Create ModelConfigPanel component
-- [ ] Add to Settings page
-- [ ] Model dropdown with descriptions
-- [ ] Timeout configuration inputs
-- [ ] Advanced options toggles
+### Phase 4: UI Components (Priority: Medium) ✅ COMPLETE
+- [x] Create ModelConfigPanel component → `frontend/src/components/ModelConfigPanel.tsx` (310 lines)
+- [x] Add to Settings page → Integrated in `SettingsPanel.tsx`
+- [x] Model dropdown with descriptions → Fetches from Ollama, shows recommendations
+- [x] Timeout configuration inputs → Slider 5-120s with default indicators
+- [x] Advanced options toggles → Query Templates + Location Preprocessing toggles
 
-### Phase 5: Testing & Validation (Priority: High)
-- [ ] Unit tests for ModelRouter
-- [ ] Integration tests for per-task routing
-- [ ] Performance benchmarks
-- [ ] A/B testing framework
+### Phase 5: Testing & Validation (Priority: High) 🔄 IN PROGRESS
+- [x] Unit tests for ModelRouter → `tests/test_model_router.py` (220 lines)
+- [x] Unit tests for QueryPreprocessor → `tests/test_query_preprocessor.py` (264 lines)
+- [x] Unit tests for TemplateEngine → `tests/test_query_templates.py` (252 lines)
+- [ ] Integration tests for per-task routing → Planned
+- [ ] Performance benchmarks → Planned
+- [ ] A/B testing framework → Future consideration
 
 ---
 
@@ -431,6 +433,8 @@ ENABLE_PER_TASK_MODELS=true
 
 ## Related Documentation
 
+- [SMALL_MODEL_OPTIMIZATION_PHASE2.md](SMALL_MODEL_OPTIMIZATION_PHASE2.md) - **Phase 2 planning** (dialect support, prompt optimization, learning)
+- [SQL_GENERATION_PIPELINE.md](SQL_GENERATION_PIPELINE.md) - Pipeline overview with template/preprocessing integration
 - [CLAUDE.md](../CLAUDE.md) - Main project documentation
 - [FUTURE_PLANS.md](FUTURE_PLANS.md) - Roadmap
 - [SEMANTIC_CACHING.md](SEMANTIC_CACHING.md) - Caching system
@@ -440,4 +444,10 @@ ENABLE_PER_TASK_MODELS=true
 
 ## Changelog
 
+- **2026-01-02**: Implementation complete (Phases 1-4), testing in progress (Phase 5)
+  - ModelRouter service implemented with per-task model/timeout configuration
+  - QueryPreprocessor with bidirectional location normalization
+  - TemplateEngine with 10 query patterns bypassing LLM
+  - ModelConfigPanel UI component with full configuration
+  - 736 lines of test code across 3 test files
 - **2025-12-30**: Initial documentation created
