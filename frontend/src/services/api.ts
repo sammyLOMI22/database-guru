@@ -248,6 +248,8 @@ import type {
   UpdateChatSessionRequest,
   MultiDatabaseQueryRequest,
   MultiDatabaseQueryResponse,
+  ValidateMultiDBRequest,
+  ValidateMultiDBResponse,
 } from '../types/api';
 
 export const connectionsAPI = {
@@ -340,6 +342,12 @@ export const multiQueryAPI = {
   // Process multi-database query
   async processQuery(request: MultiDatabaseQueryRequest): Promise<MultiDatabaseQueryResponse> {
     const { data } = await api.post<MultiDatabaseQueryResponse>('/api/multi-query/', request);
+    return data;
+  },
+
+  // Pre-flight validation for multi-database queries (Phase 2.4)
+  async validateQuery(request: ValidateMultiDBRequest): Promise<ValidateMultiDBResponse> {
+    const { data } = await api.post<ValidateMultiDBResponse>('/api/multi-query/validate', request);
     return data;
   },
 };

@@ -13,7 +13,7 @@ Database Guru is an AI-powered natural language to SQL query assistant. Users as
 - Databases: SQLite for metadata, supports PostgreSQL/MySQL/SQLite/MongoDB/DuckDB for user databases
 
 ## Development Commands
-
+After Completing a task that involves tool use, provide a quick summary of the work you've done.
 ### Backend Development
 
 ```bash

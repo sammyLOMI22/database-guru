@@ -521,3 +521,33 @@ export interface ToolsPromptResponse {
   prompt: string;
   tool_count: number;
 }
+
+// Multi-Database Query Validation Types (Phase 2.4)
+export type QueryCapability = 'full' | 'partial' | 'cannot';
+
+export interface DatabaseAssessmentResponse {
+  connection_id: number;
+  connection_name: string;
+  database_type: string;
+  capability: QueryCapability;
+  missing_tables: string[];
+  missing_columns: Record<string, string[]>;
+  available_alternatives: Record<string, string>;
+  suggested_sql: string | null;
+  reason: string;
+  confidence: number;
+}
+
+export interface ValidateMultiDBRequest {
+  question: string;
+  connection_ids: number[];
+  base_sql?: string;
+}
+
+export interface ValidateMultiDBResponse {
+  assessments: DatabaseAssessmentResponse[];
+  can_execute_any: boolean;
+  all_full: boolean;
+  primary_sql: string | null;
+  warnings: string[];
+}

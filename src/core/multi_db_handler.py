@@ -11,6 +11,12 @@ from src.core.schema_inspector import SchemaInspector
 from src.core.executor import SQLExecutor
 from src.llm.self_correcting_agent import SelfCorrectingSQLAgent
 from src.llm.sql_generator import SQLGenerator
+from src.llm.multi_db_query_validator import (
+    MultiDatabaseQueryValidator,
+    MultiDatabaseValidationResult,
+    DatabaseQueryAssessment,
+    QueryCapability,
+)
 from src.config.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -206,6 +212,128 @@ class MultiDatabaseHandler:
                 lines.append("")  # Empty line between tables
 
         return "\n".join(lines)
+
+    async def validate_multi_database_query(
+        self,
+        question: str,
+        connections: List[DatabaseConnection],
+        base_sql: Optional[str] = None,
+        combined_schema: Optional[Dict[str, Any]] = None,
+    ) -> MultiDatabaseValidationResult:
+        """
+        Pre-flight validation for multi-database queries.
+
+        Assesses each database's capability to answer the query:
+        - FULL: Can answer completely with original SQL
+        - PARTIAL: Can answer with modified SQL (alternatives found)
+        - CANNOT: Cannot answer (missing required tables/columns)
+
+        Args:
+            question: Natural language question
+            connections: List of target database connections
+            base_sql: Optional pre-generated SQL to validate
+            combined_schema: Optional pre-built combined schema (saves introspection)
+
+        Returns:
+            MultiDatabaseValidationResult with per-database assessments
+        """
+        logger.info(f"Validating query across {len(connections)} database(s)")
+
+        # Build combined schema if not provided
+        if combined_schema is None:
+            combined_schema = await self.build_combined_schema(connections)
+
+        # Convert combined schema to validator format
+        # Validator expects: {conn_id: {"name": ..., "database_type": ..., "tables": {...}}}
+        schemas_for_validator: Dict[int, Dict[str, Any]] = {}
+        connection_names: Dict[int, str] = {}
+
+        for db_info in combined_schema.get("databases", []):
+            conn_id = db_info.get("connection_id")
+            if conn_id is None:
+                continue
+
+            # Skip databases with errors
+            if "error" in db_info:
+                logger.warning(f"Skipping validation for {db_info.get('name')}: {db_info.get('error')}")
+                continue
+
+            connection_names[conn_id] = db_info.get("name", f"Database {conn_id}")
+
+            # Convert tables list to dict format for validator
+            tables_dict = {}
+            for table in db_info.get("tables", []):
+                table_name = table.get("name", "")
+                tables_dict[table_name] = {
+                    "columns": table.get("columns", []),
+                    "foreign_keys": table.get("foreign_keys", []),
+                }
+
+            schemas_for_validator[conn_id] = {
+                "name": db_info.get("name"),
+                "database_type": db_info.get("database_type"),
+                "tables": tables_dict,
+            }
+
+        # If no base SQL provided, use question-based validation
+        # The validator will analyze the question to detect location references,
+        # table mentions, etc. and check if the schema can support them
+        if not base_sql:
+            logger.info("No base SQL provided - using question-based validation")
+            base_sql = ""  # Validator will use _extract_requirements_from_question
+
+        # Create validator and assess
+        validator = MultiDatabaseQueryValidator(schemas_for_validator)
+        result = validator.assess_query(
+            question=question,
+            base_sql=base_sql,
+            connection_names=connection_names,
+        )
+
+        # Log summary
+        summary = result.get_summary()
+        logger.info(
+            f"Validation complete: {summary['full']} full, "
+            f"{summary['partial']} partial, {summary['cannot']} cannot"
+        )
+
+        return result
+
+    def _convert_schema_for_validation(
+        self,
+        combined_schema: Dict[str, Any]
+    ) -> tuple[Dict[int, Dict[str, Any]], Dict[int, str]]:
+        """
+        Convert combined schema format to validator format.
+
+        Returns:
+            Tuple of (schemas_dict, connection_names_dict)
+        """
+        schemas: Dict[int, Dict[str, Any]] = {}
+        names: Dict[int, str] = {}
+
+        for db_info in combined_schema.get("databases", []):
+            conn_id = db_info.get("connection_id")
+            if conn_id is None or "error" in db_info:
+                continue
+
+            names[conn_id] = db_info.get("name", f"Database {conn_id}")
+
+            tables_dict = {}
+            for table in db_info.get("tables", []):
+                table_name = table.get("name", "")
+                tables_dict[table_name] = {
+                    "columns": table.get("columns", []),
+                    "foreign_keys": table.get("foreign_keys", []),
+                }
+
+            schemas[conn_id] = {
+                "name": db_info.get("name"),
+                "database_type": db_info.get("database_type"),
+                "tables": tables_dict,
+            }
+
+        return schemas, names
 
     async def execute_query_on_database(
         self,
