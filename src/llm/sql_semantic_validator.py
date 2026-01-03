@@ -569,8 +569,33 @@ class SQLSemanticValidator:
         column_pattern = re.compile(r'\b(\w+)\s*(?:=|<|>|<=|>=|<>|!=|LIKE|ILIKE|IN|IS)\s*', re.IGNORECASE)
         where_columns = set(column_pattern.findall(where_clause_no_subquery))
 
-        # Remove SQL keywords that might be caught
-        sql_keywords = {'and', 'or', 'not', 'null', 'true', 'false', 'between'}
+        # Remove SQL keywords and functions that might be caught
+        # Uses superset of functions across all SQL dialects (SQLite, PostgreSQL, MySQL, DuckDB, Oracle, SQL Server)
+        # This is safe because column names rarely match function names
+        # TODO: Consider adding database_type parameter for dialect-specific filtering if false positives occur
+        sql_keywords = {
+            # Logical keywords
+            'and', 'or', 'not', 'null', 'true', 'false', 'between', 'in', 'is', 'like', 'ilike',
+            # NULL handling functions (SQLite: IFNULL, MySQL: IFNULL/ISNULL, Oracle: NVL, SQL Server: ISNULL)
+            'ifnull', 'isnull', 'coalesce', 'nullif', 'nvl', 'nvl2',
+            # Type conversion
+            'cast', 'convert', 'try_cast', 'try_convert', 'typeof',
+            # String functions
+            'upper', 'lower', 'trim', 'ltrim', 'rtrim', 'concat', 'substring', 'substr', 'length', 'len',
+            'replace', 'left', 'right', 'charindex', 'instr', 'locate', 'position', 'printf', 'format',
+            # Date/time functions
+            'date', 'datetime', 'time', 'timestamp', 'year', 'month', 'day', 'hour', 'minute', 'second',
+            'datepart', 'datediff', 'dateadd', 'now', 'current_date', 'current_time', 'current_timestamp',
+            'strftime', 'julianday', 'date_trunc', 'extract', 'epoch',
+            # Numeric functions
+            'abs', 'round', 'floor', 'ceil', 'ceiling', 'mod', 'power', 'sqrt', 'sign',
+            # Aggregate functions (shouldn't appear in WHERE but be safe)
+            'count', 'sum', 'avg', 'min', 'max', 'group_concat', 'string_agg',
+            # Conditional functions
+            'case', 'when', 'then', 'else', 'end', 'if', 'iff', 'iif', 'decode',
+            # Existence checks
+            'exists', 'any', 'all', 'some',
+        }
         where_columns = {c.lower() for c in where_columns if c.lower() not in sql_keywords}
 
         # Build set of columns available in queried tables
@@ -829,23 +854,54 @@ class SQLSemanticValidator:
             Set of column names found
         """
         columns = set()
-        sql_keywords = {'select', 'from', 'where', 'and', 'or', 'not', 'null',
-                       'true', 'false', 'between', 'in', 'like', 'is', 'as',
-                       'join', 'on', 'order', 'by', 'group', 'having', 'limit',
-                       'offset', 'distinct', 'count', 'sum', 'avg', 'max', 'min',
-                       'asc', 'desc', 'inner', 'left', 'right', 'outer', 'case',
-                       'when', 'then', 'else', 'end', 'cast', 'coalesce', 'nullif'}
+        # Comprehensive set of SQL keywords and functions to filter out
+        sql_keywords = {
+            # Core keywords
+            'select', 'from', 'where', 'and', 'or', 'not', 'null',
+            'true', 'false', 'between', 'in', 'like', 'ilike', 'is', 'as',
+            'join', 'on', 'order', 'by', 'group', 'having', 'limit',
+            'offset', 'distinct', 'asc', 'desc', 'inner', 'left', 'right', 'outer',
+            # Conditional
+            'case', 'when', 'then', 'else', 'end', 'if', 'iff', 'iif',
+            # NULL handling functions
+            'ifnull', 'isnull', 'coalesce', 'nullif', 'nvl', 'nvl2',
+            # Aggregate functions
+            'count', 'sum', 'avg', 'max', 'min', 'group_concat', 'string_agg',
+            # Type conversion
+            'cast', 'convert', 'typeof',
+            # String functions
+            'upper', 'lower', 'trim', 'ltrim', 'rtrim', 'concat', 'substring', 'substr',
+            'length', 'len', 'replace', 'left', 'right', 'instr', 'position',
+            # Date/time functions
+            'date', 'datetime', 'time', 'timestamp', 'year', 'month', 'day',
+            'hour', 'minute', 'second', 'strftime', 'julianday', 'now',
+            'current_date', 'current_time', 'current_timestamp', 'date_trunc', 'extract',
+            # Numeric functions
+            'abs', 'round', 'floor', 'ceil', 'ceiling', 'mod', 'power', 'sqrt',
+            # Other
+            'exists', 'any', 'all', 'some', 'union', 'except', 'intersect',
+        }
+
+        # Helper to strip string literals (replace with placeholder to preserve structure)
+        def strip_strings(text: str) -> str:
+            """Remove string literals to prevent their contents from being treated as columns."""
+            # Handle both single and double quoted strings, including escaped quotes
+            result = re.sub(r"'(?:[^'\\]|\\.)*'", '__STR__', text)
+            result = re.sub(r'"(?:[^"\\]|\\.)*"', '__STR__', result)
+            return result
 
         # Extract from SELECT clause
         select_match = re.search(r'\bSELECT\s+(.+?)\s+FROM\b', sql, re.IGNORECASE | re.DOTALL)
         if select_match:
             select_part = select_match.group(1)
+            # Strip string literals first
+            select_part = strip_strings(select_part)
             # Remove table prefixes (table.column -> column)
             select_part = re.sub(r'\w+\.', '', select_part)
             # Find word tokens
             tokens = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', select_part)
             for token in tokens:
-                if token.lower() not in sql_keywords and token != '*':
+                if token.lower() not in sql_keywords and token != '*' and token != '__STR__':
                     columns.add(token.lower())
 
         # Extract from WHERE clause
@@ -854,12 +910,14 @@ class SQLSemanticValidator:
             where_part = where_match.group(1)
             # Remove subqueries first
             where_part = self._remove_subqueries(where_part)
+            # Strip string literals
+            where_part = strip_strings(where_part)
             # Remove table prefixes
             where_part = re.sub(r'\w+\.', '', where_part)
             # Find word tokens before operators
             tokens = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', where_part)
             for token in tokens:
-                if token.lower() not in sql_keywords:
+                if token.lower() not in sql_keywords and token != '__STR__':
                     columns.add(token.lower())
 
         return columns

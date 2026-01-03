@@ -33,8 +33,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request with rate limiting"""
 
-        # Skip rate limiting for health check
-        if request.url.path in ["/health", "/", "/docs", "/openapi.json"]:
+        # Skip rate limiting for health/monitoring endpoints
+        exempt_paths = [
+            "/health", "/", "/docs", "/openapi.json",
+            # Pool monitoring endpoints (internal health checks, polled frequently)
+            "/api/pools/stats", "/api/pools/health",
+            # Model listing (needed on every page load)
+            "/api/models/", "/api/models/details",
+            # Settings (loaded on app init)
+            "/api/settings/",
+        ]
+        if request.url.path in exempt_paths or request.url.path.rstrip('/') in exempt_paths:
             return await call_next(request)
 
         # Get client identifier (IP address)

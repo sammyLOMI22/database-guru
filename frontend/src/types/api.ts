@@ -194,6 +194,8 @@ export interface QueryResponse {
   result_analysis?: ResultAnalysis | null;
   // Chart Intent fields (Phase 8: Chart Intelligence)
   preferred_chart_type?: ChartType | null;
+  // Model tracking (Phase: Small Model Optimization)
+  model_used?: string | null;
 }
 
 export interface Model {

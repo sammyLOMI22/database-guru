@@ -242,6 +242,11 @@ class QueryResponse(BaseModel):
         default=None,
         description="User-requested chart type passed through from request (bar, line, pie, scatter, table)"
     )
+    # Model tracking (Phase: Small Model Optimization)
+    model_used: Optional[str] = Field(
+        default=None,
+        description="The LLM model that was actually used for SQL generation (may differ from default if per-task routing is enabled)"
+    )
 
     class Config:
         json_schema_extra = {
