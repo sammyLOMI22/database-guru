@@ -107,6 +107,7 @@ The demo showcases:
 - 🔌 **Enhanced Connections** - Edit, delete, and manage database connections
 - 📊 **Advanced Visualization** - Intelligent chart detection with Bar, Line, Pie, Scatter charts
 - 📈 **Cross-Database Comparison** - Visual comparison across multiple databases
+- ⚙️ **Small Model Optimization** - Per-task model configuration, query templates, location preprocessing
 
 All with mock data - no database connection needed!
 
@@ -211,6 +212,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Cross-Database Comparison Charts** - Visual comparison across databases with auto-detection
 - ✅ **Configurable Row Limits (NEW!)** - Select from 10 to 10,000 rows per query via dropdown
 - ✅ **Result Table Pagination (NEW!)** - Navigate through large result sets with 10/25/50/100 rows per page
+- ✅ **Small Model Optimization (NEW!)** - Per-task model routing, query templates, and location preprocessing for faster responses with smaller models
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
@@ -355,6 +357,110 @@ Database Guru now includes a comprehensive UI for the Tool-Using Agent, accessib
 **Orange Color Theme**: The Tools tab uses an orange color scheme to visually distinguish it from other tabs.
 
 **See:** [Tool-Using Agent Guide](docs/TOOL_USING_AGENT.md) for complete documentation
+
+## ⚙️ Small Model Optimization (NEW!)
+
+Database Guru now includes **intelligent optimizations** specifically designed to improve performance when using smaller, faster LLM models. These features reduce LLM calls, normalize inputs, and enable per-task model routing.
+
+### Key Features:
+
+**1. Per-Task Model Configuration**
+Assign different models to different tasks for optimal performance:
+
+| Task | Recommended Model | Default Timeout |
+|------|------------------|-----------------|
+| **SQL Generation** | `duckdb-nsql`, `sqlcoder` | 30s |
+| **Narratives** | `llama3.2`, `gemma` | 15s |
+| **Query Planning** | Reasoning-capable models | 20s |
+| **Error Correction** | Code-focused models | 15s |
+
+**Benefits:**
+- Use specialized SQL models for query generation
+- Use general-purpose models for natural language tasks
+- Configure per-task timeouts for optimal responsiveness
+- Falls back to default model when per-task model is not configured
+
+**2. Query Template Engine**
+Bypass LLM entirely for simple, common query patterns:
+
+| Pattern | Example Input | Generated SQL |
+|---------|---------------|---------------|
+| `list_all` | "show all products" | `SELECT * FROM products LIMIT 100` |
+| `count` | "how many customers" | `SELECT COUNT(*) FROM customers` |
+| `top_n` | "top 5 by price" | `SELECT * FROM X ORDER BY Y DESC LIMIT 5` |
+| `filter_location` | "orders from California" | `SELECT * FROM orders WHERE state = 'CA'` |
+| `sum/average` | "total revenue" | `SELECT SUM(revenue) FROM orders` |
+| `group_by` | "sales by category" | `SELECT category, COUNT(*) FROM X GROUP BY category` |
+
+**Benefits:**
+- **Instant responses** - No LLM latency for simple queries
+- **Zero errors** - Template-generated SQL is always valid
+- **Resource savings** - Reduces LLM API calls significantly
+- **Confidence scores** - Each match includes a confidence level (0.9-0.95)
+
+**3. Location Preprocessing (Bidirectional)**
+Automatically normalizes location values to match your database format:
+
+```
+Query: "Show orders from California"
+Database uses state codes: CA, NY, TX
+→ Preprocessed: "Show orders from CA"
+
+Query: "Show orders from CA"
+Database uses full names: California, New York
+→ Preprocessed: "Show orders from California"
+```
+
+**Benefits:**
+- Detects database format from sample values
+- Works for US states, cities, countries
+- Eliminates common WHERE clause mismatches
+- Improves first-attempt SQL accuracy
+
+### Configuration:
+
+Access **Settings** → **Per-Task Model Configuration** to:
+- Select models for each task type
+- Adjust timeouts per task
+- Toggle Query Templates on/off
+- Toggle Location Preprocessing on/off
+
+### Example Workflow:
+
+```
+User: "show all customers"
+
+⚡ Template Match: list_all (confidence: 0.95)
+→ SELECT * FROM customers LIMIT 100
+→ Executed in 50ms (no LLM call!)
+
+User: "What's the average order value for California customers?"
+
+🗺️ Location Preprocessing: California → CA
+🧠 SQL Generation Model: duckdb-nsql
+→ SELECT AVG(order_total) FROM orders WHERE state = 'CA'
+→ Executed in 1.2s (single LLM call with optimized prompt)
+```
+
+### API Endpoints:
+
+```bash
+# Get current model settings
+curl http://localhost:8000/api/settings/
+
+# Update per-task model configuration
+curl -X PUT http://localhost:8000/api/settings/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_sql_generation": "duckdb-nsql",
+    "model_narratives": "llama3.2:latest",
+    "timeout_sql_generation": 30,
+    "enable_query_templates": true,
+    "enable_location_preprocessing": true
+  }'
+```
+
+---
 
 ## 🧠 Semantic Caching (NEW!)
 
