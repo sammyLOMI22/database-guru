@@ -380,6 +380,7 @@ export default function EnhancedChatInterface() {
             planning: perTaskModels.model_query_planning,
             correction: perTaskModels.model_error_correction,
           } : null}
+          connectionIds={currentSession?.connections.map(c => c.id)}
         />
       </div>
     </div>
