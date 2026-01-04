@@ -657,27 +657,29 @@ class SchemaInspector:
                     sem_type = col["semantic_type"]
                     if sem_type == "location":
                         # Provide location-specific guidance
+                        # NOTE: Use parentheses, not square brackets, to avoid LLM confusion
+                        # with SQL Server's [identifier] syntax
                         fmt = col.get("value_format", "unknown")
                         subtype = col.get("location_subtype", "")
                         if fmt == "code":
-                            semantic_hint = f" [LOCATION:{subtype} - use 2-letter codes like 'CA', 'NY']"
+                            semantic_hint = f" (location:{subtype}, use 2-letter codes like 'CA', 'NY')"
                         elif fmt == "full_name":
-                            semantic_hint = f" [LOCATION:{subtype} - use full names like 'California', 'New York']"
+                            semantic_hint = f" (location:{subtype}, use full names like 'California', 'New York')"
                         else:
-                            semantic_hint = f" [LOCATION:{subtype}]"
+                            semantic_hint = f" (location:{subtype})"
                     elif sem_type == "categorical":
                         # Phase 3: Show actual valid values for categorical columns
                         if sample_values:
                             valid_values = ", ".join(repr(s) for s in sample_values[:8])
-                            semantic_hint = f" [STATUS/ENUM - valid values: {valid_values}]"
+                            semantic_hint = f" (enum, valid values: {valid_values})"
                         else:
-                            semantic_hint = " [CATEGORICAL - use exact enum values]"
+                            semantic_hint = " (categorical, use exact enum values)"
                     elif sem_type == "temporal":
-                        semantic_hint = " [DATE/TIME - use appropriate date functions]"
+                        semantic_hint = " (date/time)"
                     elif sem_type == "boolean":
-                        semantic_hint = " [BOOLEAN - use 0/1 or TRUE/FALSE depending on DB]"
+                        semantic_hint = " (boolean, use 0/1 or TRUE/FALSE)"
                     elif sem_type == "identifier":
-                        semantic_hint = " [ID - primary/foreign key]"
+                        semantic_hint = " (primary/foreign key)"
 
                 # Add sample values if available (helps LLM understand format)
                 # Skip if already shown in semantic hint (for categorical)

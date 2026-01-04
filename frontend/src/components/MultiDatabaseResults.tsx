@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { MessageSquare, Copy, Check, Zap, Database, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MessageSquare, Copy, Check, Zap, Database, ChevronLeft, ChevronRight, AlertCircle, XCircle } from 'lucide-react';
 import type { DatabaseQueryResult, CacheInfo } from '../types/api';
 import { AgentTrace } from './AgentTrace';
 import { CorrectionHistory } from './CorrectionHistory';
@@ -104,8 +104,29 @@ export default function MultiDatabaseResults({
     }
   };
 
+  // Helper to determine if an error is "Cannot Answer" (schema limitation) vs actual error
+  const isCannotAnswer = (result: DatabaseQueryResult): boolean => {
+    if (result.success) return false;
+    const error = result.error?.toLowerCase() || '';
+    return (
+      error.includes('cannot execute query on this database') ||
+      error.includes('required column(s) not found') ||
+      error.includes('required table(s) not found') ||
+      error.includes('location column for filtering') ||
+      error.includes('missing required')
+    );
+  };
+
+  // Get result status: 'success' | 'cannot_answer' | 'error'
+  const getResultStatus = (result: DatabaseQueryResult): 'success' | 'cannot_answer' | 'error' => {
+    if (result.success) return 'success';
+    if (isCannotAnswer(result)) return 'cannot_answer';
+    return 'error';
+  };
+
   const successfulQueries = results.filter((r) => r.success).length;
-  const failedQueries = results.filter((r) => !r.success).length;
+  const cannotAnswerQueries = results.filter((r) => !r.success && isCannotAnswer(r)).length;
+  const failedQueries = results.filter((r) => !r.success && !isCannotAnswer(r)).length;
 
   return (
     <div className="space-y-4">
@@ -145,9 +166,10 @@ export default function MultiDatabaseResults({
           </div>
           <div>
             <p className="text-gray-600">Status</p>
-            <p className="text-lg font-semibold">
-              <span className="text-green-600">{successfulQueries} ✓</span>
-              {failedQueries > 0 && <span className="text-red-600 ml-2">{failedQueries} ✗</span>}
+            <p className="text-lg font-semibold flex items-center gap-2">
+              {successfulQueries > 0 && <span className="text-green-600">{successfulQueries} ✓</span>}
+              {cannotAnswerQueries > 0 && <span className="text-amber-600">{cannotAnswerQueries} ⊘</span>}
+              {failedQueries > 0 && <span className="text-red-600">{failedQueries} ✗</span>}
             </p>
           </div>
         </div>
@@ -189,12 +211,23 @@ export default function MultiDatabaseResults({
 
       {/* Individual database results */}
       <div className="space-y-3">
-        {results.map((result) => (
+        {results.map((result) => {
+          const status = getResultStatus(result);
+          const borderClass = {
+            success: 'border-gray-200',
+            cannot_answer: 'border-amber-300 bg-amber-50/50',
+            error: 'border-red-300 bg-red-50',
+          }[status];
+          const dotClass = {
+            success: 'bg-green-500',
+            cannot_answer: 'bg-amber-500',
+            error: 'bg-red-500',
+          }[status];
+
+          return (
           <div
             key={result.connection_id}
-            className={`border rounded-lg overflow-hidden ${
-              result.success ? 'border-gray-200' : 'border-red-300 bg-red-50'
-            }`}
+            className={`border rounded-lg overflow-hidden ${borderClass}`}
           >
             {/* Database header */}
             <button
@@ -202,19 +235,25 @@ export default function MultiDatabaseResults({
               className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center space-x-3">
-                <div
-                  className={`w-3 h-3 rounded-full ${
-                    result.success ? 'bg-green-500' : 'bg-red-500'
-                  }`}
-                />
+                <div className={`w-3 h-3 rounded-full ${dotClass}`} />
                 <div className="text-left">
-                  <h4 className="font-semibold text-gray-900">{result.connection_name}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold text-gray-900">{result.connection_name}</h4>
+                    {status === 'cannot_answer' && (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                        Cannot Answer
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-600">
                     {result.database_type}
                     {result.success && (
                       <>
                         {' '}• {result.row_count} row{result.row_count !== 1 ? 's' : ''} • {result.execution_time_ms?.toFixed(1)}ms
                       </>
+                    )}
+                    {status === 'cannot_answer' && (
+                      <span className="text-amber-600"> • Missing required data</span>
                     )}
                   </p>
                 </div>
@@ -466,16 +505,37 @@ export default function MultiDatabaseResults({
                   ) : (
                     <p className="text-sm text-gray-500 italic">No results returned</p>
                   )
+                ) : status === 'cannot_answer' ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <h5 className="text-sm font-semibold text-amber-800 mb-1">Cannot Answer This Query</h5>
+                        <p className="text-sm text-amber-700">
+                          {result.error?.replace('Cannot execute query on this database: ', '') || 'This database does not have the required data to answer this query.'}
+                        </p>
+                        <p className="text-xs text-amber-600 mt-2">
+                          This is expected when databases have different schemas. The query will only run on databases that have the required tables and columns.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="bg-red-50 border border-red-200 rounded p-3">
-                    <h5 className="text-xs font-semibold text-red-700 mb-1">Error</h5>
-                    <p className="text-sm text-red-600">{result.error}</p>
+                    <div className="flex items-start gap-2">
+                      <XCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <h5 className="text-xs font-semibold text-red-700 mb-1">Error</h5>
+                        <p className="text-sm text-red-600">{result.error}</p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Expand/Collapse all button */}

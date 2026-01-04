@@ -275,6 +275,14 @@ class MultiDatabaseHandler:
                 "tables": tables_dict,
             }
 
+            # Debug: Log tables and any location-related columns found
+            for tbl_name, tbl_info in tables_dict.items():
+                cols = tbl_info.get("columns", [])
+                col_names = [c.get("name", c) if isinstance(c, dict) else c for c in cols]
+                loc_cols = [c for c in col_names if any(sub in c.lower() for sub in ['state', 'city', 'region'])]
+                if loc_cols:
+                    logger.info(f"Validator schema - DB {conn_id} table '{tbl_name}' has location columns: {loc_cols}")
+
         # If no base SQL provided, use question-based validation
         # The validator will analyze the question to detect location references,
         # table mentions, etc. and check if the schema can support them

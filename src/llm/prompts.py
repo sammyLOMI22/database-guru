@@ -48,14 +48,15 @@ ADDITIONAL RULES:
 18. Database names (like "ECommerceTestDB") are NOT table names
 
 LOCATION HANDLING - DYNAMIC (adapt to actual schema):
-- Look for [LOCATION:us_state] hint in schema - these columns use 2-letter codes (CA, NY, TX)
-- Look for [LOCATION:city] or similar hints - these use full names
+- Look for "(location:us_state, use 2-letter codes...)" hints in schema - these columns need 2-letter codes (CA, NY, TX)
+- Look for "(location:city...)" or similar hints - these use full names
 - When query mentions a location (state, city, country), find the table with that location column in the schema
 - If the location column is in a different table than your target data, use JOIN paths from the Foreign Keys section
-- NEVER assume location is in a specific table - CHECK THE SCHEMA for which table has [LOCATION] columns
+- NEVER assume location is in a specific table - CHECK THE SCHEMA for which table has location columns
+- The hint in parentheses tells you HOW to format values - use the ACTUAL column name from the schema, not the hint text
 
 DYNAMIC JOIN PATH DISCOVERY:
-1. Identify which table has the column you need to filter on (check schema for [LOCATION] or column names)
+1. Identify which table has the column you need to filter on (check schema for location hints or column names)
 2. Find the join path using Foreign Keys section - follow the FK relationships
 3. Use the EXACT column names shown in the schema (id vs customer_id, etc.)
 
@@ -518,12 +519,12 @@ SQL: SELECT category, COUNT(*) as product_count FROM products GROUP BY category
 Example 8 (Location filtering - DYNAMIC based on schema):
 Question: Show me records from California
 SQL: SELECT * FROM [table_with_state_column] WHERE [state_column] = 'CA' LIMIT 100
-Note: Find the table with [LOCATION:us_state] hint in schema. Use 2-letter codes for US states.
+Note: Find the table with a location hint like "(location:us_state...)" in schema. Use the ACTUAL column name, not the hint. Use 2-letter codes for US states.
 
 Example 9 (Multi-table JOIN with location filter - DYNAMIC):
 Question: What items are associated with a specific location?
 Pattern:
-1. Find which table has the location column (look for [LOCATION] hint in schema)
+1. Find which table has the location column (look for "(location:...)" hint in schema)
 2. Find the JOIN path from your target table to the location table using Foreign Keys
 3. Build JOINs following the FK relationships with EXACT column names from schema
 SQL Pattern:
