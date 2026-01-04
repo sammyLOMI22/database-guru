@@ -551,3 +551,77 @@ export interface ValidateMultiDBResponse {
   primary_sql: string | null;
   warnings: string[];
 }
+
+// Schema Exploration Types (Phase 2.5)
+export interface SchemaColumnInfo {
+  name: string;
+  type: string;
+  nullable: boolean;
+  primary_key: boolean;
+  foreign_key: string | null;
+  sample_values: unknown[];
+  semantic_type: string | null;
+}
+
+export interface SchemaTableInfo {
+  name: string;
+  columns: SchemaColumnInfo[];
+  row_count: number | null;
+  primary_keys: string[];
+  foreign_keys: Array<{
+    column: string;
+    referred_table: string;
+    referred_column: string;
+  }>;
+  indexes: Array<{
+    name: string;
+    columns: string[];
+    unique: boolean;
+  }>;
+}
+
+export interface SchemaExploreResponse {
+  connection_id: number;
+  connection_name: string;
+  database_type: string;
+  tables: SchemaTableInfo[];
+  table_count: number;
+  total_columns: number;
+  last_updated: string | null;
+  cached: boolean;
+}
+
+export interface SchemaCompareRequest {
+  connection_ids: number[];
+  tables?: string[];
+}
+
+export interface ColumnComparison {
+  column_name: string;
+  databases: Record<string, string | null>;
+}
+
+export interface TableComparison {
+  table_name: string;
+  present_in: string[];
+  missing_from: string[];
+  columns: ColumnComparison[];
+}
+
+export interface SchemaCompareResponse {
+  connections: Array<{
+    id: number;
+    name: string;
+    type: string;
+    error?: string;
+  }>;
+  tables: TableComparison[];
+  common_tables: string[];
+  unique_tables: Record<string, string[]>;
+  query_compatibility: Array<{
+    query_type: string;
+    works_on: string[];
+    missing_from: string[];
+    suggestion: string;
+  }>;
+}

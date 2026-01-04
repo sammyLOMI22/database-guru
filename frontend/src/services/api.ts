@@ -170,6 +170,12 @@ export const queryAPI = {
   },
 };
 
+import type {
+  SchemaExploreResponse,
+  SchemaCompareRequest,
+  SchemaCompareResponse,
+} from '../types/api';
+
 export const schemaAPI = {
   // Get database schema
   async getSchema(refresh = false): Promise<SchemaResponse> {
@@ -194,6 +200,21 @@ export const schemaAPI = {
   // Refresh schema cache
   async refreshSchema(): Promise<SchemaResponse> {
     const { data } = await api.post<SchemaResponse>('/api/schema/refresh');
+    return data;
+  },
+
+  // Get detailed schema for a specific connection (Phase 2.5)
+  async exploreSchema(connectionId: number, refresh: boolean = false): Promise<SchemaExploreResponse> {
+    const { data } = await api.get<SchemaExploreResponse>(
+      `/api/schema/explore/${connectionId}`,
+      { params: { refresh } }
+    );
+    return data;
+  },
+
+  // Compare schemas across multiple connections (Phase 2.5)
+  async compareSchemas(request: SchemaCompareRequest): Promise<SchemaCompareResponse> {
+    const { data } = await api.post<SchemaCompareResponse>('/api/schema/compare', request);
     return data;
   },
 };
