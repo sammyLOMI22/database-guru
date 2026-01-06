@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import Message from './Message';
 import QueryInput from './QueryInput';
+import SchemaGlance from './SchemaGlance';
 import { useQuerySubmit } from '../hooks/useQuerySubmit';
 import { useModels } from '../hooks/useModels';
+import { connectionsAPI } from '../services/api';
 import { parseChartIntent, getChartIntentHint } from '../utils/chartIntentParser';
-import type { QueryResponse } from '../types/api';
+import type { QueryResponse, DatabaseConnection } from '../types/api';
 
 interface ChatMessage {
   id: string;
@@ -30,6 +32,7 @@ export default function ChatInterface() {
   ]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [perTaskModels, setPerTaskModels] = useState<PerTaskModelSettings | null>(null);
+  const [activeConnection, setActiveConnection] = useState<DatabaseConnection | null>(null);
   const [enableNarratives, setEnableNarratives] = useState<boolean>(() => {
     // Load from localStorage, default to true
     const stored = localStorage.getItem('enableNarratives');
@@ -46,6 +49,20 @@ export default function ChatInterface() {
       setSelectedModel(modelsData.default_model);
     }
   }, [modelsData, selectedModel]);
+
+  // Fetch active connection on mount
+  useEffect(() => {
+    const fetchActiveConnection = async () => {
+      try {
+        const data = await connectionsAPI.listConnections();
+        const active = data.connections.find((c: DatabaseConnection) => c.is_active);
+        setActiveConnection(active || null);
+      } catch (error) {
+        console.error('Failed to fetch connections:', error);
+      }
+    };
+    fetchActiveConnection();
+  }, []);
 
   // Fetch per-task model settings on mount
   useEffect(() => {
@@ -168,6 +185,16 @@ export default function ChatInterface() {
           {messages.length - 1} {messages.length === 2 ? 'query' : 'queries'}
         </div>
       </div>
+
+      {/* Schema at a Glance for active connection */}
+      {activeConnection && (
+        <div className="px-6 py-2 bg-gray-50 border-b border-gray-200">
+          <SchemaGlance
+            connectionIds={[activeConnection.id]}
+            connectionNames={{ [activeConnection.id]: activeConnection.name }}
+          />
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">

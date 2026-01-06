@@ -302,24 +302,39 @@ class SchemaInspector:
                         "max_length": None,  # Not available in SQLite
                     })
             else:
-                # PostgreSQL/MySQL query
-                query = """
-                    SELECT
-                        column_name,
-                        data_type,
-                        is_nullable,
-                        column_default,
-                        character_maximum_length
-                    FROM information_schema.columns
-                    WHERE table_name = :table_name
-                    AND table_schema = COALESCE(:schema_name, 'public')
-                    ORDER BY ordinal_position
-                """
+                # PostgreSQL/MySQL/DuckDB - use information_schema
+                # If schema_name provided, filter by it; otherwise, exclude system schemas
+                if schema_name:
+                    query = """
+                        SELECT
+                            column_name,
+                            data_type,
+                            is_nullable,
+                            column_default,
+                            character_maximum_length
+                        FROM information_schema.columns
+                        WHERE table_name = :table_name
+                        AND table_schema = :schema_name
+                        ORDER BY ordinal_position
+                    """
+                    params = {"table_name": table_name, "schema_name": schema_name}
+                else:
+                    # No schema specified - exclude system schemas dynamically
+                    query = """
+                        SELECT
+                            column_name,
+                            data_type,
+                            is_nullable,
+                            column_default,
+                            character_maximum_length
+                        FROM information_schema.columns
+                        WHERE table_name = :table_name
+                        AND table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
+                        ORDER BY ordinal_position
+                    """
+                    params = {"table_name": table_name}
 
-                result = await self._execute_query(session, text(query), {
-                        "table_name": table_name,
-                        "schema_name": schema_name or "public"
-                    })
+                result = await self._execute_query(session, text(query), params)
 
                 columns = []
                 for row in result.all():
