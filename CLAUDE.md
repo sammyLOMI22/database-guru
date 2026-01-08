@@ -223,6 +223,21 @@ The system uses a multi-agent architecture with specialized agents that work tog
     - **Enhanced Context**: Builds LLM hints with matched entities and format guidance
     - Key method: `preprocess()` - returns `PreprocessedQuery` with normalized question and metadata
 
+16. **Multi-Database Query Validator** (`src/llm/multi_db_query_validator.py`) **NEW - January 7, 2026**
+    - Pre-flight validation for multi-database queries before execution
+    - Assesses each database's capability to answer a query: FULL / PARTIAL / CANNOT
+    - **SQL Parsing**: Uses `sqlparse` library for production-grade parsing
+      - Handles schema-qualified names (`public.orders` → `orders`)
+      - Extracts tables from JOINs, comma-separated FROM, aliases
+      - Layered fallback: sqlparse → regex for robustness
+    - **Location Detection**: Detects location-based queries, validates location columns across ALL tables
+    - **Fuzzy Matching**: Finds alternative columns for missing ones (`state` → `region`, `province`)
+    - **Suggested SQL**: Generates modified SQL for PARTIAL capability databases
+    - **UI Integration**: Works with `SchemaGlance`, `MultiDatabaseAssessment`, `QueryFeasibilityBadge` components
+    - Key classes: `QueryCapability`, `DatabaseQueryAssessment`, `MultiDatabaseValidationResult`
+    - Key methods: `validate_query()`, `assess_database()`, `_extract_requirements()`
+    - Test coverage: 27 tests in `tests/test_multi_db_query_validator.py`
+
 ### Tool System (`src/tools/`)
 
 The tool system provides 10 specialized tools across 4 categories for schema exploration and query validation:
@@ -572,6 +587,16 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `src/core/multi_db_handler.py` - Passes row_limit through multi-database execution
   - `frontend/tests/QueryResults.test.tsx` - 10 pagination tests
   - `frontend/tests/MultiDatabaseResults.test.tsx` - 16 pagination tests
+- **Multi-Database Query Validation (NEW - Jan 7, 2026)**:
+  - `src/llm/multi_db_query_validator.py` - Pre-flight validation with sqlparse (1061 lines)
+  - `src/llm/multi_db_query_validator.py:289` - `_extract_requirements()` - SQL parsing with layered fallback
+  - `src/llm/multi_db_query_validator.py:650` - `_extract_requirements_from_question()` - NL question analysis
+  - `src/llm/multi_db_query_validator.py:767` - Location requirement validation
+  - `src/api/endpoints/multi_db_query.py:662` - Pre-validation integration in API
+  - `frontend/src/components/SchemaGlance.tsx` - Database schema overview (382 lines)
+  - `frontend/src/components/MultiDatabaseAssessment.tsx` - Capability selection UI (264 lines)
+  - `frontend/src/components/QueryFeasibilityBadge.tsx` - Status badges (194 lines)
+  - `tests/test_multi_db_query_validator.py` - 27 comprehensive tests
 - **Tool-Using Agent (NEW)**: `src/llm/tool_using_agent.py` - Schema exploration and context building for SQL generation
 - **Tool Registry (NEW)**: `src/tools/tool_registry.py` - Central registry with caching (follows ColumnMapper pattern)
 - **Schema Tools (NEW)**: `src/tools/schema_tools.py` - 4 tools for schema exploration (search_schema, get_table_info, find_columns, get_relationships)
@@ -688,3 +713,6 @@ Key docs in `docs/`:
 - `DATA_NARRATIVES_GUIDE.md` - **Intelligent Data Narratives & Human Insights (NEW - Dec 13, 2025)** - Complete feature guide with usage, architecture, performance, configuration, and troubleshooting
 - `MULTI_DB_NARRATIVES.md` - **Multi-Database Narratives (NEW - Dec 13, 2025)** - Per-database + combined analysis for multi-database queries
 - `ADVANCED_VISUALIZATION_PHASE2_PLAN.md` - **Advanced Visualization Phase 2 (Dec 20-26, 2025)** - Chart Intelligence (Phase 8) + Advanced Charts (Phase 10) with 10 chart types, 132 tests
+- `SQL_GENERATION_PIPELINE.md` - **SQL Generation Pipeline (UPDATED - Jan 7, 2026)** - Complete pipeline documentation with Phase 2.4 multi-database validation
+- `MULTI_DB_VALIDATION_GUIDE.md` - **Multi-Database Validation Guide (NEW - Jan 7, 2026)** - Pre-flight validation architecture, troubleshooting, and API reference
+- `SMALL_MODEL_OPTIMIZATION_PHASE_2_PR_REVIEW.md` - **Phase 2 PR Review (UPDATED - Jan 7, 2026)** - Code review with all issues resolved (sqlparse fix)
