@@ -363,7 +363,7 @@ class QueryPreprocessor:
         """
         from src.core.location_mapper import LocationMapper
 
-        if location_type == "us_state":
+        if location_type in ("us_state", "state"):  # Handle both formats from LocationMapper
             # Check if it's already in the target format
             location_upper = location.upper().strip()
             location_lower = location.lower().strip()
