@@ -26,6 +26,11 @@ from src.core.executor import SQLExecutor
 from src.llm.self_correcting_agent import AgentTrace
 from src.llm.result_narrator import ResultNarrator
 from src.llm.ollama_client import OllamaClient
+from src.llm.multi_db_query_validator import (
+    QueryCapability,
+    DatabaseQueryAssessment,
+    MultiDatabaseValidationResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +102,132 @@ class MultiDatabaseQueryResponse(BaseModel):
     combined_analysis: Optional[Dict[str, Any]] = None  # Narrative across all databases
     # Chart Intent (Phase 8: Chart Intelligence)
     preferred_chart_type: Optional[str] = None  # User-requested chart type passed through from request
+
+
+# ============================================================================
+# Phase 2.4: Pre-Flight Validation Models and Endpoint
+# ============================================================================
+
+class ValidateMultiDBRequest(BaseModel):
+    """Request model for pre-flight query validation."""
+    question: str = Field(..., min_length=1)
+    connection_ids: List[int]
+    base_sql: Optional[str] = None  # Optional pre-generated SQL to validate
+
+
+class DatabaseAssessmentResponse(BaseModel):
+    """Single database assessment in response."""
+    connection_id: int
+    connection_name: str
+    database_type: str
+    capability: str  # "full", "partial", "cannot"
+    missing_tables: List[str]
+    missing_columns: Dict[str, List[str]]
+    available_alternatives: Dict[str, str]
+    suggested_sql: Optional[str]
+    reason: str
+    confidence: float
+
+
+class ValidateMultiDBResponse(BaseModel):
+    """Response model for pre-flight validation."""
+    assessments: List[DatabaseAssessmentResponse]
+    can_execute_any: bool
+    all_full: bool
+    primary_sql: Optional[str]
+    warnings: List[str]
+    summary: Dict[str, int]  # {full: N, partial: N, cannot: N}
+
+
+@router.post("/validate", response_model=ValidateMultiDBResponse)
+async def validate_multi_database_query(
+    request: ValidateMultiDBRequest,
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    """
+    Pre-flight validation for multi-database queries.
+
+    Returns capability assessment for each database:
+    - FULL: Can answer completely with original SQL
+    - PARTIAL: Can answer with modified SQL (alternatives found)
+    - CANNOT: Cannot answer (missing required data)
+
+    Use this endpoint to check query feasibility before execution,
+    allowing the UI to show users which databases can answer their question.
+    """
+    try:
+        # Check if validation is enabled
+        from src.api.endpoints.settings import get_or_create_settings
+        system_settings = await get_or_create_settings(db)
+
+        if not system_settings.enable_multi_db_validation:
+            # Return all-full response when validation disabled
+            return ValidateMultiDBResponse(
+                assessments=[],
+                can_execute_any=True,
+                all_full=True,
+                primary_sql=request.base_sql,
+                warnings=["Multi-database validation is disabled"],
+                summary={"full": len(request.connection_ids), "partial": 0, "cannot": 0},
+            )
+
+        # Fetch connections
+        result = await db.execute(
+            select(DatabaseConnection).where(
+                DatabaseConnection.id.in_(request.connection_ids)
+            )
+        )
+        connections = list(result.scalars().all())
+
+        if not connections:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No valid connections found for the provided IDs",
+            )
+
+        # Initialize handler and run validation
+        multi_db_handler = MultiDatabaseHandler()
+        validation_result = await multi_db_handler.validate_multi_database_query(
+            question=request.question,
+            connections=connections,
+            base_sql=request.base_sql,
+        )
+
+        # Convert to response format
+        assessments = [
+            DatabaseAssessmentResponse(
+                connection_id=a.connection_id,
+                connection_name=a.connection_name,
+                database_type=a.database_type,
+                capability=a.capability.value,
+                missing_tables=a.missing_tables,
+                missing_columns=a.missing_columns,
+                available_alternatives=a.available_alternatives,
+                suggested_sql=a.suggested_sql,
+                reason=a.reason,
+                confidence=a.confidence,
+            )
+            for a in validation_result.assessments.values()
+        ]
+
+        return ValidateMultiDBResponse(
+            assessments=assessments,
+            can_execute_any=validation_result.can_execute_any,
+            all_full=validation_result.all_full,
+            primary_sql=validation_result.primary_sql,
+            warnings=validation_result.warnings,
+            summary=validation_result.get_summary(),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during multi-database validation: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Validation failed: {str(e)}",
+        )
 
 
 @router.post("/", response_model=MultiDatabaseQueryResponse)
@@ -311,6 +442,58 @@ async def process_multi_database_query(
 
         logger.info(f"Multi-database query will generate SQL per-database to avoid schema mismatches")
 
+        # ========== PRE-FLIGHT VALIDATION (Phase 2.4) ==========
+        # Check if multi-db validation is enabled and run it
+        from src.api.endpoints.settings import get_or_create_settings
+        system_settings = await get_or_create_settings(db)
+
+        validation_result = None
+        cannot_execute_connections = set()  # Track which databases cannot execute
+        per_db_hints = {}  # connection_id -> hint string for alternatives
+
+        if system_settings.enable_multi_db_validation:
+            try:
+                validation_result = await multi_db_handler.validate_multi_database_query(
+                    question=request.question,
+                    connections=connections,
+                    combined_schema=combined_schema_data,
+                )
+
+                # Process validation results
+                for conn_id, assessment in validation_result.assessments.items():
+                    if assessment.capability == QueryCapability.CANNOT:
+                        cannot_execute_connections.add(conn_id)
+                        logger.warning(
+                            f"Database {assessment.connection_name} (ID: {conn_id}) CANNOT execute query: "
+                            f"{assessment.reason}"
+                        )
+                    elif assessment.capability == QueryCapability.PARTIAL:
+                        # Build hint for the SQL generator about alternatives
+                        alt_hints = []
+                        for missing, alternative in assessment.available_alternatives.items():
+                            col_name = missing.split('.')[-1] if '.' in missing else missing
+                            alt_hints.append(f"use '{alternative}' instead of '{col_name}'")
+                        if alt_hints:
+                            per_db_hints[conn_id] = f"[SCHEMA HINT: In this database, {', '.join(alt_hints)}]"
+                            logger.info(
+                                f"Database {assessment.connection_name} (ID: {conn_id}) has PARTIAL capability: "
+                                f"{', '.join(alt_hints)}"
+                            )
+
+                # Add warnings from validation
+                if not validation_result.can_execute_any:
+                    warnings.append("No databases can fully execute this query")
+                elif not validation_result.all_full:
+                    warnings.append(
+                        f"Query capability varies: {len([a for a in validation_result.assessments.values() if a.capability == QueryCapability.FULL])} full, "
+                        f"{len([a for a in validation_result.assessments.values() if a.capability == QueryCapability.PARTIAL])} partial, "
+                        f"{len(cannot_execute_connections)} cannot"
+                    )
+
+            except Exception as e:
+                logger.warning(f"Pre-flight validation failed, proceeding without validation: {e}")
+                warnings.append(f"Pre-flight validation skipped: {str(e)}")
+
         # Map database names to connections
         queries_with_connections = multi_db_handler.map_database_names_to_connections(
             queries, connections
@@ -363,6 +546,36 @@ async def process_multi_database_query(
                 task_metadata.append({"has_error": True})
                 continue
 
+            # Phase 2.4: Skip databases that CANNOT execute this query
+            if conn_id in cannot_execute_connections:
+                assessment = validation_result.assessments.get(conn_id) if validation_result else None
+                reason = assessment.reason if assessment else "Schema validation failed"
+                missing_tables = assessment.missing_tables if assessment else []
+                missing_cols = assessment.missing_columns if assessment else {}
+
+                async def cannot_execute_task(
+                    conn=connection, r=reason, mt=missing_tables, mc=missing_cols
+                ):
+                    return {
+                        "success": False,
+                        "error": f"Cannot execute query on this database: {r}",
+                        "connection_id": conn.id,
+                        "connection_name": conn.name,
+                        "database_type": conn.database_type,
+                        "sql": "",
+                        "capability": "cannot",
+                        "missing_tables": mt,
+                        "missing_columns": mc,
+                    }
+
+                parallel_tasks.append(cannot_execute_task())
+                task_metadata.append({
+                    "has_error": True,
+                    "connection": connection,
+                    "validation_skipped": True,
+                })
+                continue
+
             # Check if we have a semantic cache hit for this database
             cached_hit = semantic_cache_hits.get(conn_id)
             if cached_hit:
@@ -387,11 +600,18 @@ async def process_multi_database_query(
                     "cache_similarity": cached_hit.similarity,
                 })
             else:
+                # Phase 2.4: Modify question with hints for PARTIAL capability databases
+                question_for_db = request.question
+                if conn_id in per_db_hints:
+                    # Append schema hints to help the SQL generator use correct column names
+                    question_for_db = f"{request.question} {per_db_hints[conn_id]}"
+                    logger.info(f"Using modified question for {connection.name}: {question_for_db[:100]}...")
+
                 # Create parallel task for this database (fresh execution)
                 parallel_tasks.append(
                     multi_db_handler._execute_single_query_task(
                         connection=connection,
-                        question=request.question,
+                        question=question_for_db,  # Use modified question with hints
                         sql=sql,
                         schema=combined_schema_text,  # Will be refined in helper
                         sql_generator=sql_generator,
@@ -401,7 +621,12 @@ async def process_multi_database_query(
                         row_limit=request.row_limit,
                     )
                 )
-                task_metadata.append({"has_error": False, "connection": connection, "from_cache": False})
+                task_metadata.append({
+                    "has_error": False,
+                    "connection": connection,
+                    "from_cache": False,
+                    "has_schema_hints": conn_id in per_db_hints,
+                })
 
         # Execute all queries in parallel!
         logger.info(f"⚡ Executing {len(parallel_tasks)} database queries IN PARALLEL...")

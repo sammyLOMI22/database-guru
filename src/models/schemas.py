@@ -475,6 +475,10 @@ class SystemSettingsResponse(BaseModel):
     enable_query_templates: bool = True  # Bypass LLM for simple patterns
     enable_location_preprocessing: bool = True  # Normalize locations before LLM
 
+    # Multi-Database Query Intelligence (Phase 2.4)
+    enable_multi_db_validation: bool = True  # Pre-flight schema validation
+    multi_db_validation_threshold: float = 0.6  # Fuzzy match threshold for alternatives
+
     created_at: datetime
     updated_at: datetime
 
@@ -513,3 +517,7 @@ class SystemSettingsUpdateRequest(BaseModel):
     # Small Model Optimization Feature Flags
     enable_query_templates: Optional[bool] = None  # Bypass LLM for simple patterns
     enable_location_preprocessing: Optional[bool] = None  # Normalize locations before LLM
+
+    # Multi-Database Query Intelligence (Phase 2.4)
+    enable_multi_db_validation: Optional[bool] = None  # Pre-flight schema validation
+    multi_db_validation_threshold: Optional[float] = Field(None, ge=0.0, le=1.0)  # Fuzzy match threshold

@@ -282,6 +282,10 @@ class SystemSettings(Base):
     enable_query_templates = Column(Boolean, default=True, nullable=False)  # Bypass LLM for simple patterns
     enable_location_preprocessing = Column(Boolean, default=True, nullable=False)  # Normalize locations before LLM
 
+    # Multi-Database Query Intelligence (Phase 2.4)
+    enable_multi_db_validation = Column(Boolean, default=True, nullable=False)  # Pre-flight schema validation
+    multi_db_validation_threshold = Column(Float, default=0.6, nullable=False)  # Fuzzy match threshold for alternatives
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

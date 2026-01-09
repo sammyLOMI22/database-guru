@@ -170,6 +170,12 @@ export const queryAPI = {
   },
 };
 
+import type {
+  SchemaExploreResponse,
+  SchemaCompareRequest,
+  SchemaCompareResponse,
+} from '../types/api';
+
 export const schemaAPI = {
   // Get database schema
   async getSchema(refresh = false): Promise<SchemaResponse> {
@@ -194,6 +200,21 @@ export const schemaAPI = {
   // Refresh schema cache
   async refreshSchema(): Promise<SchemaResponse> {
     const { data } = await api.post<SchemaResponse>('/api/schema/refresh');
+    return data;
+  },
+
+  // Get detailed schema for a specific connection (Phase 2.5)
+  async exploreSchema(connectionId: number, refresh: boolean = false): Promise<SchemaExploreResponse> {
+    const { data } = await api.get<SchemaExploreResponse>(
+      `/api/schema/explore/${connectionId}`,
+      { params: { refresh } }
+    );
+    return data;
+  },
+
+  // Compare schemas across multiple connections (Phase 2.5)
+  async compareSchemas(request: SchemaCompareRequest): Promise<SchemaCompareResponse> {
+    const { data } = await api.post<SchemaCompareResponse>('/api/schema/compare', request);
     return data;
   },
 };
@@ -248,6 +269,8 @@ import type {
   UpdateChatSessionRequest,
   MultiDatabaseQueryRequest,
   MultiDatabaseQueryResponse,
+  ValidateMultiDBRequest,
+  ValidateMultiDBResponse,
 } from '../types/api';
 
 export const connectionsAPI = {
@@ -340,6 +363,12 @@ export const multiQueryAPI = {
   // Process multi-database query
   async processQuery(request: MultiDatabaseQueryRequest): Promise<MultiDatabaseQueryResponse> {
     const { data } = await api.post<MultiDatabaseQueryResponse>('/api/multi-query/', request);
+    return data;
+  },
+
+  // Pre-flight validation for multi-database queries (Phase 2.4)
+  async validateQuery(request: ValidateMultiDBRequest): Promise<ValidateMultiDBResponse> {
+    const { data } = await api.post<ValidateMultiDBResponse>('/api/multi-query/validate', request);
     return data;
   },
 };

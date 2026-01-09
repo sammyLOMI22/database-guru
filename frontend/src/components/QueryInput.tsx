@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect, KeyboardEvent } from 'react';
-import { Send, ChevronDown } from 'lucide-react';
+import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
+import { Send, ChevronDown, CheckCircle, AlertCircle, XCircle, Loader2 } from 'lucide-react';
+import { multiQueryAPI } from '../services/api';
+import type { ValidateMultiDBResponse } from '../types/api';
 
 interface PerTaskModels {
   sql: string | null;
@@ -13,6 +15,7 @@ interface QueryInputProps {
   isLoading: boolean;
   selectedModel?: string;
   perTaskModels?: PerTaskModels | null;  // All per-task models from Settings
+  connectionIds?: number[];  // For pre-flight validation
 }
 
 const ROW_LIMIT_OPTIONS = [
@@ -27,12 +30,15 @@ const ROW_LIMIT_OPTIONS = [
   { value: 10000, label: '10,000 rows' },
 ];
 
-export default function QueryInput({ onSubmit, isLoading, selectedModel, perTaskModels }: QueryInputProps) {
+export default function QueryInput({ onSubmit, isLoading, selectedModel, perTaskModels, connectionIds }: QueryInputProps) {
   const [question, setQuestion] = useState('');
   const [rowLimit, setRowLimit] = useState(100);
   const [showLimitDropdown, setShowLimitDropdown] = useState(false);
+  const [validation, setValidation] = useState<ValidateMultiDBResponse | null>(null);
+  const [validating, setValidating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -53,6 +59,53 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Debounced pre-flight validation for multi-database queries
+  const validateQuery = useCallback(async (q: string, connIds: number[]) => {
+    if (!q.trim() || connIds.length < 2) {
+      setValidation(null);
+      return;
+    }
+
+    setValidating(true);
+    try {
+      const result = await multiQueryAPI.validateQuery({
+        question: q,
+        connection_ids: connIds,
+      });
+      setValidation(result);
+    } catch (error) {
+      console.error('Pre-flight validation error:', error);
+      setValidation(null);
+    } finally {
+      setValidating(false);
+    }
+  }, []);
+
+  // Trigger validation on question or connection change (debounced)
+  useEffect(() => {
+    // Clear any pending validation
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current);
+    }
+
+    // Only validate if we have connections and a question
+    if (!connectionIds || connectionIds.length < 2 || !question.trim()) {
+      setValidation(null);
+      return;
+    }
+
+    // Debounce validation by 500ms
+    validationTimeoutRef.current = setTimeout(() => {
+      validateQuery(question, connectionIds);
+    }, 500);
+
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
+  }, [question, connectionIds, validateQuery]);
+
   const handleSubmit = () => {
     if (question.trim() && !isLoading) {
       onSubmit(question.trim(), rowLimit);
@@ -69,9 +122,75 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
 
   const selectedOption = ROW_LIMIT_OPTIONS.find(o => o.value === rowLimit) || ROW_LIMIT_OPTIONS[3];
 
+  // Get validation status summary
+  const getValidationSummary = () => {
+    if (!validation) return null;
+
+    const full = validation.assessments.filter(a => a.capability === 'full').length;
+    const partial = validation.assessments.filter(a => a.capability === 'partial').length;
+    const cannot = validation.assessments.filter(a => a.capability === 'cannot').length;
+    const total = validation.assessments.length;
+
+    return { full, partial, cannot, total };
+  };
+
+  const summary = getValidationSummary();
+
   return (
     <div className="border-t border-gray-200 bg-white p-4">
       <div className="max-w-4xl mx-auto">
+        {/* Pre-flight validation indicator */}
+        {connectionIds && connectionIds.length >= 2 && (
+          <div className="mb-3">
+            {validating ? (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Checking database compatibility...</span>
+              </div>
+            ) : validation && summary ? (
+              <div className="flex items-center gap-3 text-sm">
+                {/* Full support */}
+                {summary.full > 0 && (
+                  <div className="flex items-center gap-1 text-green-600">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>{summary.full} can answer</span>
+                  </div>
+                )}
+                {/* Partial support */}
+                {summary.partial > 0 && (
+                  <div className="flex items-center gap-1 text-yellow-600">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{summary.partial} partial</span>
+                  </div>
+                )}
+                {/* Cannot answer */}
+                {summary.cannot > 0 && (
+                  <div className="flex items-center gap-1 text-red-600">
+                    <XCircle className="w-4 h-4" />
+                    <span>{summary.cannot} cannot answer</span>
+                  </div>
+                )}
+                {/* Warnings */}
+                {validation.warnings.length > 0 && (
+                  <div className="text-xs text-amber-600 ml-2" title={validation.warnings.join('\n')}>
+                    ⚠️ {validation.warnings.length} warning{validation.warnings.length !== 1 ? 's' : ''}
+                  </div>
+                )}
+                {/* Overall status message */}
+                {!validation.can_execute_any && (
+                  <div className="text-xs text-red-600 font-medium ml-2">
+                    Query cannot be executed on any selected database
+                  </div>
+                )}
+              </div>
+            ) : question.trim() ? (
+              <div className="text-xs text-gray-400">
+                Type more to check database compatibility...
+              </div>
+            ) : null}
+          </div>
+        )}
+
         <div className="flex items-end space-x-3">
           {/* Textarea */}
           <div className="flex-1 relative">

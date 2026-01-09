@@ -102,6 +102,152 @@ User Question
 │  2. Save to chat history (if session_id provided)                │
 │  3. Learn from corrections (if successful fix)                   │
 └─────────────────────────────────────────────────────────────────┘
+
+---
+
+## Multi-Database Query Pipeline (Phase 2.4 - January 2026)
+
+When querying multiple databases simultaneously, an additional pre-flight validation
+layer ensures queries are only sent to databases that can answer them.
+
+### Multi-Database Flow
+
+```
+User Question (Multi-DB Mode)
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              🔍 PRE-FLIGHT VALIDATION (NEW - Jan 2026)          │
+├─────────────────────────────────────────────────────────────────┤
+│  MultiDatabaseQueryValidator assesses each database:            │
+│  - Parses SQL using sqlparse (production-grade parser)          │
+│  - Extracts required tables, columns, and values                │
+│  - Validates against each database's schema                     │
+│  - Assigns capability: FULL / PARTIAL / CANNOT                  │
+│  - Finds alternatives for missing columns (fuzzy matching)      │
+└─────────────────────────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     USER ASSESSMENT UI                           │
+├─────────────────────────────────────────────────────────────────┤
+│  MultiDatabaseAssessment component shows:                        │
+│  - Which databases can answer (FULL capability)                  │
+│  - Which need modifications (PARTIAL capability)                 │
+│  - Which cannot answer (CANNOT capability + reason)              │
+│  - Users can select/deselect databases before execution          │
+└─────────────────────────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              🚀 PARALLEL EXECUTION (Selected DBs Only)          │
+├─────────────────────────────────────────────────────────────────┤
+│  - FULL databases: Execute original SQL                          │
+│  - PARTIAL databases: Execute suggested_sql with alternatives    │
+│  - CANNOT databases: Skip with informative error message         │
+│  - Per-database result narratives generated                      │
+│  - Combined analysis synthesizes insights across all databases   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Query Capability Assessment
+
+| Capability | Description | UI Treatment |
+|------------|-------------|--------------|
+| **FULL** | Database has all required tables/columns | ✅ Green badge, auto-selected |
+| **PARTIAL** | Missing columns but alternatives found | 🟡 Amber badge, auto-selected |
+| **CANNOT** | Missing required data, no alternatives | ❌ Red badge, disabled |
+
+### Pre-Flight Validation Details
+
+#### SQL Parsing with sqlparse
+The validator uses `sqlparse` (not regex) for production-grade SQL parsing:
+
+```python
+# From multi_db_query_validator.py
+import sqlparse
+from sqlparse.sql import IdentifierList, Identifier, Where, Parenthesis
+
+# Handles complex SQL patterns:
+# - Schema-qualified names: public.orders → orders
+# - Multiple tables: FROM orders, customers
+# - All JOIN types: INNER, LEFT, RIGHT, OUTER, CROSS
+# - Aliased tables: orders o, customers AS c
+```
+
+#### Location Detection
+Intelligent detection of location-based queries:
+
+```python
+# Detects when query needs location filtering
+# "orders from California" → needs state/region column
+
+# Checks ALL tables for location columns (enables JOINs)
+LOCATION_COLUMNS = [
+    "state", "state_code", "region", "province",
+    "ship_state", "shipping_state", "bill_state",
+    # ... comprehensive list
+]
+```
+
+#### Fuzzy Matching for Alternatives
+When a required column is missing, finds close matches:
+
+```python
+COMMON_ALTERNATIVES = {
+    "state": ["region", "province", "territory", "state_code"],
+    "price": ["cost", "amount", "unit_price", "total_price"],
+    "name": ["title", "label", "description", "full_name"],
+    # ... more mappings
+}
+
+# Also uses SequenceMatcher for fuzzy similarity
+# "state" → "us_state" (similarity > 0.6)
+```
+
+### Example Assessment
+
+**Query**: "Show orders from California"
+
+| Database | Schema | Capability | Reason |
+|----------|--------|------------|--------|
+| Sales DB | `orders.state` exists | FULL | Has state column |
+| Inventory DB | No state column, has `region` | PARTIAL | Using `region` as alternative |
+| Products DB | No location columns | CANNOT | No location data in schema |
+
+### API Response Structure
+
+```typescript
+interface MultiDatabaseValidationResult {
+  assessments: Record<number, DatabaseQueryAssessment>;
+  can_execute_any: boolean;
+  all_full: boolean;
+  primary_sql: string;
+  warnings: string[];
+}
+
+interface DatabaseQueryAssessment {
+  connection_id: number;
+  connection_name: string;
+  database_type: string;
+  capability: "full" | "partial" | "cannot";
+  missing_tables: string[];
+  missing_columns: Record<string, string[]>;
+  available_alternatives: Record<string, string>;
+  suggested_sql: string | null;
+  reason: string;
+  confidence: number;
+}
+```
+
+### Frontend Components
+
+| Component | Purpose |
+|-----------|---------|
+| `SchemaGlance.tsx` | Overview of all database schemas with location warnings |
+| `MultiDatabaseAssessment.tsx` | Per-database capability selection UI |
+| `QueryFeasibilityBadge.tsx` | Compact/expanded capability indicators |
+| `MultiDatabaseResults.tsx` | Results with "Cannot Answer" differentiation |
 ```
 
 ---
@@ -475,6 +621,10 @@ System: "This database doesn't have location data. Did you mean:
 | **Template Engine (NEW)** | `src/llm/query_templates.py` | `try_match()`, `TemplateMatch` |
 | **Query Preprocessor (NEW)** | `src/llm/query_preprocessor.py` | `preprocess()`, `PreprocessedQuery` |
 | **Model Config UI (NEW)** | `frontend/src/components/ModelConfigPanel.tsx` | Per-task model configuration |
+| **Multi-DB Validator (NEW)** | `src/llm/multi_db_query_validator.py` | `validate_query()`, `assess_database()` |
+| **Schema Glance UI (NEW)** | `frontend/src/components/SchemaGlance.tsx` | Database schema overview |
+| **Assessment UI (NEW)** | `frontend/src/components/MultiDatabaseAssessment.tsx` | Per-DB capability selection |
+| **Feasibility Badge (NEW)** | `frontend/src/components/QueryFeasibilityBadge.tsx` | Capability status badges |
 
 ---
 
@@ -489,10 +639,12 @@ The SQL generation pipeline has evolved to include:
 6. **Template matching (NEW - Jan 2026)** - Bypass LLM for simple query patterns
 7. **Query preprocessing (NEW - Jan 2026)** - Bidirectional location normalization
 8. **Per-task model routing (NEW - Jan 2026)** - Specialized models for different tasks
+9. **Multi-DB pre-flight validation (NEW - Jan 2026)** - Assess query feasibility per database before execution
 
 Future improvements focus on:
 - ~~Pre-generation intent classification~~ ✅ Implemented via TemplateEngine
 - ~~Schema-specific example generation~~ ✅ Partially implemented via templates
+- ~~Multi-database query intelligence~~ ✅ Implemented via MultiDatabaseQueryValidator
 - Semantic validation of generated SQL (planned)
 - Continuous learning from successful queries (existing via CorrectionLearner)
 - Integration tests for per-task model routing

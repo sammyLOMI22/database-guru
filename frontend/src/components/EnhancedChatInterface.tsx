@@ -4,9 +4,11 @@ import ChatSessionSelector from './ChatSessionSelector';
 import Sidebar from './Sidebar';
 import MultiDatabaseResults from './MultiDatabaseResults';
 import ConversationContextPanel from './ConversationContextPanel';
+import SchemaGlance from './SchemaGlance';
 import { useMultiQuery } from '../hooks/useMultiQuery';
 import { useModels } from '../hooks/useModels';
-import type { ChatSession, MultiDatabaseQueryResponse } from '../types/api';
+import { connectionsAPI } from '../services/api';
+import type { ChatSession, MultiDatabaseQueryResponse, DatabaseConnection } from '../types/api';
 
 interface ChatMessage {
   id: string;
@@ -38,6 +40,7 @@ export default function EnhancedChatInterface() {
   const [hasContext, setHasContext] = useState(false);
   const [forceSchemaRefresh, setForceSchemaRefresh] = useState(false);
   const [perTaskModels, setPerTaskModels] = useState<PerTaskModelSettings | null>(null);
+  const [activeConnection, setActiveConnection] = useState<DatabaseConnection | null>(null);
   const [enableNarratives, setEnableNarratives] = useState<boolean>(() => {
     // Load from localStorage, default to true
     const stored = localStorage.getItem('enableNarratives');
@@ -54,6 +57,21 @@ export default function EnhancedChatInterface() {
       setSelectedModel(modelsData.default_model);
     }
   }, [modelsData, selectedModel]);
+
+  // Fetch active connection for default mode (no session selected)
+  const fetchActiveConnection = async () => {
+    try {
+      const data = await connectionsAPI.listConnections();
+      const active = data.connections.find((c: DatabaseConnection) => c.is_active);
+      setActiveConnection(active || null);
+    } catch (error) {
+      console.error('Failed to fetch connections:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchActiveConnection();
+  }, []);
 
   // Fetch per-task model settings on mount
   useEffect(() => {
@@ -140,6 +158,7 @@ export default function EnhancedChatInterface() {
         <Sidebar
           onClose={() => setShowSidebar(false)}
           onSelectQuery={(question) => handleSubmit(question)}
+          onConnectionSelect={() => fetchActiveConnection()}
         />
       )}
 
@@ -277,6 +296,23 @@ export default function EnhancedChatInterface() {
             </div>
           )}
 
+          {/* Schema at a Glance - show for session connections OR active connection in default mode */}
+          {currentSession && currentSession.connections.length > 0 ? (
+            <div className="mt-2">
+              <SchemaGlance
+                connectionIds={currentSession.connections.map(c => c.id)}
+                connectionNames={Object.fromEntries(currentSession.connections.map(c => [c.id, c.name]))}
+              />
+            </div>
+          ) : !currentSession && activeConnection ? (
+            <div className="mt-2">
+              <SchemaGlance
+                connectionIds={[activeConnection.id]}
+                connectionNames={{ [activeConnection.id]: activeConnection.name }}
+              />
+            </div>
+          ) : null}
+
           {/* Context awareness indicator */}
           {hasContext && (
             <div className="mt-2 flex items-center justify-between text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded">
@@ -380,6 +416,7 @@ export default function EnhancedChatInterface() {
             planning: perTaskModels.model_query_planning,
             correction: perTaskModels.model_error_correction,
           } : null}
+          connectionIds={currentSession?.connections.map(c => c.id)}
         />
       </div>
     </div>

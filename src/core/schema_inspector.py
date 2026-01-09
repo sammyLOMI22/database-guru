@@ -302,24 +302,39 @@ class SchemaInspector:
                         "max_length": None,  # Not available in SQLite
                     })
             else:
-                # PostgreSQL/MySQL query
-                query = """
-                    SELECT
-                        column_name,
-                        data_type,
-                        is_nullable,
-                        column_default,
-                        character_maximum_length
-                    FROM information_schema.columns
-                    WHERE table_name = :table_name
-                    AND table_schema = COALESCE(:schema_name, 'public')
-                    ORDER BY ordinal_position
-                """
+                # PostgreSQL/MySQL/DuckDB - use information_schema
+                # If schema_name provided, filter by it; otherwise, exclude system schemas
+                if schema_name:
+                    query = """
+                        SELECT
+                            column_name,
+                            data_type,
+                            is_nullable,
+                            column_default,
+                            character_maximum_length
+                        FROM information_schema.columns
+                        WHERE table_name = :table_name
+                        AND table_schema = :schema_name
+                        ORDER BY ordinal_position
+                    """
+                    params = {"table_name": table_name, "schema_name": schema_name}
+                else:
+                    # No schema specified - exclude system schemas dynamically
+                    query = """
+                        SELECT
+                            column_name,
+                            data_type,
+                            is_nullable,
+                            column_default,
+                            character_maximum_length
+                        FROM information_schema.columns
+                        WHERE table_name = :table_name
+                        AND table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
+                        ORDER BY ordinal_position
+                    """
+                    params = {"table_name": table_name}
 
-                result = await self._execute_query(session, text(query), {
-                        "table_name": table_name,
-                        "schema_name": schema_name or "public"
-                    })
+                result = await self._execute_query(session, text(query), params)
 
                 columns = []
                 for row in result.all():
@@ -657,27 +672,29 @@ class SchemaInspector:
                     sem_type = col["semantic_type"]
                     if sem_type == "location":
                         # Provide location-specific guidance
+                        # NOTE: Use parentheses, not square brackets, to avoid LLM confusion
+                        # with SQL Server's [identifier] syntax
                         fmt = col.get("value_format", "unknown")
                         subtype = col.get("location_subtype", "")
                         if fmt == "code":
-                            semantic_hint = f" [LOCATION:{subtype} - use 2-letter codes like 'CA', 'NY']"
+                            semantic_hint = f" (location:{subtype}, use 2-letter codes like 'CA', 'NY')"
                         elif fmt == "full_name":
-                            semantic_hint = f" [LOCATION:{subtype} - use full names like 'California', 'New York']"
+                            semantic_hint = f" (location:{subtype}, use full names like 'California', 'New York')"
                         else:
-                            semantic_hint = f" [LOCATION:{subtype}]"
+                            semantic_hint = f" (location:{subtype})"
                     elif sem_type == "categorical":
                         # Phase 3: Show actual valid values for categorical columns
                         if sample_values:
                             valid_values = ", ".join(repr(s) for s in sample_values[:8])
-                            semantic_hint = f" [STATUS/ENUM - valid values: {valid_values}]"
+                            semantic_hint = f" (enum, valid values: {valid_values})"
                         else:
-                            semantic_hint = " [CATEGORICAL - use exact enum values]"
+                            semantic_hint = " (categorical, use exact enum values)"
                     elif sem_type == "temporal":
-                        semantic_hint = " [DATE/TIME - use appropriate date functions]"
+                        semantic_hint = " (date/time)"
                     elif sem_type == "boolean":
-                        semantic_hint = " [BOOLEAN - use 0/1 or TRUE/FALSE depending on DB]"
+                        semantic_hint = " (boolean, use 0/1 or TRUE/FALSE)"
                     elif sem_type == "identifier":
-                        semantic_hint = " [ID - primary/foreign key]"
+                        semantic_hint = " (primary/foreign key)"
 
                 # Add sample values if available (helps LLM understand format)
                 # Skip if already shown in semantic hint (for categorical)
