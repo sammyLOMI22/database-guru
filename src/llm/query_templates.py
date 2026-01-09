@@ -27,6 +27,13 @@ from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
+from src.llm.dialect_registry import (
+    DatabaseDialect,
+    DialectRules,
+    DIALECT_RULES,
+    get_dialect_for_database_type,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -146,21 +153,32 @@ class TemplateEngine:
         r"^(\w+)\s+(for\s+each|per)\s+(\w+)$",
     ]
 
-    def __init__(self, schema_dict: Dict[str, Any], default_limit: int = 100):
+    def __init__(
+        self,
+        schema_dict: Dict[str, Any],
+        default_limit: int = 100,
+        database_type: str = "sqlite"
+    ):
         """
         Initialize the template engine with schema information.
 
         Args:
             schema_dict: Parsed schema dictionary from SchemaInspector
             default_limit: Default row limit for list queries
+            database_type: Database type for dialect-specific SQL generation
+                          (postgresql, mysql, sqlite, duckdb)
         """
         self.default_limit = default_limit
+        self.database_type = database_type
+        self.dialect = get_dialect_for_database_type(database_type)
+        self.dialect_rules: Optional[DialectRules] = DIALECT_RULES.get(self.dialect)
         self.schema_info = self._parse_schema(schema_dict)
         self._table_aliases = self._build_table_aliases()
 
         logger.debug(
             f"TemplateEngine initialized: {len(self.schema_info.tables)} tables, "
-            f"{len(self.schema_info.location_columns)} location columns"
+            f"{len(self.schema_info.location_columns)} location columns, "
+            f"dialect={self.dialect.value}"
         )
 
     def _parse_schema(self, schema_dict: Dict[str, Any]) -> SchemaInfo:
@@ -249,6 +267,74 @@ class TemplateEngine:
                 aliases["emp"] = table_name
 
         return aliases
+
+    # =========================================================================
+    # Dialect-Aware SQL Formatting Methods
+    # =========================================================================
+
+    def _format_boolean(self, value: bool) -> str:
+        """
+        Format boolean value for the current dialect.
+
+        PostgreSQL/DuckDB: TRUE/FALSE
+        SQLite: 1/0
+        MySQL: TRUE/FALSE (also accepts 1/0)
+        """
+        if self.dialect_rules:
+            return self.dialect_rules.true_value if value else self.dialect_rules.false_value
+        # Default to SQLite-compatible (safest)
+        return "1" if value else "0"
+
+    def _format_case_insensitive_match(self, column: str, value: str) -> str:
+        """
+        Format case-insensitive string match for the current dialect.
+
+        PostgreSQL/DuckDB: column ILIKE '%value%'
+        SQLite/MySQL: LOWER(column) LIKE LOWER('%value%')
+        """
+        escaped_value = value.replace("'", "''")
+
+        if self.dialect_rules and "ILIKE" in self.dialect_rules.case_insensitive:
+            return f"{column} ILIKE '%{escaped_value}%'"
+        else:
+            return f"LOWER({column}) LIKE LOWER('%{escaped_value}%')"
+
+    def _format_date_filter(self, column: str, days: int) -> str:
+        """
+        Format date filter for "last N days" queries.
+
+        PostgreSQL/DuckDB: column > CURRENT_TIMESTAMP - INTERVAL 'N days'
+        SQLite: column > datetime('now', '-N days')
+        MySQL: column > DATE_SUB(NOW(), INTERVAL N DAY)
+        """
+        if self.dialect == DatabaseDialect.SQLITE:
+            return f"{column} > datetime('now', '-{days} days')"
+        elif self.dialect == DatabaseDialect.MYSQL:
+            return f"{column} > DATE_SUB(NOW(), INTERVAL {days} DAY)"
+        else:
+            # PostgreSQL, DuckDB
+            return f"{column} > CURRENT_TIMESTAMP - INTERVAL '{days} days'"
+
+    def _is_boolean_value(self, value: str) -> Optional[bool]:
+        """
+        Check if a value represents a boolean and return its boolean form.
+
+        Returns True, False, or None if not a boolean value.
+
+        Note: Only explicit boolean keywords are detected. Common status values
+        like "active"/"inactive" are NOT treated as booleans since they're often
+        used as literal string values in status columns.
+        """
+        # Only explicit boolean keywords - conservative to avoid false positives
+        true_values = {"true", "yes", "1", "on", "enabled"}
+        false_values = {"false", "no", "0", "off", "disabled"}
+
+        value_lower = value.lower().strip()
+        if value_lower in true_values:
+            return True
+        elif value_lower in false_values:
+            return False
+        return None
 
     def _find_table(self, text: str) -> Optional[str]:
         """Find a table name from text, handling aliases."""
@@ -576,7 +662,18 @@ class TemplateEngine:
                             # Clean up value
                             clean_value = value_text.strip().strip("'\"")
 
-                            sql = f"SELECT * FROM {table} WHERE {filter_col} = '{clean_value}' LIMIT {self.default_limit}"
+                            # Check if value is boolean and use dialect-specific format
+                            bool_value = self._is_boolean_value(clean_value)
+                            if bool_value is not None:
+                                formatted_value = self._format_boolean(bool_value)
+                                sql = f"SELECT * FROM {table} WHERE {filter_col} = {formatted_value} LIMIT {self.default_limit}"
+                                explanation = f"{table} where {filter_col} = {formatted_value}"
+                            else:
+                                # Escape single quotes in string values
+                                escaped_value = clean_value.replace("'", "''")
+                                sql = f"SELECT * FROM {table} WHERE {filter_col} = '{escaped_value}' LIMIT {self.default_limit}"
+                                explanation = f"{table} where {filter_col} = '{clean_value}'"
+
                             return TemplateMatch(
                                 template_type=TemplateType.FILTER_VALUE,
                                 sql=sql,
@@ -584,7 +681,7 @@ class TemplateEngine:
                                 matched_table=table,
                                 matched_columns=[filter_col],
                                 parameters={"column": filter_col, "value": clean_value},
-                                explanation=f"{table} where {filter_col} = '{clean_value}'"
+                                explanation=explanation
                             )
 
         return None
@@ -707,7 +804,8 @@ class TemplateEngine:
 def try_template_match(
     question: str,
     schema_dict: Dict[str, Any],
-    default_limit: int = 100
+    default_limit: int = 100,
+    database_type: str = "sqlite"
 ) -> Optional[TemplateMatch]:
     """
     Convenience function to try matching a question to a template.
@@ -716,9 +814,10 @@ def try_template_match(
         question: Natural language question
         schema_dict: Schema dictionary from SchemaInspector
         default_limit: Default row limit
+        database_type: Database type for dialect-specific SQL (postgresql, mysql, sqlite, duckdb)
 
     Returns:
         TemplateMatch if pattern matches, None otherwise
     """
-    engine = TemplateEngine(schema_dict, default_limit)
+    engine = TemplateEngine(schema_dict, default_limit, database_type)
     return engine.try_match(question)
