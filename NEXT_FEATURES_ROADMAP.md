@@ -371,9 +371,9 @@ Building on the completed Self-Correcting Agent, these enhancements will make it
 - ✅ Integration: Seamlessly integrated with self-correcting agent
 
 **Documentation:**
-- [Learning from Corrections Guide](docs/LEARNING_FROM_CORRECTIONS.md)
-- [Quick Start Guide](docs/LEARNING_QUICKSTART.md)
-- [Implementation Summary](docs/LEARNING_IMPLEMENTATION_SUMMARY.md)
+- [Learning from Corrections Guide](docs/technical/LEARNING_FROM_CORRECTIONS.md)
+- [Quick Start Guide](docs/guides/LEARNING_QUICKSTART.md)
+- [Implementation Summary](docs/reports/LEARNING_IMPLEMENTATION_SUMMARY.md)
 
 **Example:**
 ```
@@ -500,8 +500,8 @@ async def _try_parallel_fixes(self, sql, last_error, error_type, ...):
 - Real-time performance visualization
 
 **Documentation:**
-- [Parallel Execution Technical Guide](docs/PARALLEL_EXECUTION.md)
-- [Code Review](docs/CODE_REVIEW_PARALLEL_EXECUTION.md) - 9.0/10 score
+- [Parallel Execution Technical Guide](docs/technical/PARALLEL_EXECUTION.md)
+- [Code Review](docs/reports/CODE_REVIEW_PARALLEL_EXECUTION.md) - 9.0/10 score
 
 ---
 
@@ -550,8 +550,8 @@ User: "Sort by price"  (uses context!)
 - ✅ Easy to clear and restart
 
 **Documentation:**
-- [API Reference](docs/CONVERSATIONAL_MEMORY_API.md)
-- [User Guide](docs/CONVERSATIONAL_MEMORY_USER_GUIDE.md)
+- [API Reference](docs/technical/CONVERSATIONAL_MEMORY_API.md)
+- [User Guide](docs/guides/CONVERSATIONAL_MEMORY_USER_GUIDE.md)
 - [Implementation](CONVERSATIONAL_MEMORY_IMPLEMENTATION.md)
 - [Phase 1 Summary](PHASE_1_COMPLETE.md)
 
@@ -621,8 +621,8 @@ Agent: SELECT * FROM products WHERE category_name = 'electronics'
 - Three-tier correction: Schema → Learning → LLM
 
 **Documentation:**
-- [Schema-Aware Fixes Guide](docs/SCHEMA_AWARE_FIXES.md)
-- [Implementation Summary](docs/SCHEMA_AWARE_IMPLEMENTATION_SUMMARY.md)
+- [Schema-Aware Fixes Guide](docs/reports/SCHEMA_AWARE_FIXES.md)
+- [Implementation Summary](docs/reports/SCHEMA_AWARE_IMPLEMENTATION_SUMMARY.md)
 
 **Example:**
 ```
@@ -658,7 +658,7 @@ Success! (200x faster than LLM)
 
 **See**:
 - [Self-Correcting Agent Implementation](SELF_CORRECTING_IMPLEMENTATION.md)
-- [User Guide](docs/SELF_CORRECTING_AGENT.md)
+- [User Guide](docs/modules/SELF_CORRECTING_AGENT.md)
 
 **Benefits:**
 - ✅ Dramatically improves success rate
@@ -691,8 +691,8 @@ Success! (200x faster than LLM)
 - Integrated in [src/llm/self_correcting_agent.py](src/llm/self_correcting_agent.py)
 
 **Documentation:**
-- [Query Planning Agent Guide](docs/QUERY_PLANNING_AGENT.md)
-- [Quick Start Guide](docs/QUERY_PLANNING_QUICKSTART.md)
+- [Query Planning Agent Guide](docs/modules/QUERY_PLANNING_AGENT.md)
+- [Quick Start Guide](docs/guides/QUERY_PLANNING_QUICKSTART.md)
 
 **Example:**
 ```
@@ -748,8 +748,8 @@ Agent Planning:
 - Enhanced [src/llm/query_planning_agent.py](src/llm/query_planning_agent.py) with validation
 
 **Documentation:**
-- [Schema Validation Guide](docs/SCHEMA_VALIDATION_IMPROVEMENTS.md)
-- [Implementation Summary](docs/SCHEMA_VALIDATION_SUMMARY.md)
+- [Schema Validation Guide](docs/technical/SCHEMA_VALIDATION_IMPROVEMENTS.md)
+- [Implementation Summary](docs/reports/SCHEMA_VALIDATION_SUMMARY.md)
 
 **Example:**
 ```
@@ -817,9 +817,9 @@ Corrected Plan (CORRECT):
 - Configurable confidence thresholds
 
 **Documentation:**
-- [Result Verification Agent Guide](docs/RESULT_VERIFICATION_AGENT.md)
-- [Quick Start Guide](docs/RESULT_VERIFICATION_QUICKSTART.md)
-- [Implementation Summary](docs/RESULT_VERIFICATION_IMPLEMENTATION_SUMMARY.md)
+- [Result Verification Agent Guide](docs/modules/RESULT_VERIFICATION_AGENT.md)
+- [Quick Start Guide](docs/guides/RESULT_VERIFICATION_QUICKSTART.md)
+- [Implementation Summary](docs/reports/RESULT_VERIFICATION_IMPLEMENTATION_SUMMARY.md)
 
 **Example Use Case:**
 ```
@@ -1161,8 +1161,8 @@ class ConversationalSQLAgent:
 - ✅ Full observability with UI dashboard
 
 **Documentation:**
-- [Semantic Caching Guide](docs/SEMANTIC_CACHING.md)
-- [Semantic Cache UI Guide](docs/SEMANTIC_CACHE_UI.md)
+- [Semantic Caching Guide](docs/technical/SEMANTIC_CACHING.md)
+- [Semantic Cache UI Guide](docs/technical/SEMANTIC_CACHE_UI.md)
 
 ---
 
@@ -1265,10 +1265,10 @@ POOL_CLEANUP_INTERVAL=300             # 5 min cleanup
 - Test-to-code ratio: 1.24:1 (excellent!)
 
 **Documentation:**
-- `docs/CONNECTION_POOLING_GUIDE.md` - Comprehensive user guide (600 lines)
-- `docs/TEST_DATABASE_SETUP.md` - Test infrastructure guide (450 lines)
-- `docs/CONNECTION_POOLING_DAY5_COMPLETE.md` - Implementation summary
-- `docs/CONNECTION_POOLING_CODE_COVERAGE.md` - Coverage analysis
+- `docs/guides/CONNECTION_POOLING_GUIDE.md` - Comprehensive user guide (600 lines)
+- `docs/guides/TEST_DATABASE_SETUP.md` - Test infrastructure guide (450 lines)
+- `docs/reports/CONNECTION_POOLING_DAY5_COMPLETE.md` - Implementation summary
+- `docs/reports/CONNECTION_POOLING_CODE_COVERAGE.md` - Coverage analysis
 - `CLAUDE.md` - Updated with pooling architecture
 - `README.md` - Updated with performance features
 

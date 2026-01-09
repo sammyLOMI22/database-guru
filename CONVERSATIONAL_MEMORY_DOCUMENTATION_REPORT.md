@@ -115,7 +115,7 @@ interface ConversationContextPanelProps {
 
 ### 2. API Documentation
 
-**File**: `/Users/sam/database-guru/docs/CONVERSATIONAL_MEMORY_API.md` (NEW)
+**File**: `/Users/sam/database-guru/docs/technical/CONVERSATIONAL_MEMORY_API.md` (NEW)
 
 **Coverage**: 100% ✅
 
@@ -152,7 +152,7 @@ interface ConversationContextPanelProps {
 
 ### 3. User Guides
 
-**File**: `/Users/sam/database-guru/docs/CONVERSATIONAL_MEMORY_USER_GUIDE.md` (NEW)
+**File**: `/Users/sam/database-guru/docs/guides/CONVERSATIONAL_MEMORY_USER_GUIDE.md` (NEW)
 
 **Coverage**: 100% ✅
 
@@ -305,13 +305,13 @@ interface ConversationContextPanelProps {
 
 ### New Documentation Created
 
-1. **`docs/CONVERSATIONAL_MEMORY_API.md`** (21 KB)
+1. **`docs/technical/CONVERSATIONAL_MEMORY_API.md`** (21 KB)
    - Complete API reference
    - All endpoints documented
    - Examples and error handling
    - Target audience: API developers
 
-2. **`docs/CONVERSATIONAL_MEMORY_USER_GUIDE.md`** (15 KB)
+2. **`docs/guides/CONVERSATIONAL_MEMORY_USER_GUIDE.md`** (15 KB)
    - End-user documentation
    - Step-by-step guides
    - Troubleshooting and FAQ
@@ -466,12 +466,12 @@ interface ConversationContextPanelProps {
 
 ### Files Created (2)
 
-1. **`docs/CONVERSATIONAL_MEMORY_API.md`**
+1. **`docs/technical/CONVERSATIONAL_MEMORY_API.md`**
    - 600+ lines
    - Complete API reference
    - Examples and error handling
 
-2. **`docs/CONVERSATIONAL_MEMORY_USER_GUIDE.md`**
+2. **`docs/guides/CONVERSATIONAL_MEMORY_USER_GUIDE.md`**
    - 550+ lines
    - End-user guide
    - Troubleshooting and FAQ

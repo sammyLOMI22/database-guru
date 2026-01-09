@@ -54,9 +54,9 @@ Auto-learning: ENABLED ✅
 ```
 
 **For complete details, see:**
-- `docs/PHASE_1_COMPLETE_SUMMARY.md`
-- `docs/PHASE_1_MANUAL_TEST_RESULTS.md`
-- `docs/PHASE_1_FINAL_STATUS.md`
+- `docs/reports/PHASE_1_COMPLETE_SUMMARY.md`
+- `docs/reports/PHASE_1_MANUAL_TEST_RESULTS.md`
+- `docs/reports/PHASE_1_FINAL_STATUS.md`
 
 ---
 
@@ -163,11 +163,11 @@ Auto-learning: ENABLED for all non-SQL feedback types ✅
 - ⏳ Management APIs for mappings/patterns (pending)
 
 **For complete details, see:**
-- `docs/PHASE_2_NON_SQL_FEEDBACK_COMPLETE.md` - Implementation summary
-- `docs/NON_SQL_FEEDBACK_INTEGRATION.md` - Integration guide with API examples
-- `docs/NON_SQL_FEEDBACK_DESIGN.md` - Detailed design documentation
-- `docs/CONNECTION_NAME_MIGRATION.md` - Connection-scoped mapping design
-- `docs/NEXT_STEPS_GUIDE.md` - Next steps and priorities
+- `docs/reports/PHASE_2_NON_SQL_FEEDBACK_COMPLETE.md` - Implementation summary
+- `docs/technical/NON_SQL_FEEDBACK_INTEGRATION.md` - Integration guide with API examples
+- `docs/technical/NON_SQL_FEEDBACK_DESIGN.md` - Detailed design documentation
+- `docs/reports/CONNECTION_NAME_MIGRATION.md` - Connection-scoped mapping design
+- `docs/guides/NEXT_STEPS_GUIDE.md` - Next steps and priorities
 
 ---
 
@@ -412,7 +412,7 @@ result_issue (114): Should flag for query regeneration or add to learned pattern
   - After: 570 feedback entries (100% production data)
 - **Safety Features**: Dry-run mode, pattern matching, orphan detection
 - **Data Preserved**: All 3 learned corrections intact
-- **Documentation**: `docs/DATABASE_CLEANUP_SUMMARY.md`
+- **Documentation**: `docs/reports/DATABASE_CLEANUP_SUMMARY.md`
 - **Status**: Database now 100% clean ✅
 
 ---
@@ -731,9 +731,9 @@ DELETE FROM user_feedback WHERE applied_successfully = -1;
 - Connection-scoped mappings
 
 **Documentation:** ✅ Complete
-- See `docs/PHASE_2_NON_SQL_FEEDBACK_COMPLETE.md`
-- See `docs/NON_SQL_FEEDBACK_INTEGRATION.md`
-- See `docs/NEXT_STEPS_GUIDE.md`
+- See `docs/reports/PHASE_2_NON_SQL_FEEDBACK_COMPLETE.md`
+- See `docs/technical/NON_SQL_FEEDBACK_INTEGRATION.md`
+- See `docs/guides/NEXT_STEPS_GUIDE.md`
 
 ---
 
@@ -1091,7 +1091,7 @@ Pending feedback avg confidence: 0.79 (higher than applied!)
 **Status:** ✅ All critical issues resolved, production ready
 **Next Phase:** Phase 2 - Table/column mapping + batch operations UI
 **Related Docs:**
-- `docs/PHASE_1_FINAL_STATUS.md` - Complete Phase 1 status
-- `docs/PHASE_1_MANUAL_TEST_RESULTS.md` - Manual testing verification
-- `docs/DATABASE_CLEANUP_SUMMARY.md` - Database cleanup details
-- `docs/PHASE_1_COMPLETE_SUMMARY.md` - Phase 1 comprehensive summary
+- `docs/reports/PHASE_1_FINAL_STATUS.md` - Complete Phase 1 status
+- `docs/reports/PHASE_1_MANUAL_TEST_RESULTS.md` - Manual testing verification
+- `docs/reports/DATABASE_CLEANUP_SUMMARY.md` - Database cleanup details
+- `docs/reports/PHASE_1_COMPLETE_SUMMARY.md` - Phase 1 comprehensive summary

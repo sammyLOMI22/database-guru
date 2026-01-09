@@ -368,6 +368,6 @@ curl http://localhost:11434/api/tags
 
 ## See Also
 
-- [Cache Setup Guide](../docs/CACHE_SETUP.md) - Complete cache setup documentation
+- [Cache Setup Guide](../docs/technical/CACHE_SETUP.md) - Complete cache setup documentation
 - [README.md](../README.md) - Main project documentation
 - [CHANGELOG.md](../CHANGELOG.md) - Version history and recent changes

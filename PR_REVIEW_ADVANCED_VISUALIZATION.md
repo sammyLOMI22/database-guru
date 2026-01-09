@@ -54,8 +54,8 @@ npm install jszip
 
 ### Documentation
 The documentation provided is excellent and comprehensive:
-- `docs/ADVANCED_VISUALIZATION_GUIDE.md`: Clearly defines the heuristic for auto-detecting chart types (Line, Scatter, Pie, Bar).
-- `docs/CHART_TYPE_SELECTOR_PR_REVIEW.md`: detailed manual testing steps.
+- `docs/guides/ADVANCED_VISUALIZATION_GUIDE.md`: Clearly defines the heuristic for auto-detecting chart types (Line, Scatter, Pie, Bar).
+- `docs/reports/CHART_TYPE_SELECTOR_PR_REVIEW.md`: detailed manual testing steps.
 
 ### Implementation Insights
 1.  **Chart Detection Logic**:

@@ -380,7 +380,7 @@ Transform Database Guru query results from raw tables into intelligent narrative
 
 - [ ] Documentation:
   - [ ] Update `CLAUDE.md` with new feature section
-  - [ ] Create `docs/DATA_NARRATIVES_GUIDE.md` with:
+  - [ ] Create `docs/guides/DATA_NARRATIVES_GUIDE.md` with:
     - [ ] Feature overview
     - [ ] Configuration options
     - [ ] Example outputs
@@ -550,7 +550,7 @@ Transform Database Guru query results from raw tables into intelligent narrative
    - Add narrative-related configuration
 
 ### Documentation Files (2 new):
-1. **`docs/DATA_NARRATIVES_GUIDE.md`**
+1. **`docs/guides/DATA_NARRATIVES_GUIDE.md`**
    - Feature overview
    - Configuration
    - Examples
