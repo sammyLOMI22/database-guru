@@ -716,3 +716,4 @@ Key docs in `docs/`:
 - `SQL_GENERATION_PIPELINE.md` - **SQL Generation Pipeline (UPDATED - Jan 7, 2026)** - Complete pipeline documentation with Phase 2.4 multi-database validation
 - `MULTI_DB_VALIDATION_GUIDE.md` - **Multi-Database Validation Guide (NEW - Jan 7, 2026)** - Pre-flight validation architecture, troubleshooting, and API reference
 - `SMALL_MODEL_OPTIMIZATION_PHASE_2_PR_REVIEW.md` - **Phase 2 PR Review (UPDATED - Jan 7, 2026)** - Code review with all issues resolved (sqlparse fix)
+- `SEMANTIC_TYPE_INTELLIGENCE_PLAN.md` - **Semantic Type Intelligence Roadmap (NEW - Jan 8, 2026)** - Future plan for Date/Time, Status/Enum, Boolean, and other query intelligence features
