@@ -28,7 +28,7 @@ export default function Header({ isHealthy }: HeaderProps) {
 
           {/* GitHub Link */}
           <a
-            href="https://github.com/yourusername/database-guru"
+            href="https://github.com/sammyLOMI22/database-guru"
             target="_blank"
             rel="noopener noreferrer"
             className="text-gray-600 hover:text-gray-900 transition-colors"
