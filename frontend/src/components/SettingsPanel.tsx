@@ -155,23 +155,23 @@ export function SettingsPanel() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg">
+    <div className="max-w-4xl mx-auto p-6 min-h-full transition-colors">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
         {/* Header */}
-        <div className="border-b border-gray-200 px-6 py-4">
+        <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <SettingsIcon className="w-6 h-6 text-gray-700" />
+              <SettingsIcon className="w-6 h-6 text-gray-700 dark:text-gray-300" />
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">System Settings</h2>
-                <p className="text-sm text-gray-600">Configure auto-learning and feedback behavior</p>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">System Settings</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Configure auto-learning and feedback behavior</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
               <button
                 onClick={resetSettings}
                 disabled={saving}
-                className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50"
+                className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg disabled:opacity-50 transition-colors"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Reset to Defaults</span>
@@ -190,29 +190,29 @@ export function SettingsPanel() {
 
         {/* Messages */}
         {error && (
-          <div className="mx-6 mt-4 p-4 bg-red-100 border-2 border-red-500 rounded-lg">
-            <p className="text-red-900 font-semibold">⚠️ {error}</p>
+          <div className="mx-6 mt-4 p-4 bg-red-100 dark:bg-red-900/30 border-2 border-red-500 dark:border-red-800 rounded-lg">
+            <p className="text-red-900 dark:text-red-200 font-semibold">⚠️ {error}</p>
           </div>
         )}
         {successMessage && (
-          <div className="mx-6 mt-4 p-4 bg-green-100 border-2 border-green-500 rounded-lg">
-            <p className="text-green-900 font-semibold">✅ {successMessage}</p>
+          <div className="mx-6 mt-4 p-4 bg-green-100 dark:bg-green-900/30 border-2 border-green-500 dark:border-green-800 rounded-lg">
+            <p className="text-green-900 dark:text-green-200 font-semibold">✅ {successMessage}</p>
           </div>
         )}
 
         {/* Settings Form */}
         <div className="p-6 space-y-8">
           {/* Query Quality Section */}
-          <div className="space-y-4 pb-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+          <div className="space-y-4 pb-6 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
               <span>🎯 Query Quality</span>
             </h3>
 
-            <div className="p-4 bg-gradient-to-r from-green-50 via-blue-50 to-purple-50 border border-gray-200 rounded-lg">
-              <label className="block font-semibold text-gray-900 mb-2">
+            <div className="p-4 bg-gradient-to-r from-green-50 via-blue-50 to-purple-50 dark:from-green-900/10 dark:via-blue-900/10 dark:to-purple-900/10 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
+              <label className="block font-semibold text-gray-900 dark:text-white mb-2">
                 Quality Level: {settings.query_quality_level}%
               </label>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Balance between query speed and accuracy
               </p>
 
@@ -228,15 +228,15 @@ export function SettingsPanel() {
                     ...settings,
                     query_quality_level: parseInt(e.target.value)
                   })}
-                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
                 <span className="text-xs font-medium text-purple-600">Thorough</span>
               </div>
 
               {/* Mode Description */}
-              <div className="mt-4 p-3 bg-white border border-gray-200 rounded text-sm">
+              <div className="mt-4 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm transition-colors">
                 {settings.query_quality_level <= 30 && (
-                  <div className="text-green-700">
+                  <div className="text-green-700 dark:text-green-400">
                     <strong className="block">Fast Mode (0-30%)</strong>
                     <ul className="mt-1 ml-4 list-disc text-xs">
                       <li>Minimal query planning</li>
@@ -246,7 +246,7 @@ export function SettingsPanel() {
                   </div>
                 )}
                 {settings.query_quality_level > 30 && settings.query_quality_level <= 70 && (
-                  <div className="text-blue-700">
+                  <div className="text-blue-700 dark:text-blue-400">
                     <strong className="block">Balanced Mode (31-70%) - Recommended</strong>
                     <ul className="mt-1 ml-4 list-disc text-xs">
                       <li>Smart query planning for complex queries</li>
@@ -256,7 +256,7 @@ export function SettingsPanel() {
                   </div>
                 )}
                 {settings.query_quality_level > 70 && (
-                  <div className="text-purple-700">
+                  <div className="text-purple-700 dark:text-purple-400">
                     <strong className="block">Thorough Mode (71-100%)</strong>
                     <ul className="mt-1 ml-4 list-disc text-xs">
                       <li>Full planning for all queries</li>
@@ -270,84 +270,78 @@ export function SettingsPanel() {
           </div>
 
           {/* SQL Generation Intelligence Section */}
-          <div className="space-y-4 pb-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+          <div className="space-y-4 pb-6 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
               <span>🧠 SQL Generation Intelligence</span>
             </h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Advanced features that improve SQL generation accuracy. Disable for faster responses.
             </p>
 
-            {/* Intent Classification Toggle */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            {/* Toggle components (Generic styling for all blue toggles in this section) */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
               <div className="flex-1">
-                <label className="font-semibold text-gray-900">Intent Classification</label>
-                <p className="text-sm text-gray-600 mt-1">
+                <label className="font-semibold text-gray-900 dark:text-white">Intent Classification</label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Detect impossible queries before SQL generation (e.g., "Show me data we don't have")
                 </p>
               </div>
               <button
                 onClick={() => setSettings({ ...settings, enable_intent_classification: !settings.enable_intent_classification })}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                  settings.enable_intent_classification ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${settings.enable_intent_classification ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                    settings.enable_intent_classification ? 'translate-x-7' : 'translate-x-1'
-                  }`}
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.enable_intent_classification ? 'translate-x-7' : 'translate-x-1'
+                    }`}
                 />
               </button>
             </div>
 
             {/* Dynamic Examples Toggle */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
               <div className="flex-1">
-                <label className="font-semibold text-gray-900">Dynamic Examples</label>
-                <p className="text-sm text-gray-600 mt-1">
+                <label className="font-semibold text-gray-900 dark:text-white">Dynamic Examples</label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Generate schema-specific few-shot examples for better SQL accuracy
                 </p>
               </div>
               <button
                 onClick={() => setSettings({ ...settings, enable_dynamic_examples: !settings.enable_dynamic_examples })}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                  settings.enable_dynamic_examples ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${settings.enable_dynamic_examples ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                    settings.enable_dynamic_examples ? 'translate-x-7' : 'translate-x-1'
-                  }`}
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.enable_dynamic_examples ? 'translate-x-7' : 'translate-x-1'
+                    }`}
                 />
               </button>
             </div>
 
             {/* Semantic Validation Toggle */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
               <div className="flex-1">
-                <label className="font-semibold text-gray-900">Semantic Validation</label>
-                <p className="text-sm text-gray-600 mt-1">
+                <label className="font-semibold text-gray-900 dark:text-white">Semantic Validation</label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Validate that generated SQL matches your question's intent before execution
                 </p>
               </div>
               <button
                 onClick={() => setSettings({ ...settings, enable_semantic_validation: !settings.enable_semantic_validation })}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                  settings.enable_semantic_validation ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${settings.enable_semantic_validation ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                    settings.enable_semantic_validation ? 'translate-x-7' : 'translate-x-1'
-                  }`}
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.enable_semantic_validation ? 'translate-x-7' : 'translate-x-1'
+                    }`}
                 />
               </button>
             </div>
 
             {/* Info box */}
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-              <Info className="w-4 h-4 inline mr-2 text-blue-500" />
-              <span className="text-blue-800">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm transition-colors">
+              <Info className="w-4 h-4 inline mr-2 text-blue-500 dark:text-blue-400" />
+              <span className="text-blue-800 dark:text-blue-300">
                 These features are automatically enabled for Balanced and Thorough quality levels.
                 Override here to customize behavior.
               </span>
@@ -355,7 +349,7 @@ export function SettingsPanel() {
           </div>
 
           {/* Per-Task Model Configuration Section */}
-          <div className="space-y-4 pb-6 border-b border-gray-200">
+          <div className="space-y-4 pb-6 border-b border-gray-200 dark:border-gray-700">
             <ModelConfigPanel
               config={{
                 model_sql_generation: settings.model_sql_generation,
@@ -376,38 +370,36 @@ export function SettingsPanel() {
 
           {/* Auto-Learning Section */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
               <span>🤖 Smart Auto-Learning (Option 3)</span>
             </h3>
 
             {/* Master Toggle */}
-            <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors">
               <div className="flex-1">
-                <label className="font-semibold text-gray-900">Enable Auto-Learning</label>
-                <p className="text-sm text-gray-600 mt-1">
+                <label className="font-semibold text-gray-900 dark:text-white">Enable Auto-Learning</label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Automatically apply high-confidence user feedback to the learning system
                 </p>
               </div>
               <button
                 onClick={() => setSettings({ ...settings, auto_learning_enabled: !settings.auto_learning_enabled })}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                  settings.auto_learning_enabled ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${settings.auto_learning_enabled ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                    settings.auto_learning_enabled ? 'translate-x-7' : 'translate-x-1'
-                  }`}
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.auto_learning_enabled ? 'translate-x-7' : 'translate-x-1'
+                    }`}
                 />
               </button>
             </div>
 
             {/* Confidence Threshold Slider */}
-            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <label className="block font-semibold text-gray-900 mb-2">
+            <div className="p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
+              <label className="block font-semibold text-gray-900 dark:text-white mb-2">
                 Confidence Threshold: {(settings.confidence_threshold * 100).toFixed(0)}%
               </label>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Minimum confidence required for auto-application (50-100%)
               </p>
               <div className="flex items-center space-x-4">
@@ -419,15 +411,15 @@ export function SettingsPanel() {
                   step="0.05"
                   value={settings.confidence_threshold}
                   onChange={(e) => setSettings({ ...settings, confidence_threshold: parseFloat(e.target.value) })}
-                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   disabled={!settings.auto_learning_enabled}
                 />
-                <span className="text-xs text-gray-500">100%</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">100%</span>
               </div>
-              <div className="mt-3 p-3 bg-white border border-gray-200 rounded text-sm">
-                <Info className="w-4 h-4 inline mr-2 text-blue-500" />
-                <strong>Auto-Learning Rules:</strong>
-                <ul className="mt-2 ml-6 list-disc space-y-1 text-gray-700">
+              <div className="mt-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm transition-colors">
+                <Info className="w-4 h-4 inline mr-2 text-blue-500 dark:text-blue-400" />
+                <strong className="text-gray-900 dark:text-white">Auto-Learning Rules:</strong>
+                <ul className="mt-2 ml-6 list-disc space-y-1 text-gray-700 dark:text-gray-300">
                   <li>High confidence (≥90%): Auto-apply immediately</li>
                   <li>Medium confidence (70-89%): Queue for batch (deferred mode)</li>
                   <li>Low confidence (&lt;70%): Manual review required</li>
@@ -436,9 +428,9 @@ export function SettingsPanel() {
             </div>
 
             {/* Apply Mode */}
-            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <label className="block font-semibold text-gray-900 mb-2">Apply Mode</label>
-              <p className="text-sm text-gray-600 mb-3">
+            <div className="p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
+              <label className="block font-semibold text-gray-900 dark:text-white mb-2">Apply Mode</label>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                 How to handle medium-confidence feedback (70-89%)
               </p>
               <div className="flex space-x-4">
@@ -466,7 +458,7 @@ export function SettingsPanel() {
                     className="w-4 h-4 text-blue-600"
                     disabled={!settings.auto_learning_enabled}
                   />
-                  <span className="text-sm">
+                  <span className="text-sm text-gray-800 dark:text-gray-200">
                     <strong>Deferred</strong> - Queue for batch processing
                   </span>
                 </label>
@@ -474,59 +466,55 @@ export function SettingsPanel() {
             </div>
 
             {/* Test Before Learning */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
               <div className="flex-1">
-                <label className="font-semibold text-gray-900">Test Before Learning</label>
-                <p className="text-sm text-gray-600 mt-1">
+                <label className="font-semibold text-gray-900 dark:text-white">Test Before Learning</label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Execute corrected SQL to verify it works before adding to learning system
                 </p>
               </div>
               <button
                 onClick={() => setSettings({ ...settings, test_before_learning: !settings.test_before_learning })}
                 disabled={!settings.auto_learning_enabled}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors disabled:opacity-50 ${
-                  settings.test_before_learning ? 'bg-green-600' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors disabled:opacity-50 ${settings.test_before_learning ? 'bg-green-600' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                    settings.test_before_learning ? 'translate-x-7' : 'translate-x-1'
-                  }`}
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.test_before_learning ? 'translate-x-7' : 'translate-x-1'
+                    }`}
                 />
               </button>
             </div>
           </div>
 
           {/* Audit Settings Section */}
-          <div className="space-y-4 pt-6 border-t border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">📋 Audit & Logging</h3>
+          <div className="space-y-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">📋 Audit & Logging</h3>
 
-            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
               <div className="flex-1">
-                <label className="font-semibold text-gray-900">Enable Audit Log</label>
-                <p className="text-sm text-gray-600 mt-1">
+                <label className="font-semibold text-gray-900 dark:text-white">Enable Audit Log</label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Track all auto-applied feedback for review and rollback
                 </p>
               </div>
               <button
                 onClick={() => setSettings({ ...settings, enable_audit_log: !settings.enable_audit_log })}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                  settings.enable_audit_log ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${settings.enable_audit_log ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                    settings.enable_audit_log ? 'translate-x-7' : 'translate-x-1'
-                  }`}
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.enable_audit_log ? 'translate-x-7' : 'translate-x-1'
+                    }`}
                 />
               </button>
             </div>
 
-            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <label className="block font-semibold text-gray-900 mb-2">
+            <div className="p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
+              <label className="block font-semibold text-gray-900 dark:text-white mb-2">
                 Audit Log Retention: {settings.max_audit_log_days} days
               </label>
-              <p className="text-sm text-gray-600 mb-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                 How long to keep audit logs (1-365 days)
               </p>
               <div className="flex items-center space-x-4">
@@ -538,19 +526,19 @@ export function SettingsPanel() {
                   step="1"
                   value={settings.max_audit_log_days}
                   onChange={(e) => setSettings({ ...settings, max_audit_log_days: parseInt(e.target.value) })}
-                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   disabled={!settings.enable_audit_log}
                 />
-                <span className="text-xs text-gray-500">365 days</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">365 days</span>
               </div>
             </div>
           </div>
 
           {/* Info Section */}
-          <div className="pt-6 border-t border-gray-200">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-semibold text-blue-900 mb-2">ℹ️ How Auto-Learning Works</h4>
-              <ul className="text-sm text-blue-800 space-y-2 ml-4 list-disc">
+          <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors">
+              <h4 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">ℹ️ How Auto-Learning Works</h4>
+              <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-2 ml-4 list-disc">
                 <li>When users submit feedback with high confidence (≥90%), the system automatically applies it</li>
                 <li>The corrected SQL is tested before learning (if enabled) to ensure it works</li>
                 <li>Future similar errors will automatically use the learned correction</li>
@@ -561,7 +549,7 @@ export function SettingsPanel() {
           </div>
 
           {/* Metadata */}
-          <div className="pt-4 border-t border-gray-200 text-xs text-gray-500">
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
             <p>Last updated: {new Date(settings.updated_at).toLocaleString()}</p>
             <p>Created: {new Date(settings.created_at).toLocaleString()}</p>
           </div>
