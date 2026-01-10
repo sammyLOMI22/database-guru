@@ -20,6 +20,7 @@ import {
 } from 'recharts';
 import { prepareBoxPlotData } from '../../utils/statisticalChartUtils';
 import { CHART_COLORS } from '../../utils/chartUtils';
+import { useDarkMode } from '../../hooks/useDarkMode';
 
 interface BoxPlotViewProps {
   data: Record<string, unknown>[];
@@ -42,6 +43,7 @@ export const BoxPlotView: React.FC<BoxPlotViewProps> = ({
   showMean = true,
   animate = true,
 }) => {
+  const { isDarkMode } = useDarkMode();
   const boxPlotData = useMemo(() => {
     if (!data || data.length === 0) {
       return [];
@@ -92,9 +94,9 @@ export const BoxPlotView: React.FC<BoxPlotViewProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 transition-colors">
       {title && (
-        <h4 className="text-sm font-medium text-gray-700 mb-3">{title}</h4>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">{title}</h4>
       )}
 
       <ResponsiveContainer width="100%" height={height}>
@@ -102,15 +104,20 @@ export const BoxPlotView: React.FC<BoxPlotViewProps> = ({
           data={chartData}
           margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
         >
-          <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
           <XAxis
             dataKey="name"
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 11, fill: isDarkMode ? '#9ca3af' : '#6b7280' }}
             angle={chartData.length > 5 ? -45 : 0}
             textAnchor={chartData.length > 5 ? 'end' : 'middle'}
             height={chartData.length > 5 ? 60 : 30}
+            stroke={isDarkMode ? '#4b5563' : '#9ca3af'}
           />
-          <YAxis tick={{ fontSize: 11 }} width={60} />
+          <YAxis
+            tick={{ fontSize: 11, fill: isDarkMode ? '#9ca3af' : '#6b7280' }}
+            width={60}
+            stroke={isDarkMode ? '#4b5563' : '#9ca3af'}
+          />
           <ZAxis range={[40, 40]} />
 
           <Tooltip
@@ -118,20 +125,20 @@ export const BoxPlotView: React.FC<BoxPlotViewProps> = ({
               if (!payload || payload.length === 0) return null;
               const item = payload[0].payload;
               return (
-                <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
-                  <div className="font-medium text-gray-900 mb-2">{item.name}</div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600">
-                    <div>Min: {item.min?.toFixed(2)}</div>
-                    <div>Max: {item.max?.toFixed(2)}</div>
-                    <div>Q1: {item.q1?.toFixed(2)}</div>
-                    <div>Q3: {item.q3?.toFixed(2)}</div>
-                    <div>Median: {item.median?.toFixed(2)}</div>
-                    <div>Mean: {item.mean?.toFixed(2)}</div>
-                    <div>IQR: {item.iqr?.toFixed(2)}</div>
-                    <div>Std Dev: {item.stdDev?.toFixed(2)}</div>
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 text-sm">
+                  <div className="font-medium text-gray-900 dark:text-gray-100 mb-2">{item.name}</div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600 dark:text-gray-400">
+                    <div><span className="font-medium text-gray-500">Min:</span> {item.min?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500">Max:</span> {item.max?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500">Q1:</span> {item.q1?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500">Q3:</span> {item.q3?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500">Median:</span> {item.median?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500">Mean:</span> {item.mean?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500">IQR:</span> {item.iqr?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500">Std Dev:</span> {item.stdDev?.toFixed(2)}</div>
                   </div>
                   {item.outliers?.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-amber-600">
+                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs text-amber-600 dark:text-amber-500">
                       {item.outliers.length} outlier(s)
                     </div>
                   )}
@@ -213,7 +220,7 @@ export const BoxPlotView: React.FC<BoxPlotViewProps> = ({
       </ResponsiveContainer>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600">
+      <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-3 rounded" style={{ backgroundColor: CHART_COLORS.primary, opacity: 0.6 }} />
           <span>IQR (Q1-Q3)</span>

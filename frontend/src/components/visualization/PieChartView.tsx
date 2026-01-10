@@ -13,7 +13,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { PIE_PALETTE, prepareChartData } from '../../utils/chartUtils';
+import { CHART_COLORS, prepareChartData } from '../../utils/chartUtils';
 import { useDarkMode } from '../../hooks/useDarkMode';
 
 interface PieChartViewProps {
@@ -94,9 +94,7 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
     }));
   }, [data, xColumn, yColumn]);
 
-  const total = useMemo(() => {
-    return chartData.reduce((sum, item) => sum + (item.value || 0), 0);
-  }, [chartData]);
+  const total = useMemo(() => data.reduce((sum, row) => sum + Number(row[yColumn] || 0), 0), [data, yColumn]);
 
   if (!chartData || chartData.length === 0) {
     return (
@@ -124,10 +122,12 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
             dataKey="value"
             isAnimationActive={animate}
           >
-            {chartData.map((_, index) => (
+            {chartData.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={PIE_PALETTE[index % PIE_PALETTE.length]}
+                fill={entry.color as string || CHART_COLORS.primary}
+                stroke={isDarkMode ? '#374151' : '#fff'}
+                strokeWidth={2}
               />
             ))}
           </Pie>

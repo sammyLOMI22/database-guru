@@ -12,6 +12,7 @@ import {
   HIERARCHICAL_COLORS,
   SunburstNode,
 } from '../../utils/hierarchicalChartUtils';
+import { useDarkMode } from '../../hooks/useDarkMode';
 
 interface SunburstViewProps {
   data: Record<string, unknown>[];
@@ -84,6 +85,7 @@ export const SunburstView: React.FC<SunburstViewProps> = ({
   height = 350,
   animate = true,
 }) => {
+  const { isDarkMode } = useDarkMode();
   const { rings, maxDepth } = useMemo(() => {
     if (!data || data.length === 0 || categoryColumns.length === 0) {
       return { rings: [], maxDepth: 0 };
@@ -111,9 +113,9 @@ export const SunburstView: React.FC<SunburstViewProps> = ({
   const ringWidth = Math.min(35, (height / 2 - baseRadius - 30) / maxDepth);
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 transition-colors">
       {title && (
-        <h4 className="text-sm font-medium text-gray-700 mb-3">{title}</h4>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">{title}</h4>
       )}
 
       <ResponsiveContainer width="100%" height={height}>
@@ -135,7 +137,7 @@ export const SunburstView: React.FC<SunburstViewProps> = ({
                 <Cell
                   key={`cell-${ringIndex}-${index}`}
                   fill={entry.color}
-                  stroke="#fff"
+                  stroke={isDarkMode ? '#374151' : '#fff'}
                   strokeWidth={1}
                   style={{ cursor: 'pointer' }}
                 />
@@ -148,13 +150,13 @@ export const SunburstView: React.FC<SunburstViewProps> = ({
               if (!payload || payload.length === 0) return null;
               const item = payload[0].payload as FlattenedNode;
               return (
-                <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
-                  <div className="font-medium text-gray-900">{item.name}</div>
-                  <div className="text-gray-600 mt-1">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 text-sm">
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{item.name}</div>
+                  <div className="text-gray-600 dark:text-gray-400 mt-1">
                     {valueColumn}: {item.value?.toLocaleString()}
                   </div>
                   {item.path && item.path.length > 1 && (
-                    <div className="text-gray-500 text-xs mt-2 pt-2 border-t border-gray-100">
+                    <div className="text-gray-500 dark:text-gray-500 text-xs mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
                       {item.path.join(' → ')}
                     </div>
                   )}
@@ -167,9 +169,9 @@ export const SunburstView: React.FC<SunburstViewProps> = ({
 
       {/* Legend - show first ring items */}
       {rings[0] && (
-        <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-100">
+        <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
           {rings[0].slice(0, 8).map((item) => (
-            <div key={item.name} className="flex items-center gap-1.5 text-xs text-gray-600">
+            <div key={item.name} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
               <div
                 className="w-3 h-3 rounded"
                 style={{ backgroundColor: item.color }}
@@ -178,15 +180,15 @@ export const SunburstView: React.FC<SunburstViewProps> = ({
             </div>
           ))}
           {rings[0].length > 8 && (
-            <span className="text-xs text-gray-400">+{rings[0].length - 8} more</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">+{rings[0].length - 8} more</span>
           )}
         </div>
       )}
 
       {/* Depth indicator */}
-      <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+      <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-500">
         <span>Hierarchy depth: {maxDepth} level{maxDepth !== 1 ? 's' : ''}</span>
-        <span className="text-gray-300">|</span>
+        <span className="text-gray-300 dark:text-gray-700">|</span>
         <span>Inner ring = top level, outer rings = sub-categories</span>
       </div>
     </div>
