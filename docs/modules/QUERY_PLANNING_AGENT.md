@@ -831,6 +831,6 @@ The Query Planning Agent:
 **You now have world-class query planning capabilities!** 🚀
 
 For more information, see:
-- [NEXT_FEATURES_ROADMAP.md](../../NEXT_FEATURES_ROADMAP.md) - What to build next
+- [NEXT_FEATURES_ROADMAP.md](../planning/NEXT_FEATURES_ROADMAP.md) - What to build next
 - [Self-Correcting Agent Guide](SELF_CORRECTING_AGENT.md) - Error correction
 - [Result Verification Guide](RESULT_VERIFICATION_AGENT.md) - Result checking

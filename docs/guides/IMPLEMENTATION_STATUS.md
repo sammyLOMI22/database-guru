@@ -347,7 +347,7 @@ curl -X POST http://localhost:8000/api/query/ \
 
 ## 📈 Next Steps (Recommended Priority)
 
-See [NEXT_FEATURES_ROADMAP.md](../../NEXT_FEATURES_ROADMAP.md) for complete feature roadmap.
+See [NEXT_FEATURES_ROADMAP.md](../planning/NEXT_FEATURES_ROADMAP.md) for complete feature roadmap.
 
 1. **Immediate (This Week)**
    - [x] ~~Add actual SQL execution engine~~ ✅ COMPLETED (Version 2.0)

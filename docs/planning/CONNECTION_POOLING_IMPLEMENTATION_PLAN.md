@@ -1436,7 +1436,7 @@ When MongoDB query support is implemented, add connection pooling in a separate 
 
 ## Related Documentation
 
-- [Roadmap - Connection Pooling](../../NEXT_FEATURES_ROADMAP.md#8-connection-pooling-optimization)
+- [Roadmap - Connection Pooling](NEXT_FEATURES_ROADMAP.md#8-connection-pooling-optimization)
 - [Parallel Execution Guide](../technical/PARALLEL_EXECUTION.md) - Complements pooling for max performance
 - [Multi-Database Guide](../guides/MULTI_DATABASE_GUIDE.md) - How pooling integrates with multi-DB queries
 - [Test Database Setup](../guides/TEST_DATABASE_SETUP.md) - Setting up databases for pooling tests

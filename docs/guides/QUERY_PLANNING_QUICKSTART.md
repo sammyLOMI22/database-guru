@@ -311,7 +311,7 @@ if plan.confidence < 0.7:
 1. **Try it!** Use the self-correcting agent and watch planning happen automatically
 2. **View Plans** Use the API to see how your queries are planned
 3. **Read Full Guide** Check out [QUERY_PLANNING_AGENT.md](QUERY_PLANNING_AGENT.md) for details
-4. **Build More Features** See [NEXT_FEATURES_ROADMAP.md](../../NEXT_FEATURES_ROADMAP.md) for what to build next
+4. **Build More Features** See [NEXT_FEATURES_ROADMAP.md](../planning/NEXT_FEATURES_ROADMAP.md) for what to build next
 
 ---
 
@@ -332,5 +332,5 @@ if plan.confidence < 0.7:
 ## Need Help?
 
 - Full documentation: [QUERY_PLANNING_AGENT.md](QUERY_PLANNING_AGENT.md)
-- Roadmap: [NEXT_FEATURES_ROADMAP.md](../../NEXT_FEATURES_ROADMAP.md)
+- Roadmap: [NEXT_FEATURES_ROADMAP.md](../planning/NEXT_FEATURES_ROADMAP.md)
 - Examples: See the [Examples section](QUERY_PLANNING_AGENT.md#examples)
