@@ -137,13 +137,13 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
   const summary = getValidationSummary();
 
   return (
-    <div className="border-t border-gray-200 bg-white p-4">
+    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 transition-colors">
       <div className="max-w-4xl mx-auto">
         {/* Pre-flight validation indicator */}
         {connectionIds && connectionIds.length >= 2 && (
           <div className="mb-3">
             {validating ? (
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Checking database compatibility...</span>
               </div>
@@ -151,40 +151,40 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
               <div className="flex items-center gap-3 text-sm">
                 {/* Full support */}
                 {summary.full > 0 && (
-                  <div className="flex items-center gap-1 text-green-600">
+                  <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
                     <CheckCircle className="w-4 h-4" />
                     <span>{summary.full} can answer</span>
                   </div>
                 )}
                 {/* Partial support */}
                 {summary.partial > 0 && (
-                  <div className="flex items-center gap-1 text-yellow-600">
+                  <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
                     <AlertCircle className="w-4 h-4" />
                     <span>{summary.partial} partial</span>
                   </div>
                 )}
                 {/* Cannot answer */}
                 {summary.cannot > 0 && (
-                  <div className="flex items-center gap-1 text-red-600">
+                  <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
                     <XCircle className="w-4 h-4" />
                     <span>{summary.cannot} cannot answer</span>
                   </div>
                 )}
                 {/* Warnings */}
                 {validation.warnings.length > 0 && (
-                  <div className="text-xs text-amber-600 ml-2" title={validation.warnings.join('\n')}>
+                  <div className="text-xs text-amber-600 dark:text-amber-400 ml-2" title={validation.warnings.join('\n')}>
                     ⚠️ {validation.warnings.length} warning{validation.warnings.length !== 1 ? 's' : ''}
                   </div>
                 )}
                 {/* Overall status message */}
                 {!validation.can_execute_any && (
-                  <div className="text-xs text-red-600 font-medium ml-2">
+                  <div className="text-xs text-red-600 dark:text-red-500 font-medium ml-2">
                     Query cannot be executed on any selected database
                   </div>
                 )}
               </div>
             ) : question.trim() ? (
-              <div className="text-xs text-gray-400">
+              <div className="text-xs text-gray-400 dark:text-gray-500">
                 Type more to check database compatibility...
               </div>
             ) : null}
@@ -202,13 +202,13 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
               placeholder="Ask a question about your database..."
               disabled={isLoading}
               rows={1}
-              className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-500"
+              className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-500 transition-colors"
               style={{ maxHeight: '200px' }}
             />
 
             {/* Character count */}
             {question.length > 0 && (
-              <div className="absolute bottom-2 right-2 text-xs text-gray-400">
+              <div className="absolute bottom-2 right-2 text-xs text-gray-400 dark:text-gray-500">
                 {question.length}/500
               </div>
             )}
@@ -219,7 +219,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
             <button
               onClick={() => setShowLimitDropdown(!showLimitDropdown)}
               disabled={isLoading}
-              className="px-3 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors flex items-center space-x-1 text-sm text-gray-700"
+              className="px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 disabled:cursor-not-allowed transition-colors flex items-center space-x-1 text-sm text-gray-700 dark:text-gray-300"
               title="Maximum rows to return"
             >
               <span>{selectedOption.label}</span>
@@ -227,7 +227,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
             </button>
 
             {showLimitDropdown && (
-              <div className="absolute bottom-full mb-1 right-0 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[120px]">
+              <div className="absolute bottom-full mb-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[120px]">
                 {ROW_LIMIT_OPTIONS.map((option) => (
                   <button
                     key={option.value}
@@ -235,9 +235,10 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
                       setRowLimit(option.value);
                       setShowLimitDropdown(false);
                     }}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
-                      option.value === rowLimit ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
-                    }`}
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors ${option.value === rowLimit
+                        ? 'bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-400 font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
                   >
                     {option.label}
                   </button>
@@ -250,12 +251,12 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
           <button
             onClick={handleSubmit}
             disabled={!question.trim() || isLoading}
-            className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+            className="px-6 py-3 bg-primary-600 dark:bg-primary-700 text-white rounded-lg hover:bg-primary-700 dark:hover:bg-primary-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-500 disabled:cursor-not-allowed transition-colors flex items-center space-x-2 shadow-sm"
             title="Send (Ctrl+Enter)"
           >
             {isLoading ? (
               <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 <span>Thinking...</span>
               </>
             ) : (
@@ -268,7 +269,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
         </div>
 
         {/* Hints */}
-        <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+        <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
           <span>Press Ctrl+Enter to send</span>
           <div className="flex items-center gap-1 flex-wrap justify-end">
             {(() => {
@@ -294,7 +295,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
                 <>
                   <span>{label} <strong>{selectedModel}</strong></span>
                   {overrides.map((o) => (
-                    <span key={o.label} className="text-blue-600">
+                    <span key={o.label} className="text-blue-600 dark:text-blue-400">
                       | {o.label} → <strong>{o.model}</strong>
                     </span>
                   ))}

@@ -258,7 +258,7 @@ export default function EnhancedChatInterface() {
               <label className="flex items-center space-x-2 cursor-pointer">
                 <button
                   onClick={() => setEnableNarratives(!enableNarratives)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enableNarratives ? 'bg-blue-600' : 'bg-gray-300'
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enableNarratives ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
                     }`}
                   title={enableNarratives ? 'Disable AI Narratives' : 'Enable AI Narratives'}
                 >
@@ -285,9 +285,9 @@ export default function EnhancedChatInterface() {
               {currentSession.connections.map((conn) => (
                 <span
                   key={conn.id}
-                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700"
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 transition-colors"
                 >
-                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-1.5"></span>
+                  <span className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full mr-1.5"></span>
                   {conn.name}
                 </span>
               ))}
@@ -346,8 +346,8 @@ export default function EnhancedChatInterface() {
             <div key={message.id} className="flex items-start space-x-3">
               {/* Avatar */}
               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${message.type === 'user'
-                  ? 'bg-primary-100 text-primary-700'
-                  : 'bg-gray-100 text-gray-700'
+                ? 'bg-primary-100 text-primary-700'
+                : 'bg-gray-100 text-gray-700'
                 }`}>
                 {message.type === 'user' ? (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
