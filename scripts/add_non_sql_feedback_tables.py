@@ -289,7 +289,7 @@ async def main():
         logger.info("   2. Implement TableMapper class (src/llm/table_mapper.py)")
         logger.info("   3. Implement ResultPatternLearner class (src/llm/result_pattern_learner.py)")
         logger.info("   4. Update feedback.py endpoint to handle non-SQL feedback types")
-        logger.info("\n📖 See docs/NON_SQL_FEEDBACK_DESIGN.md for full implementation plan")
+        logger.info("\n📖 See docs/technical/NON_SQL_FEEDBACK_DESIGN.md for full implementation plan")
     else:
         logger.error("\n❌ Migration failed. Check logs for details.")
         sys.exit(1)

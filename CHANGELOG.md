@@ -166,4 +166,4 @@ ollama pull nomic-embed-text
 ```
 Without embedding model, semantic cache uses TF-IDF fallback.
 
-See [Cache Setup Guide](docs/CACHE_SETUP.md) for detailed instructions.
+See [Cache Setup Guide](docs/technical/CACHE_SETUP.md) for detailed instructions.
