@@ -46,6 +46,7 @@ class TemplateType(Enum):
     FILTER_CATEGORY = "filter_category"
     FILTER_VALUE = "filter_value"
     FILTER_DATE = "filter_date"
+    SEARCH = "search"  # Case-insensitive search
     SUM_TOTAL = "sum_total"
     AVERAGE = "average"
     GROUP_BY = "group_by"
@@ -133,6 +134,22 @@ class TemplateEngine:
         r"^(\w+)\s+with\s+(\w+)\s+(of|=)\s+['\"]?(.+?)['\"]?$",
         r"^(show|list|get)\s+(\w+)\s+where\s+(\w+)\s+(is|=)\s+['\"]?(.+?)['\"]?$",
         # Removed overly general pattern that was matching "show all customers" incorrectly
+    ]
+
+    # Case-insensitive search patterns (uses ILIKE for PostgreSQL/DuckDB, LOWER() LIKE for others)
+    SEARCH_PATTERNS = [
+        r"^(search|find)\s+(\w+)\s+(containing|with|like|named?)\s+['\"]?(.+?)['\"]?$",
+        r"^(\w+)\s+(containing|like)\s+['\"]?(.+?)['\"]?$",
+        r"^(search|find)\s+(\w+)\s+where\s+(\w+)\s+(contains?|like)\s+['\"]?(.+?)['\"]?$",
+        r"^(\w+)\s+where\s+(\w+)\s+(contains?|like)\s+['\"]?(.+?)['\"]?$",
+    ]
+
+    # Date filter patterns (uses dialect-specific date math)
+    FILTER_DATE_PATTERNS = [
+        r"^(\w+)\s+(from|in)\s+(the\s+)?(last|past)\s+(\d+)\s+(days?|weeks?|months?|years?)$",
+        r"^(recent|latest)\s+(\w+)(\s+from\s+(last|past)\s+(\d+)\s+(days?|weeks?|months?|years?))?$",
+        r"^(\w+)\s+(created|updated|added|modified)\s+(in\s+)?(the\s+)?(last|past)\s+(\d+)\s+(days?|weeks?|months?|years?)$",
+        r"^(show|list|get)\s+(\w+)\s+from\s+(the\s+)?(last|past)\s+(\d+)\s+(days?|weeks?|months?|years?)$",
     ]
 
     SUM_PATTERNS = [
@@ -408,7 +425,9 @@ class TemplateEngine:
             (self._try_sum, TemplateType.SUM_TOTAL),
             (self._try_average, TemplateType.AVERAGE),
             (self._try_group_by, TemplateType.GROUP_BY),
+            (self._try_filter_date, TemplateType.FILTER_DATE),  # Date filters before location
             (self._try_filter_location, TemplateType.FILTER_LOCATION),
+            (self._try_search, TemplateType.SEARCH),  # Case-insensitive search
             (self._try_list_all, TemplateType.LIST_ALL),  # "show all X" before value filters
             (self._try_filter_value, TemplateType.FILTER_VALUE),  # Most general, try last
         ]
@@ -697,6 +716,147 @@ class TemplateEngine:
             for sample in samples:
                 if str(sample).lower() == value_lower:
                     return col
+
+        return None
+
+    def _try_search(self, question: str) -> Optional[TemplateMatch]:
+        """
+        Try to match case-insensitive search pattern.
+
+        Uses dialect-specific case-insensitive matching:
+        - PostgreSQL/DuckDB: ILIKE
+        - SQLite/MySQL: LOWER() LIKE LOWER()
+        """
+        for pattern in self.SEARCH_PATTERNS:
+            match = re.match(pattern, question, re.IGNORECASE)
+            if match:
+                groups = match.groups()
+                # Filter out keywords
+                clean_groups = [g for g in groups if g and g.lower() not in (
+                    "search", "find", "containing", "with", "like", "named", "name",
+                    "contains", "contain", "where"
+                )]
+
+                if len(clean_groups) >= 2:
+                    # Determine table, column, and search value
+                    table_text = clean_groups[0]
+                    search_value = clean_groups[-1]
+                    column_text = clean_groups[1] if len(clean_groups) >= 3 else None
+
+                    table = self._find_table(table_text)
+                    if table:
+                        # Find the search column (default to name/title if available)
+                        search_col = None
+                        if column_text:
+                            search_col = self._find_column(table, column_text)
+
+                        if not search_col:
+                            # Look for name/title columns
+                            for col in self.schema_info.tables.get(table, []):
+                                col_lower = col.lower()
+                                if any(n in col_lower for n in ['name', 'title', 'description']):
+                                    search_col = col
+                                    break
+
+                        if search_col:
+                            # Use dialect-specific case-insensitive matching
+                            where_clause = self._format_case_insensitive_match(search_col, search_value)
+                            sql = f"SELECT * FROM {table} WHERE {where_clause} LIMIT {self.default_limit}"
+
+                            return TemplateMatch(
+                                template_type=TemplateType.SEARCH,
+                                sql=sql,
+                                confidence=0.85,
+                                matched_table=table,
+                                matched_columns=[search_col],
+                                parameters={"column": search_col, "search_value": search_value},
+                                explanation=f"Search {table} where {search_col} contains '{search_value}'"
+                            )
+
+        return None
+
+    def _try_filter_date(self, question: str) -> Optional[TemplateMatch]:
+        """
+        Try to match date filter pattern.
+
+        Uses dialect-specific date math:
+        - PostgreSQL/DuckDB: CURRENT_TIMESTAMP - INTERVAL 'N days'
+        - SQLite: datetime('now', '-N days')
+        - MySQL: DATE_SUB(NOW(), INTERVAL N DAY)
+        """
+        for pattern in self.FILTER_DATE_PATTERNS:
+            match = re.match(pattern, question, re.IGNORECASE)
+            if match:
+                groups = match.groups()
+
+                # Extract table name and time period
+                table_text = None
+                days = 7  # Default to last 7 days
+                unit = "days"
+
+                # Parse the groups to find table and time info
+                for i, g in enumerate(groups):
+                    if not g:
+                        continue
+                    g_lower = g.lower()
+
+                    # Skip keywords
+                    if g_lower in ('the', 'from', 'in', 'last', 'past', 'recent', 'latest',
+                                   'created', 'updated', 'added', 'modified', 'show', 'list', 'get'):
+                        continue
+
+                    # Check if it's a number (days/weeks count)
+                    if g.isdigit():
+                        days = int(g)
+                        continue
+
+                    # Check if it's a time unit
+                    if g_lower.rstrip('s') in ('day', 'week', 'month', 'year'):
+                        unit = g_lower.rstrip('s') + 's'
+                        continue
+
+                    # Otherwise it's likely the table name
+                    if not table_text:
+                        table_text = g
+
+                if table_text:
+                    table = self._find_table(table_text)
+                    if table:
+                        # Find a date column
+                        date_col = None
+                        date_columns = self.schema_info.date_columns.get(table, [])
+                        if date_columns:
+                            date_col = date_columns[0]
+                        else:
+                            # Look for common date column names
+                            for col in self.schema_info.tables.get(table, []):
+                                col_lower = col.lower()
+                                if any(d in col_lower for d in ['date', 'created', 'updated', 'time', 'timestamp']):
+                                    date_col = col
+                                    break
+
+                        if date_col:
+                            # Convert weeks/months/years to days for simpler handling
+                            if unit == 'weeks':
+                                days = days * 7
+                            elif unit == 'months':
+                                days = days * 30
+                            elif unit == 'years':
+                                days = days * 365
+
+                            # Use dialect-specific date filter
+                            where_clause = self._format_date_filter(date_col, days)
+                            sql = f"SELECT * FROM {table} WHERE {where_clause} LIMIT {self.default_limit}"
+
+                            return TemplateMatch(
+                                template_type=TemplateType.FILTER_DATE,
+                                sql=sql,
+                                confidence=0.85,
+                                matched_table=table,
+                                matched_columns=[date_col],
+                                parameters={"column": date_col, "days": days},
+                                explanation=f"{table} from the last {days} days"
+                            )
 
         return None
 

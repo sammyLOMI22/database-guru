@@ -48,86 +48,88 @@ class DialectRules:
     array_length: str  # ARRAY_LENGTH, CARDINALITY
 
 # Dialect configurations
+# Each dialect has specific syntax for common SQL operations.
+# Comments indicate non-obvious behaviors or key differences from standard SQL.
 DIALECT_RULES: Dict[DatabaseDialect, DialectRules] = {
     DatabaseDialect.POSTGRESQL: DialectRules(
         current_timestamp="CURRENT_TIMESTAMP",
         date_diff="CURRENT_TIMESTAMP - INTERVAL '{n} {unit}'",  # Returns TIMESTAMP
         date_format="TO_CHAR({col}, '{format}')",
-        concat="||",
-        substring="SUBSTRING({col} FROM {start} FOR {len})",
+        concat="||",  # Operator-based concatenation
+        substring="SUBSTRING({col} FROM {start} FOR {len})",  # Uses FROM/FOR syntax
         string_length="LENGTH({col})",
-        case_insensitive="ILIKE",
+        case_insensitive="ILIKE",  # Native case-insensitive LIKE
         limit_syntax="LIMIT {n}",
         offset_syntax="OFFSET {n}",
-        true_value="TRUE",
-        false_value="FALSE",
-        null_safe_equals="IS NOT DISTINCT FROM",
+        true_value="TRUE",  # Native boolean type
+        false_value="FALSE",  # Native boolean type
+        null_safe_equals="IS NOT DISTINCT FROM",  # SQL standard null-safe comparison
         coalesce="COALESCE({args})",
-        cast_syntax="{expr}::{type}",
-        json_extract="{col}->'{key}'",
+        cast_syntax="{expr}::{type}",  # PostgreSQL-style cast shorthand
+        json_extract="{col}->'{key}'",  # Returns JSON, ->> for text
         json_array="JSON_BUILD_ARRAY({args})",
-        array_contains="{col} @> ARRAY[{val}]",
-        array_length="ARRAY_LENGTH({col}, 1)",
+        array_contains="{col} @> ARRAY[{val}]",  # Array containment operator
+        array_length="ARRAY_LENGTH({col}, 1)",  # Second arg is dimension
     ),
     DatabaseDialect.SQLITE: DialectRules(
-        current_timestamp="datetime('now')",
-        date_diff="datetime('now', '-{n} {unit}')",
-        date_format="strftime('{format}', {col})",
-        concat="||",
-        substring="SUBSTR({col}, {start}, {len})",
+        current_timestamp="datetime('now')",  # SQLite uses datetime() function
+        date_diff="datetime('now', '-{n} {unit}')",  # Modifier-based date math
+        date_format="strftime('{format}', {col})",  # Format string first
+        concat="||",  # Operator-based concatenation
+        substring="SUBSTR({col}, {start}, {len})",  # SUBSTR not SUBSTRING
         string_length="LENGTH({col})",
-        case_insensitive="LIKE",  # SQLite LIKE is case-insensitive for ASCII
+        case_insensitive="LIKE",  # Case-insensitive for ASCII only
         limit_syntax="LIMIT {n}",
         offset_syntax="OFFSET {n}",
-        true_value="1",
-        false_value="0",
-        null_safe_equals="IS",  # Limited support
+        true_value="1",  # No native boolean, uses integers
+        false_value="0",  # No native boolean, uses integers
+        null_safe_equals="IS",  # Limited null-safe support
         coalesce="COALESCE({args})",
         cast_syntax="CAST({expr} AS {type})",
-        json_extract="JSON_EXTRACT({col}, '$.{key}')",
+        json_extract="JSON_EXTRACT({col}, '$.{key}')",  # JSON path syntax
         json_array="JSON_ARRAY({args})",
         array_contains="",  # Not supported
         array_length="",  # Not supported
     ),
     DatabaseDialect.MYSQL: DialectRules(
-        current_timestamp="NOW()",
-        date_diff="DATE_SUB(NOW(), INTERVAL {n} {unit})",
+        current_timestamp="NOW()",  # Function-based timestamp
+        date_diff="DATE_SUB(NOW(), INTERVAL {n} {unit})",  # DATE_SUB function
         date_format="DATE_FORMAT({col}, '{format}')",
-        concat="CONCAT({args})",
+        concat="CONCAT({args})",  # Function-based concatenation
         substring="SUBSTRING({col}, {start}, {len})",
         string_length="LENGTH({col})",
-        case_insensitive="LIKE",  # Case-insensitive by default with most collations
+        case_insensitive="LIKE",  # Case-insensitive with default collation
         limit_syntax="LIMIT {n}",
         offset_syntax="OFFSET {n}",
-        true_value="TRUE",
-        false_value="FALSE",
-        null_safe_equals="<=>",
+        true_value="TRUE",  # Also accepts 1
+        false_value="FALSE",  # Also accepts 0
+        null_safe_equals="<=>",  # MySQL null-safe equals operator
         coalesce="COALESCE({args})",
         cast_syntax="CAST({expr} AS {type})",
-        json_extract="{col}->'$.{key}'",
+        json_extract="{col}->'$.{key}'",  # JSON path with -> operator
         json_array="JSON_ARRAY({args})",
-        array_contains="",  # Not supported directly
-        array_length="JSON_LENGTH({col})",  # For JSON arrays
+        array_contains="",  # Not supported natively
+        array_length="JSON_LENGTH({col})",  # Works with JSON arrays
     ),
     DatabaseDialect.DUCKDB: DialectRules(
         current_timestamp="CURRENT_TIMESTAMP",
         date_diff="CURRENT_TIMESTAMP - INTERVAL '{n} {unit}'",  # Returns TIMESTAMP
-        date_format="strftime({col}, '{format}')",
-        concat="||",
-        substring="substring({col}, {start}, {len})",
-        string_length="length({col})",
-        case_insensitive="ILIKE",  # DuckDB supports ILIKE
+        date_format="strftime({col}, '{format}')",  # Column first, format second
+        concat="||",  # Operator-based concatenation
+        substring="substring({col}, {start}, {len})",  # Lowercase function name
+        string_length="length({col})",  # Lowercase function name
+        case_insensitive="ILIKE",  # Native case-insensitive LIKE
         limit_syntax="LIMIT {n}",
         offset_syntax="OFFSET {n}",
-        true_value="TRUE",
-        false_value="FALSE",
-        null_safe_equals="IS NOT DISTINCT FROM",
+        true_value="TRUE",  # Native boolean type
+        false_value="FALSE",  # Native boolean type
+        null_safe_equals="IS NOT DISTINCT FROM",  # SQL standard null-safe comparison
         coalesce="COALESCE({args})",
         cast_syntax="CAST({expr} AS {type})",
-        json_extract="{col}.{key}",  # Struct extraction style or json_extract
-        json_array="list_value({args})",  # Arrays/Lists
-        array_contains="list_contains({col}, {val})",
-        array_length="len({col})",
+        json_extract="{col}.{key}",  # Struct/dot notation for JSON
+        json_array="list_value({args})",  # DuckDB uses lists, not JSON arrays
+        array_contains="list_contains({col}, {val})",  # List containment function
+        array_length="len({col})",  # Simple len() function
     ),
 }
 
