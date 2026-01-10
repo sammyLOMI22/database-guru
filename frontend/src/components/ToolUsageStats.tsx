@@ -96,9 +96,9 @@ export const ToolUsageStats: React.FC = () => {
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-10 bg-gray-200 rounded w-48" />
+        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-48" />
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-24 bg-gray-200 rounded-lg" />
+          <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded-lg" />
         ))}
       </div>
     );
@@ -120,10 +120,10 @@ export const ToolUsageStats: React.FC = () => {
 
   if (!stats || Object.keys(stats.by_tool).length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
+      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
         <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
         <p>No tool usage statistics available yet</p>
-        <p className="text-sm mt-2">Tools will show stats after being executed</p>
+        <p className="text-sm dark:text-gray-500 mt-2">Tools will show stats after being executed</p>
       </div>
     );
   }
@@ -137,7 +137,7 @@ export const ToolUsageStats: React.FC = () => {
       {/* Sort Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Sort by:</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
           <div className="flex gap-1">
             {[
               { key: 'executions', label: 'Executions', icon: TrendingUp },
@@ -147,11 +147,10 @@ export const ToolUsageStats: React.FC = () => {
               <button
                 key={key}
                 onClick={() => setSortBy(key as typeof sortBy)}
-                className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  sortBy === key
+                className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg transition-colors ${sortBy === key
                     ? 'bg-orange-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
               >
                 <Icon className="w-3.5 h-3.5" />
                 {label}
@@ -161,7 +160,7 @@ export const ToolUsageStats: React.FC = () => {
         </div>
         <button
           onClick={() => loadStats(true)}
-          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Refresh
@@ -178,16 +177,16 @@ export const ToolUsageStats: React.FC = () => {
           return (
             <div
               key={toolName}
-              className="bg-white rounded-lg border border-gray-200 p-4 hover:border-orange-200 transition-colors"
+              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:border-orange-200 dark:hover:border-orange-900/50 transition-colors"
             >
               {/* Tool Header */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Zap className="w-5 h-5 text-orange-500" />
-                  <h3 className="font-semibold text-gray-900">{toolName}</h3>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">{toolName}</h3>
                 </div>
                 {toolStats.last_executed && (
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
                     Last: {new Date(toolStats.last_executed).toLocaleString()}
                   </span>
                 )}
@@ -197,11 +196,11 @@ export const ToolUsageStats: React.FC = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {/* Executions */}
                 <div>
-                  <div className="text-xs text-gray-500 mb-1">Executions</div>
-                  <div className="text-lg font-bold text-gray-900">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Executions</div>
+                  <div className="text-lg font-bold text-gray-900 dark:text-white">
                     {toolStats.times_executed}
                   </div>
-                  <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="mt-1 h-1.5 bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-blue-500 rounded-full transition-all"
                       style={{ width: `${executionBarWidth}%` }}
@@ -211,7 +210,7 @@ export const ToolUsageStats: React.FC = () => {
 
                 {/* Success Rate */}
                 <div>
-                  <div className="text-xs text-gray-500 mb-1">Success Rate</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Success Rate</div>
                   <div className="flex items-center gap-1">
                     {successPercent >= 80 ? (
                       <CheckCircle className="w-4 h-4 text-green-500" />
@@ -221,26 +220,24 @@ export const ToolUsageStats: React.FC = () => {
                       <XCircle className="w-4 h-4 text-red-500" />
                     )}
                     <span
-                      className={`text-lg font-bold ${
-                        successPercent >= 80
-                          ? 'text-green-600'
+                      className={`text-lg font-bold ${successPercent >= 80
+                          ? 'text-green-600 dark:text-green-400'
                           : successPercent >= 50
-                          ? 'text-yellow-600'
-                          : 'text-red-600'
-                      }`}
+                            ? 'text-yellow-600 dark:text-yellow-400'
+                            : 'text-red-600 dark:text-red-400'
+                        }`}
                     >
                       {successPercent.toFixed(0)}%
                     </span>
                   </div>
-                  <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="mt-1 h-1.5 bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${
-                        successPercent >= 80
+                      className={`h-full rounded-full transition-all ${successPercent >= 80
                           ? 'bg-green-500'
                           : successPercent >= 50
-                          ? 'bg-yellow-500'
-                          : 'bg-red-500'
-                      }`}
+                            ? 'bg-yellow-500'
+                            : 'bg-red-500'
+                        }`}
                       style={{ width: `${successPercent}%` }}
                     />
                   </div>
@@ -248,11 +245,11 @@ export const ToolUsageStats: React.FC = () => {
 
                 {/* Avg Time */}
                 <div>
-                  <div className="text-xs text-gray-500 mb-1">Avg Time</div>
-                  <div className="text-lg font-bold text-gray-900">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Avg Time</div>
+                  <div className="text-lg font-bold text-gray-900 dark:text-white">
                     {toolStats.avg_time_ms.toFixed(0)}ms
                   </div>
-                  <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="mt-1 h-1.5 bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-purple-500 rounded-full transition-all"
                       style={{ width: `${timeBarWidth}%` }}
@@ -262,11 +259,11 @@ export const ToolUsageStats: React.FC = () => {
 
                 {/* Cache Hit Rate */}
                 <div>
-                  <div className="text-xs text-gray-500 mb-1">Cache Hits</div>
-                  <div className="text-lg font-bold text-gray-900">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Cache Hits</div>
+                  <div className="text-lg font-bold text-gray-900 dark:text-white">
                     {(toolStats.cache_hit_rate * 100).toFixed(0)}%
                   </div>
-                  <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="mt-1 h-1.5 bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-orange-500 rounded-full transition-all"
                       style={{ width: `${toolStats.cache_hit_rate * 100}%` }}
@@ -276,7 +273,7 @@ export const ToolUsageStats: React.FC = () => {
               </div>
 
               {/* Success/Failure Counts */}
-              <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
+              <div className="mt-3 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1">
                   <CheckCircle className="w-3 h-3 text-green-500" />
                   {toolStats.successes} successes

@@ -157,15 +157,32 @@ export const FeedbackStats: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Feedback Dashboard</h2>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">User corrections and continuous learning insights</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Feedback Dashboard</h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">User corrections and continuous learning insights</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 cursor-pointer bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-lg text-sm transition-colors">
+            <Clock className={`w-4 h-4 ${autoRefresh ? 'text-blue-500 animate-pulse' : 'text-gray-400'}`} />
+            <span className="text-gray-700 dark:text-gray-300 font-medium">Auto-Refresh</span>
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+            />
+            <div className={`w-8 h-4 rounded-full transition-colors relative ${autoRefresh ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+              <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${autoRefresh ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </div>
+          </label>
+        </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Total Feedback */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-blue-500 overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-blue-500 overflow-hidden border border-gray-100 dark:border-gray-700 transition-colors">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Feedback</p>
@@ -176,7 +193,7 @@ export const FeedbackStats: React.FC = () => {
         </div>
 
         {/* Applied to Learning */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-green-500 overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-green-500 overflow-hidden border border-gray-100 dark:border-gray-700 transition-colors">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Applied to Learning</p>
@@ -186,8 +203,8 @@ export const FeedbackStats: React.FC = () => {
           </div>
         </div>
 
-        {/* Pending */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-yellow-500 overflow-hidden">
+        {/* Pending Review */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-yellow-500 overflow-hidden border border-gray-100 dark:border-gray-700 transition-colors">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Review</p>
@@ -262,70 +279,43 @@ export const FeedbackStats: React.FC = () => {
       </div>
 
       {/* Recent Feedback */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden max-w-full">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Recent Feedback
-              </h3>
-              <button
-                onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`px-3 py-1 text-xs rounded font-medium transition-colors ${autoRefresh
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-800/50'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-700'
-                  }`}
-                title={autoRefresh ? 'Auto-refresh enabled (every 10s)' : 'Enable auto-refresh'}
-              >
-                {autoRefresh ? '🔄 Auto-refresh ON' : '⏸️ Auto-refresh OFF'}
-              </button>
-            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Recent Feedback
+            </h3>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3 text-sm">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="feedbackFilter"
-                    value="all"
-                    checked={filterMode === 'all'}
-                    onChange={() => {
-                      setFilterMode('all');
-                      setCurrentPage(0);
-                    }}
-                    className="cursor-pointer"
-                  />
-                  <span className="text-gray-700 dark:text-gray-300">All</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="feedbackFilter"
-                    value="pending"
-                    checked={filterMode === 'pending'}
-                    onChange={() => {
-                      setFilterMode('pending');
-                      setCurrentPage(0);
-                    }}
-                    className="cursor-pointer"
-                  />
-                  <span className="text-gray-700 dark:text-gray-300">Pending</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="feedbackFilter"
-                    value="applied"
-                    checked={filterMode === 'applied'}
-                    onChange={() => {
-                      setFilterMode('applied');
-                      setCurrentPage(0);
-                    }}
-                    className="cursor-pointer"
-                  />
-                  <span className="text-gray-700 dark:text-gray-300">Applied</span>
-                </label>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => { setFilterMode('all'); setCurrentPage(0); }}
+                  className={`px-3 py-1 text-xs rounded font-medium transition-all ${filterMode === 'all'
+                    ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => { setFilterMode('pending'); setCurrentPage(0); }}
+                  className={`px-3 py-1 text-xs rounded font-medium transition-all ${filterMode === 'pending'
+                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 shadow-sm'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                >
+                  Pending
+                </button>
+                <button
+                  onClick={() => { setFilterMode('applied'); setCurrentPage(0); }}
+                  className={`px-3 py-1 text-xs rounded font-medium transition-all ${filterMode === 'applied'
+                    ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 shadow-sm'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                >
+                  Applied
+                </button>
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
                 Page {currentPage + 1}
               </div>
             </div>
@@ -340,15 +330,15 @@ export const FeedbackStats: React.FC = () => {
             </div>
           ) : (
             recentFeedback.map((feedback) => (
-              <div key={feedback.id} className="p-4 hover:bg-gray-50 transition-colors overflow-x-hidden">
+              <div key={feedback.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors overflow-x-hidden">
                 <div className="flex flex-col sm:flex-row items-start gap-3">
                   <div className="flex-1 min-w-0 overflow-hidden" style={{ maxWidth: "calc(100% - 100px)" }}>
 
                     <div className="flex flex-wrap items-center gap-1.5 mb-2">
                       <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${feedback.feedback_type === 'sql_correction' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' :
-                          feedback.feedback_type === 'column_name' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' :
-                            feedback.feedback_type === 'table_name' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300' :
-                              'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+                        feedback.feedback_type === 'column_name' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' :
+                          feedback.feedback_type === 'table_name' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300' :
+                            'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
                         }`}>
                         {feedback.feedback_type.replace('_', ' ').toUpperCase()}
                       </span>
@@ -505,7 +495,7 @@ export const FeedbackStats: React.FC = () => {
 
         {/* Pagination Controls */}
         {recentFeedback.length > 0 && (
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <button
               onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
               disabled={currentPage === 0}

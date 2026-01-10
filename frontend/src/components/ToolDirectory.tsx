@@ -114,7 +114,7 @@ export const ToolDirectory: React.FC = () => {
     return (
       <div className="animate-pulse space-y-4">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-20 bg-gray-200 rounded-lg" />
+          <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded-lg" />
         ))}
       </div>
     );
@@ -137,8 +137,8 @@ export const ToolDirectory: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Filter Bar */}
-      <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
-        <div className="flex items-center gap-2 text-gray-600">
+      <div className="flex items-center gap-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
           <Filter className="w-4 h-4" />
           <span className="text-sm font-medium">Filter:</span>
         </div>
@@ -147,11 +147,10 @@ export const ToolDirectory: React.FC = () => {
             <button
               key={cat.value}
               onClick={() => setCategoryFilter(cat.value)}
-              className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
-                categoryFilter === cat.value
+              className={`px-3 py-1.5 text-sm rounded-full transition-colors ${categoryFilter === cat.value
                   ? 'bg-orange-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
             >
               {cat.label}
             </button>
@@ -179,20 +178,20 @@ export const ToolDirectory: React.FC = () => {
                 {/* Tool Header */}
                 <button
                   onClick={() => toggleTool(tool.name)}
-                  className={`w-full flex items-center justify-between p-4 text-left ${colors.bg} hover:opacity-90 transition-opacity`}
+                  className={`w-full flex items-center justify-between p-4 text-left ${colors.bg} dark:bg-opacity-10 dark:hover:bg-opacity-20 transition-all`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg bg-white ${colors.text}`}>
+                    <div className={`p-2 rounded-lg bg-white dark:bg-gray-800 ${colors.text} shadow-sm border border-transparent dark:border-gray-700`}>
                       {categoryIcons[tool.category] || <Zap className="w-5 h-5" />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className={`font-semibold ${colors.text}`}>{tool.name}</h3>
-                        <span className={`text-xs px-2 py-0.5 rounded-full bg-white ${colors.text}`}>
+                        <h3 className={`font-semibold ${colors.text} dark:text-white`}>{tool.name}</h3>
+                        <span className={`text-xs px-2 py-0.5 rounded-full bg-white dark:bg-gray-700 ${colors.text} dark:text-gray-300 border border-transparent dark:border-gray-600`}>
                           {tool.category}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 mt-0.5">{tool.description}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{tool.description}</p>
                     </div>
                   </div>
                   <div className={`flex-shrink-0 ${colors.text}`}>
@@ -206,30 +205,30 @@ export const ToolDirectory: React.FC = () => {
 
                 {/* Expanded Details */}
                 {isExpanded && (
-                  <div className="p-4 bg-white border-t border-gray-100">
+                  <div className="p-4 bg-white dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700">
                     {/* Parameters */}
                     <div className="mb-4">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Parameters</h4>
+                      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Parameters</h4>
                       {Object.keys(tool.parameters).length === 0 ? (
-                        <p className="text-sm text-gray-500">No parameters required</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-500">No parameters required</p>
                       ) : (
                         <div className="space-y-2">
                           {Object.entries(tool.parameters).map(([name, param]) => (
                             <div
                               key={name}
-                              className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg"
+                              className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700"
                             >
-                              <code className="text-sm font-mono bg-gray-200 px-2 py-0.5 rounded">
+                              <code className="text-sm font-mono bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-green-400 px-2 py-0.5 rounded">
                                 {name}
                               </code>
                               <div className="flex-1 text-sm">
-                                <span className="text-gray-500">({param.type})</span>
+                                <span className="text-gray-500 dark:text-gray-400">({param.type})</span>
                                 {tool.required_params.includes(name) && (
-                                  <span className="ml-2 text-red-500 text-xs">required</span>
+                                  <span className="ml-2 text-red-500 dark:text-red-400 text-xs">required</span>
                                 )}
-                                <p className="text-gray-600 mt-1">{param.description}</p>
+                                <p className="text-gray-600 dark:text-gray-300 mt-1">{param.description}</p>
                                 {param.default !== undefined && (
-                                  <p className="text-gray-400 text-xs mt-1">
+                                  <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
                                     Default: {JSON.stringify(param.default)}
                                   </p>
                                 )}
@@ -241,7 +240,7 @@ export const ToolDirectory: React.FC = () => {
                     </div>
 
                     {/* Cache Info */}
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />
                         <span>
