@@ -483,6 +483,10 @@ class TestStringEscaping:
         engine = TemplateEngine(sample_schema, database_type="sqlite")
         match = engine.try_match("customers where name is O'Malley")
 
-        if match:
-            # Should have escaped single quote
-            assert "O''Malley" in match.sql or "O\\'Malley" in match.sql or "O'Malley" not in match.sql
+        # Must match the filter pattern
+        assert match is not None, "Should match filter pattern for 'customers where name is O'Malley'"
+        # Single quotes must be escaped to prevent SQL injection
+        # Note: template engine may lowercase values, so check case-insensitively
+        sql_lower = match.sql.lower()
+        assert "o''malley" in sql_lower or "o\\'malley" in sql_lower, \
+            f"Single quotes should be escaped in SQL. Got: {match.sql}"
