@@ -102,7 +102,7 @@ export const SunburstView: React.FC<SunburstViewProps> = ({
 
   if (!rings || rings.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-500">
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
         No hierarchical data available for sunburst chart
       </div>
     );
@@ -156,7 +156,7 @@ export const SunburstView: React.FC<SunburstViewProps> = ({
                     {valueColumn}: {item.value?.toLocaleString()}
                   </div>
                   {item.path && item.path.length > 1 && (
-                    <div className="text-gray-500 dark:text-gray-500 text-xs mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <div className="text-gray-500 dark:text-gray-400 text-xs mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
                       {item.path.join(' → ')}
                     </div>
                   )}
@@ -186,7 +186,7 @@ export const SunburstView: React.FC<SunburstViewProps> = ({
       )}
 
       {/* Depth indicator */}
-      <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-500">
+      <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
         <span>Hierarchy depth: {maxDepth} level{maxDepth !== 1 ? 's' : ''}</span>
         <span className="text-gray-300 dark:text-gray-700">|</span>
         <span>Inner ring = top level, outer rings = sub-categories</span>

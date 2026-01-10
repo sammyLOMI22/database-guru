@@ -72,7 +72,7 @@ export const HistogramView: React.FC<HistogramViewProps> = ({
 
   if (!histogramData || histogramData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-500">
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
         No numeric data available for histogram
       </div>
     );

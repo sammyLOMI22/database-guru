@@ -52,7 +52,7 @@ export const BubbleChartView: React.FC<BubbleChartViewProps> = ({
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-500">
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
         No numeric data available for bubble chart (requires 3 numeric columns)
       </div>
     );
@@ -148,7 +148,7 @@ export const BubbleChartView: React.FC<BubbleChartViewProps> = ({
         </ScatterChart>
       </ResponsiveContainer>
       {data.length > 100 && (
-        <p className="text-xs text-gray-400 mt-2 text-center">
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
           Showing first 100 of {data.length} points
         </p>
       )}

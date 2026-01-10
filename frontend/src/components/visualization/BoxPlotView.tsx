@@ -87,7 +87,7 @@ export const BoxPlotView: React.FC<BoxPlotViewProps> = ({
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-500">
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
         No data available for box plot
       </div>
     );
@@ -128,14 +128,14 @@ export const BoxPlotView: React.FC<BoxPlotViewProps> = ({
                 <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 text-sm">
                   <div className="font-medium text-gray-900 dark:text-gray-100 mb-2">{item.name}</div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600 dark:text-gray-400">
-                    <div><span className="font-medium text-gray-500">Min:</span> {item.min?.toFixed(2)}</div>
-                    <div><span className="font-medium text-gray-500">Max:</span> {item.max?.toFixed(2)}</div>
-                    <div><span className="font-medium text-gray-500">Q1:</span> {item.q1?.toFixed(2)}</div>
-                    <div><span className="font-medium text-gray-500">Q3:</span> {item.q3?.toFixed(2)}</div>
-                    <div><span className="font-medium text-gray-500">Median:</span> {item.median?.toFixed(2)}</div>
-                    <div><span className="font-medium text-gray-500">Mean:</span> {item.mean?.toFixed(2)}</div>
-                    <div><span className="font-medium text-gray-500">IQR:</span> {item.iqr?.toFixed(2)}</div>
-                    <div><span className="font-medium text-gray-500">Std Dev:</span> {item.stdDev?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500 dark:text-gray-500">Min:</span> {item.min?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500 dark:text-gray-500">Max:</span> {item.max?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500 dark:text-gray-500">Q1:</span> {item.q1?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500 dark:text-gray-500">Q3:</span> {item.q3?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500 dark:text-gray-500">Median:</span> {item.median?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500 dark:text-gray-500">Mean:</span> {item.mean?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500 dark:text-gray-500">IQR:</span> {item.iqr?.toFixed(2)}</div>
+                    <div><span className="font-medium text-gray-500 dark:text-gray-500">Std Dev:</span> {item.stdDev?.toFixed(2)}</div>
                   </div>
                   {item.outliers?.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs text-amber-600 dark:text-amber-500">
