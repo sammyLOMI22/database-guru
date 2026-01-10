@@ -116,14 +116,18 @@ export const CacheOverview: React.FC = () => {
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <div className="text-red-500 mb-4">Error: {error}</div>
-        <button
-          onClick={() => loadData(true)}
-          className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
-        >
-          Retry
-        </button>
+      <div className="flex items-center justify-center h-64">
+        <div className="p-6 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/50 rounded-xl text-center max-w-md shadow-sm">
+          <AlertCircle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-red-900 dark:text-red-100 mb-2">Service Error</h3>
+          <p className="text-red-700 dark:text-red-300 mb-6">{error}</p>
+          <button
+            onClick={() => loadData(true)}
+            className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
+          >
+            Retry Connection
+          </button>
+        </div>
       </div>
     );
   }
@@ -395,41 +399,38 @@ export const CacheOverview: React.FC = () => {
       </div>
 
       {/* How It Works */}
-      <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200 p-5 dark:from-amber-950/20 dark:to-orange-950/20 dark:border-amber-800/50">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3 dark:text-white">How Semantic Caching Works</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-amber-500 text-white rounded-full flex items-center justify-center font-bold">
-              1
+      <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-6">
+        <h3 className="text-lg font-bold text-amber-900 dark:text-amber-100 flex items-center gap-2 mb-4">
+          <Zap className="w-5 h-5" />
+          How Semantic Caching Works
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <div className="font-semibold text-amber-800 dark:text-amber-400 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-400 flex items-center justify-center text-xs">1</span>
+              Vector Embedding
             </div>
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">Exact Hash Check</p>
-              <p className="text-gray-600 dark:text-gray-300">
-                First checks for exact query match (fastest path, ~0.5s)
-              </p>
-            </div>
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Incoming natural language queries are converted into mathematical vectors using locally hosted Ollama embedding models.
+            </p>
           </div>
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-amber-500 text-white rounded-full flex items-center justify-center font-bold">
-              2
+          <div className="space-y-2">
+            <div className="font-semibold text-amber-800 dark:text-amber-400 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-400 flex items-center justify-center text-xs">2</span>
+              Similarity Search
             </div>
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">Semantic Similarity</p>
-              <p className="text-gray-600 dark:text-gray-300">
-                Compares query embeddings to find similar questions (threshold: 0.85)
-              </p>
-            </div>
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              The cache performs a cosine similarity search in Redis to find previous queries with the same intent, not just same keywords.
+            </p>
           </div>
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-amber-500 text-white rounded-full flex items-center justify-center font-bold">
-              3
+          <div className="space-y-2">
+            <div className="font-semibold text-amber-800 dark:text-amber-400 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-400 flex items-center justify-center text-xs">3</span>
+              Instant Response
             </div>
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">LLM Cache</p>
-              <p className="text-gray-600 dark:text-gray-300">
-                Caches LLM responses with schema fingerprinting (threshold: 0.88)
-              </p>
-            </div>
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Matches above the threshold (.90) return the cached SQL immediately, reducing LLM costs and database latency to milliseconds.
+            </p>
           </div>
         </div>
       </div>
