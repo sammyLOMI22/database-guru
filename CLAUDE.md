@@ -686,34 +686,41 @@ Settings managed via Pydantic in `src/config/settings.py`:
 ## Documentation
 
 Key docs in `docs/`:
-- `PARALLEL_EXECUTION.md` - **Parallel execution technical guide (PRODUCTION-READY - Nov 8, 2025!)**
-  - Comprehensive guide with timeout protection, metrics, and frontend integration
-- `CODE_REVIEW_PARALLEL_EXECUTION.md` - **Code review documentation (9.0/10 score)**
-  - All critical & important issues resolved
-- `CONVERSATIONAL_MEMORY_IMPLEMENTATION.md` - Conversational memory technical guide
-- `PHASE_1_COMPLETE.md` - Conversational memory completion summary
-- `TEST_CONVERSATIONAL_MEMORY.md` - Conversational memory testing guide
-- `SECURITY_IMPROVEMENTS.md` - Recent security fixes and remaining issues
-- `FUTURE_PLANS.md` - Prioritized roadmap (UPDATED with production-ready parallel features - Nov 8, 2025!)
-- `QUERY_PLANNING_AGENT.md` - Query planning system deep dive
-- `CONFIDENCE_SCORING.md` - Confidence scoring system
-- `LEARNING_FROM_CORRECTIONS.md` - Correction learning system
-- `RESULT_VERIFICATION_AGENT.md` - Result verification details
-- `AUTO_LEARNING_GUIDE.md` - User feedback and auto-learning
-- `MULTI_DATABASE_GUIDE.md` - Multi-database queries (UPDATED with production-ready parallel execution)
-- `SECURITY_POLICY.md` - Security controls and validation
-- `tests/TESTING.md` - Testing guide
-- `DEMO_PAGE_UPDATED.md` - Demo page with Scenario 5 (Parallel Execution) showcase
-- `TOOL_USING_AGENT.md` - **Tool-Using Agent guide (NEW - Nov 21, 2025)** - Phase 3.1 implementation
-- `SEMANTIC_CACHING.md` - **Semantic Caching guide (NEW - Nov 22, 2025)** - Phase 3.2 backend implementation
-- `SEMANTIC_CACHE_UI.md` - **Semantic Cache UI guide (NEW - Nov 22, 2025)** - Phase 3.3 frontend components
-- `CONNECTION_POOLING_GUIDE.md` - **Connection Pooling Guide (PRODUCTION-READY - Dec 6, 2025)** - Phase 4.1 complete user guide (configuration, monitoring, performance tuning, troubleshooting)
-- `TEST_DATABASE_SETUP.md` - **Test Database Setup Guide (Dec 6, 2025)** - Docker Compose test infrastructure setup and usage
-- `CONNECTION_POOLING_IMPLEMENTATION_PLAN.md` - **5-day implementation plan (80% complete)** - Day 4 complete (test infrastructure)
-- `DATA_NARRATIVES_GUIDE.md` - **Intelligent Data Narratives & Human Insights (NEW - Dec 13, 2025)** - Complete feature guide with usage, architecture, performance, configuration, and troubleshooting
-- `MULTI_DB_NARRATIVES.md` - **Multi-Database Narratives (NEW - Dec 13, 2025)** - Per-database + combined analysis for multi-database queries
-- `ADVANCED_VISUALIZATION_PHASE2_PLAN.md` - **Advanced Visualization Phase 2 (Dec 20-26, 2025)** - Chart Intelligence (Phase 8) + Advanced Charts (Phase 10) with 10 chart types, 132 tests
-- `SQL_GENERATION_PIPELINE.md` - **SQL Generation Pipeline (UPDATED - Jan 7, 2026)** - Complete pipeline documentation with Phase 2.4 multi-database validation
-- `MULTI_DB_VALIDATION_GUIDE.md` - **Multi-Database Validation Guide (NEW - Jan 7, 2026)** - Pre-flight validation architecture, troubleshooting, and API reference
-- `SMALL_MODEL_OPTIMIZATION_PHASE_2_PR_REVIEW.md` - **Phase 2 PR Review (UPDATED - Jan 7, 2026)** - Code review with all issues resolved (sqlparse fix)
-- `SEMANTIC_TYPE_INTELLIGENCE_PLAN.md` - **Semantic Type Intelligence Roadmap (NEW - Jan 8, 2026)** - Future plan for Date/Time, Status/Enum, Boolean, and other query intelligence features
+
+**Guides** (`docs/guides/`):
+- `guides/AUTO_LEARNING_GUIDE.md` - User feedback and auto-learning
+- `guides/MULTI_DATABASE_GUIDE.md` - Multi-database queries (UPDATED with production-ready parallel execution)
+- `guides/CONNECTION_POOLING_GUIDE.md` - **Connection Pooling Guide (PRODUCTION-READY - Dec 6, 2025)** - Configuration, monitoring, performance tuning, troubleshooting
+- `guides/TEST_DATABASE_SETUP.md` - **Test Database Setup Guide (Dec 6, 2025)** - Docker Compose test infrastructure setup and usage
+- `guides/DATA_NARRATIVES_GUIDE.md` - **Intelligent Data Narratives & Human Insights (NEW - Dec 13, 2025)** - Complete feature guide
+- `guides/MULTI_DB_VALIDATION_GUIDE.md` - **Multi-Database Validation Guide (NEW - Jan 7, 2026)** - Pre-flight validation architecture and API reference
+- `guides/testing/TESTING.md` - Testing guide
+
+**Technical** (`docs/technical/`):
+- `technical/PARALLEL_EXECUTION.md` - **Parallel execution technical guide (PRODUCTION-READY - Nov 8, 2025!)** - Timeout protection, metrics, frontend integration
+- `technical/CONVERSATIONAL_MEMORY_IMPLEMENTATION.md` - Conversational memory technical guide
+- `technical/SECURITY_IMPROVEMENTS.md` - Recent security fixes and remaining issues
+- `technical/CONFIDENCE_SCORING.md` - Confidence scoring system
+- `technical/LEARNING_FROM_CORRECTIONS.md` - Correction learning system
+- `technical/SECURITY_POLICY.md` - Security controls and validation
+- `technical/SEMANTIC_CACHING.md` - **Semantic Caching guide (NEW - Nov 22, 2025)** - Phase 3.2 backend implementation
+- `technical/SEMANTIC_CACHE_UI.md` - **Semantic Cache UI guide (NEW - Nov 22, 2025)** - Phase 3.3 frontend components
+- `technical/MULTI_DB_NARRATIVES.md` - **Multi-Database Narratives (NEW - Dec 13, 2025)** - Per-database + combined analysis
+- `technical/SQL_GENERATION_PIPELINE.md` - **SQL Generation Pipeline (UPDATED - Jan 7, 2026)** - Complete pipeline with Phase 2.4 multi-database validation
+
+**Modules** (`docs/modules/`):
+- `modules/QUERY_PLANNING_AGENT.md` - Query planning system deep dive
+- `modules/RESULT_VERIFICATION_AGENT.md` - Result verification details
+- `modules/TOOL_USING_AGENT.md` - **Tool-Using Agent guide (NEW - Nov 21, 2025)** - Phase 3.1 implementation
+
+**Planning** (`docs/planning/`):
+- `planning/FUTURE_PLANS.md` - Prioritized roadmap (UPDATED with production-ready parallel features - Nov 8, 2025!)
+- `planning/CONNECTION_POOLING_IMPLEMENTATION_PLAN.md` - **5-day implementation plan (80% complete)** - Day 4 complete
+- `planning/ADVANCED_VISUALIZATION_PHASE2_PLAN.md` - **Advanced Visualization Phase 2 (Dec 20-26, 2025)** - Chart Intelligence + Advanced Charts
+- `planning/SEMANTIC_TYPE_INTELLIGENCE_PLAN.md` - **Semantic Type Intelligence Roadmap (NEW - Jan 8, 2026)** - Future plan for Date/Time, Status/Enum, Boolean intelligence
+
+**Reports** (`docs/reports/`):
+- `reports/CODE_REVIEW_PARALLEL_EXECUTION.md` - **Code review documentation (9.0/10 score)** - All critical & important issues resolved
+- `reports/PHASE_1_COMPLETE.md` - Conversational memory completion summary
+- `reports/TEST_CONVERSATIONAL_MEMORY.md` - Conversational memory testing guide
+- `reports/SMALL_MODEL_OPTIMIZATION_PHASE_2_PR_REVIEW.md` - **Phase 2 PR Review (UPDATED - Jan 7, 2026)** - Code review with all issues resolved

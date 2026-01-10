@@ -189,7 +189,7 @@ def main():
     print("4. Observe the auto-refresh (every 10 seconds)")
     print("5. Try the manual refresh button")
     print("6. Try evicting a pool")
-    print("\n📖 Full testing guide: docs/CONNECTION_POOLING_MANUAL_TESTING.md")
+    print("\n📖 Full testing guide: docs/reports/CONNECTION_POOLING_MANUAL_TESTING.md")
     print("="*60)
 
 if __name__ == "__main__":
