@@ -91,8 +91,8 @@ export const LineChartView: React.FC<LineChartViewProps> = ({
             contentStyle={{
               backgroundColor: isDarkMode ? '#1f2937' : 'white',
               border: `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`,
-              borderRadius: '6px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              borderRadius: '8px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
               color: isDarkMode ? '#f3f4f6' : '#111827',
             }}
             itemStyle={{ color: isDarkMode ? '#f3f4f6' : '#111827' }}
