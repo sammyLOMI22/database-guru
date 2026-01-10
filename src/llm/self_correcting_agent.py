@@ -832,7 +832,11 @@ class SelfCorrectingSQLAgent:
 
             if enable_templates:
                 try:
-                    template_engine = TemplateEngine(schema_dict, default_limit=row_limit)
+                    template_engine = TemplateEngine(
+                        schema_dict,
+                        default_limit=row_limit,
+                        database_type=database_type
+                    )
                     template_match = template_engine.try_match(question)
 
                     if template_match:

@@ -144,20 +144,55 @@ class SQLValidator:
             List of table names found in the query
         """
         tables = set()
-        sql_upper = sql.upper()
-
-        # Pattern for FROM clause (including JOINs)
-        # Matches: FROM table, JOIN table, FROM table AS alias, JOIN table alias
-        from_pattern = r'\b(?:FROM|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*)\b'
-        matches = re.findall(from_pattern, sql, re.IGNORECASE)
-        tables.update(m.lower() for m in matches)
+        
+        # Remove comments to avoid false positives
+        sql_clean = re.sub(r'--.*$', '', sql, flags=re.MULTILINE)
+        sql_clean = re.sub(r'/\*.*?\*/', ' ', sql_clean, flags=re.DOTALL)
+        
+        # 1. Handle JOINs: JOIN schema.table or JOIN table
+        join_matches = re.findall(
+            r'\bJOIN\s+(?:([a-zA-Z_][a-zA-Z0-9_]*)\.)?([a-zA-Z_][a-zA-Z0-9_]*)\b',
+            sql_clean,
+            re.IGNORECASE
+        )
+        for schema, table in join_matches:
+            if table:
+                tables.add(table.lower())
+                
+        # 2. Handle FROM blocks: FROM table1, schema.table2, table3 AS alias
+        # Find the content after FROM until the next major keyword or end of string
+        from_blocks = re.findall(
+            r'\bFROM\s+([^;]+?)(?:\bWHERE\b|\bJOIN\b|\bORDER\b|\bGROUP\b|\bLIMIT\b|\bHAVING\b|\bUNION\b|$)',
+            sql_clean,
+            re.IGNORECASE | re.DOTALL
+        )
+        
+        for from_content in from_blocks:
+            # Split by comma for multiple tables
+            parts = from_content.split(',')
+            for part in parts:
+                part = part.strip()
+                if not part:
+                    continue
+                # Match schema.table or just table, handling optional alias
+                # We want the first name-like thing (the table)
+                match = re.match(
+                    r'(?:([a-zA-Z_][a-zA-Z0-9_]*)\.)?([a-zA-Z_][a-zA-Z0-9_]*)\b',
+                    part,
+                    re.IGNORECASE
+                )
+                if match:
+                    schema, table = match.groups()
+                    if table:
+                        tables.add(table.lower())
 
         # Remove common SQL keywords that might be mistakenly captured
         sql_keywords = {'select', 'where', 'and', 'or', 'on', 'as', 'in', 'not',
                        'null', 'is', 'like', 'between', 'exists', 'case', 'when',
                        'then', 'else', 'end', 'inner', 'outer', 'left', 'right',
                        'full', 'cross', 'natural', 'using', 'group', 'order',
-                       'having', 'limit', 'offset', 'union', 'intersect', 'except'}
+                       'having', 'limit', 'offset', 'union', 'intersect', 'except',
+                       'values', 'distinct', 'from', 'into', 'set', 'update', 'delete'}
         tables = tables - sql_keywords
 
         return list(tables)

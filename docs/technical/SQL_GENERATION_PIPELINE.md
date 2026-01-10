@@ -316,7 +316,7 @@ When quality >= 31% and schema_dict is available:
 - Adds hints: `"'texas' should use code: 'TX'"`
 - Enhances question before sending to LLM
 
-### 2.5 Template Matching (NEW - January 2026)
+### 2.5 Template Matching (NEW - January 2026, Updated January 10, 2026)
 
 #### Template Engine (`src/llm/query_templates.py`)
 Bypasses LLM entirely for simple, common query patterns:
@@ -328,16 +328,57 @@ Bypasses LLM entirely for simple, common query patterns:
 | `top_n` | "top 5 by price" | `SELECT * FROM X ORDER BY Y DESC LIMIT 5` |
 | `filter_location` | "orders from California" | `SELECT * FROM orders WHERE state = 'CA'` |
 | `filter_value` | "customers where status is active" | `SELECT * FROM customers WHERE status = 'active'` |
+| `filter_date` | "orders from last 7 days" | Dialect-specific (see below) |
+| `search` | "find products containing 'widget'" | Dialect-specific (see below) |
 | `sum_total` | "total revenue" | `SELECT SUM(revenue) FROM orders` |
 | `average` | "average price" | `SELECT AVG(price) FROM products` |
 | `group_by` | "sales by category" | `SELECT category, COUNT(*) FROM X GROUP BY category` |
 
 **Key Features:**
-- Returns `TemplateMatch` with SQL, confidence score (0.9-0.95), and explanation
+- Returns `TemplateMatch` with SQL, confidence score (0.9-0.95), explanation, and `dialect_used`
 - Table alias handling (singular/plural, abbreviations: cust → customers)
 - Column variation matching (price → unit_price, name → product_name)
+- **Dialect-aware SQL generation (NEW - Jan 10, 2026)** - Uses `DialectRegistry` for database-specific syntax
 - If matched: Execute directly, skip all LLM processing
 - If not matched: Continue to preprocessing and LLM generation
+
+### 2.5.1 Dialect Registry (NEW - January 10, 2026)
+
+#### Dialect Registry (`src/llm/dialect_registry.py`)
+Defines database-specific SQL syntax rules for accurate cross-database SQL generation:
+
+**Supported Dialects:**
+| Dialect | Current Timestamp | Date Math | Case-Insensitive | Boolean |
+|---------|-------------------|-----------|------------------|---------|
+| PostgreSQL | `CURRENT_TIMESTAMP` | `CURRENT_TIMESTAMP - INTERVAL '7 days'` | `ILIKE` | `TRUE/FALSE` |
+| MySQL | `NOW()` | `DATE_SUB(NOW(), INTERVAL 7 DAY)` | `LIKE` (default collation) | `TRUE/FALSE` |
+| SQLite | `datetime('now')` | `datetime('now', '-7 days')` | `LIKE` (ASCII only) | `1/0` |
+| DuckDB | `CURRENT_TIMESTAMP` | `CURRENT_TIMESTAMP - INTERVAL '7 days'` | `ILIKE` | `TRUE/FALSE` |
+
+**Key Components:**
+- `DatabaseDialect` enum - Identifies target database type
+- `DialectRules` dataclass - Contains syntax rules for date functions, string operations, pagination, booleans, JSON, arrays
+- `DIALECT_RULES` dict - Maps dialects to their rules
+- `build_dialect_context()` - Generates dialect-specific instructions for LLM prompts
+- `get_dialect_for_database_type()` - Maps connection string to dialect
+
+**Example: Date Filter Generation**
+```
+Query: "orders from last 7 days"
+
+PostgreSQL: WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'
+SQLite: WHERE created_at > datetime('now', '-7 days')
+MySQL: WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+DuckDB: WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'
+```
+
+**Example: Case-Insensitive Search**
+```
+Query: "find products containing 'widget'"
+
+PostgreSQL/DuckDB: WHERE name ILIKE '%widget%'
+SQLite/MySQL: WHERE LOWER(name) LIKE LOWER('%widget%')
+```
 
 ### 2.6 Query Preprocessing (NEW - January 2026)
 
@@ -619,6 +660,7 @@ System: "This database doesn't have location data. Did you mean:
 | Result Narrator | `src/llm/result_narrator.py` | `generate_narrative()` |
 | **Model Router (NEW)** | `src/llm/model_router.py` | `get_model_for_task()`, `get_timeout_for_task()` |
 | **Template Engine (NEW)** | `src/llm/query_templates.py` | `try_match()`, `TemplateMatch` |
+| **Dialect Registry (NEW - Jan 10)** | `src/llm/dialect_registry.py` | `DatabaseDialect`, `DialectRules`, `build_dialect_context()` |
 | **Query Preprocessor (NEW)** | `src/llm/query_preprocessor.py` | `preprocess()`, `PreprocessedQuery` |
 | **Model Config UI (NEW)** | `frontend/src/components/ModelConfigPanel.tsx` | Per-task model configuration |
 | **Multi-DB Validator (NEW)** | `src/llm/multi_db_query_validator.py` | `validate_query()`, `assess_database()` |
@@ -640,6 +682,7 @@ The SQL generation pipeline has evolved to include:
 7. **Query preprocessing (NEW - Jan 2026)** - Bidirectional location normalization
 8. **Per-task model routing (NEW - Jan 2026)** - Specialized models for different tasks
 9. **Multi-DB pre-flight validation (NEW - Jan 2026)** - Assess query feasibility per database before execution
+10. **Dialect-aware SQL generation (NEW - Jan 10, 2026)** - Database-specific syntax for dates, booleans, strings
 
 Future improvements focus on:
 - ~~Pre-generation intent classification~~ ✅ Implemented via TemplateEngine

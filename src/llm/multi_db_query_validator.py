@@ -419,6 +419,7 @@ class MultiDatabaseQueryValidator:
 
         # Get the real name (handles schema.table -> returns table)
         real_name = identifier.get_real_name()
+        logger.debug(f"sqlparse real_name: {real_name}")
 
         # Get alias if present
         alias = identifier.get_alias()
@@ -429,6 +430,7 @@ class MultiDatabaseQueryValidator:
             # Take the last part as the table name
             parts = real_name.split('.')
             real_name = parts[-1]
+            logger.debug(f"Split qualified name: {parts} -> {real_name}")
 
         return real_name, alias
 
@@ -582,12 +584,13 @@ class MultiDatabaseQueryValidator:
 
         # Extract tables from FROM clause - handle schema.table
         from_matches = re.findall(
-            r'\bFROM\s+(?:([a-zA-Z_][a-zA-Z0-9_]*)\.)?([a-zA-Z_][a-zA-Z0-9_]*)',
+            r'\bFROM\s+(?:([a-zA-Z_][a-zA-Z0-9_]*)\.)?([a-zA-Z_][a-zA-Z0-9_]*)\b',
             sql_clean,
             re.IGNORECASE
         )
         for schema, table in from_matches:
-            tables.add(table.lower())
+            if table:
+                tables.add(table.lower())
 
         # Handle comma-separated tables: FROM orders, customers
         from_block = re.search(
@@ -613,12 +616,13 @@ class MultiDatabaseQueryValidator:
 
         # Extract tables from JOIN clauses
         join_matches = re.findall(
-            r'\bJOIN\s+(?:([a-zA-Z_][a-zA-Z0-9_]*)\.)?([a-zA-Z_][a-zA-Z0-9_]*)',
+            r'\bJOIN\s+(?:([a-zA-Z_][a-zA-Z0-9_]*)\.)?([a-zA-Z_][a-zA-Z0-9_]*)\b',
             sql_clean,
             re.IGNORECASE
         )
         for schema, table in join_matches:
-            tables.add(table.lower())
+            if table:
+                tables.add(table.lower())
 
         # Extract columns from WHERE clause
         where_match = re.search(
