@@ -114,16 +114,16 @@ export const TreemapView: React.FC<TreemapViewProps> = ({
 
   if (!treemapData || !treemapData.children || treemapData.children.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-500">
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         No hierarchical data available for treemap
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 transition-colors">
       {title && (
-        <h4 className="text-sm font-medium text-gray-700 mb-3">{title}</h4>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">{title}</h4>
       )}
       <ResponsiveContainer width="100%" height={height}>
         <Treemap
@@ -140,13 +140,13 @@ export const TreemapView: React.FC<TreemapViewProps> = ({
               if (!payload || payload.length === 0) return null;
               const item = payload[0].payload;
               return (
-                <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-2 text-sm">
-                  <div className="font-medium text-gray-900">{item.name}</div>
-                  <div className="text-gray-600">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 text-sm">
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{item.name}</div>
+                  <div className="text-gray-600 dark:text-gray-400">
                     {valueColumn}: {item.value?.toLocaleString()}
                   </div>
                   {item.path && item.path.length > 1 && (
-                    <div className="text-gray-500 text-xs mt-1">
+                    <div className="text-gray-500 dark:text-gray-500 text-xs mt-1">
                       {item.path.join(' > ')}
                     </div>
                   )}
@@ -158,9 +158,9 @@ export const TreemapView: React.FC<TreemapViewProps> = ({
       </ResponsiveContainer>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-100">
+      <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
         {treemapData.children.slice(0, 8).map((child, index) => (
-          <div key={child.name} className="flex items-center gap-1.5 text-xs text-gray-600">
+          <div key={child.name} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
             <div
               className="w-3 h-3 rounded"
               style={{ backgroundColor: HIERARCHICAL_COLORS[index % HIERARCHICAL_COLORS.length] }}
@@ -169,7 +169,7 @@ export const TreemapView: React.FC<TreemapViewProps> = ({
           </div>
         ))}
         {treemapData.children.length > 8 && (
-          <span className="text-xs text-gray-400">+{treemapData.children.length - 8} more</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">+{treemapData.children.length - 8} more</span>
         )}
       </div>
     </div>

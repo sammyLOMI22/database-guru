@@ -16,6 +16,7 @@ import {
   Legend,
 } from 'recharts';
 import { CHART_COLORS, prepareChartData } from '../../utils/chartUtils';
+import { useDarkMode } from '../../hooks/useDarkMode';
 
 interface LineChartViewProps {
   data: Record<string, unknown>[];
@@ -36,6 +37,8 @@ export const LineChartView: React.FC<LineChartViewProps> = ({
   showLegend = false,
   animate = true,
 }) => {
+  const { isDarkMode } = useDarkMode();
+
   const chartData = useMemo(() => {
     const prepared = prepareChartData(data, xColumn, yColumn, 'line', 100);
     // Sort by x-axis for proper line rendering
@@ -51,39 +54,49 @@ export const LineChartView: React.FC<LineChartViewProps> = ({
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-500">
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         No data available for line chart
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 transition-colors">
       {title && (
-        <h4 className="text-sm font-medium text-gray-700 mb-3">{title}</h4>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">{title}</h4>
       )}
       <ResponsiveContainer width="100%" height={height}>
         <LineChart
           data={chartData}
           margin={{ top: 10, right: 30, left: 0, bottom: 20 }}
         >
-          <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke={isDarkMode ? '#374151' : '#e5e7eb'}
+          />
           <XAxis
             dataKey={xColumn}
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 11, fill: isDarkMode ? '#9ca3af' : '#6b7280' }}
             angle={-45}
             textAnchor="end"
             height={60}
+            stroke={isDarkMode ? '#4b5563' : '#9ca3af'}
           />
-          <YAxis tick={{ fontSize: 11 }} width={60} />
+          <YAxis
+            tick={{ fontSize: 11, fill: isDarkMode ? '#9ca3af' : '#6b7280' }}
+            width={60}
+            stroke={isDarkMode ? '#4b5563' : '#9ca3af'}
+          />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'white',
-              border: '1px solid #e5e7eb',
+              backgroundColor: isDarkMode ? '#1f2937' : 'white',
+              border: `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`,
               borderRadius: '6px',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              color: isDarkMode ? '#f3f4f6' : '#111827',
             }}
-            formatter={(value: number | undefined) => [
+            itemStyle={{ color: isDarkMode ? '#f3f4f6' : '#111827' }}
+            formatter={(value: any) => [
               value !== undefined ? value.toLocaleString() : '0',
               yColumn,
             ]}

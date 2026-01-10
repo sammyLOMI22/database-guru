@@ -80,7 +80,7 @@ export default function ConversationContextPanel({
 
   if (!sessionId) {
     return (
-      <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-500">
+      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 text-sm text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-gray-800">
         💬 Select or create a chat session to enable conversational memory
       </div>
     );
@@ -88,7 +88,7 @@ export default function ConversationContextPanel({
 
   if (loading && !context) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center text-gray-500">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
           Loading conversation context...
@@ -99,13 +99,13 @@ export default function ConversationContextPanel({
 
   if (error) {
     return (
-      <div className="bg-red-50 rounded-lg border border-red-200 p-4">
-        <div className="text-red-700 text-sm">
+      <div className="bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-900/50 p-4">
+        <div className="text-red-700 dark:text-red-400 text-sm">
           ⚠️ {error}
         </div>
         <button
           onClick={loadContext}
-          className="mt-2 text-red-600 hover:text-red-800 text-sm underline"
+          className="mt-2 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm underline"
         >
           Retry
         </button>
@@ -115,18 +115,18 @@ export default function ConversationContextPanel({
 
   if (!context || !context.has_context) {
     return (
-      <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-900/50 p-4">
         <div className="flex items-start">
           <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
             </svg>
           </div>
           <div className="ml-3 flex-1">
-            <h3 className="text-sm font-medium text-blue-800">
+            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
               No conversation history yet
             </h3>
-            <p className="mt-1 text-sm text-blue-700">
+            <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
               Start asking questions! I'll remember your queries to help with follow-ups like "filter that" or "sort by price".
             </p>
           </div>
@@ -136,9 +136,9 @@ export default function ConversationContextPanel({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center flex-1 text-left"
@@ -150,7 +150,7 @@ export default function ConversationContextPanel({
           >
             <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
           </svg>
-          <span className="ml-2 text-sm font-medium text-gray-900">
+          <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
             💬 Conversation Context ({context.window_size})
           </span>
         </button>
@@ -186,14 +186,14 @@ export default function ConversationContextPanel({
           {context.messages.map((msg, index) => (
             <div
               key={index}
-              className="text-sm border-l-2 border-blue-300 pl-3 py-2 bg-gray-50 rounded-r"
+              className="text-sm border-l-2 border-blue-300 dark:border-blue-700 pl-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-r"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="text-gray-700 font-medium mb-1">
+                  <div className="text-gray-700 dark:text-gray-300 font-medium mb-1">
                     {index + 1}. {msg.question}
                   </div>
-                  <div className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded mb-1 overflow-x-auto">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded mb-1 overflow-x-auto border border-gray-200 dark:border-gray-800">
                     {msg.sql}
                   </div>
                 </div>
@@ -212,8 +212,8 @@ export default function ConversationContextPanel({
             </div>
           ))}
 
-          <div className="pt-2 border-t border-gray-200">
-            <p className="text-xs text-gray-500 italic">
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
               💡 I'll use this context when you ask follow-up questions like "filter that" or "sort by price"
             </p>
           </div>

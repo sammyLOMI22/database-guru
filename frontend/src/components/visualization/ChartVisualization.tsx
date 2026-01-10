@@ -6,7 +6,15 @@
  */
 
 import React, { useMemo } from 'react';
-import { BarChart2, AlertCircle, Lightbulb, TrendingUp, AlertTriangle } from 'lucide-react';
+import {
+  BarChart2,
+  AlertCircle,
+  Sparkles,
+  Zap,
+  TrendingUp,
+  AlertTriangle,
+  Lightbulb
+} from 'lucide-react';
 import {
   ChartType,
   classifyColumns,
@@ -39,86 +47,70 @@ interface ChartVisualizationProps {
   overrideChartType?: ChartType | null;
 }
 
-interface ChartInfoBadgeProps {
-  recommendation: IntelligentChartRecommendation;
-}
+const chartTypeLabels: Record<ChartType, string> = {
+  bar: 'Bar Chart',
+  line: 'Line Chart',
+  pie: 'Pie Chart',
+  scatter: 'Scatter Plot',
+  table: 'Table',
+  // Phase 10: Advanced Charts
+  treemap: 'Treemap',
+  sunburst: 'Sunburst',
+  boxplot: 'Box Plot',
+  histogram: 'Histogram',
+  bubble: 'Bubble Chart',
+  area: 'Area Chart',
+};
 
-const ChartInfoBadge: React.FC<ChartInfoBadgeProps> = ({ recommendation }) => {
-  const chartTypeLabels: Record<ChartType, string> = {
-    bar: 'Bar Chart',
-    line: 'Line Chart',
-    pie: 'Pie Chart',
-    scatter: 'Scatter Plot',
-    table: 'Table',
-    // Phase 10: Advanced Charts
-    treemap: 'Treemap',
-    sunburst: 'Sunburst',
-    boxplot: 'Box Plot',
-    histogram: 'Histogram',
-    bubble: 'Bubble Chart',
-    area: 'Area Chart',
-  };
-
+const ChartInfoBadge: React.FC<{ recommendation: IntelligentChartRecommendation }> = ({
+  recommendation,
+}) => {
   return (
-    <div className="flex flex-col gap-2 mb-3">
-      <div className="flex items-center gap-2">
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-          <BarChart2 className="w-3 h-3" />
-          {chartTypeLabels[recommendation.primaryChart]}
-        </span>
-        <span className="text-xs text-gray-500">{recommendation.reason}</span>
-        {recommendation.confidence >= 80 && (
-          <span className="text-xs text-green-600 font-medium">High confidence</span>
-        )}
+    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-900/50 flex items-start gap-3">
+      <div className="mt-0.5">
+        <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
       </div>
-      {recommendation.alternatives.length > 0 && (
-        <div className="flex items-center gap-1 text-xs text-gray-400">
-          <span>Alternatives:</span>
-          {recommendation.alternatives.slice(0, 3).map((alt, i) => (
-            <span key={alt.chartType} className="px-1.5 py-0.5 bg-gray-100 rounded">
-              {chartTypeLabels[alt.chartType]}{i < Math.min(recommendation.alternatives.length, 3) - 1 ? '' : ''}
+      <div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">
+            AI Recommendation
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded font-medium">
+              {chartTypeLabels[recommendation.primaryChart]}
             </span>
-          ))}
+            <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded font-medium">
+              {Math.round(recommendation.confidence * 100)}% Confidence
+            </span>
+          </div>
         </div>
-      )}
+        <p className="text-sm text-blue-800 dark:text-blue-300 mt-0.5">{recommendation.reason}</p>
+      </div>
     </div>
   );
 };
 
-interface InsightsBadgeProps {
-  insights: DataInsight[];
-}
-
-const InsightsBadge: React.FC<InsightsBadgeProps> = ({ insights }) => {
-  if (insights.length === 0) return null;
-
-  const getIcon = (type: DataInsight['type']) => {
-    switch (type) {
-      case 'trend': return <TrendingUp className="w-3 h-3" />;
-      case 'outlier': return <AlertTriangle className="w-3 h-3" />;
-      default: return <Lightbulb className="w-3 h-3" />;
-    }
-  };
-
-  const getColor = (severity: DataInsight['severity']) => {
-    switch (severity) {
-      case 'warning': return 'bg-amber-100 text-amber-800';
-      case 'highlight': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-700';
-    }
-  };
+const InsightsBadge: React.FC<{ insights: DataInsight[] }> = ({ insights }) => {
+  if (!insights || insights.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-1 mb-2">
-      {insights.map((insight, i) => (
-        <span
-          key={i}
-          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${getColor(insight.severity)}`}
-        >
-          {getIcon(insight.type)}
-          {insight.message}
+    <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-900/50">
+      <div className="flex items-center gap-2 mb-2">
+        <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+        <span className="text-xs font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider">
+          Data Insights
         </span>
-      ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {insights.map((insight, index) => (
+          <div key={index} className="flex items-center gap-2 px-2 py-1 bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 rounded text-xs">
+            {insight.type === 'trend' && <TrendingUp className="w-3 h-3" />}
+            {insight.type === 'outlier' && <AlertTriangle className="w-3 h-3" />}
+            {insight.type === 'summary' && <Lightbulb className="w-3 h-3" />}
+            <span>{insight.message}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -141,7 +133,6 @@ export const ChartVisualization: React.FC<ChartVisualizationProps> = ({
   const recommendation: IntelligentChartRecommendation = useMemo(() => {
     if (overrideChartType && overrideChartType !== 'table') {
       // CRITICAL: Recalculate columns for the overridden chart type
-      // Different chart types need different column configurations
       const classification = classifyColumns(data, statistics);
       const { xColumn, yColumn } = selectColumnsForChart(
         overrideChartType,
@@ -154,7 +145,7 @@ export const ChartVisualization: React.FC<ChartVisualizationProps> = ({
         primaryChart: overrideChartType,
         xColumn,
         yColumn,
-        reason: `Manually selected ${overrideChartType} chart`,
+        reason: `Manually selected ${chartTypeLabels[overrideChartType]}`,
       };
     }
     return autoRecommendation;
@@ -174,12 +165,12 @@ export const ChartVisualization: React.FC<ChartVisualizationProps> = ({
   // No chart available
   if (recommendation.primaryChart === 'table') {
     return (
-      <div className="bg-gray-50 rounded-lg border border-gray-200 p-6 text-center">
-        <AlertCircle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-        <p className="text-sm text-gray-600 font-medium">
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 text-center">
+        <AlertCircle className="w-8 h-8 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
+        <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">
           No Visualization Available
         </p>
-        <p className="text-xs text-gray-500 mt-1">{recommendation.reason}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{recommendation.reason}</p>
       </div>
     );
   }
