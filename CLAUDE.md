@@ -197,7 +197,7 @@ The system uses a multi-agent architecture with specialized agents that work tog
     - Falls back to default model when per-task model is not configured
     - Key methods: `get_model_for_task()`, `get_timeout_for_task()`, `get_config_for_task()`
 
-14. **Query Template Engine** (`src/llm/query_templates.py`) **NEW - January 2, 2026**
+14. **Query Template Engine** (`src/llm/query_templates.py`) **NEW - January 2, 2026** (Updated January 10, 2026)
     - Template-based SQL generation that bypasses LLM for simple query patterns
     - Improves response time and reduces errors for straightforward requests
     - **Supported Patterns**:
@@ -206,13 +206,30 @@ The system uses a multi-agent architecture with specialized agents that work tog
       - `top_n`: "top 5 by price" → `SELECT * FROM X ORDER BY Y DESC LIMIT 5`
       - `filter_location`: "orders from California" → `SELECT * FROM orders WHERE state = 'CA'`
       - `filter_value`: "customers where status is active" → `SELECT * FROM customers WHERE status = 'active'`
+      - `filter_date`: "orders from last 7 days" → Dialect-specific date math (NEW)
+      - `search`: "find products containing 'widget'" → Dialect-specific case-insensitive search (NEW)
       - `sum_total`, `average`, `group_by`: Aggregation patterns
     - Table alias handling (singular/plural, abbreviations)
     - Column variation matching (price → unit_price, name → product_name)
-    - Returns `TemplateMatch` with SQL, confidence score, and explanation
+    - **Dialect-aware SQL generation (NEW - Jan 10, 2026)**: Uses `DialectRegistry` for database-specific syntax
+    - Returns `TemplateMatch` with SQL, confidence score, explanation, and `dialect_used`
     - Key method: `try_match()` - returns `TemplateMatch` or None
 
-15. **Query Preprocessor** (`src/llm/query_preprocessor.py`) **NEW - January 2, 2026**
+15. **Dialect Registry** (`src/llm/dialect_registry.py`) **NEW - January 10, 2026**
+    - Defines database-specific SQL syntax rules for cross-database compatibility
+    - **Supported Dialects**: PostgreSQL, MySQL, SQLite, DuckDB (MongoDB placeholder for MQL)
+    - **DialectRules dataclass** covers:
+      - Date/Time functions: `CURRENT_TIMESTAMP`, `NOW()`, `datetime('now')`
+      - Date math: `INTERVAL '7 days'`, `DATE_SUB()`, `datetime('now', '-7 days')`
+      - String functions: `ILIKE` vs `LOWER() LIKE`, `CONCAT` vs `||`
+      - Boolean handling: `TRUE/FALSE` vs `1/0`
+      - NULL handling: `IS NOT DISTINCT FROM`, `<=>`, `IS`
+      - JSON/Array support: Database-specific operators
+    - `build_dialect_context()` - Generates dialect-specific instructions for LLM prompts
+    - `get_dialect_for_database_type()` - Maps connection string to `DatabaseDialect` enum
+    - Key classes: `DatabaseDialect`, `DialectRules`, `DIALECT_RULES`
+
+16. **Query Preprocessor** (`src/llm/query_preprocessor.py`) **NEW - January 2, 2026**
     - Pre-processes natural language queries before LLM generation
     - **Bidirectional Location Normalization**: Detects DB format and converts accordingly
       - If DB uses codes (CA, NY): "California" → "CA"
@@ -223,7 +240,7 @@ The system uses a multi-agent architecture with specialized agents that work tog
     - **Enhanced Context**: Builds LLM hints with matched entities and format guidance
     - Key method: `preprocess()` - returns `PreprocessedQuery` with normalized question and metadata
 
-16. **Multi-Database Query Validator** (`src/llm/multi_db_query_validator.py`) **NEW - January 7, 2026**
+17. **Multi-Database Query Validator** (`src/llm/multi_db_query_validator.py`) **NEW - January 7, 2026**
     - Pre-flight validation for multi-database queries before execution
     - Assesses each database's capability to answer a query: FULL / PARTIAL / CANNOT
     - **SQL Parsing**: Uses `sqlparse` library for production-grade parsing
@@ -669,9 +686,10 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `frontend/src/components/visualization/ChartToggle.tsx` - Table/chart toggle with type selector
   - `frontend/tests/AdvancedCharts.test.tsx` - 61 comprehensive tests
   - `frontend/tests/chartIntelligence.test.ts` - Pattern detection tests
-- **Small Model Optimization (NEW - Jan 2, 2026)**:
+- **Small Model Optimization (NEW - Jan 2, 2026)** (Updated Jan 10, 2026):
   - `src/llm/model_router.py` - Per-task model routing (246 lines)
-  - `src/llm/query_templates.py` - Template-based SQL for simple patterns (724 lines)
+  - `src/llm/query_templates.py` - Template-based SQL for simple patterns (1024 lines, updated with dialect support)
+  - `src/llm/dialect_registry.py` - Database dialect rules and SQL syntax (205 lines) **NEW - Jan 10, 2026**
   - `src/llm/query_preprocessor.py` - Location normalization and preprocessing (504 lines)
   - `src/llm/self_correcting_agent.py` - Template matching + preprocessing integration (lines 821-907, 1068-1111)
   - `src/database/models.py` - Per-task model/timeout fields in SystemSettings
@@ -681,7 +699,8 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `frontend/src/components/SettingsPanel.tsx` - Updated with ModelConfigPanel integration
   - `tests/test_model_router.py` - 220 lines of model router tests
   - `tests/test_query_preprocessor.py` - 264 lines of preprocessor tests
-  - `tests/test_query_templates.py` - 252 lines of template engine tests
+  - `tests/test_query_templates.py` - 510 lines of template engine tests (updated with dialect tests)
+  - `tests/test_dialect_registry.py` - 72 lines of dialect registry tests **NEW - Jan 10, 2026**
 
 ## Documentation
 
