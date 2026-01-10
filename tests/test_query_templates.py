@@ -252,6 +252,24 @@ class TestTemplateMatch:
         assert "table" in result
         assert result["template"] == "list_all"
 
+    def test_dialect_used_field_populated(self, sample_schema):
+        """Test that dialect_used field is populated in TemplateMatch for observability."""
+        # Test different dialects
+        for db_type, expected_dialect in [
+            ("postgresql", "postgresql"),
+            ("sqlite", "sqlite"),
+            ("mysql", "mysql"),
+            ("duckdb", "duckdb"),
+        ]:
+            engine = TemplateEngine(sample_schema, database_type=db_type)
+            match = engine.try_match("show all customers")
+            assert match is not None
+            assert match.dialect_used == expected_dialect, f"Expected {expected_dialect}, got {match.dialect_used}"
+
+            # Also verify it's in to_dict()
+            result = match.to_dict()
+            assert result["dialect"] == expected_dialect
+
 
 # =============================================================================
 # Dialect-Aware Tests (Phase 3.1)

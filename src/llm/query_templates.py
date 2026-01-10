@@ -62,6 +62,7 @@ class TemplateMatch:
     matched_columns: List[str] = field(default_factory=list)
     parameters: Dict[str, Any] = field(default_factory=dict)
     explanation: str = ""
+    dialect_used: str = ""  # Database dialect used for SQL generation (e.g., "postgresql", "sqlite")
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for logging."""
@@ -72,6 +73,7 @@ class TemplateMatch:
             "table": self.matched_table,
             "columns": self.matched_columns,
             "params": self.parameters,
+            "dialect": self.dialect_used,
         }
 
 
@@ -461,7 +463,8 @@ class TemplateEngine:
                             sql=sql,
                             confidence=0.95,
                             matched_table=table,
-                            explanation=f"List all records from {table}"
+                            explanation=f"List all records from {table}",
+                            dialect_used=self.dialect.value
                         )
 
         return None
@@ -488,7 +491,8 @@ class TemplateEngine:
                             sql=sql,
                             confidence=0.95,
                             matched_table=table,
-                            explanation=f"Count all records in {table}"
+                            explanation=f"Count all records in {table}",
+                            dialect_used=self.dialect.value
                         )
 
         return None
@@ -532,7 +536,8 @@ class TemplateEngine:
                             matched_table=table,
                             matched_columns=[sort_col],
                             parameters={"n": n, "order": "DESC"},
-                            explanation=f"Top {n} {table} by {sort_col}"
+                            explanation=f"Top {n} {table} by {sort_col}",
+                            dialect_used=self.dialect.value
                         )
 
         # Check for ascending (bottom/lowest)
@@ -569,7 +574,8 @@ class TemplateEngine:
                             matched_table=table,
                             matched_columns=[sort_col],
                             parameters={"n": n, "order": "ASC"},
-                            explanation=f"Bottom {n} {table} by {sort_col}"
+                            explanation=f"Bottom {n} {table} by {sort_col}",
+                            dialect_used=self.dialect.value
                         )
 
         return None
@@ -608,7 +614,8 @@ class TemplateEngine:
                             matched_table=table,
                             matched_columns=[loc_col],
                             parameters={"location": location_value},
-                            explanation=f"{table} from {location_value}"
+                            explanation=f"{table} from {location_value}",
+                            dialect_used=self.dialect.value
                         )
 
         return None
@@ -700,7 +707,8 @@ class TemplateEngine:
                                 matched_table=table,
                                 matched_columns=[filter_col],
                                 parameters={"column": filter_col, "value": clean_value},
-                                explanation=explanation
+                                explanation=explanation,
+                                dialect_used=self.dialect.value
                             )
 
         return None
@@ -770,7 +778,8 @@ class TemplateEngine:
                                 matched_table=table,
                                 matched_columns=[search_col],
                                 parameters={"column": search_col, "search_value": search_value},
-                                explanation=f"Search {table} where {search_col} contains '{search_value}'"
+                                explanation=f"Search {table} where {search_col} contains '{search_value}'",
+                                dialect_used=self.dialect.value
                             )
 
         return None
@@ -855,7 +864,8 @@ class TemplateEngine:
                                 matched_table=table,
                                 matched_columns=[date_col],
                                 parameters={"column": date_col, "days": days},
-                                explanation=f"{table} from the last {days} days"
+                                explanation=f"{table} from the last {days} days",
+                                dialect_used=self.dialect.value
                             )
 
         return None
@@ -882,7 +892,8 @@ class TemplateEngine:
                                 confidence=0.90,
                                 matched_table=table,
                                 matched_columns=[column],
-                                explanation=f"Sum of {column} in {table}"
+                                explanation=f"Sum of {column} in {table}",
+                                dialect_used=self.dialect.value
                             )
 
         return None
@@ -909,7 +920,8 @@ class TemplateEngine:
                                 confidence=0.90,
                                 matched_table=table,
                                 matched_columns=[column],
-                                explanation=f"Average of {column} in {table}"
+                                explanation=f"Average of {column} in {table}",
+                                dialect_used=self.dialect.value
                             )
 
         return None
@@ -955,7 +967,8 @@ class TemplateEngine:
                                     confidence=0.85,
                                     matched_table=table,
                                     matched_columns=[group_col],
-                                    explanation=f"Count {table} grouped by {group_col}"
+                                    explanation=f"Count {table} grouped by {group_col}",
+                                    dialect_used=self.dialect.value
                                 )
 
         return None
