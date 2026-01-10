@@ -152,7 +152,11 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
               layout="vertical"
               verticalAlign="middle"
               align="right"
-              wrapperStyle={{ fontSize: 12 }}
+              wrapperStyle={{
+                fontSize: 12,
+                color: isDarkMode ? '#9ca3af' : '#4b5563',
+                paddingLeft: '20px',
+              }}
             />
           )}
         </PieChart>

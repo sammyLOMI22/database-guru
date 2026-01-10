@@ -148,7 +148,7 @@ export const BubbleChartView: React.FC<BubbleChartViewProps> = ({
         </ScatterChart>
       </ResponsiveContainer>
       {data.length > 100 && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
+        <p className="text-xs text-gray-400 dark:text-gray-400 mt-2 text-center">
           Showing first 100 of {data.length} points
         </p>
       )}

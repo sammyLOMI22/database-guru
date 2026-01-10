@@ -144,7 +144,15 @@ export const AreaChartView: React.FC<AreaChartViewProps> = ({
               name ?? '',
             ]}
           />
-          {showLegend && <Legend />}
+          {showLegend && (
+            <Legend
+              wrapperStyle={{
+                paddingTop: '10px',
+                color: isDarkMode ? '#9ca3af' : '#4b5563',
+                fontSize: '12px',
+              }}
+            />
+          )}
 
           {yColumns.map((col, index) => (
             <Area

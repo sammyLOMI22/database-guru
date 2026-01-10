@@ -101,7 +101,15 @@ export const LineChartView: React.FC<LineChartViewProps> = ({
               yColumn,
             ]}
           />
-          {showLegend && <Legend />}
+          {showLegend && (
+            <Legend
+              wrapperStyle={{
+                paddingTop: '10px',
+                color: isDarkMode ? '#9ca3af' : '#4b5563',
+                fontSize: '12px',
+              }}
+            />
+          )}
           <Line
             type="monotone"
             dataKey={yColumn}

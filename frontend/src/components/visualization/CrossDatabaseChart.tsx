@@ -316,7 +316,13 @@ export function CrossDatabaseChart({
                       }}
                       itemStyle={{ color: isDarkMode ? '#f3f4f6' : '#111827' }}
                     />
-                    <Legend />
+                    <Legend
+                      wrapperStyle={{
+                        paddingTop: '20px',
+                        color: isDarkMode ? '#9ca3af' : '#4b5563',
+                        fontSize: '12px',
+                      }}
+                    />
                     {config.aggregatedData.map((db) => (
                       <Bar key={db.databaseName} dataKey={db.databaseName} fill={db.color} radius={[4, 4, 0, 0]} />
                     ))}
@@ -344,7 +350,13 @@ export function CrossDatabaseChart({
                     }}
                     itemStyle={{ color: isDarkMode ? '#f3f4f6' : '#111827' }}
                   />
-                  <Legend />
+                  <Legend
+                    wrapperStyle={{
+                      paddingTop: '20px',
+                      color: isDarkMode ? '#9ca3af' : '#4b5563',
+                      fontSize: '12px',
+                    }}
+                  />
                   <Line
                     type="monotone"
                     dataKey="value"
@@ -382,7 +394,13 @@ export function CrossDatabaseChart({
                     }}
                     itemStyle={{ color: isDarkMode ? '#f3f4f6' : '#111827' }}
                   />
-                  <Legend />
+                  <Legend
+                    wrapperStyle={{
+                      paddingTop: '20px',
+                      color: isDarkMode ? '#9ca3af' : '#4b5563',
+                      fontSize: '12px',
+                    }}
+                  />
                 </PieChart>
               )}
 
@@ -420,7 +438,13 @@ export function CrossDatabaseChart({
                     }}
                     itemStyle={{ color: isDarkMode ? '#f3f4f6' : '#111827' }}
                   />
-                  <Legend />
+                  <Legend
+                    wrapperStyle={{
+                      paddingTop: '20px',
+                      color: isDarkMode ? '#9ca3af' : '#4b5563',
+                      fontSize: '12px',
+                    }}
+                  />
                   {config.aggregatedData.map((db) => (
                     <Scatter
                       key={db.databaseName}

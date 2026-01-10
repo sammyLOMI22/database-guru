@@ -94,7 +94,15 @@ export const BarChartView: React.FC<BarChartViewProps> = ({
               yColumn,
             ]}
           />
-          {showLegend && <Legend />}
+          {showLegend && (
+            <Legend
+              wrapperStyle={{
+                paddingTop: '10px',
+                color: isDarkMode ? '#9ca3af' : '#4b5563',
+                fontSize: '12px',
+              }}
+            />
+          )}
           <Bar
             dataKey={yColumn}
             fill={CHART_COLORS.primary}

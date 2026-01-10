@@ -180,7 +180,7 @@ export const SunburstView: React.FC<SunburstViewProps> = ({
             </div>
           ))}
           {rings[0].length > 8 && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">+{rings[0].length - 8} more</span>
+            <span className="text-xs text-gray-400 dark:text-gray-400">+{rings[0].length - 8} more</span>
           )}
         </div>
       )}

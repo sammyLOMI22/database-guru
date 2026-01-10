@@ -61,7 +61,7 @@ export const ScatterChartView: React.FC<ScatterChartViewProps> = ({
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-500">
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
         No numeric data available for scatter chart
       </div>
     );
@@ -72,17 +72,17 @@ export const ScatterChartView: React.FC<ScatterChartViewProps> = ({
     : '';
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 transition-colors">
       {title && (
-        <h4 className="text-sm font-medium text-gray-700 mb-1">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
           {title}
           {correlationLabel && (
-            <span className="text-gray-500 font-normal">{correlationLabel}</span>
+            <span className="text-gray-500 dark:text-gray-400 font-normal">{correlationLabel}</span>
           )}
         </h4>
       )}
       {correlationValue !== undefined && (
-        <p className="text-xs text-gray-500 mb-3">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
           {Math.abs(correlationValue) > 0.7
             ? 'Strong correlation detected'
             : Math.abs(correlationValue) > 0.4

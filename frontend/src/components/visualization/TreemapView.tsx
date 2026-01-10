@@ -12,6 +12,7 @@ import {
   assignColors,
   HIERARCHICAL_COLORS,
 } from '../../utils/hierarchicalChartUtils';
+import { useDarkMode } from '../../hooks/useDarkMode';
 
 interface TreemapViewProps {
   data: Record<string, unknown>[];
@@ -61,8 +62,8 @@ const CustomContent: React.FC<CustomContentProps> = ({
         height={height}
         fill={color || HIERARCHICAL_COLORS[0]}
         stroke="#fff"
-        strokeWidth={2}
-        rx={2}
+        strokeWidth={1}
+        rx={1}
         style={{ cursor: 'pointer' }}
       />
       {showLabel && (
@@ -104,6 +105,7 @@ export const TreemapView: React.FC<TreemapViewProps> = ({
   height = 300,
   animate = true,
 }) => {
+  const { isDarkMode } = useDarkMode();
   const treemapData = useMemo(() => {
     if (!data || data.length === 0 || categoryColumns.length === 0) {
       return null;
@@ -130,7 +132,7 @@ export const TreemapView: React.FC<TreemapViewProps> = ({
           data={treemapData.children}
           dataKey="value"
           aspectRatio={4 / 3}
-          stroke="#fff"
+          stroke={isDarkMode ? '#374151' : '#fff'}
           fill={HIERARCHICAL_COLORS[0]}
           isAnimationActive={animate}
           content={<CustomContent />}
@@ -146,7 +148,7 @@ export const TreemapView: React.FC<TreemapViewProps> = ({
                     {valueColumn}: {item.value?.toLocaleString()}
                   </div>
                   {item.path && item.path.length > 1 && (
-                    <div className="text-gray-500 dark:text-gray-500 text-xs mt-1">
+                    <div className="text-gray-500 dark:text-gray-400 text-xs mt-1">
                       {item.path.join(' > ')}
                     </div>
                   )}
@@ -169,7 +171,7 @@ export const TreemapView: React.FC<TreemapViewProps> = ({
           </div>
         ))}
         {treemapData.children.length > 8 && (
-          <span className="text-xs text-gray-400 dark:text-gray-500">+{treemapData.children.length - 8} more</span>
+          <span className="text-xs text-gray-400 dark:text-gray-400">+{treemapData.children.length - 8} more</span>
         )}
       </div>
     </div>
