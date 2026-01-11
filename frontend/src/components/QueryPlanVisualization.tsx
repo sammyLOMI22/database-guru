@@ -20,13 +20,13 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
   const getComplexityColor = (complexity: string): string => {
     switch (complexity.toLowerCase()) {
       case 'simple':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300';
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300';
       case 'complex':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300';
       case 'very_complex':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300';
       default:
         return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300';
     }
@@ -100,12 +100,12 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
           {/* Stats Badges */}
           <div className="flex flex-wrap gap-2 mb-4">
             {plan.joins_count > 0 && (
-              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+              <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 text-xs rounded-full border border-blue-200 dark:border-blue-800/50">
                 {plan.joins_count} join{plan.joins_count !== 1 ? 's' : ''}
               </span>
             )}
             {plan.filters_count > 0 && (
-              <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+              <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 text-xs rounded-full border border-purple-200 dark:border-purple-800/50">
                 {plan.filters_count} filter{plan.filters_count !== 1 ? 's' : ''}
               </span>
             )}
@@ -141,15 +141,15 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
           {/* Joins */}
           {plan.joins && plan.joins.length > 0 && (
             <div className="mb-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Joins</h4>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Joins</h4>
               <div className="space-y-2">
                 {plan.joins.map((join, idx) => (
-                  <div key={idx} className="bg-blue-50 p-2 rounded border border-blue-200">
+                  <div key={idx} className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-200 dark:border-blue-800/50">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs px-2 py-0.5 bg-blue-200 text-blue-800 rounded">
+                      <span className="text-xs px-2 py-0.5 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded">
                         {join.type}
                       </span>
-                      <span className="font-mono text-sm text-gray-900">
+                      <span className="font-mono text-sm text-gray-900 dark:text-gray-100">
                         {join.from} → {join.to}
                       </span>
                     </div>
@@ -166,10 +166,10 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
           {/* Filters */}
           {plan.filters && plan.filters.length > 0 && (
             <div className="mb-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Filters</h4>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Filters</h4>
               <div className="space-y-2">
                 {plan.filters.map((filter, idx) => (
-                  <div key={idx} className="bg-purple-50 p-2 rounded border border-purple-200">
+                  <div key={idx} className="bg-purple-50 dark:bg-purple-900/20 p-2 rounded border border-purple-200 dark:border-purple-800/50">
                     <div className="font-mono text-sm text-gray-900 dark:text-gray-100">
                       {filter.column} {filter.operator} {filter.value}
                     </div>
@@ -185,10 +185,10 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
           {/* Aggregations */}
           {plan.aggregations && plan.aggregations.length > 0 && (
             <div className="mb-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Aggregations</h4>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Aggregations</h4>
               <div className="space-y-2">
                 {plan.aggregations.map((agg, idx) => (
-                  <div key={idx} className="bg-green-50 p-2 rounded border border-green-200">
+                  <div key={idx} className="bg-green-50 dark:bg-green-900/20 p-2 rounded border border-green-200 dark:border-green-800/50">
                     <div className="font-mono text-sm text-gray-900 dark:text-gray-100">
                       {agg.function}({agg.column}){agg.alias && ` AS ${agg.alias}`}
                     </div>
@@ -204,7 +204,7 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
           {/* Grouping */}
           {plan.grouping && (
             <div className="mb-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Grouping</h4>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Grouping</h4>
               <div className="bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-200 dark:border-gray-700">
                 <div className="font-mono text-sm text-gray-900 dark:text-gray-100">
                   GROUP BY {plan.grouping.columns.join(', ')}
@@ -219,13 +219,13 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
           {/* Ordering */}
           {plan.ordering && (
             <div className="mb-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Ordering</h4>
-              <div className="bg-gray-50 p-2 rounded border border-gray-200">
-                <div className="font-mono text-sm text-gray-900">
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Ordering</h4>
+              <div className="bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-200 dark:border-gray-700">
+                <div className="font-mono text-sm text-gray-900 dark:text-gray-100">
                   ORDER BY {plan.ordering.column} {plan.ordering.direction}
                 </div>
                 {plan.ordering.purpose && (
-                  <p className="text-xs text-gray-600 mt-1">{plan.ordering.purpose}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{plan.ordering.purpose}</p>
                 )}
               </div>
             </div>
@@ -234,9 +234,9 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
           {/* Limit */}
           {plan.limit !== null && plan.limit !== undefined && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Limit</h4>
-              <div className="bg-gray-50 p-2 rounded border border-gray-200">
-                <div className="font-mono text-sm text-gray-900">
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Limit</h4>
+              <div className="bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-200 dark:border-gray-700">
+                <div className="font-mono text-sm text-gray-900 dark:text-gray-100">
                   LIMIT {plan.limit}
                 </div>
               </div>
