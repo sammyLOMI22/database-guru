@@ -26,6 +26,13 @@ interface SystemSettings {
   timeout_error_correction: number;
   enable_query_templates: boolean;
   enable_location_preprocessing: boolean;
+  // Prompt Optimization (Phase 2.2)
+  enable_prompt_optimization: boolean;
+  prompt_model_size: string;
+  enable_schema_compression: boolean;
+  max_schema_tables: number;
+  enable_example_selection: boolean;
+  max_few_shot_examples: number;
   created_at: string;
   updated_at: string;
 }
@@ -91,6 +98,13 @@ export function SettingsPanel() {
           timeout_error_correction: settings.timeout_error_correction,
           enable_query_templates: settings.enable_query_templates,
           enable_location_preprocessing: settings.enable_location_preprocessing,
+          // Prompt Optimization (Phase 2.2)
+          enable_prompt_optimization: settings.enable_prompt_optimization,
+          prompt_model_size: settings.prompt_model_size,
+          enable_schema_compression: settings.enable_schema_compression,
+          max_schema_tables: settings.max_schema_tables,
+          enable_example_selection: settings.enable_example_selection,
+          max_few_shot_examples: settings.max_few_shot_examples,
         }),
       });
 
@@ -362,6 +376,13 @@ export function SettingsPanel() {
                 timeout_error_correction: settings.timeout_error_correction,
                 enable_query_templates: settings.enable_query_templates,
                 enable_location_preprocessing: settings.enable_location_preprocessing,
+                // Prompt Optimization (Phase 2.2)
+                enable_prompt_optimization: settings.enable_prompt_optimization,
+                prompt_model_size: settings.prompt_model_size,
+                enable_schema_compression: settings.enable_schema_compression,
+                max_schema_tables: settings.max_schema_tables,
+                enable_example_selection: settings.enable_example_selection,
+                max_few_shot_examples: settings.max_few_shot_examples,
               }}
               onChange={(modelConfig) => setSettings({ ...settings, ...modelConfig })}
               disabled={saving}
