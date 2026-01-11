@@ -47,17 +47,17 @@ export default function SchemaPanel() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <RefreshCw className="w-6 h-6 animate-spin text-gray-500" />
-        <span className="ml-2 text-gray-600">Loading connections...</span>
+        <RefreshCw className="w-6 h-6 animate-spin text-gray-400 dark:text-gray-500" />
+        <span className="ml-2 text-gray-500 dark:text-gray-400">Loading connections...</span>
       </div>
     );
   }
 
   if (connections.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-500">
-        <Database className="w-12 h-12 mb-4 opacity-50" />
-        <p className="text-lg font-medium">No Database Connections</p>
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
+        <Database className="w-12 h-12 mb-4 opacity-30" />
+        <p className="text-lg font-medium text-gray-900 dark:text-white">No Database Connections</p>
         <p className="text-sm mt-2">Add a database connection to explore schemas.</p>
       </div>
     );
@@ -66,12 +66,12 @@ export default function SchemaPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Header with View Mode Toggle */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 transition-colors">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Schema Explorer</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Schema Explorer</h2>
           <button
             onClick={loadConnections}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+            className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             title="Refresh connections"
           >
             <RefreshCw className="w-5 h-5" />
@@ -82,11 +82,10 @@ export default function SchemaPanel() {
         <div className="mt-4 flex gap-2">
           <button
             onClick={() => setViewMode('explore')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'explore'
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'explore'
+                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-transparent'
+              }`}
           >
             <List className="w-4 h-4" />
             Explore Single Database
@@ -94,16 +93,15 @@ export default function SchemaPanel() {
           <button
             onClick={() => setViewMode('compare')}
             disabled={connections.length < 2}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'compare'
-                ? 'bg-purple-100 text-purple-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            } ${connections.length < 2 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'compare'
+                ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-transparent'
+              } ${connections.length < 2 ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <GitCompare className="w-4 h-4" />
             Compare Databases
             {connections.length < 2 && (
-              <span className="text-xs">(need 2+)</span>
+              <span className="text-xs ml-1">(need 2+)</span>
             )}
           </button>
         </div>
@@ -114,9 +112,9 @@ export default function SchemaPanel() {
         {viewMode === 'explore' ? (
           <>
             {/* Connection Selector Sidebar */}
-            <div className="w-64 border-r border-gray-200 bg-gray-50 overflow-y-auto">
+            <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
               <div className="p-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                   Select Database
                 </h3>
                 <div className="space-y-2">
@@ -124,16 +122,15 @@ export default function SchemaPanel() {
                     <button
                       key={conn.id}
                       onClick={() => setSelectedConnectionId(conn.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                        selectedConnectionId === conn.id
-                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                          : 'bg-white border border-gray-200 hover:bg-gray-100'
-                      }`}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${selectedConnectionId === conn.id
+                          ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                          : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
                     >
                       <Database className="w-4 h-4 flex-shrink-0" />
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{conn.name}</p>
-                        <p className="text-xs text-gray-500">{conn.database_type}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{conn.database_type}</p>
                       </div>
                     </button>
                   ))}
@@ -160,12 +157,12 @@ export default function SchemaPanel() {
         ) : (
           <>
             {/* Comparison Connection Selector */}
-            <div className="w-64 border-r border-gray-200 bg-gray-50 overflow-y-auto">
+            <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
               <div className="p-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-1">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Select Databases to Compare
                 </h3>
-                <p className="text-xs text-gray-500 mb-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                   {compareConnectionIds.length} selected
                 </p>
                 <div className="space-y-2">
@@ -174,22 +171,21 @@ export default function SchemaPanel() {
                     return (
                       <label
                         key={conn.id}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'bg-purple-100 border border-purple-200'
-                            : 'bg-white border border-gray-200 hover:bg-gray-100'
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isSelected
+                            ? 'bg-purple-100 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-800'
+                            : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                          }`}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleCompareConnection(conn.id)}
-                          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                          className="rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-900"
                         />
-                        <Database className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                        <Database className="w-4 h-4 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{conn.name}</p>
-                          <p className="text-xs text-gray-500">{conn.database_type}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{conn.database_type}</p>
                         </div>
                       </label>
                     );
@@ -200,14 +196,14 @@ export default function SchemaPanel() {
                 <div className="mt-4 flex gap-2">
                   <button
                     onClick={() => setCompareConnectionIds(connections.map((c) => c.id))}
-                    className="text-xs text-purple-600 hover:text-purple-800"
+                    className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition-colors"
                   >
                     Select All
                   </button>
-                  <span className="text-gray-300">|</span>
+                  <span className="text-gray-300 dark:text-gray-600">|</span>
                   <button
                     onClick={() => setCompareConnectionIds([])}
-                    className="text-xs text-purple-600 hover:text-purple-800"
+                    className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition-colors"
                   >
                     Clear
                   </button>

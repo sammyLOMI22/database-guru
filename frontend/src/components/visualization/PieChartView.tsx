@@ -13,7 +13,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { PIE_PALETTE, prepareChartData } from '../../utils/chartUtils';
+import { CHART_COLORS, prepareChartData } from '../../utils/chartUtils';
+import { useDarkMode } from '../../hooks/useDarkMode';
 
 interface PieChartViewProps {
   data: Record<string, unknown>[];
@@ -81,32 +82,27 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
   showLegend = true,
   animate = true,
 }) => {
+  const { isDarkMode } = useDarkMode();
+
   const chartData = useMemo((): PieDataItem[] => {
-    const prepared = prepareChartData(data, xColumn, yColumn, 'pie', 20);
-    // Transform to pie chart format with name and value
-    return prepared.map((item) => ({
-      ...item,
-      name: String(item[xColumn] ?? 'Unknown'),
-      value: Number(item[yColumn]) || 0,
-    }));
+    // prepareChartData already returns { name, value } objects for pie charts
+    return prepareChartData(data, xColumn, yColumn, 'pie', 20) as PieDataItem[];
   }, [data, xColumn, yColumn]);
 
-  const total = useMemo(() => {
-    return chartData.reduce((sum, item) => sum + (item.value || 0), 0);
-  }, [chartData]);
+  const total = useMemo(() => data.reduce((sum, row) => sum + Number(row[yColumn] || 0), 0), [data, yColumn]);
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-500">
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         No data available for pie chart
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 transition-colors">
       {title && (
-        <h4 className="text-sm font-medium text-gray-700 mb-3">{title}</h4>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">{title}</h4>
       )}
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
@@ -121,21 +117,25 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
             dataKey="value"
             isAnimationActive={animate}
           >
-            {chartData.map((_, index) => (
+            {chartData.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={PIE_PALETTE[index % PIE_PALETTE.length]}
+                fill={entry.color as string || CHART_COLORS.primary}
+                stroke={isDarkMode ? '#374151' : '#fff'}
+                strokeWidth={2}
               />
             ))}
           </Pie>
           <Tooltip
             contentStyle={{
-              backgroundColor: 'white',
-              border: '1px solid #e5e7eb',
-              borderRadius: '6px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              backgroundColor: isDarkMode ? '#1f2937' : 'white',
+              border: `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
+              color: isDarkMode ? '#f3f4f6' : '#111827',
             }}
-            formatter={(value: number | undefined, name: string | undefined) => [
+            itemStyle={{ color: isDarkMode ? '#f3f4f6' : '#111827' }}
+            formatter={(value: any, name: any) => [
               value !== undefined
                 ? `${value.toLocaleString()} (${((value / total) * 100).toFixed(1)}%)`
                 : '0',
@@ -147,7 +147,11 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
               layout="vertical"
               verticalAlign="middle"
               align="right"
-              wrapperStyle={{ fontSize: 12 }}
+              wrapperStyle={{
+                fontSize: 12,
+                color: isDarkMode ? '#9ca3af' : '#4b5563',
+                paddingLeft: '20px',
+              }}
             />
           )}
         </PieChart>

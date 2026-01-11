@@ -115,10 +115,10 @@ export const ToolsOverview: React.FC = () => {
       <div className="animate-pulse space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-28 bg-gray-200 rounded-lg" />
+            <div key={i} className="h-28 bg-gray-200 dark:bg-gray-800 rounded-lg" />
           ))}
         </div>
-        <div className="h-40 bg-gray-200 rounded-lg" />
+        <div className="h-40 bg-gray-200 dark:bg-gray-800 rounded-lg" />
       </div>
     );
   }
@@ -142,74 +142,79 @@ export const ToolsOverview: React.FC = () => {
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Total Tools */}
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-5 border border-orange-200">
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/20 dark:to-orange-900/10 rounded-lg p-5 border border-orange-200 dark:border-orange-800/50 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-orange-700">Total Tools</p>
-              <p className="text-3xl font-bold text-orange-900 mt-1">
+              <p className="text-sm font-medium text-orange-700 dark:text-orange-400">Total Tools</p>
+              <p className="text-3xl font-bold text-orange-900 dark:text-orange-100 mt-1">
                 {stats?.total_tools || 0}
               </p>
             </div>
-            <div className="p-3 bg-orange-200 rounded-full">
-              <Wrench className="w-6 h-6 text-orange-700" />
+            <div className="p-3 bg-orange-200 dark:bg-orange-800/50 rounded-full">
+              <Wrench className="w-6 h-6 text-orange-700 dark:text-orange-300" />
             </div>
           </div>
         </div>
 
         {/* Total Executions */}
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-5 border border-blue-200">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/20 dark:to-blue-900/10 rounded-lg p-5 border border-blue-200 dark:border-blue-800/50 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-blue-700">Total Executions</p>
-              <p className="text-3xl font-bold text-blue-900 mt-1">
+              <p className="text-sm font-medium text-blue-700 dark:text-blue-400">Total Executions</p>
+              <p className="text-3xl font-bold text-blue-900 dark:text-blue-100 mt-1">
                 {stats?.total_executions || 0}
               </p>
             </div>
-            <div className="p-3 bg-blue-200 rounded-full">
-              <Activity className="w-6 h-6 text-blue-700" />
+            <div className="p-3 bg-blue-200 dark:bg-blue-800/50 rounded-full">
+              <Activity className="w-6 h-6 text-blue-700 dark:text-blue-300" />
             </div>
           </div>
         </div>
 
         {/* Success Rate */}
-        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-5 border border-green-200">
+        <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/20 dark:to-green-900/10 rounded-lg p-5 border border-green-200 dark:border-green-800/50 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-green-700">Success Rate</p>
-              <p className="text-3xl font-bold text-green-900 mt-1">
+              <p className="text-sm font-medium text-green-700 dark:text-green-400">Success Rate</p>
+              <p className="text-3xl font-bold text-green-900 dark:text-green-100 mt-1">
                 {stats ? `${(stats.overall_success_rate * 100).toFixed(1)}%` : '-'}
               </p>
             </div>
-            <div className="p-3 bg-green-200 rounded-full">
-              <CheckCircle className="w-6 h-6 text-green-700" />
+            <div className="p-3 bg-green-200 dark:bg-green-800/50 rounded-full">
+              <CheckCircle className="w-6 h-6 text-green-700 dark:text-green-300" />
             </div>
           </div>
         </div>
 
         {/* Active Tools */}
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-5 border border-purple-200">
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/20 dark:to-purple-900/10 rounded-lg p-5 border border-purple-200 dark:border-purple-800/50 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-purple-700">Categories</p>
-              <p className="text-3xl font-bold text-purple-900 mt-1">
+              <p className="text-sm font-medium text-purple-700 dark:text-purple-400">Categories</p>
+              <p className="text-3xl font-bold text-purple-900 dark:text-purple-100 mt-1">
                 {Object.keys(toolsByCategory).length}
               </p>
             </div>
-            <div className="p-3 bg-purple-200 rounded-full">
-              <Zap className="w-6 h-6 text-purple-700" />
+            <div className="p-3 bg-purple-200 dark:bg-purple-800/50 rounded-full">
+              <Zap className="w-6 h-6 text-purple-700 dark:text-purple-300" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Tools by Category */}
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Tools by Category</h3>
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tools by Category</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {Object.entries(toolsByCategory).map(([category, count]) => (
             <div
               key={category}
-              className={`flex items-center gap-3 p-4 rounded-lg ${categoryColors[category] || 'bg-gray-100'}`}
+              className={`flex items-center gap-3 p-4 rounded-lg border transition-colors ${categoryColors[category] || 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
+                } ${category === 'schema' ? 'dark:bg-blue-900/20 dark:border-blue-800/50 dark:text-blue-300' :
+                  category === 'data' ? 'dark:bg-green-900/20 dark:border-green-800/50 dark:text-green-300' :
+                    category === 'query' ? 'dark:bg-purple-900/20 dark:border-purple-800/50 dark:text-purple-300' :
+                      category === 'validation' ? 'dark:bg-orange-900/20 dark:border-orange-800/50 dark:text-orange-300' : ''
+                }`}
             >
               <div className="flex-shrink-0">
                 {categoryIcons[category] || <Wrench className="w-5 h-5" />}
@@ -224,16 +229,16 @@ export const ToolsOverview: React.FC = () => {
       </div>
 
       {/* How It Works */}
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 p-5">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">How Tool-Using Agent Works</h3>
+      <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">How Tool-Using Agent Works</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold">
               1
             </div>
             <div>
-              <p className="font-medium text-gray-900">Analyze Question</p>
-              <p className="text-gray-600">
+              <p className="font-medium text-gray-900 dark:text-gray-100">Analyze Question</p>
+              <p className="text-gray-600 dark:text-gray-400">
                 Identifies what information is needed (tables, columns, values)
               </p>
             </div>
@@ -243,8 +248,8 @@ export const ToolsOverview: React.FC = () => {
               2
             </div>
             <div>
-              <p className="font-medium text-gray-900">Use Tools</p>
-              <p className="text-gray-600">
+              <p className="font-medium text-gray-900 dark:text-gray-100">Use Tools</p>
+              <p className="text-gray-600 dark:text-gray-400">
                 Explores schema and samples data (e.g., discovers "CA" not "California")
               </p>
             </div>
@@ -254,8 +259,8 @@ export const ToolsOverview: React.FC = () => {
               3
             </div>
             <div>
-              <p className="font-medium text-gray-900">Generate SQL</p>
-              <p className="text-gray-600">
+              <p className="font-medium text-gray-900 dark:text-gray-100">Generate SQL</p>
+              <p className="text-gray-600 dark:text-gray-400">
                 Builds enriched context for accurate first-attempt SQL generation
               </p>
             </div>
@@ -264,20 +269,20 @@ export const ToolsOverview: React.FC = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleInvalidateAllCache}
             disabled={invalidating}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/60 disabled:opacity-50 transition-colors border border-orange-200 dark:border-orange-800/50"
           >
             <RefreshCw className={`w-4 h-4 ${invalidating ? 'animate-spin' : ''}`} />
             {invalidating ? 'Invalidating...' : 'Clear All Tool Cache'}
           </button>
           <button
             onClick={() => loadData(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600"
           >
             <Clock className="w-4 h-4" />
             Refresh Stats

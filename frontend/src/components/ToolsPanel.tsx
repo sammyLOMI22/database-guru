@@ -57,12 +57,12 @@ export const ToolsPanel: React.FC = () => {
       {/* Header */}
       <div>
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-orange-100 rounded-lg">
-            <Wrench className="w-6 h-6 text-orange-600" />
+          <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+            <Wrench className="w-6 h-6 text-orange-600 dark:text-orange-400" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Tool-Using Agent</h2>
-            <p className="text-gray-600 mt-1">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Tool-Using Agent</h2>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
               10 specialized tools for schema exploration, data sampling, and query validation
             </p>
           </div>
@@ -70,19 +70,18 @@ export const ToolsPanel: React.FC = () => {
       </div>
 
       {/* Main Content Card */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-100 dark:border-gray-700">
         {/* Tab Navigation */}
-        <div className="border-b border-gray-200">
+        <div className="border-b border-gray-200 dark:border-gray-700 transition-colors">
           <nav className="flex overflow-x-auto" aria-label="Tools tabs">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-                  activeTab === tab.key
-                    ? 'border-orange-500 text-orange-600 bg-orange-50'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                }`}
+                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.key
+                    ? 'border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
                 aria-current={activeTab === tab.key ? 'page' : undefined}
               >
                 {tab.icon}
@@ -93,8 +92,8 @@ export const ToolsPanel: React.FC = () => {
         </div>
 
         {/* Tab Description */}
-        <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-          <p className="text-sm text-gray-600">{currentTab?.description}</p>
+        <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400">{currentTab?.description}</p>
         </div>
 
         {/* Tab Content */}

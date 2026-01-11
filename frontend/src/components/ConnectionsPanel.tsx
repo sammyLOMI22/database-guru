@@ -107,29 +107,29 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
   return (
     <div className="flex flex-col h-full relative">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-          <Database className="w-4 h-4" />
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <Database className="w-4 h-4 text-primary-600 dark:text-primary-400" />
           Connections
         </h3>
         <button
           onClick={handleAddConnection}
-          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           title="Add Connection"
         >
-          <Plus className="w-4 h-4 text-primary-600" />
+          <Plus className="w-4 h-4 text-primary-600 dark:text-primary-400" />
         </button>
       </div>
 
       {/* Connections List */}
       <div className="flex-1 overflow-y-auto">
         {connections.length === 0 ? (
-          <div className="p-8 text-center">
-            <Database className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 text-sm mb-4">No database connections yet</p>
+          <div className="p-8 text-center mt-10">
+            <Database className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">No database connections yet</p>
             <button
               onClick={handleAddConnection}
-              className="px-4 py-2 bg-primary-500 text-white text-sm rounded-lg hover:bg-primary-600 transition-colors"
+              className="px-4 py-2 bg-primary-500 dark:bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-600 dark:hover:bg-primary-500 transition-colors shadow-sm"
             >
               Add Your First Connection
             </button>
@@ -142,36 +142,35 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
                 <div
                   key={conn.id}
                   onClick={() => handleSelectConnection(conn.id)}
-                  className={`group p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                    conn.is_active
-                      ? 'border-primary-500 bg-primary-50'
+                  className={`group p-3 rounded-lg border-2 cursor-pointer transition-all ${conn.is_active
+                      ? 'border-primary-500 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/20'
                       : isSelected
-                      ? 'border-blue-400 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
+                        ? 'border-blue-400 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         {conn.is_active ? (
-                          <Check className="w-4 h-4 text-primary-600 flex-shrink-0" />
+                          <Check className="w-4 h-4 text-primary-600 dark:text-primary-400 flex-shrink-0" />
                         ) : (
-                          <Circle className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          <Circle className="w-4 h-4 text-gray-400 dark:text-gray-600 flex-shrink-0" />
                         )}
-                        <span className="font-medium text-gray-900 truncate">{conn.name}</span>
+                        <span className="font-medium text-gray-900 dark:text-white truncate">{conn.name}</span>
                       </div>
                       <div className="ml-6 space-y-1">
-                        <p className="text-xs text-gray-600">
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 transition-colors">
                             {conn.database_type.toUpperCase()}
                           </span>
                         </p>
                         {conn.host && (
-                          <p className="text-xs text-gray-600 font-mono">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 font-mono">
                             {conn.host}:{conn.port}
                           </p>
                         )}
-                        <p className="text-xs text-gray-700 font-medium truncate" title={conn.database_name}>
+                        <p className="text-xs text-gray-700 dark:text-gray-300 font-medium truncate" title={conn.database_name}>
                           {conn.database_name}
                         </p>
                       </div>
@@ -182,20 +181,20 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
                           e.stopPropagation();
                           handleEditConnection(conn);
                         }}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-50 rounded transition-all"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
                         title="Edit"
                       >
-                        <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                        <Pencil className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDeleteConnection(conn.id);
                         }}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 rounded transition-all"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all"
                         title="Delete"
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                        <Trash2 className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
                       </button>
                     </div>
                   </div>
@@ -208,8 +207,8 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
 
       {/* Loading Overlay */}
       {loading && (
-        <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
-          <div className="flex items-center gap-2 text-primary-600">
+        <div className="absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm flex items-center justify-center z-10">
+          <div className="flex items-center gap-2 text-primary-600 dark:text-primary-400 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-lg border border-gray-100 dark:border-gray-700">
             <Loader2 className="w-5 h-5 animate-spin" />
             <span className="text-sm font-medium">Saving...</span>
           </div>

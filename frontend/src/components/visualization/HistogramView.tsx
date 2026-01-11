@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { prepareHistogramData, calculateSummaryStats } from '../../utils/statisticalChartUtils';
 import { CHART_COLORS } from '../../utils/chartUtils';
+import { useDarkMode } from '../../hooks/useDarkMode';
 
 interface HistogramViewProps {
   data: Record<string, unknown>[];
@@ -40,6 +41,7 @@ export const HistogramView: React.FC<HistogramViewProps> = ({
   showMedian = false,
   animate = true,
 }) => {
+  const { isDarkMode } = useDarkMode();
   const { histogramData, stats } = useMemo(() => {
     if (!data || data.length === 0) {
       return { histogramData: [], stats: null };
@@ -70,16 +72,16 @@ export const HistogramView: React.FC<HistogramViewProps> = ({
 
   if (!histogramData || histogramData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-500">
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
         No numeric data available for histogram
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 transition-colors">
       {title && (
-        <h4 className="text-sm font-medium text-gray-700 mb-3">{title}</h4>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">{title}</h4>
       )}
 
       <ResponsiveContainer width="100%" height={height}>
@@ -88,33 +90,37 @@ export const HistogramView: React.FC<HistogramViewProps> = ({
           margin={{ top: 10, right: 30, left: 0, bottom: 20 }}
           barCategoryGap={1}
         >
-          <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
           <XAxis
             dataKey="range"
-            tick={{ fontSize: 10 }}
+            tick={{ fontSize: 10, fill: isDarkMode ? '#9ca3af' : '#6b7280' }}
             angle={-45}
             textAnchor="end"
             height={60}
+            stroke={isDarkMode ? '#4b5563' : '#9ca3af'}
             interval={Math.floor(histogramData.length / 8)}
           />
           <YAxis
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 11, fill: isDarkMode ? '#9ca3af' : '#6b7280' }}
             width={50}
+            stroke={isDarkMode ? '#4b5563' : '#9ca3af'}
             label={{
               value: 'Count',
               angle: -90,
               position: 'insideLeft',
-              style: { textAnchor: 'middle', fontSize: 11 },
+              style: { textAnchor: 'middle', fontSize: 11, fill: isDarkMode ? '#9ca3af' : '#6b7280' },
             }}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'white',
-              border: '1px solid #e5e7eb',
-              borderRadius: '6px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              backgroundColor: isDarkMode ? '#1f2937' : 'white',
+              border: `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
+              color: isDarkMode ? '#f3f4f6' : '#111827',
             }}
-            formatter={(value: number | undefined) => [value !== undefined ? value.toLocaleString() : '0', 'Count']}
+            itemStyle={{ color: isDarkMode ? '#f3f4f6' : '#111827' }}
+            formatter={(value: any) => [value !== undefined ? value.toLocaleString() : '0', 'Count']}
             labelFormatter={(label) => `Range: ${label}`}
           />
 
@@ -165,21 +171,21 @@ export const HistogramView: React.FC<HistogramViewProps> = ({
 
       {/* Statistics summary */}
       {stats && (
-        <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600">
+        <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
           <div>
-            <span className="font-medium">Count:</span> {stats.count}
+            <span className="font-medium text-gray-700 dark:text-gray-300">Count:</span> {stats.count}
           </div>
           <div>
-            <span className="font-medium">Mean:</span> {stats.mean.toFixed(2)}
+            <span className="font-medium text-gray-700 dark:text-gray-300">Mean:</span> {stats.mean.toFixed(2)}
           </div>
           <div>
-            <span className="font-medium">Median:</span> {stats.median.toFixed(2)}
+            <span className="font-medium text-gray-700 dark:text-gray-300">Median:</span> {stats.median.toFixed(2)}
           </div>
           <div>
-            <span className="font-medium">Std Dev:</span> {stats.stdDev.toFixed(2)}
+            <span className="font-medium text-gray-700 dark:text-gray-300">Std Dev:</span> {stats.stdDev.toFixed(2)}
           </div>
           <div>
-            <span className="font-medium">Range:</span> {stats.min.toFixed(2)} - {stats.max.toFixed(2)}
+            <span className="font-medium text-gray-700 dark:text-gray-300">Range:</span> {stats.min.toFixed(2)} - {stats.max.toFixed(2)}
           </div>
         </div>
       )}
