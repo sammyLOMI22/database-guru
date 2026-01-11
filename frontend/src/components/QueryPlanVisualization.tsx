@@ -28,28 +28,28 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
       case 'very_complex':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300';
     }
   };
 
   const getConfidenceColor = (confidence: number): string => {
-    if (confidence >= 0.8) return 'text-green-700';
-    if (confidence >= 0.6) return 'text-yellow-700';
-    return 'text-red-700';
+    if (confidence >= 0.8) return 'text-green-700 dark:text-green-400';
+    if (confidence >= 0.6) return 'text-yellow-700 dark:text-yellow-400';
+    return 'text-red-700 dark:text-red-400';
   };
 
   return (
-    <div className="bg-indigo-50 border border-indigo-200 rounded-lg overflow-hidden mt-4">
+    <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 rounded-lg overflow-hidden mt-4 shadow-sm transition-colors">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full text-left px-4 py-3 hover:bg-indigo-100 transition-colors"
+        className="flex items-center justify-between w-full text-left px-4 py-3 hover:bg-indigo-100 dark:hover:bg-indigo-800/40 transition-colors"
         aria-expanded={expanded}
         aria-label="Toggle query plan"
       >
         <div className="flex items-center gap-3">
           <span className="text-xl" role="img" aria-label="Query plan">📋</span>
           <div>
-            <h3 className="font-semibold text-indigo-900">
+            <h3 className="font-semibold text-indigo-900 dark:text-indigo-100">
               Query Plan
             </h3>
             <div className="flex items-center gap-2 text-sm">
@@ -63,9 +63,8 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
           </div>
         </div>
         <svg
-          className={`w-5 h-5 text-indigo-700 transition-transform ${
-            expanded ? 'rotate-180' : ''
-          }`}
+          className={`w-5 h-5 text-indigo-700 dark:text-indigo-400 transition-transform ${expanded ? 'rotate-180' : ''
+            }`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -81,20 +80,20 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
       </button>
 
       {expanded && (
-        <div className="border-t border-indigo-200 p-4 bg-white">
+        <div className="border-t border-indigo-200 dark:border-indigo-800/50 p-4 bg-white dark:bg-gray-800">
           {/* Intent */}
           {plan.intent && (
             <div className="mb-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-1">Intent</h4>
-              <p className="text-sm text-gray-600">{plan.intent}</p>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Intent</h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{plan.intent}</p>
             </div>
           )}
 
           {/* Reasoning */}
           {plan.reasoning && (
             <div className="mb-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-1">Reasoning</h4>
-              <p className="text-sm text-gray-600">{plan.reasoning}</p>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Reasoning</h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{plan.reasoning}</p>
             </div>
           )}
 
@@ -111,7 +110,7 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
               </span>
             )}
             {plan.aggregations_count > 0 && (
-              <span className="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+              <span className="px-3 py-1 bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 text-xs rounded-full border border-green-200 dark:border-green-800/50">
                 {plan.aggregations_count} aggregation{plan.aggregations_count !== 1 ? 's' : ''}
               </span>
             )}
@@ -120,18 +119,18 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
           {/* Tables */}
           {plan.tables && plan.tables.length > 0 && (
             <div className="mb-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Tables</h4>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Tables</h4>
               <div className="space-y-2">
                 {plan.tables.map((table, idx) => (
-                  <div key={idx} className="bg-gray-50 p-2 rounded border border-gray-200">
+                  <div key={idx} className="bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm text-gray-900">{table.name}</span>
+                      <span className="font-mono text-sm text-gray-900 dark:text-gray-100">{table.name}</span>
                       {table.alias && (
                         <span className="text-xs text-gray-500">as {table.alias}</span>
                       )}
                     </div>
                     {table.purpose && (
-                      <p className="text-xs text-gray-600 mt-1">{table.purpose}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{table.purpose}</p>
                     )}
                   </div>
                 ))}
@@ -154,9 +153,9 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
                         {join.from} → {join.to}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-600 mt-1">ON {join.on}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">ON {join.on}</p>
                     {join.purpose && (
-                      <p className="text-xs text-gray-500 mt-1">{join.purpose}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{join.purpose}</p>
                     )}
                   </div>
                 ))}
@@ -171,11 +170,11 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
               <div className="space-y-2">
                 {plan.filters.map((filter, idx) => (
                   <div key={idx} className="bg-purple-50 p-2 rounded border border-purple-200">
-                    <div className="font-mono text-sm text-gray-900">
+                    <div className="font-mono text-sm text-gray-900 dark:text-gray-100">
                       {filter.column} {filter.operator} {filter.value}
                     </div>
                     {filter.purpose && (
-                      <p className="text-xs text-gray-600 mt-1">{filter.purpose}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{filter.purpose}</p>
                     )}
                   </div>
                 ))}
@@ -190,11 +189,11 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
               <div className="space-y-2">
                 {plan.aggregations.map((agg, idx) => (
                   <div key={idx} className="bg-green-50 p-2 rounded border border-green-200">
-                    <div className="font-mono text-sm text-gray-900">
+                    <div className="font-mono text-sm text-gray-900 dark:text-gray-100">
                       {agg.function}({agg.column}){agg.alias && ` AS ${agg.alias}`}
                     </div>
                     {agg.purpose && (
-                      <p className="text-xs text-gray-600 mt-1">{agg.purpose}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{agg.purpose}</p>
                     )}
                   </div>
                 ))}
@@ -206,12 +205,12 @@ export const QueryPlanVisualization: React.FC<QueryPlanVisualizationProps> = ({
           {plan.grouping && (
             <div className="mb-4">
               <h4 className="text-sm font-semibold text-gray-700 mb-2">Grouping</h4>
-              <div className="bg-gray-50 p-2 rounded border border-gray-200">
-                <div className="font-mono text-sm text-gray-900">
+              <div className="bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-200 dark:border-gray-700">
+                <div className="font-mono text-sm text-gray-900 dark:text-gray-100">
                   GROUP BY {plan.grouping.columns.join(', ')}
                 </div>
                 {plan.grouping.purpose && (
-                  <p className="text-xs text-gray-600 mt-1">{plan.grouping.purpose}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{plan.grouping.purpose}</p>
                 )}
               </div>
             </div>
