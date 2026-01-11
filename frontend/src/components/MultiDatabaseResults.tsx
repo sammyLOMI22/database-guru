@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MessageSquare, Copy, Check, Zap, Database, ChevronLeft, ChevronRight, AlertCircle, XCircle } from 'lucide-react';
 import type { DatabaseQueryResult, CacheInfo } from '../types/api';
 import { AgentTrace } from './AgentTrace';
@@ -13,7 +13,8 @@ import { ChartToggle, ViewMode } from './visualization/ChartToggle';
 import { ExportDropdown } from './visualization/ExportDropdown';
 import { CombinedExportDropdown } from './visualization/CombinedExportDropdown';
 import { CrossDatabaseChart } from './visualization/CrossDatabaseChart';
-import { detectChartType, ChartRecommendation, ChartType } from '../utils/chartUtils';
+import { ChartRecommendation, ChartType } from '../utils/chartUtils';
+import { analyzeData } from '../utils/chartIntelligence';
 import { detectCrossDbComparison } from '../utils/crossDbUtils';
 
 interface MultiDatabaseResultsProps {
@@ -59,15 +60,36 @@ export default function MultiDatabaseResults({
     Object.fromEntries(results.map((r) => [r.connection_id, 10]))
   );
 
+  // Reset states when results prop changes
+  useEffect(() => {
+    setViewModes(Object.fromEntries(results.map((r) => [r.connection_id, 'table'])));
+    setSelectedChartTypes(Object.fromEntries(results.map((r) => [r.connection_id, null])));
+    setCurrentPages(Object.fromEntries(results.map((r) => [r.connection_id, 1])));
+    setExpandedDatabases(new Set(results.map((r) => r.connection_id)));
+  }, [results]);
+
   // Memoized chart recommendations for each database
   const chartRecommendations = useMemo<Record<number, ChartRecommendation>>(() => {
     return Object.fromEntries(
-      results.map((r) => [
-        r.connection_id,
-        r.results && r.results.length > 0
-          ? detectChartType(r.results, r.result_analysis?.statistics || {})
-          : { chartType: 'table' as const, confidence: 0, xColumn: null, yColumn: null, reason: 'No data' },
-      ])
+      results.map((r) => {
+        if (r.results && r.results.length > 0) {
+          const analysis = analyzeData(r.results, r.result_analysis?.statistics || {});
+          return [
+            r.connection_id,
+            {
+              chartType: analysis.primaryChart,
+              confidence: analysis.confidence,
+              xColumn: analysis.xColumn,
+              yColumn: analysis.yColumn,
+              reason: analysis.reason,
+            },
+          ];
+        }
+        return [
+          r.connection_id,
+          { chartType: 'table' as const, confidence: 0, xColumn: null, yColumn: null, reason: 'No data' },
+        ];
+      })
     );
   }, [results]);
 

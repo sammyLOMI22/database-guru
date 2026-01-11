@@ -19,7 +19,8 @@ import { feedbackAPI } from '../services/api';
 import { ChartVisualization } from './visualization/ChartVisualization';
 import { ChartToggle, ViewMode } from './visualization/ChartToggle';
 import { ExportDropdown } from './visualization/ExportDropdown';
-import { detectChartType, ChartType } from '../utils/chartUtils';
+import { ChartType } from '../utils/chartUtils';
+import { analyzeData } from '../utils/chartIntelligence';
 
 interface QueryResultsProps {
   sql: string;
@@ -82,9 +83,10 @@ export default function QueryResults({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Reset pagination when results change
+  // Reset pagination and selection when results change
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedChartType(null);
   }, [results]);
 
   // Auto-select chart type and view mode when preferred chart type is provided
@@ -100,7 +102,14 @@ export default function QueryResults({
     if (!results || results.length === 0) {
       return { chartType: 'table' as const, confidence: 0, xColumn: null, yColumn: null, reason: 'No data' };
     }
-    return detectChartType(results, resultAnalysis?.statistics || {});
+    const analysis = analyzeData(results, resultAnalysis?.statistics || {});
+    return {
+      chartType: analysis.primaryChart,
+      confidence: analysis.confidence,
+      xColumn: analysis.xColumn,
+      yColumn: analysis.yColumn,
+      reason: analysis.reason
+    };
   }, [results, resultAnalysis]);
 
   const chartAvailable = chartRecommendation.chartType !== 'table';
@@ -128,8 +137,8 @@ export default function QueryResults({
       {/* Cache Badge */}
       {cacheType && (
         <div className={`rounded-lg p-3 border ${cacheType === 'exact'
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50'
-            : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50'
+          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50'
+          : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50'
           }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -151,8 +160,8 @@ export default function QueryResults({
               </div>
             </div>
             <span className={`text-xs px-2 py-1 rounded-full ${cacheType === 'exact'
-                ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
-                : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+              ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
+              : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
               }`}>
               Instant Response
             </span>

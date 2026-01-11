@@ -7,7 +7,6 @@
 
 import React, { useMemo } from 'react';
 import {
-  BarChart2,
   AlertCircle,
   Sparkles,
   Zap,
@@ -80,7 +79,7 @@ const ChartInfoBadge: React.FC<{ recommendation: IntelligentChartRecommendation 
               {chartTypeLabels[recommendation.primaryChart]}
             </span>
             <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded font-medium">
-              {Math.round(recommendation.confidence * 100)}% Confidence
+              {Math.round(recommendation.confidence)}% Confidence
             </span>
           </div>
         </div>
@@ -106,7 +105,7 @@ const InsightsBadge: React.FC<{ insights: DataInsight[] }> = ({ insights }) => {
           <div key={index} className="flex items-center gap-2 px-2 py-1 bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 rounded text-xs">
             {insight.type === 'trend' && <TrendingUp className="w-3 h-3" />}
             {insight.type === 'outlier' && <AlertTriangle className="w-3 h-3" />}
-            {insight.type === 'summary' && <Lightbulb className="w-3 h-3" />}
+            {insight.type === 'pattern' && <Lightbulb className="w-3 h-3" />}
             <span>{insight.message}</span>
           </div>
         ))}
