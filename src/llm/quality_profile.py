@@ -102,6 +102,9 @@ class QualityProfile:
     # Post-Generation Semantic Validation (Phase 3)
     enable_semantic_validation: bool
 
+    # Prompt Optimization (Phase 2.2)
+    enable_prompt_optimization: bool
+
     def __str__(self) -> str:
         return f"QualityProfile({self.level.value}, {self.raw_value}%)"
 
@@ -172,6 +175,8 @@ def get_quality_profile(quality_level: int) -> QualityProfile:
             use_dynamic_examples=False,
             # Post-Generation - disabled for speed
             enable_semantic_validation=False,
+            # Prompt Optimization - user opt-in (default off)
+            enable_prompt_optimization=False,
         )
     elif quality_level <= 70:
         # BALANCED: Good accuracy with reasonable speed
@@ -204,6 +209,8 @@ def get_quality_profile(quality_level: int) -> QualityProfile:
             use_dynamic_examples=True,
             # Post-Generation - enabled for validation
             enable_semantic_validation=True,
+            # Prompt Optimization - user opt-in (default off)
+            enable_prompt_optimization=False,
         )
     else:
         # THOROUGH: Maximum accuracy
@@ -236,6 +243,8 @@ def get_quality_profile(quality_level: int) -> QualityProfile:
             use_dynamic_examples=True,
             # Post-Generation - enabled for validation
             enable_semantic_validation=True,
+            # Prompt Optimization - user opt-in (default off)
+            enable_prompt_optimization=False,
         )
 
 
@@ -272,6 +281,11 @@ def get_quality_profile_with_settings(
         if system_settings.get('enable_semantic_validation') is not None:
             profile = QualityProfile(
                 **{**profile.__dict__, 'enable_semantic_validation': system_settings['enable_semantic_validation']}
+            )
+        # Prompt Optimization (Phase 2.2)
+        if system_settings.get('enable_prompt_optimization') is not None:
+            profile = QualityProfile(
+                **{**profile.__dict__, 'enable_prompt_optimization': system_settings['enable_prompt_optimization']}
             )
 
     return profile

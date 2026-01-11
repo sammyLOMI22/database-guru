@@ -104,7 +104,8 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
     try {
       setLoadingModels(true);
       setModelsError(null);
-      const response = await fetch('http://localhost:8000/api/models/details');
+      const baseURL = (import.meta as any).env?.VITE_API_URL || '';
+      const response = await fetch(`${baseURL}/api/models/details`);
       if (!response.ok) throw new Error('Failed to fetch models');
       const data = await response.json();
       setAvailableModels(data.models || []);
@@ -123,7 +124,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
     });
   };
 
-  const handleTimeoutChange = (key: keyof ModelConfig, value: number) => {
+  const handleNumberChange = (key: keyof ModelConfig, value: number) => {
     onChange({
       ...config,
       [key]: Math.max(1, Math.min(300, value)),
@@ -245,7 +246,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
                   max="120"
                   step="5"
                   value={currentTimeout}
-                  onChange={(e) => handleTimeoutChange(task.timeoutKey, parseInt(e.target.value))}
+                  onChange={(e) => handleNumberChange(task.timeoutKey, parseInt(e.target.value))}
                   disabled={disabled}
                   className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
@@ -396,7 +397,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
                     max="20"
                     step="1"
                     value={config.max_schema_tables || 10}
-                    onChange={(e) => handleTimeoutChange('max_schema_tables' as keyof ModelConfig, parseInt(e.target.value))}
+                    onChange={(e) => handleNumberChange('max_schema_tables' as keyof ModelConfig, parseInt(e.target.value))}
                     disabled={disabled}
                     className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-600"
                   />
@@ -436,7 +437,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
                     max="5"
                     step="1"
                     value={config.max_few_shot_examples || 3}
-                    onChange={(e) => handleTimeoutChange('max_few_shot_examples' as keyof ModelConfig, parseInt(e.target.value))}
+                    onChange={(e) => handleNumberChange('max_few_shot_examples' as keyof ModelConfig, parseInt(e.target.value))}
                     disabled={disabled}
                     className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-600"
                   />

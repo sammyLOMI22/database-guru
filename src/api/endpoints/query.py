@@ -249,6 +249,8 @@ async def process_query(
                     'enable_intent_classification': settings_record.enable_intent_classification,
                     'enable_dynamic_examples': settings_record.enable_dynamic_examples,
                     'enable_semantic_validation': settings_record.enable_semantic_validation,
+                    # Prompt Optimization (Phase 2.2)
+                    'enable_prompt_optimization': settings_record.enable_prompt_optimization,
                 }
             )
             logger.info(f"Using quality profile: {quality_profile.level.value} (level={settings_record.query_quality_level})")

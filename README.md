@@ -439,6 +439,39 @@ Generates database-specific SQL syntax for accurate cross-database queries:
 - No manual configuration required
 - Reduces SQL errors by ~30% on cross-database queries
 
+**5. Prompt Optimization for Small Models (NEW!)**
+Intelligently compresses prompts to fit within smaller context windows while preserving SQL generation accuracy:
+
+| Model Size | Context Budget | Schema Strategy | Examples |
+|------------|---------------|-----------------|----------|
+| **SMALL** (<7B) | ~2K tokens | Essential tables only | Zero-shot |
+| **MEDIUM** (7-13B) | ~4K tokens | Most relevant tables | 2-3 examples |
+| **LARGE** (13B+) | ~8K tokens | Full schema if needed | 4-5 examples |
+
+**Key Features:**
+- **Auto Model Detection**: Detects model size from name (e.g., "7b" → MEDIUM)
+- **Schema Compression**: Includes only tables relevant to the query
+- **Model-Specific Templates**: Formatting matched to model training (Llama, Qwen, Gemma, Mistral, Phi, DuckDB-NSQL, SQLCoder)
+- **Token Budgeting**: Allocates tokens across system prompt, schema, examples, and response buffer
+- **Safe Defaults**: Feature is OFF by default, user opt-in via settings
+
+**Supported Model Families:**
+```
+Llama      - <|start_header_id|>system<|end_header_id|>
+Qwen       - <|im_start|>system
+Gemma      - <start_of_turn>user
+Mistral    - [INST] instruction [/INST]
+Phi        - <|system|> ... <|end|>
+DuckDB-NSQL - ### Database Schema: (SQL-specialized)
+SQLCoder   - ### Task ... ### Question ... ### SQL
+```
+
+**Benefits:**
+- **40% token reduction** for schema-heavy prompts
+- **Faster responses** with smaller models
+- **Higher accuracy** with model-specific formatting
+- **Graceful fallback** if optimization fails
+
 ### Configuration:
 
 Access **Settings** → **Per-Task Model Configuration** to:

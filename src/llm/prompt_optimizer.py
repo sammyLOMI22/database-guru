@@ -455,20 +455,26 @@ def get_model_family(model_name: str) -> ModelFamily:
 
 
 def _count_tokens(text: str) -> int:
-    """Estimate token count from text.
+    """Estimate token count from text with safety margin.
 
-    Uses a simple approximation of ~4 characters per token,
-    which is reasonable for English text and SQL.
+    Uses ~4 characters per token approximation with a 20% safety margin
+    to account for:
+    - SQL keywords (often 2-3 chars/token)
+    - Special characters and model template tokens
+    - Non-ASCII characters
 
     Args:
         text: Text to estimate tokens for
 
     Returns:
-        Estimated token count
+        Estimated token count (conservative estimate)
     """
     if not text:
         return 0
-    return len(text) // 4
+    # Base estimate: ~4 chars per token
+    base_estimate = len(text) // 4
+    # Add 20% safety margin for SQL/code which tokenizes differently
+    return int(base_estimate * 1.2)
 
 
 # =============================================================================
@@ -493,20 +499,25 @@ class PromptOptimizer:
 
     def __init__(
         self,
-        model_size: ModelSize = ModelSize.MEDIUM,
+        model_size: Optional[ModelSize] = None,
         model_name: Optional[str] = None,
     ):
         """Initialize the prompt optimizer.
 
         Args:
-            model_size: Explicit model size (if known)
+            model_size: Explicit model size (if known). If None, auto-detects from model_name.
             model_name: Model name (used to auto-detect size and family)
         """
-        # Auto-detect size from model name if not explicitly provided
-        if model_name and model_size == ModelSize.MEDIUM:
+        # Determine model size: explicit > auto-detect > default
+        if model_size is not None:
+            # User explicitly provided a model size - use it
+            self.model_size = model_size
+        elif model_name:
+            # Auto-detect from model name
             self.model_size = get_model_size_for_model(model_name)
         else:
-            self.model_size = model_size
+            # Default to MEDIUM
+            self.model_size = ModelSize.MEDIUM
 
         self.model_name = model_name
         self.budget = PROMPT_BUDGETS[self.model_size]
