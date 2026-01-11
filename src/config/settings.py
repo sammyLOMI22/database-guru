@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     NARRATIVE_TIMEOUT_SECONDS: int = 15  # Max seconds for LLM narrative generation
     NARRATIVE_MAX_SAMPLE_ROWS: int = 20  # Only analyze first N rows for large result sets
 
+    # Prompt Optimization (Phase 2.2)
+    PROMPT_OPTIMIZATION_ENABLED: bool = False  # OFF by default, user opt-in
+    MODEL_SIZE_DETECTION: str = "auto"  # auto, small, medium, large
+    SCHEMA_COMPRESSION_ENABLED: bool = True  # Compress schema to relevant tables
+    MAX_SCHEMA_TABLES: int = 10  # Max tables before compression triggers
+    MAX_FEW_SHOT_EXAMPLES: int = 3  # Max examples to include in prompts
+
     class Config:
         env_file = ".env"
         case_sensitive = True

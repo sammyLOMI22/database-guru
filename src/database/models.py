@@ -282,6 +282,14 @@ class SystemSettings(Base):
     enable_query_templates = Column(Boolean, default=True, nullable=False)  # Bypass LLM for simple patterns
     enable_location_preprocessing = Column(Boolean, default=True, nullable=False)  # Normalize locations before LLM
 
+    # Prompt Optimization (Phase 2.2) - USER TOGGLE
+    enable_prompt_optimization = Column(Boolean, default=False, nullable=False)  # OFF by default, user opt-in
+    prompt_model_size = Column(String(20), default="auto", nullable=False)  # auto|small|medium|large
+    enable_schema_compression = Column(Boolean, default=True, nullable=False)  # Compress schema to relevant tables
+    max_schema_tables = Column(Integer, default=10, nullable=False)  # Max tables before compression
+    enable_example_selection = Column(Boolean, default=True, nullable=False)  # Select relevant few-shot examples
+    max_few_shot_examples = Column(Integer, default=3, nullable=False)  # Max examples to include
+
     # Multi-Database Query Intelligence (Phase 2.4)
     enable_multi_db_validation = Column(Boolean, default=True, nullable=False)  # Pre-flight schema validation
     multi_db_validation_threshold = Column(Float, default=0.6, nullable=False)  # Fuzzy match threshold for alternatives

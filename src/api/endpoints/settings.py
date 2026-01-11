@@ -48,6 +48,13 @@ async def get_or_create_settings(db: AsyncSession) -> SystemSettings:
             # Small Model Optimization Feature Flags
             enable_query_templates=True,
             enable_location_preprocessing=True,
+            # Prompt Optimization (Phase 2.2)
+            enable_prompt_optimization=False,  # OFF by default, user opt-in
+            prompt_model_size="auto",
+            enable_schema_compression=True,
+            max_schema_tables=10,
+            enable_example_selection=True,
+            max_few_shot_examples=3,
         )
         db.add(settings)
         await db.commit()
@@ -181,6 +188,13 @@ async def reset_settings(db: AsyncSession = Depends(get_db)):
         # Small Model Optimization Feature Flags
         settings.enable_query_templates = True
         settings.enable_location_preprocessing = True
+        # Prompt Optimization (Phase 2.2)
+        settings.enable_prompt_optimization = False  # OFF by default
+        settings.prompt_model_size = "auto"
+        settings.enable_schema_compression = True
+        settings.max_schema_tables = 10
+        settings.enable_example_selection = True
+        settings.max_few_shot_examples = 3
 
         # Invalidate model router cache
         from src.llm.model_router import invalidate_model_router

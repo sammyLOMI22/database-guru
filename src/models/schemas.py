@@ -475,6 +475,14 @@ class SystemSettingsResponse(BaseModel):
     enable_query_templates: bool = True  # Bypass LLM for simple patterns
     enable_location_preprocessing: bool = True  # Normalize locations before LLM
 
+    # Prompt Optimization (Phase 2.2)
+    enable_prompt_optimization: bool = False  # OFF by default, user opt-in
+    prompt_model_size: str = "auto"  # auto|small|medium|large
+    enable_schema_compression: bool = True  # Compress schema to relevant tables
+    max_schema_tables: int = 10  # Max tables before compression
+    enable_example_selection: bool = True  # Select relevant few-shot examples
+    max_few_shot_examples: int = 3  # Max examples to include
+
     # Multi-Database Query Intelligence (Phase 2.4)
     enable_multi_db_validation: bool = True  # Pre-flight schema validation
     multi_db_validation_threshold: float = 0.6  # Fuzzy match threshold for alternatives
@@ -517,6 +525,14 @@ class SystemSettingsUpdateRequest(BaseModel):
     # Small Model Optimization Feature Flags
     enable_query_templates: Optional[bool] = None  # Bypass LLM for simple patterns
     enable_location_preprocessing: Optional[bool] = None  # Normalize locations before LLM
+
+    # Prompt Optimization (Phase 2.2)
+    enable_prompt_optimization: Optional[bool] = None  # Toggle for prompt optimization
+    prompt_model_size: Optional[str] = Field(None, pattern="^(auto|small|medium|large)$")
+    enable_schema_compression: Optional[bool] = None  # Compress schema to relevant tables
+    max_schema_tables: Optional[int] = Field(None, ge=1, le=50)  # Max tables before compression
+    enable_example_selection: Optional[bool] = None  # Select relevant few-shot examples
+    max_few_shot_examples: Optional[int] = Field(None, ge=0, le=10)  # Max examples to include
 
     # Multi-Database Query Intelligence (Phase 2.4)
     enable_multi_db_validation: Optional[bool] = None  # Pre-flight schema validation
