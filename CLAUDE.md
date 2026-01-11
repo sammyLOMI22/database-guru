@@ -197,7 +197,7 @@ The system uses a multi-agent architecture with specialized agents that work tog
     - Falls back to default model when per-task model is not configured
     - Key methods: `get_model_for_task()`, `get_timeout_for_task()`, `get_config_for_task()`
 
-14. **Query Template Engine** (`src/llm/query_templates.py`) **NEW - January 2, 2026**
+14. **Query Template Engine** (`src/llm/query_templates.py`) **NEW - January 2, 2026** (Updated January 10, 2026)
     - Template-based SQL generation that bypasses LLM for simple query patterns
     - Improves response time and reduces errors for straightforward requests
     - **Supported Patterns**:
@@ -206,13 +206,30 @@ The system uses a multi-agent architecture with specialized agents that work tog
       - `top_n`: "top 5 by price" → `SELECT * FROM X ORDER BY Y DESC LIMIT 5`
       - `filter_location`: "orders from California" → `SELECT * FROM orders WHERE state = 'CA'`
       - `filter_value`: "customers where status is active" → `SELECT * FROM customers WHERE status = 'active'`
+      - `filter_date`: "orders from last 7 days" → Dialect-specific date math (NEW)
+      - `search`: "find products containing 'widget'" → Dialect-specific case-insensitive search (NEW)
       - `sum_total`, `average`, `group_by`: Aggregation patterns
     - Table alias handling (singular/plural, abbreviations)
     - Column variation matching (price → unit_price, name → product_name)
-    - Returns `TemplateMatch` with SQL, confidence score, and explanation
+    - **Dialect-aware SQL generation (NEW - Jan 10, 2026)**: Uses `DialectRegistry` for database-specific syntax
+    - Returns `TemplateMatch` with SQL, confidence score, explanation, and `dialect_used`
     - Key method: `try_match()` - returns `TemplateMatch` or None
 
-15. **Query Preprocessor** (`src/llm/query_preprocessor.py`) **NEW - January 2, 2026**
+15. **Dialect Registry** (`src/llm/dialect_registry.py`) **NEW - January 10, 2026**
+    - Defines database-specific SQL syntax rules for cross-database compatibility
+    - **Supported Dialects**: PostgreSQL, MySQL, SQLite, DuckDB (MongoDB placeholder for MQL)
+    - **DialectRules dataclass** covers:
+      - Date/Time functions: `CURRENT_TIMESTAMP`, `NOW()`, `datetime('now')`
+      - Date math: `INTERVAL '7 days'`, `DATE_SUB()`, `datetime('now', '-7 days')`
+      - String functions: `ILIKE` vs `LOWER() LIKE`, `CONCAT` vs `||`
+      - Boolean handling: `TRUE/FALSE` vs `1/0`
+      - NULL handling: `IS NOT DISTINCT FROM`, `<=>`, `IS`
+      - JSON/Array support: Database-specific operators
+    - `build_dialect_context()` - Generates dialect-specific instructions for LLM prompts
+    - `get_dialect_for_database_type()` - Maps connection string to `DatabaseDialect` enum
+    - Key classes: `DatabaseDialect`, `DialectRules`, `DIALECT_RULES`
+
+16. **Query Preprocessor** (`src/llm/query_preprocessor.py`) **NEW - January 2, 2026**
     - Pre-processes natural language queries before LLM generation
     - **Bidirectional Location Normalization**: Detects DB format and converts accordingly
       - If DB uses codes (CA, NY): "California" → "CA"
@@ -223,7 +240,7 @@ The system uses a multi-agent architecture with specialized agents that work tog
     - **Enhanced Context**: Builds LLM hints with matched entities and format guidance
     - Key method: `preprocess()` - returns `PreprocessedQuery` with normalized question and metadata
 
-16. **Multi-Database Query Validator** (`src/llm/multi_db_query_validator.py`) **NEW - January 7, 2026**
+17. **Multi-Database Query Validator** (`src/llm/multi_db_query_validator.py`) **NEW - January 7, 2026**
     - Pre-flight validation for multi-database queries before execution
     - Assesses each database's capability to answer a query: FULL / PARTIAL / CANNOT
     - **SQL Parsing**: Uses `sqlparse` library for production-grade parsing
@@ -669,9 +686,10 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `frontend/src/components/visualization/ChartToggle.tsx` - Table/chart toggle with type selector
   - `frontend/tests/AdvancedCharts.test.tsx` - 61 comprehensive tests
   - `frontend/tests/chartIntelligence.test.ts` - Pattern detection tests
-- **Small Model Optimization (NEW - Jan 2, 2026)**:
+- **Small Model Optimization (NEW - Jan 2, 2026)** (Updated Jan 10, 2026):
   - `src/llm/model_router.py` - Per-task model routing (246 lines)
-  - `src/llm/query_templates.py` - Template-based SQL for simple patterns (724 lines)
+  - `src/llm/query_templates.py` - Template-based SQL for simple patterns (1024 lines, updated with dialect support)
+  - `src/llm/dialect_registry.py` - Database dialect rules and SQL syntax (205 lines) **NEW - Jan 10, 2026**
   - `src/llm/query_preprocessor.py` - Location normalization and preprocessing (504 lines)
   - `src/llm/self_correcting_agent.py` - Template matching + preprocessing integration (lines 821-907, 1068-1111)
   - `src/database/models.py` - Per-task model/timeout fields in SystemSettings
@@ -681,39 +699,47 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `frontend/src/components/SettingsPanel.tsx` - Updated with ModelConfigPanel integration
   - `tests/test_model_router.py` - 220 lines of model router tests
   - `tests/test_query_preprocessor.py` - 264 lines of preprocessor tests
-  - `tests/test_query_templates.py` - 252 lines of template engine tests
+  - `tests/test_query_templates.py` - 510 lines of template engine tests (updated with dialect tests)
+  - `tests/test_dialect_registry.py` - 72 lines of dialect registry tests **NEW - Jan 10, 2026**
 
 ## Documentation
 
 Key docs in `docs/`:
-- `PARALLEL_EXECUTION.md` - **Parallel execution technical guide (PRODUCTION-READY - Nov 8, 2025!)**
-  - Comprehensive guide with timeout protection, metrics, and frontend integration
-- `CODE_REVIEW_PARALLEL_EXECUTION.md` - **Code review documentation (9.0/10 score)**
-  - All critical & important issues resolved
-- `CONVERSATIONAL_MEMORY_IMPLEMENTATION.md` - Conversational memory technical guide
-- `PHASE_1_COMPLETE.md` - Conversational memory completion summary
-- `TEST_CONVERSATIONAL_MEMORY.md` - Conversational memory testing guide
-- `SECURITY_IMPROVEMENTS.md` - Recent security fixes and remaining issues
-- `FUTURE_PLANS.md` - Prioritized roadmap (UPDATED with production-ready parallel features - Nov 8, 2025!)
-- `QUERY_PLANNING_AGENT.md` - Query planning system deep dive
-- `CONFIDENCE_SCORING.md` - Confidence scoring system
-- `LEARNING_FROM_CORRECTIONS.md` - Correction learning system
-- `RESULT_VERIFICATION_AGENT.md` - Result verification details
-- `AUTO_LEARNING_GUIDE.md` - User feedback and auto-learning
-- `MULTI_DATABASE_GUIDE.md` - Multi-database queries (UPDATED with production-ready parallel execution)
-- `SECURITY_POLICY.md` - Security controls and validation
-- `tests/TESTING.md` - Testing guide
-- `DEMO_PAGE_UPDATED.md` - Demo page with Scenario 5 (Parallel Execution) showcase
-- `TOOL_USING_AGENT.md` - **Tool-Using Agent guide (NEW - Nov 21, 2025)** - Phase 3.1 implementation
-- `SEMANTIC_CACHING.md` - **Semantic Caching guide (NEW - Nov 22, 2025)** - Phase 3.2 backend implementation
-- `SEMANTIC_CACHE_UI.md` - **Semantic Cache UI guide (NEW - Nov 22, 2025)** - Phase 3.3 frontend components
-- `CONNECTION_POOLING_GUIDE.md` - **Connection Pooling Guide (PRODUCTION-READY - Dec 6, 2025)** - Phase 4.1 complete user guide (configuration, monitoring, performance tuning, troubleshooting)
-- `TEST_DATABASE_SETUP.md` - **Test Database Setup Guide (Dec 6, 2025)** - Docker Compose test infrastructure setup and usage
-- `CONNECTION_POOLING_IMPLEMENTATION_PLAN.md` - **5-day implementation plan (80% complete)** - Day 4 complete (test infrastructure)
-- `DATA_NARRATIVES_GUIDE.md` - **Intelligent Data Narratives & Human Insights (NEW - Dec 13, 2025)** - Complete feature guide with usage, architecture, performance, configuration, and troubleshooting
-- `MULTI_DB_NARRATIVES.md` - **Multi-Database Narratives (NEW - Dec 13, 2025)** - Per-database + combined analysis for multi-database queries
-- `ADVANCED_VISUALIZATION_PHASE2_PLAN.md` - **Advanced Visualization Phase 2 (Dec 20-26, 2025)** - Chart Intelligence (Phase 8) + Advanced Charts (Phase 10) with 10 chart types, 132 tests
-- `SQL_GENERATION_PIPELINE.md` - **SQL Generation Pipeline (UPDATED - Jan 7, 2026)** - Complete pipeline documentation with Phase 2.4 multi-database validation
-- `MULTI_DB_VALIDATION_GUIDE.md` - **Multi-Database Validation Guide (NEW - Jan 7, 2026)** - Pre-flight validation architecture, troubleshooting, and API reference
-- `SMALL_MODEL_OPTIMIZATION_PHASE_2_PR_REVIEW.md` - **Phase 2 PR Review (UPDATED - Jan 7, 2026)** - Code review with all issues resolved (sqlparse fix)
-- `SEMANTIC_TYPE_INTELLIGENCE_PLAN.md` - **Semantic Type Intelligence Roadmap (NEW - Jan 8, 2026)** - Future plan for Date/Time, Status/Enum, Boolean, and other query intelligence features
+
+**Guides** (`docs/guides/`):
+- `guides/AUTO_LEARNING_GUIDE.md` - User feedback and auto-learning
+- `guides/MULTI_DATABASE_GUIDE.md` - Multi-database queries (UPDATED with production-ready parallel execution)
+- `guides/CONNECTION_POOLING_GUIDE.md` - **Connection Pooling Guide (PRODUCTION-READY - Dec 6, 2025)** - Configuration, monitoring, performance tuning, troubleshooting
+- `guides/TEST_DATABASE_SETUP.md` - **Test Database Setup Guide (Dec 6, 2025)** - Docker Compose test infrastructure setup and usage
+- `guides/DATA_NARRATIVES_GUIDE.md` - **Intelligent Data Narratives & Human Insights (NEW - Dec 13, 2025)** - Complete feature guide
+- `guides/MULTI_DB_VALIDATION_GUIDE.md` - **Multi-Database Validation Guide (NEW - Jan 7, 2026)** - Pre-flight validation architecture and API reference
+- `guides/testing/TESTING.md` - Testing guide
+
+**Technical** (`docs/technical/`):
+- `technical/PARALLEL_EXECUTION.md` - **Parallel execution technical guide (PRODUCTION-READY - Nov 8, 2025!)** - Timeout protection, metrics, frontend integration
+- `technical/CONVERSATIONAL_MEMORY_IMPLEMENTATION.md` - Conversational memory technical guide
+- `technical/SECURITY_IMPROVEMENTS.md` - Recent security fixes and remaining issues
+- `technical/CONFIDENCE_SCORING.md` - Confidence scoring system
+- `technical/LEARNING_FROM_CORRECTIONS.md` - Correction learning system
+- `technical/SECURITY_POLICY.md` - Security controls and validation
+- `technical/SEMANTIC_CACHING.md` - **Semantic Caching guide (NEW - Nov 22, 2025)** - Phase 3.2 backend implementation
+- `technical/SEMANTIC_CACHE_UI.md` - **Semantic Cache UI guide (NEW - Nov 22, 2025)** - Phase 3.3 frontend components
+- `technical/MULTI_DB_NARRATIVES.md` - **Multi-Database Narratives (NEW - Dec 13, 2025)** - Per-database + combined analysis
+- `technical/SQL_GENERATION_PIPELINE.md` - **SQL Generation Pipeline (UPDATED - Jan 7, 2026)** - Complete pipeline with Phase 2.4 multi-database validation
+
+**Modules** (`docs/modules/`):
+- `modules/QUERY_PLANNING_AGENT.md` - Query planning system deep dive
+- `modules/RESULT_VERIFICATION_AGENT.md` - Result verification details
+- `modules/TOOL_USING_AGENT.md` - **Tool-Using Agent guide (NEW - Nov 21, 2025)** - Phase 3.1 implementation
+
+**Planning** (`docs/planning/`):
+- `planning/FUTURE_PLANS.md` - Prioritized roadmap (UPDATED with production-ready parallel features - Nov 8, 2025!)
+- `planning/CONNECTION_POOLING_IMPLEMENTATION_PLAN.md` - **5-day implementation plan (80% complete)** - Day 4 complete
+- `planning/ADVANCED_VISUALIZATION_PHASE2_PLAN.md` - **Advanced Visualization Phase 2 (Dec 20-26, 2025)** - Chart Intelligence + Advanced Charts
+- `planning/SEMANTIC_TYPE_INTELLIGENCE_PLAN.md` - **Semantic Type Intelligence Roadmap (NEW - Jan 8, 2026)** - Future plan for Date/Time, Status/Enum, Boolean intelligence
+
+**Reports** (`docs/reports/`):
+- `reports/CODE_REVIEW_PARALLEL_EXECUTION.md` - **Code review documentation (9.0/10 score)** - All critical & important issues resolved
+- `reports/PHASE_1_COMPLETE.md` - Conversational memory completion summary
+- `reports/TEST_CONVERSATIONAL_MEMORY.md` - Conversational memory testing guide
+- `reports/SMALL_MODEL_OPTIMIZATION_PHASE_2_PR_REVIEW.md` - **Phase 2 PR Review (UPDATED - Jan 7, 2026)** - Code review with all issues resolved

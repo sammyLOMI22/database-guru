@@ -39,7 +39,7 @@ export default function Header({ isHealthy, isDarkMode, toggleDarkMode }: Header
 
           {/* GitHub Link */}
           <a
-            href="https://github.com/yourusername/database-guru"
+            href="https://github.com/sammyLOMI22/database-guru"
             target="_blank"
             rel="noopener noreferrer"
             className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"

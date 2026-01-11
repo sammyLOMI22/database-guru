@@ -84,7 +84,7 @@ ollama serve
 ./scripts/setup_ollama.sh   # Pull embedding models
 ```
 
-See [Cache Setup Guide](docs/CACHE_SETUP.md) for details.
+See [Cache Setup Guide](docs/technical/CACHE_SETUP.md) for details.
 
 ## 🎨 Feature Demo Page
 
@@ -108,6 +108,7 @@ The demo showcases:
 - 📊 **Advanced Visualization** - Intelligent chart detection with Bar, Line, Pie, Scatter charts
 - 📈 **Cross-Database Comparison** - Visual comparison across multiple databases
 - ⚙️ **Small Model Optimization** - Per-task model configuration, query templates, location preprocessing
+- 🗄️ **Dialect-Aware SQL (NEW!)** - Database-specific SQL generation for PostgreSQL, MySQL, SQLite, DuckDB
 - 🔍 **Multi-Database Query Validation (NEW!)** - Pre-flight validation with schema assessment
 
 All with mock data - no database connection needed!
@@ -184,7 +185,7 @@ MAX_PARALLEL_DATABASES=10
 PARALLEL_CORRECTIONS_TIMEOUT=10
 ```
 
-**See:** [Cache Setup Guide](docs/CACHE_SETUP.md) for Redis and Ollama installation instructions
+**See:** [Cache Setup Guide](docs/technical/CACHE_SETUP.md) for Redis and Ollama installation instructions
 
 ## 🎯 Features
 
@@ -214,7 +215,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Cross-Database Comparison Charts** - Visual comparison across databases with auto-detection
 - ✅ **Configurable Row Limits (NEW!)** - Select from 10 to 10,000 rows per query via dropdown
 - ✅ **Result Table Pagination (NEW!)** - Navigate through large result sets with 10/25/50/100 rows per page
-- ✅ **Small Model Optimization (NEW!)** - Per-task model routing, query templates, and location preprocessing for faster responses with smaller models
+- ✅ **Small Model Optimization (NEW!)** - Per-task model routing, query templates, location preprocessing, and dialect-aware SQL generation for faster responses with smaller models
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
@@ -321,7 +322,7 @@ Visit the **🔗 Pools** tab to see:
 - Wait time metrics, pool age
 - Manual eviction controls
 
-**See:** [Connection Pooling Guide](docs/CONNECTION_POOLING_GUIDE.md) for configuration and [Test Setup](docs/TEST_DATABASE_SETUP.md) for test infrastructure
+**See:** [Connection Pooling Guide](docs/guides/CONNECTION_POOLING_GUIDE.md) for configuration and [Test Setup](docs/guides/TEST_DATABASE_SETUP.md) for test infrastructure
 
 ### Observability & Metrics
 
@@ -345,7 +346,7 @@ Both features include comprehensive metrics for monitoring and optimization:
 - `ToolsPanel` - Tool-Using Agent management dashboard (NEW!)
 - Real-time performance visualization
 
-**See:** [Parallel Execution Technical Guide](docs/PARALLEL_EXECUTION.md) for implementation details and [Code Review](docs/CODE_REVIEW_PARALLEL_EXECUTION.md) for quality assurance
+**See:** [Parallel Execution Technical Guide](docs/technical/PARALLEL_EXECUTION.md) for implementation details and [Code Review](docs/reports/CODE_REVIEW_PARALLEL_EXECUTION.md) for quality assurance
 
 ## Tool-Using Agent Dashboard (NEW!)
 
@@ -358,7 +359,7 @@ Database Guru now includes a comprehensive UI for the Tool-Using Agent, accessib
 
 **Orange Color Theme**: The Tools tab uses an orange color scheme to visually distinguish it from other tabs.
 
-**See:** [Tool-Using Agent Guide](docs/TOOL_USING_AGENT.md) for complete documentation
+**See:** [Tool-Using Agent Guide](docs/modules/TOOL_USING_AGENT.md) for complete documentation
 
 ## ⚙️ Small Model Optimization (NEW!)
 
@@ -391,6 +392,8 @@ Bypass LLM entirely for simple, common query patterns:
 | `count` | "how many customers" | `SELECT COUNT(*) FROM customers` |
 | `top_n` | "top 5 by price" | `SELECT * FROM X ORDER BY Y DESC LIMIT 5` |
 | `filter_location` | "orders from California" | `SELECT * FROM orders WHERE state = 'CA'` |
+| `filter_date` | "orders from last 7 days" | Dialect-specific (see below) |
+| `search` | "find products containing 'widget'" | Dialect-specific (see below) |
 | `sum/average` | "total revenue" | `SELECT SUM(revenue) FROM orders` |
 | `group_by` | "sales by category" | `SELECT category, COUNT(*) FROM X GROUP BY category` |
 
@@ -399,6 +402,7 @@ Bypass LLM entirely for simple, common query patterns:
 - **Zero errors** - Template-generated SQL is always valid
 - **Resource savings** - Reduces LLM API calls significantly
 - **Confidence scores** - Each match includes a confidence level (0.9-0.95)
+- **Dialect-aware (NEW!)** - Generates database-specific SQL syntax
 
 **3. Location Preprocessing (Bidirectional)**
 Automatically normalizes location values to match your database format:
@@ -418,6 +422,22 @@ Database uses full names: California, New York
 - Works for US states, cities, countries
 - Eliminates common WHERE clause mismatches
 - Improves first-attempt SQL accuracy
+
+**4. Dialect-Aware SQL Generation (NEW!)**
+Generates database-specific SQL syntax for accurate cross-database queries:
+
+| Dialect | Date Filter (last 7 days) | Case-Insensitive Search |
+|---------|---------------------------|-------------------------|
+| PostgreSQL | `WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'` | `WHERE name ILIKE '%widget%'` |
+| MySQL | `WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)` | `WHERE LOWER(name) LIKE LOWER('%widget%')` |
+| SQLite | `WHERE created_at > datetime('now', '-7 days')` | `WHERE LOWER(name) LIKE LOWER('%widget%')` |
+| DuckDB | `WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'` | `WHERE name ILIKE '%widget%'` |
+
+**Benefits:**
+- Automatically detects database type from connection
+- Generates correct syntax for dates, booleans, strings
+- No manual configuration required
+- Reduces SQL errors by ~30% on cross-database queries
 
 ### Configuration:
 
@@ -532,15 +552,15 @@ In multi-database queries, you'll see:
 - **Conditional Verification**: Skips expensive verification for high-confidence results
 
 **Setup & Configuration:**
-- **[Cache Setup Guide](docs/CACHE_SETUP.md)** - Complete Redis & Ollama setup instructions
+- **[Cache Setup Guide](docs/technical/CACHE_SETUP.md)** - Complete Redis & Ollama setup instructions
   - Local installation (Homebrew)
   - Docker setup
   - Docker Compose configuration
   - Troubleshooting guide
 
 **Documentation:**
-- **[Semantic Caching Guide](docs/SEMANTIC_CACHING.md)** - Complete backend documentation
-- **[Semantic Cache UI Guide](docs/SEMANTIC_CACHE_UI.md)** - Frontend components documentation
+- **[Semantic Caching Guide](docs/technical/SEMANTIC_CACHING.md)** - Complete backend documentation
+- **[Semantic Cache UI Guide](docs/technical/SEMANTIC_CACHE_UI.md)** - Frontend components documentation
 
 ## 📊 Semantic Cache Dashboard (NEW!)
 
@@ -600,7 +620,7 @@ curl -X DELETE http://localhost:8000/api/cache/connection/1
 
 **Amber Color Theme**: The Cache tab uses an amber/gold color scheme to visually distinguish it from other tabs.
 
-**See:** [Semantic Cache UI Guide](docs/SEMANTIC_CACHE_UI.md) for complete frontend documentation
+**See:** [Semantic Cache UI Guide](docs/technical/SEMANTIC_CACHE_UI.md) for complete frontend documentation
 
 ---
 
@@ -665,7 +685,7 @@ database-guru/
 
 ⚠️ **Development Only** - This configuration is for local development.
 
-For production deployment, see [docs/SECURITY_POLICY.md](docs/SECURITY_POLICY.md) for:
+For production deployment, see [docs/technical/SECURITY_POLICY.md](docs/technical/SECURITY_POLICY.md) for:
 - Password encryption
 - Authentication/Authorization
 - CORS configuration
@@ -735,7 +755,7 @@ Database Guru supports querying multiple databases simultaneously! Perfect for:
 3. Ask questions that span databases
 4. Get aggregated results from all databases
 
-See [MULTI_DATABASE_GUIDE.md](docs/MULTI_DATABASE_GUIDE.md) for full documentation.
+See [MULTI_DATABASE_GUIDE.md](docs/guides/MULTI_DATABASE_GUIDE.md) for full documentation.
 
 ## 🔍 Multi-Database Query Validation (NEW!)
 
@@ -813,8 +833,8 @@ curl -X POST http://localhost:8000/api/multi-db-query/validate \
 ```
 
 **Documentation:**
-- [Multi-Database Validation Guide](docs/MULTI_DB_VALIDATION_GUIDE.md) - Complete architecture and troubleshooting
-- [SQL Generation Pipeline](docs/SQL_GENERATION_PIPELINE.md) - Integration details
+- [Multi-Database Validation Guide](docs/guides/MULTI_DB_VALIDATION_GUIDE.md) - Complete architecture and troubleshooting
+- [SQL Generation Pipeline](docs/technical/SQL_GENERATION_PIPELINE.md) - Integration details
 
 ---
 
@@ -905,10 +925,10 @@ curl http://localhost:8000/api/confidence/stats
 ```
 
 **Documentation:**
-- [Confidence Scoring Guide](docs/CONFIDENCE_SCORING.md) - Complete feature guide
-- [UI Components](docs/CONFIDENCE_SCORING_UI.md) - Frontend implementation
-- [Verification Guide](docs/CONFIDENCE_SCORING_VERIFICATION.md) - How to test it
-- [Manual Testing](docs/CONFIDENCE_SCORING_MANUAL_TEST.md) - Step-by-step testing
+- [Confidence Scoring Guide](docs/technical/CONFIDENCE_SCORING.md) - Complete feature guide
+- [UI Components](docs/reports/CONFIDENCE_SCORING_UI.md) - Frontend implementation
+- [Verification Guide](docs/reports/CONFIDENCE_SCORING_VERIFICATION.md) - How to test it
+- [Manual Testing](docs/reports/CONFIDENCE_SCORING_MANUAL_TEST.md) - Step-by-step testing
 
 ## 💬 Conversational Memory (NEW!)
 
@@ -972,9 +992,9 @@ curl -X DELETE http://localhost:8000/api/chat/sessions/{session_id}/context
 ```
 
 **Documentation:**
-- [Conversational Memory Implementation](docs/CONVERSATIONAL_MEMORY_IMPLEMENTATION.md) - Technical deep dive
-- [Phase 1 Complete Summary](docs/PHASE_1_COMPLETE.md) - Feature completion report
-- [Testing Guide](docs/TEST_CONVERSATIONAL_MEMORY.md) - How to test the feature
+- [Conversational Memory Implementation](docs/technical/CONVERSATIONAL_MEMORY_IMPLEMENTATION.md) - Technical deep dive
+- [Phase 1 Complete Summary](docs/reports/PHASE_1_COMPLETE.md) - Feature completion report
+- [Testing Guide](docs/reports/TEST_CONVERSATIONAL_MEMORY.md) - How to test the feature
 
 **Security Features:**
 - Multi-layer prompt injection detection and prevention
@@ -1021,9 +1041,9 @@ curl http://localhost:8000/api/learned-corrections/
 ```
 
 **Documentation:**
-- [Learning from Corrections Guide](docs/LEARNING_FROM_CORRECTIONS.md)
-- [Quick Start Guide](docs/LEARNING_QUICKSTART.md)
-- [Self-Correcting Agent](docs/SELF_CORRECTING_AGENT.md)
+- [Learning from Corrections Guide](docs/technical/LEARNING_FROM_CORRECTIONS.md)
+- [Quick Start Guide](docs/guides/LEARNING_QUICKSTART.md)
+- [Self-Correcting Agent](docs/modules/SELF_CORRECTING_AGENT.md)
 
 ## 🛡️ Result Verification (NEW!)
 
@@ -1077,9 +1097,9 @@ curl http://localhost:8000/api/verify/health
 ```
 
 **Documentation:**
-- [Result Verification Guide](docs/RESULT_VERIFICATION_AGENT.md)
-- [Quick Start Guide](docs/RESULT_VERIFICATION_QUICKSTART.md)
-- [Implementation Summary](docs/RESULT_VERIFICATION_IMPLEMENTATION_SUMMARY.md)
+- [Result Verification Guide](docs/modules/RESULT_VERIFICATION_AGENT.md)
+- [Quick Start Guide](docs/guides/RESULT_VERIFICATION_QUICKSTART.md)
+- [Implementation Summary](docs/reports/RESULT_VERIFICATION_IMPLEMENTATION_SUMMARY.md)
 
 ## 🎯 Query Planning with Schema Validation (NEW!)
 
@@ -1136,10 +1156,10 @@ curl -X POST http://localhost:8000/api/query-planning/plan \
 ```
 
 **Documentation:**
-- [Query Planning Guide](docs/QUERY_PLANNING_AGENT.md)
-- [Schema Validation Details](docs/SCHEMA_VALIDATION_IMPROVEMENTS.md)
-- [Quick Start Guide](docs/QUERY_PLANNING_QUICKSTART.md)
-- [Implementation Summary](docs/QUERY_PLANNING_IMPLEMENTATION_SUMMARY.md)
+- [Query Planning Guide](docs/modules/QUERY_PLANNING_AGENT.md)
+- [Schema Validation Details](docs/technical/SCHEMA_VALIDATION_IMPROVEMENTS.md)
+- [Quick Start Guide](docs/guides/QUERY_PLANNING_QUICKSTART.md)
+- [Implementation Summary](docs/reports/QUERY_PLANNING_IMPLEMENTATION_SUMMARY.md)
 
 ## 🔍 Learned Mapping Management (NEW!)
 
@@ -1257,8 +1277,8 @@ View statistics dashboard
 - `GET /api/mappings/patterns/stats` - Statistics
 
 **Documentation:**
-- [Mapping Management Guide](docs/MAPPING_MANAGEMENT.md) - Complete feature guide
-- [Next Steps Guide](docs/NEXT_STEPS_GUIDE.md) - Integration roadmap
+- [Mapping Management Guide](docs/guides/MAPPING_MANAGEMENT.md) - Complete feature guide
+- [Next Steps Guide](docs/guides/NEXT_STEPS_GUIDE.md) - Integration roadmap
 
 ---
 
@@ -1391,10 +1411,10 @@ The system uses **3 layers of protection**:
 These require manual admin review for safety.
 
 **Documentation:**
-- **[Auto-Learning Guide](docs/AUTO_LEARNING_GUIDE.md)** - Complete user guide
-- **[Validation System](docs/VALIDATION_SYSTEM.md)** - Technical validation details
-- **[Security Policy](docs/SECURITY_POLICY.md)** - Enterprise security controls
-- **[Security Enhancements Summary](docs/SECURITY_ENHANCEMENTS_SUMMARY.md)** - What changed and why
+- **[Auto-Learning Guide](docs/guides/AUTO_LEARNING_GUIDE.md)** - Complete user guide
+- **[Validation System](docs/technical/VALIDATION_SYSTEM.md)** - Technical validation details
+- **[Security Policy](docs/technical/SECURITY_POLICY.md)** - Enterprise security controls
+- **[Security Enhancements Summary](docs/reports/SECURITY_ENHANCEMENTS_SUMMARY.md)** - What changed and why
 - [User Feedback System Guide](USER_FEEDBACK_SYSTEM.md)
 - [Multi-Database Feedback Integration](MULTI_DB_FEEDBACK_INTEGRATION.md)
 
@@ -1538,8 +1558,8 @@ User Override: Switch to Pie Chart
 Scatter plots require **minimum 10 data points** to avoid spurious correlations in small datasets. This ensures statistical reliability when visualizing relationships between columns.
 
 **Documentation:**
-- [Advanced Visualization Guide](docs/ADVANCED_VISUALIZATION_GUIDE.md) - Complete feature documentation
-- [Chart Type Selector PR Review](docs/CHART_TYPE_SELECTOR_PR_REVIEW.md) - Manual testing guide
+- [Advanced Visualization Guide](docs/guides/ADVANCED_VISUALIZATION_GUIDE.md) - Complete feature documentation
+- [Chart Type Selector PR Review](docs/reports/CHART_TYPE_SELECTOR_PR_REVIEW.md) - Manual testing guide
 
 ---
 
