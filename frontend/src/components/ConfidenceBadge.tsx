@@ -15,30 +15,30 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
   // Color schemes for each confidence level
   const levelStyles = {
     HIGH: {
-      bg: 'bg-green-100',
-      text: 'text-green-800',
-      border: 'border-green-300',
+      bg: 'bg-green-100 dark:bg-green-900/40',
+      text: 'text-green-800 dark:text-green-300',
+      border: 'border-green-300 dark:border-green-800/50',
       icon: '🎯',
       label: 'High Confidence'
     },
     MEDIUM: {
-      bg: 'bg-yellow-100',
-      text: 'text-yellow-800',
-      border: 'border-yellow-300',
+      bg: 'bg-yellow-100 dark:bg-yellow-900/40',
+      text: 'text-yellow-800 dark:text-yellow-300',
+      border: 'border-yellow-300 dark:border-yellow-800/50',
       icon: '⚡',
       label: 'Medium Confidence'
     },
     LOW: {
-      bg: 'bg-orange-100',
-      text: 'text-orange-800',
-      border: 'border-orange-300',
+      bg: 'bg-orange-100 dark:bg-orange-900/40',
+      text: 'text-orange-800 dark:text-orange-300',
+      border: 'border-orange-300 dark:border-orange-800/50',
       icon: '⚠️',
       label: 'Low Confidence'
     },
     VERY_LOW: {
-      bg: 'bg-red-100',
-      text: 'text-red-800',
-      border: 'border-red-300',
+      bg: 'bg-red-100 dark:bg-red-900/40',
+      text: 'text-red-800 dark:text-red-300',
+      border: 'border-red-300 dark:border-red-800/50',
       icon: '🚫',
       label: 'Very Low Confidence'
     }
@@ -67,9 +67,8 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
       {/* Main Badge */}
       <button
         onClick={() => showDetails && setExpanded(!expanded)}
-        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${style.bg} ${style.text} ${style.border} ${
-          showDetails ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
-        } transition-opacity`}
+        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${style.bg} ${style.text} ${style.border} ${showDetails ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+          } transition-opacity`}
         disabled={!showDetails}
         aria-label={`${style.label}: ${percentage}%`}
         aria-expanded={expanded}
@@ -83,9 +82,8 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
         </span>
         {showDetails && (
           <svg
-            className={`w-4 h-4 transition-transform ${
-              expanded ? 'rotate-180' : ''
-            }`}
+            className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''
+              }`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -109,7 +107,7 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
             <p className={`text-xs font-semibold ${style.text} mb-1`}>
               Analysis:
             </p>
-            <p className="text-xs text-gray-700">
+            <p className="text-xs text-gray-700 dark:text-gray-300">
               {confidence.reasoning}
             </p>
           </div>
@@ -119,7 +117,7 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
             <p className={`text-xs font-semibold ${style.text} mb-1`}>
               Recommendation:
             </p>
-            <p className="text-xs text-gray-700">
+            <p className="text-xs text-gray-700 dark:text-gray-300">
               {confidence.recommendation}
             </p>
           </div>
@@ -140,16 +138,16 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
                 return (
                   <div key={key} className="text-xs">
                     <div className="flex justify-between items-center mb-0.5">
-                      <span className="text-gray-700">
+                      <span className="text-gray-700 dark:text-gray-400">
                         {factorLabels[key] || key}
                       </span>
                       <span className={`font-mono ${style.text}`}>
                         {factorPercentage}%
                       </span>
                     </div>
-                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                       <div
-                        className={`h-full ${style.bg.replace('100', '400')} transition-all`}
+                        className={`h-full ${style.bg.split(' ')[0].replace('100', '400')} dark:bg-opacity-80 transition-all`}
                         style={{ width: `${Math.min(barWidth, 100)}%` }}
                         role="progressbar"
                         aria-valuenow={validValue}
@@ -165,7 +163,7 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
           </div>
 
           {/* Overall Score Bar */}
-          <div className="mt-3 pt-3 border-t border-gray-300">
+          <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-700">
             <div className="flex justify-between items-center mb-1">
               <span className={`text-xs font-semibold ${style.text}`}>
                 Overall Confidence
@@ -174,9 +172,9 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
                 {percentage}%
               </span>
             </div>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
               <div
-                className={`h-full ${style.bg.replace('100', '500')} transition-all`}
+                className={`h-full ${style.bg.split(' ')[0].replace('100', '500')} dark:bg-opacity-90 transition-all`}
                 style={{ width: `${validOverall * 100}%` }}
                 role="progressbar"
                 aria-valuenow={validOverall}

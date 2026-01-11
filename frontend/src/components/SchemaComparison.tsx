@@ -81,8 +81,8 @@ export const SchemaComparison: React.FC<SchemaComparisonProps> = ({
 
   if (connectionIds.length < 2) {
     return (
-      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p className="text-yellow-700">Select at least 2 databases to compare schemas.</p>
+      <div className="p-4 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/50 rounded-lg">
+        <p className="text-yellow-700 dark:text-yellow-400">Select at least 2 databases to compare schemas.</p>
       </div>
     );
   }
@@ -90,19 +90,19 @@ export const SchemaComparison: React.FC<SchemaComparisonProps> = ({
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <RefreshCw className="w-5 h-5 animate-spin text-gray-500" />
-        <span className="ml-2 text-gray-600">Comparing schemas...</span>
+        <RefreshCw className="w-5 h-5 animate-spin text-gray-400 dark:text-gray-500" />
+        <span className="ml-2 text-gray-600 dark:text-gray-400">Comparing schemas...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-700">{error}</p>
+      <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 rounded-lg">
+        <p className="text-red-700 dark:text-red-400">{error}</p>
         <button
           onClick={loadComparison}
-          className="mt-2 text-sm text-red-600 hover:text-red-800"
+          className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
         >
           Retry
         </button>
@@ -115,17 +115,17 @@ export const SchemaComparison: React.FC<SchemaComparisonProps> = ({
   const dbNames = comparison.connections.map((c) => c.name);
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
       {/* Header */}
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <GitCompare className="w-5 h-5 text-purple-600" />
-            <span className="font-medium text-gray-900">Schema Comparison</span>
+            <GitCompare className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <span className="font-medium text-gray-900 dark:text-gray-100">Schema Comparison</span>
           </div>
           <button
             onClick={loadComparison}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+            className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
             title="Refresh comparison"
           >
             <RefreshCw className="w-4 h-4" />
@@ -137,28 +137,28 @@ export const SchemaComparison: React.FC<SchemaComparisonProps> = ({
           {comparison.connections.map((conn) => (
             <span
               key={conn.id}
-              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700"
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50"
             >
               <Database className="w-3 h-3" />
               {connectionNames[conn.id] || conn.name}
-              <span className="text-blue-500">({conn.type})</span>
+              <span className="text-blue-500 dark:text-blue-400">({conn.type})</span>
             </span>
           ))}
         </div>
       </div>
 
       {/* Summary Stats */}
-      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30">
         <div className="flex items-center gap-6 text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500" />
-            <span className="text-gray-700">
+            <div className="w-3 h-3 rounded-full bg-green-500 dark:bg-green-400" />
+            <span className="text-gray-700 dark:text-gray-300">
               <span className="font-semibold">{comparison.common_tables.length}</span> common tables
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500" />
-            <span className="text-gray-700">
+            <div className="w-3 h-3 rounded-full bg-yellow-500 dark:bg-yellow-400" />
+            <span className="text-gray-700 dark:text-gray-300">
               <span className="font-semibold">
                 {comparison.tables.filter((t) => t.missing_from.length > 0).length}
               </span>{' '}
@@ -173,11 +173,10 @@ export const SchemaComparison: React.FC<SchemaComparisonProps> = ({
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1 text-xs rounded-full ${
-                filter === f
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`px-3 py-1 text-xs rounded-full transition-colors ${filter === f
+                  ? 'bg-blue-600 text-white dark:bg-blue-500'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
@@ -187,20 +186,20 @@ export const SchemaComparison: React.FC<SchemaComparisonProps> = ({
 
       {/* Query Compatibility Hints */}
       {comparison.query_compatibility.length > 0 && (
-        <div className="px-4 py-3 border-b border-gray-100 bg-amber-50">
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-amber-50 dark:bg-amber-900/10">
           <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-amber-800">Query Compatibility</p>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Query Compatibility</p>
               <ul className="mt-1 space-y-1">
                 {comparison.query_compatibility.map((hint, i) => (
-                  <li key={i} className="text-xs text-amber-700">
+                  <li key={i} className="text-xs text-amber-700 dark:text-amber-300">
                     {hint.query_type}: Works on{' '}
-                    <span className="font-medium">{hint.works_on.join(', ')}</span>
+                    <span className="font-medium text-amber-800 dark:text-amber-200">{hint.works_on.join(', ')}</span>
                     {hint.missing_from.length > 0 && (
                       <>
                         , missing from{' '}
-                        <span className="font-medium text-red-600">
+                        <span className="font-medium text-red-600 dark:text-red-400">
                           {hint.missing_from.join(', ')}
                         </span>
                       </>
@@ -216,13 +215,13 @@ export const SchemaComparison: React.FC<SchemaComparisonProps> = ({
       {/* Table Comparison Grid */}
       <div className="max-h-[500px] overflow-y-auto">
         {/* Header row with database names */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 z-10">
+        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-10">
           <div className="grid gap-0" style={{ gridTemplateColumns: `200px repeat(${dbNames.length}, 1fr)` }}>
-            <div className="px-4 py-2 font-medium text-gray-700 text-sm">Table / Column</div>
+            <div className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300 text-sm">Table / Column</div>
             {dbNames.map((name) => (
               <div
                 key={name}
-                className="px-3 py-2 font-medium text-gray-700 text-sm text-center border-l border-gray-100"
+                className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300 text-sm text-center border-l border-gray-100 dark:border-gray-800"
               >
                 {name}
               </div>
@@ -242,7 +241,7 @@ export const SchemaComparison: React.FC<SchemaComparisonProps> = ({
         ))}
 
         {filteredTables?.length === 0 && (
-          <div className="p-4 text-center text-gray-500 text-sm">
+          <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
             No tables match the current filter
           </div>
         )}
@@ -267,32 +266,32 @@ const TableComparisonRow: React.FC<TableComparisonRowProps> = ({
   const hasMissing = table.missing_from.length > 0;
 
   return (
-    <div className={`border-b border-gray-100 ${hasMissing ? 'bg-yellow-50/30' : ''}`}>
+    <div className={`border-b border-gray-100 dark:border-gray-800 ${hasMissing ? 'bg-yellow-50/30 dark:bg-yellow-900/10' : ''}`}>
       {/* Table name row */}
       <div
-        className="grid gap-0 hover:bg-gray-50 cursor-pointer"
+        className="grid gap-0 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
         style={{ gridTemplateColumns: `200px repeat(${dbNames.length}, 1fr)` }}
         onClick={onToggle}
       >
         <div className="px-4 py-2 flex items-center gap-2">
           <button className="p-0.5">
             {expanded ? (
-              <ChevronDown className="w-4 h-4 text-gray-500" />
+              <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
             ) : (
-              <ChevronRight className="w-4 h-4 text-gray-500" />
+              <ChevronRight className="w-4 h-4 text-gray-500 dark:text-gray-400" />
             )}
           </button>
-          <span className="font-medium text-gray-800">{table.table_name}</span>
+          <span className="font-medium text-gray-800 dark:text-gray-100">{table.table_name}</span>
         </div>
         {dbNames.map((db) => (
           <div
             key={db}
-            className="px-3 py-2 flex items-center justify-center border-l border-gray-100"
+            className="px-3 py-2 flex items-center justify-center border-l border-gray-100 dark:border-gray-800"
           >
             {table.present_in.includes(db) ? (
-              <Check className="w-4 h-4 text-green-600" />
+              <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
             ) : (
-              <X className="w-4 h-4 text-red-500" />
+              <X className="w-4 h-4 text-red-500 dark:text-red-400" />
             )}
           </div>
         ))}
@@ -300,31 +299,32 @@ const TableComparisonRow: React.FC<TableComparisonRowProps> = ({
 
       {/* Column rows */}
       {expanded && (
-        <div className="bg-gray-50/50">
-          {table.columns.map((col) => (
-            <div
-              key={col.column_name}
-              className="grid gap-0"
-              style={{ gridTemplateColumns: `200px repeat(${dbNames.length}, 1fr)` }}
-            >
-              <div className="px-4 py-1.5 pl-10 text-sm text-gray-600 font-mono">
-                {col.column_name}
+        <div>
+          <div className="bg-gray-50/50 dark:bg-gray-900/50">
+            {table.columns.map((col) => (
+              <div
+                key={col.column_name}
+                className="grid gap-0"
+                style={{ gridTemplateColumns: `200px repeat(${dbNames.length}, 1fr)` }}
+              >
+                <div className="px-4 py-1.5 pl-10 text-sm text-gray-600 dark:text-gray-400 font-mono">
+                  {col.column_name}
+                </div>
+                {dbNames.map((db) => {
+                  const colType = col.databases[db];
+                  return (
+                    <div
+                      key={db}
+                      className={`px-3 py-1.5 text-xs text-center border-l border-gray-100 dark:border-gray-800 ${colType === null ? 'bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'
+                        }`}
+                    >
+                      {colType ?? 'Missing'}
+                    </div>
+                  );
+                })}
               </div>
-              {dbNames.map((db) => {
-                const colType = col.databases[db];
-                return (
-                  <div
-                    key={db}
-                    className={`px-3 py-1.5 text-xs text-center border-l border-gray-100 ${
-                      colType === null ? 'bg-red-50 text-red-600' : 'text-gray-600'
-                    }`}
-                  >
-                    {colType ?? 'Missing'}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

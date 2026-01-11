@@ -40,12 +40,12 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
   };
 
   return (
-    <div className="p-4 border-b border-gray-200">
+    <div className="p-4 border-b border-gray-200 dark:border-gray-700 transition-colors">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700">Chat Sessions</h3>
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Chat Sessions</h3>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700"
+          className="px-3 py-1 text-xs bg-primary-600 dark:bg-primary-700 text-white rounded hover:bg-primary-700 dark:hover:bg-primary-600 transition-colors"
         >
           + New
         </button>
@@ -55,28 +55,26 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
         {/* Default session (no chat context) */}
         <button
           onClick={() => onSessionChange(null)}
-          className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-            !currentSession
-              ? 'bg-primary-100 text-primary-700 font-medium'
-              : 'hover:bg-gray-100 text-gray-700'
-          }`}
+          className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${!currentSession
+              ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-medium'
+              : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-400'
+            }`}
         >
           <div className="flex items-center">
             <span className="text-lg mr-2">💬</span>
             <span>Default Query</span>
           </div>
-          <p className="text-xs text-gray-500 mt-1">Single database mode</p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Single database mode</p>
         </button>
 
         {/* Chat sessions */}
         {sessions.map((session) => (
           <div
             key={session.id}
-            className={`relative group rounded ${
-              currentSession?.id === session.id
-                ? 'bg-primary-100 ring-2 ring-primary-500'
-                : 'hover:bg-gray-100'
-            }`}
+            className={`relative group rounded transition-all duration-200 ${currentSession?.id === session.id
+                ? 'bg-primary-100 dark:bg-primary-900/30 ring-2 ring-primary-500 dark:ring-primary-700'
+                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
           >
             <div className="flex items-stretch">
               <button
@@ -86,8 +84,8 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
                 <div className="flex items-center">
                   <span className="text-lg mr-2">💬</span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{session.name}</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className={`font-medium truncate ${currentSession?.id === session.id ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>{session.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {session.connections.length} database{session.connections.length !== 1 ? 's' : ''} • {session.message_count} messages
                     </p>
                   </div>
@@ -97,7 +95,7 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
                     {session.connections.map((conn) => (
                       <span
                         key={conn.id}
-                        className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700"
+                        className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 transition-colors"
                       >
                         {conn.name}
                       </span>
@@ -107,7 +105,7 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
               </button>
               <button
                 onClick={(e) => handleDeleteSession(session.id, e)}
-                className="opacity-0 group-hover:opacity-100 px-3 py-2 text-red-600 hover:bg-red-100 rounded"
+                className="opacity-0 group-hover:opacity-100 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-all"
                 title="Delete session"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -183,13 +181,13 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="text-lg font-semibold">New Chat Session</h3>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden transition-colors">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">New Chat Session</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -199,7 +197,7 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
 
         <form onSubmit={handleSubmit} className="p-4">
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Session Name
             </label>
             <input
@@ -207,35 +205,35 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Production Analysis"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-white focus:ring-primary-500 focus:border-primary-500 transition-colors"
               required
             />
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select Databases ({selectedConnections.length} selected)
             </label>
-            <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto">
+            <div className="border border-gray-300 dark:border-gray-700 rounded-md max-h-48 overflow-y-auto">
               {connections.length === 0 ? (
-                <p className="p-4 text-sm text-gray-500 text-center">
+                <p className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
                   No database connections found. Please add a connection first.
                 </p>
               ) : (
                 connections.map((conn) => (
                   <label
                     key={conn.id}
-                    className="flex items-center p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                    className="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors"
                   >
                     <input
                       type="checkbox"
                       checked={selectedConnections.includes(conn.id)}
                       onChange={() => toggleConnection(conn.id)}
-                      className="mr-3 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      className="mr-3 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded"
                     />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{conn.name}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{conn.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
                         {conn.database_type} • {conn.database_name}
                       </p>
                     </div>
@@ -249,14 +247,14 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+              className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !name.trim() || selectedConnections.length === 0}
-              className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm bg-primary-600 dark:bg-primary-700 text-white rounded-md hover:bg-primary-700 dark:hover:bg-primary-600 disabled:opacity-50 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Creating...' : 'Create Session'}
             </button>

@@ -178,7 +178,7 @@ describe('CacheOverview', () => {
   it('displays cached entries count', async () => {
     render(<CacheOverview />);
     await waitFor(() => {
-      expect(screen.getByText('Cached Entries')).toBeInTheDocument();
+      expect(screen.getByText('Cache Size')).toBeInTheDocument();
     });
     expect(screen.getByText('25')).toBeInTheDocument();
   });
@@ -235,7 +235,7 @@ describe('CacheOverview', () => {
     await waitFor(() => {
       expect(screen.getByText(/error/i)).toBeInTheDocument();
     });
-    expect(screen.getByText('Retry')).toBeInTheDocument();
+    expect(screen.getByText('Retry Connection')).toBeInTheDocument();
   });
 });
 

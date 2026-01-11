@@ -96,7 +96,7 @@ export const RecentCachedQueries: React.FC = () => {
     return (
       <div className="animate-pulse space-y-4">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-24 bg-gray-200 rounded-lg" />
+          <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded-lg" />
         ))}
       </div>
     );
@@ -122,14 +122,14 @@ export const RecentCachedQueries: React.FC = () => {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           Showing {queries.length} of {data?.total || 0} cached queries
         </p>
         <div className="flex items-center gap-3">
           <select
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
-            className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors"
           >
             <option value={10}>10 per page</option>
             <option value={25}>25 per page</option>
@@ -137,7 +137,7 @@ export const RecentCachedQueries: React.FC = () => {
           </select>
           <button
             onClick={() => loadData(false)}
-            className="flex items-center gap-2 px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+            className="flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -147,10 +147,10 @@ export const RecentCachedQueries: React.FC = () => {
 
       {/* Empty State */}
       {queries.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <Database className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">No cached queries yet</p>
-          <p className="text-sm text-gray-400 mt-1">
+        <div className="text-center py-12 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
+          <Database className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-gray-400">No cached queries yet</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
             Queries will appear here after you run some queries
           </p>
         </div>
@@ -160,14 +160,14 @@ export const RecentCachedQueries: React.FC = () => {
           {queries.map((query, index) => (
             <div
               key={`${query.question}-${index}`}
-              className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:border-amber-300 transition-colors"
+              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:border-amber-300 dark:hover:border-amber-600 transition-colors"
             >
               {/* Main Row */}
               <div className="p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     {/* Question */}
-                    <p className="font-medium text-gray-900 truncate" title={query.question}>
+                    <p className="font-medium text-gray-900 dark:text-white truncate" title={query.question}>
                       {query.question}
                     </p>
 
@@ -175,27 +175,26 @@ export const RecentCachedQueries: React.FC = () => {
                     <div className="flex items-center gap-3 mt-2 text-sm">
                       {/* Database Type Badge */}
                       <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          dbTypeColors[query.database_type] || 'bg-gray-100 text-gray-700'
-                        }`}
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${dbTypeColors[query.database_type] || 'bg-gray-100 text-gray-700'
+                          }`}
                       >
                         {query.database_type}
                       </span>
 
                       {/* Connection ID */}
-                      <span className="text-gray-500 flex items-center gap-1">
+                      <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
                         <Database className="w-3 h-3" />
                         Connection #{query.connection_id}
                       </span>
 
                       {/* Created */}
-                      <span className="text-gray-500 flex items-center gap-1" title={formatDate(query.created_at)}>
+                      <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1" title={formatDate(query.created_at)}>
                         <Clock className="w-3 h-3" />
                         {formatTimeAgo(query.created_at)}
                       </span>
 
                       {/* Hits */}
-                      <span className="text-gray-500 flex items-center gap-1">
+                      <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
                         <Eye className="w-3 h-3" />
                         {query.hits} hit{query.hits !== 1 ? 's' : ''}
                       </span>
@@ -209,7 +208,7 @@ export const RecentCachedQueries: React.FC = () => {
                         expandedQuery === query.question ? null : query.question
                       )
                     }
-                    className="flex items-center gap-1 px-3 py-1 text-sm text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                    className="flex items-center gap-1 px-3 py-1 text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
                   >
                     <Code className="w-4 h-4" />
                     {expandedQuery === query.question ? 'Hide SQL' : 'View SQL'}
@@ -219,13 +218,13 @@ export const RecentCachedQueries: React.FC = () => {
 
               {/* Expanded SQL */}
               {expandedQuery === query.question && (
-                <div className="border-t border-gray-200 bg-gray-50 p-4">
-                  <p className="text-xs text-gray-500 mb-2 font-medium">CACHED SQL:</p>
-                  <pre className="bg-gray-900 text-green-400 p-3 rounded-lg text-sm overflow-x-auto">
+                <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">CACHED SQL:</p>
+                  <pre className="bg-gray-900 dark:bg-black text-green-400 dark:text-green-500 p-3 rounded-lg text-sm overflow-x-auto border border-gray-800">
                     {query.sql}
                   </pre>
                   {query.last_hit_at && (
-                    <p className="text-xs text-gray-400 mt-2">
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                       Last hit: {formatDate(query.last_hit_at)}
                     </p>
                   )}
@@ -238,7 +237,7 @@ export const RecentCachedQueries: React.FC = () => {
 
       {/* Load More Hint */}
       {queries.length > 0 && queries.length < (data?.total || 0) && (
-        <p className="text-center text-sm text-gray-500">
+        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
           Showing {queries.length} of {data?.total} queries. Increase page size to see more.
         </p>
       )}

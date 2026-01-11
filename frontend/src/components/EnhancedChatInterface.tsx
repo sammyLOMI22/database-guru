@@ -132,8 +132,8 @@ export default function EnhancedChatInterface() {
         content: response.database_results.length > 1
           ? `I queried ${response.database_results.length} databases and found ${response.total_rows} total rows:`
           : response.database_results[0]?.success
-          ? `Here's what I found in ${response.database_results[0].connection_name}:`
-          : 'Query executed.',
+            ? `Here's what I found in ${response.database_results[0].connection_name}:`
+            : 'Query executed.',
         multiQueryResponse: response,
       };
       console.log('DEBUG: Response from multi-query:', response);
@@ -164,7 +164,7 @@ export default function EnhancedChatInterface() {
 
       {/* Session Selector Sidebar */}
       {showSessionSelector && (
-        <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
+        <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0 transition-colors">
           <ChatSessionSelector
             currentSession={currentSession}
             onSessionChange={setCurrentSession}
@@ -173,18 +173,18 @@ export default function EnhancedChatInterface() {
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="px-6 py-3 bg-white border-b border-gray-200">
+        <div className="px-6 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {/* Toggle connections sidebar button */}
               <button
                 onClick={() => setShowSidebar(!showSidebar)}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                 title="Toggle database connections"
               >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
                 </svg>
               </button>
@@ -192,10 +192,10 @@ export default function EnhancedChatInterface() {
               {/* Toggle sessions sidebar button */}
               <button
                 onClick={() => setShowSessionSelector(!showSessionSelector)}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                 title="Toggle sessions panel"
               >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </button>
@@ -204,15 +204,15 @@ export default function EnhancedChatInterface() {
               <div>
                 {currentSession ? (
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{currentSession.name}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{currentSession.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
                       {currentSession.connections.length} database{currentSession.connections.length !== 1 ? 's' : ''} connected
                     </p>
                   </div>
                 ) : (
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Default Mode</p>
-                    <p className="text-xs text-gray-500">Single database queries</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Default Mode</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Single database queries</p>
                   </div>
                 )}
               </div>
@@ -221,11 +221,11 @@ export default function EnhancedChatInterface() {
             <div className="flex items-center space-x-4">
               {/* Model selector */}
               <div className="flex items-center space-x-2">
-                <span className="text-xs text-gray-600">Model:</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400">Model:</span>
                 <select
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value)}
-                  className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   {modelsData?.models.map((model) => (
                     <option key={model} value={model}>
@@ -237,17 +237,17 @@ export default function EnhancedChatInterface() {
               </div>
 
               {/* Force schema refresh checkbox */}
-              <div className="flex items-center space-x-2 px-3 py-1 rounded border border-gray-200 bg-gray-50">
+              <div className="flex items-center space-x-2 px-3 py-1 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 transition-colors">
                 <input
                   type="checkbox"
                   id="force-schema-refresh"
                   checked={forceSchemaRefresh}
                   onChange={(e) => setForceSchemaRefresh(e.target.checked)}
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 bg-white dark:bg-gray-800"
                 />
                 <label
                   htmlFor="force-schema-refresh"
-                  className="text-xs text-gray-700 cursor-pointer select-none"
+                  className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none"
                   title="Force re-introspection of database schema on next query (bypasses 30-min cache)"
                 >
                   Force Schema Refresh
@@ -258,18 +258,16 @@ export default function EnhancedChatInterface() {
               <label className="flex items-center space-x-2 cursor-pointer">
                 <button
                   onClick={() => setEnableNarratives(!enableNarratives)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    enableNarratives ? 'bg-blue-600' : 'bg-gray-300'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enableNarratives ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
                   title={enableNarratives ? 'Disable AI Narratives' : 'Enable AI Narratives'}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      enableNarratives ? 'translate-x-6' : 'translate-x-1'
-                    }`}
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enableNarratives ? 'translate-x-6' : 'translate-x-1'
+                      }`}
                   />
                 </button>
-                <span className="text-xs text-gray-600 whitespace-nowrap">
+                <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                   {enableNarratives ? '✨ Narratives' : '📊 Data Only'}
                 </span>
               </label>
@@ -287,9 +285,9 @@ export default function EnhancedChatInterface() {
               {currentSession.connections.map((conn) => (
                 <span
                   key={conn.id}
-                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700"
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 transition-colors"
                 >
-                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-1.5"></span>
+                  <span className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full mr-1.5"></span>
                   {conn.name}
                 </span>
               ))}
@@ -315,7 +313,7 @@ export default function EnhancedChatInterface() {
 
           {/* Context awareness indicator */}
           {hasContext && (
-            <div className="mt-2 flex items-center justify-between text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded">
+            <div className="mt-2 flex items-center justify-between text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded border border-blue-100 dark:border-blue-800 transition-colors">
               <div className="flex items-center">
                 <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
@@ -324,7 +322,7 @@ export default function EnhancedChatInterface() {
               </div>
               <button
                 onClick={() => setShowContextPanel(!showContextPanel)}
-                className="ml-2 px-2 py-0.5 text-blue-700 hover:bg-blue-100 rounded transition-colors"
+                className="ml-2 px-2 py-0.5 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800 rounded transition-colors"
               >
                 {showContextPanel ? 'Hide' : 'Show'} context
               </button>
@@ -347,11 +345,10 @@ export default function EnhancedChatInterface() {
           {messages.map((message) => (
             <div key={message.id} className="flex items-start space-x-3">
               {/* Avatar */}
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                message.type === 'user'
-                  ? 'bg-primary-100 text-primary-700'
-                  : 'bg-gray-100 text-gray-700'
-              }`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${message.type === 'user'
+                ? 'bg-primary-100 text-primary-700'
+                : 'bg-gray-100 text-gray-700'
+                }`}>
                 {message.type === 'user' ? (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -363,8 +360,8 @@ export default function EnhancedChatInterface() {
 
               {/* Message content */}
               <div className="flex-1 min-w-0">
-                <div className="px-4 py-3 bg-white border border-gray-200 rounded-lg">
-                  <p className="text-sm text-gray-900 whitespace-pre-wrap">{message.content}</p>
+                <div className="px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm transition-colors">
+                  <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">{message.content}</p>
                 </div>
 
                 {/* Multi-database results */}
@@ -391,8 +388,8 @@ export default function EnhancedChatInterface() {
                 <div className="w-5 h-5 border-2 border-gray-600 border-t-transparent rounded-full animate-spin"></div>
               </div>
               <div className="flex-1">
-                <div className="px-4 py-3 bg-white border border-gray-200 rounded-lg">
-                  <p className="text-sm text-gray-600">
+                <div className="px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     {currentSession && currentSession.connections.length > 1
                       ? `Querying ${currentSession.connections.length} databases...`
                       : 'Thinking...'}

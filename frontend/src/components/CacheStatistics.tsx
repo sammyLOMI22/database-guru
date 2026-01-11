@@ -58,8 +58,8 @@ export const CacheStatistics: React.FC = () => {
   if (loading) {
     return (
       <div className="animate-pulse space-y-6">
-        <div className="h-48 bg-gray-200 rounded-lg" />
-        <div className="h-48 bg-gray-200 rounded-lg" />
+        <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+        <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-lg" />
       </div>
     );
   }
@@ -100,9 +100,9 @@ export const CacheStatistics: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Hit Type Distribution */}
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-amber-600" />
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 transition-colors">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-amber-600 dark:text-amber-400" />
           Hit Type Distribution
         </h3>
 
@@ -110,18 +110,18 @@ export const CacheStatistics: React.FC = () => {
           {/* Exact Hits */}
           <div>
             <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-medium text-gray-700">Exact Hits</span>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Exact Hits</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
                 {exactHits} ({exactPercent.toFixed(1)}%)
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-4">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
               <div
                 className="bg-green-500 h-4 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(exactPercent, 100)}%` }}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Identical queries - fastest response
             </p>
           </div>
@@ -129,18 +129,18 @@ export const CacheStatistics: React.FC = () => {
           {/* Semantic Hits */}
           <div>
             <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-medium text-gray-700">Semantic Hits</span>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Semantic Hits</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
                 {semanticHits} ({semanticPercent.toFixed(1)}%)
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-4">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
               <div
                 className="bg-blue-500 h-4 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(semanticPercent, 100)}%` }}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Similar queries matched by embedding similarity
             </p>
           </div>
@@ -148,18 +148,18 @@ export const CacheStatistics: React.FC = () => {
           {/* Misses */}
           <div>
             <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-medium text-gray-700">Cache Misses</span>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Cache Misses</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
                 {misses} ({missPercent.toFixed(1)}%)
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-4">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
               <div
                 className="bg-gray-400 h-4 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(missPercent, 100)}%` }}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               New queries requiring full processing
             </p>
           </div>
@@ -167,35 +167,35 @@ export const CacheStatistics: React.FC = () => {
       </div>
 
       {/* LLM Cache Statistics */}
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-blue-600" />
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 transition-colors">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           LLM Response Cache
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-700">Hit Rate</p>
-            <p className="text-2xl font-bold text-blue-900">
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/10 dark:to-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800/50">
+            <p className="text-sm text-blue-700 dark:text-blue-300">Hit Rate</p>
+            <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
               {llm?.hit_rate_percent?.toFixed(1) || 0}%
             </p>
-            <p className="text-xs text-blue-600 mt-1">
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
               {llm?.hits || 0} hits / {llm?.total_lookups || 0} lookups
             </p>
           </div>
 
-          <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
-            <p className="text-sm text-green-700">LLM Calls Saved</p>
-            <p className="text-2xl font-bold text-green-900">{llm?.hits || 0}</p>
-            <p className="text-xs text-green-600 mt-1">
+          <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/10 dark:to-green-900/20 rounded-lg border border-green-200 dark:border-green-800/50">
+            <p className="text-sm text-green-700 dark:text-green-300">LLM Calls Saved</p>
+            <p className="text-2xl font-bold text-green-900 dark:text-green-100">{llm?.hits || 0}</p>
+            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
               Each hit saves 2-5 seconds
             </p>
           </div>
 
-          <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-            <p className="text-sm text-purple-700">Stored Entries</p>
-            <p className="text-2xl font-bold text-purple-900">{llm?.total_stores || 0}</p>
-            <p className="text-xs text-purple-600 mt-1">
+          <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/10 dark:to-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800/50">
+            <p className="text-sm text-purple-700 dark:text-purple-300">Stored Entries</p>
+            <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{llm?.total_stores || 0}</p>
+            <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
               Threshold: {llm?.similarity_threshold || 0.88}
             </p>
           </div>
@@ -203,9 +203,9 @@ export const CacheStatistics: React.FC = () => {
       </div>
 
       {/* Embedding Service Stats */}
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-purple-600" />
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 transition-colors">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-400" />
           Embedding Service Efficiency
         </h3>
 
@@ -218,72 +218,72 @@ export const CacheStatistics: React.FC = () => {
                 {embedding?.cache_hit_rate_percent?.toFixed(1) || 0}%
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-4">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
               <div
                 className="bg-purple-500 h-4 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(embedding?.cache_hit_rate_percent || 0, 100)}%` }}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Cached embeddings avoid recomputation (saves 50-200ms each)
             </p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <p className="text-lg font-bold text-gray-900">{embedding?.total_requests || 0}</p>
-              <p className="text-xs text-gray-500">Total Requests</p>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-transparent dark:border-gray-700/50">
+              <p className="text-lg font-bold text-gray-900 dark:text-white">{embedding?.total_requests || 0}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Total Requests</p>
             </div>
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <p className="text-lg font-bold text-green-600">{embedding?.cache_hits || 0}</p>
-              <p className="text-xs text-gray-500">Cache Hits</p>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-transparent dark:border-gray-700/50">
+              <p className="text-lg font-bold text-green-600 dark:text-green-400">{embedding?.cache_hits || 0}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Cache Hits</p>
             </div>
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <p className="text-lg font-bold text-blue-600">{embedding?.ollama_calls || 0}</p>
-              <p className="text-xs text-gray-500">Ollama Calls</p>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-transparent dark:border-gray-700/50">
+              <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{embedding?.ollama_calls || 0}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Ollama Calls</p>
             </div>
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <p className="text-lg font-bold text-orange-600">{embedding?.tfidf_fallbacks || 0}</p>
-              <p className="text-xs text-gray-500">TF-IDF Fallbacks</p>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-transparent dark:border-gray-700/50">
+              <p className="text-lg font-bold text-orange-600 dark:text-orange-400">{embedding?.tfidf_fallbacks || 0}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">TF-IDF Fallbacks</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Estimated Time Savings */}
-      <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200 p-5">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Clock className="w-5 h-5 text-amber-600" />
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 rounded-lg border border-amber-200 dark:border-amber-800/50 p-5 transition-colors">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
           Estimated Performance Impact
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-white rounded-lg border border-amber-200">
+          <div className="text-center p-4 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-800/50">
             <p className="text-3xl font-bold text-amber-600">
               {estimatedTimeSaved >= 60
                 ? `${(estimatedTimeSaved / 60).toFixed(1)}m`
                 : `${estimatedTimeSaved.toFixed(0)}s`}
             </p>
-            <p className="text-sm text-gray-600 mt-1">Estimated Time Saved</p>
-            <p className="text-xs text-gray-400">Based on ~2.5s per cache hit</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Estimated Time Saved</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Based on ~2.5s per cache hit</p>
           </div>
 
-          <div className="text-center p-4 bg-white rounded-lg border border-amber-200">
+          <div className="text-center p-4 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-800/50">
             <p className="text-3xl font-bold text-green-600">
               {totalHits + (llm?.hits || 0)}
             </p>
-            <p className="text-sm text-gray-600 mt-1">Total Cache Hits</p>
-            <p className="text-xs text-gray-400">Semantic + LLM combined</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Total Cache Hits</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Semantic + LLM combined</p>
           </div>
 
-          <div className="text-center p-4 bg-white rounded-lg border border-amber-200">
+          <div className="text-center p-4 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-800/50">
             <p className="text-3xl font-bold text-blue-600">
               {totalLookups > 0
                 ? `${(((exactHits + semanticHits) / totalLookups) * 100).toFixed(0)}%`
                 : '0%'}
             </p>
-            <p className="text-sm text-gray-600 mt-1">Overall Efficiency</p>
-            <p className="text-xs text-gray-400">Queries served from cache</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Overall Efficiency</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Queries served from cache</p>
           </div>
         </div>
       </div>
@@ -292,7 +292,7 @@ export const CacheStatistics: React.FC = () => {
       <div className="flex justify-end">
         <button
           onClick={() => loadData(false)}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh Statistics

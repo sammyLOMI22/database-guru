@@ -63,7 +63,7 @@ describe('Header', () => {
 
       const link = screen.getByRole('link');
       expect(link).toBeInTheDocument();
-      expect(link).toHaveAttribute('href', 'https://github.com/yourusername/database-guru');
+      expect(link).toHaveAttribute('href', 'https://github.com/sammyLOMI22/database-guru');
       expect(link).toHaveAttribute('target', '_blank');
       expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     });
