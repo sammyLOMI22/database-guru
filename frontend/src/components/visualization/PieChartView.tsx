@@ -85,13 +85,8 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
   const { isDarkMode } = useDarkMode();
 
   const chartData = useMemo((): PieDataItem[] => {
-    const prepared = prepareChartData(data, xColumn, yColumn, 'pie', 20);
-    // Transform to pie chart format with name and value
-    return prepared.map((item) => ({
-      ...item,
-      name: String(item[xColumn] ?? 'Unknown'),
-      value: Number(item[yColumn]) || 0,
-    }));
+    // prepareChartData already returns { name, value } objects for pie charts
+    return prepareChartData(data, xColumn, yColumn, 'pie', 20) as PieDataItem[];
   }, [data, xColumn, yColumn]);
 
   const total = useMemo(() => data.reduce((sum, row) => sum + Number(row[yColumn] || 0), 0), [data, yColumn]);
