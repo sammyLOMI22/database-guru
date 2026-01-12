@@ -255,6 +255,23 @@ The system uses a multi-agent architecture with specialized agents that work tog
     - Key methods: `validate_query()`, `assess_database()`, `_extract_requirements()`
     - Test coverage: 27 tests in `tests/test_multi_db_query_validator.py`
 
+18. **Prompt Optimizer** (`src/llm/prompt_optimizer.py`) **NEW - January 11, 2026**
+    - Optimizes prompts for smaller LLM models by compressing schema and selecting relevant examples
+    - **Model Size Detection**: Auto-detects model size from name patterns (e.g., "7b" → MEDIUM)
+      - SMALL: <7B params, 2K context budget
+      - MEDIUM: 7-13B params, 4K context budget
+      - LARGE: 13B+ params, 8K+ context budget
+    - **Model Family Support**: 7 families with specific prompt templates
+      - Llama, Qwen, Gemma, Mistral, Phi, DuckDB-NSQL, SQLCoder
+    - **Schema Compression**: Includes only relevant tables based on question keywords and FK relationships
+    - **Smart Example Selection**: Chooses relevant few-shot examples based on query similarity
+    - **Token Budgeting**: Allocates tokens across system prompt, schema, examples, and user input
+    - **Safety Margin**: 20% buffer on token counting for SQL/code tokenization differences
+    - **User Toggle**: OFF by default, enabled via Settings UI
+    - Key methods: `optimize_prompt()`, `compress_schema()`, `select_examples()`
+    - Key classes: `PromptBudget`, `ModelPromptTemplate`, `OptimizedPrompt`, `ModelSize`, `ModelFamily`
+    - Test coverage: 52 tests in `tests/test_prompt_optimizer.py`
+
 ### Tool System (`src/tools/`)
 
 The tool system provides 10 specialized tools across 4 categories for schema exploration and query validation:
@@ -514,12 +531,14 @@ Located in `frontend/src/`:
 - Backend Tests: `test_cache_endpoints.py` with 9 tests
 - Frontend Tests: `SemanticCachePanel.test.tsx` with 34 tests
 
-**Small Model Optimization UI Components (NEW - January 2, 2026):**
-- `ModelConfigPanel.tsx` (310 lines) - Per-task model configuration with:
+**Small Model Optimization UI Components (NEW - January 2, 2026)** (Updated January 11, 2026):
+- `ModelConfigPanel.tsx` (465 lines) - Per-task model configuration with:
   - 4 task cards: SQL Generation, Narratives, Query Planning, Error Correction
   - Model dropdown for each task (fetches from Ollama)
   - Timeout slider (5-120s) with default indicators
   - Optimization feature toggles: Query Templates, Location Preprocessing
+  - **Prompt Optimization toggle (NEW - Jan 11, 2026)**: Schema compression, example selection, model size detection
+    - Sub-options: Model size (auto/small/medium/large), Schema compression toggle, Max tables slider, Example selection toggle, Max examples slider
   - Color-coded task cards (blue, green, purple, orange)
 - `SettingsPanel.tsx` - Updated to include ModelConfigPanel integration
 - `QueryInput.tsx` - Row limit integration with per-task settings
@@ -686,21 +705,25 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `frontend/src/components/visualization/ChartToggle.tsx` - Table/chart toggle with type selector
   - `frontend/tests/AdvancedCharts.test.tsx` - 61 comprehensive tests
   - `frontend/tests/chartIntelligence.test.ts` - Pattern detection tests
-- **Small Model Optimization (NEW - Jan 2, 2026)** (Updated Jan 10, 2026):
+- **Small Model Optimization (NEW - Jan 2, 2026)** (Updated Jan 11, 2026):
   - `src/llm/model_router.py` - Per-task model routing (246 lines)
   - `src/llm/query_templates.py` - Template-based SQL for simple patterns (1024 lines, updated with dialect support)
   - `src/llm/dialect_registry.py` - Database dialect rules and SQL syntax (205 lines) **NEW - Jan 10, 2026**
   - `src/llm/query_preprocessor.py` - Location normalization and preprocessing (504 lines)
+  - `src/llm/prompt_optimizer.py` - Prompt compression and schema optimization (1013 lines) **NEW - Jan 11, 2026**
+  - `src/llm/quality_profile.py` - Added `enable_prompt_optimization` field **UPDATED - Jan 11, 2026**
   - `src/llm/self_correcting_agent.py` - Template matching + preprocessing integration (lines 821-907, 1068-1111)
-  - `src/database/models.py` - Per-task model/timeout fields in SystemSettings
+  - `src/database/models.py` - Per-task model/timeout fields + prompt optimization settings in SystemSettings
   - `src/api/endpoints/settings.py` - Model configuration API endpoints
+  - `src/api/endpoints/query.py` - Passes prompt optimization settings to QualityProfile
   - `src/api/endpoints/models.py` - Filter embedding models from model list
-  - `frontend/src/components/ModelConfigPanel.tsx` - Per-task model configuration UI (310 lines)
+  - `frontend/src/components/ModelConfigPanel.tsx` - Per-task model configuration UI + prompt optimization toggle (465 lines)
   - `frontend/src/components/SettingsPanel.tsx` - Updated with ModelConfigPanel integration
   - `tests/test_model_router.py` - 220 lines of model router tests
   - `tests/test_query_preprocessor.py` - 264 lines of preprocessor tests
   - `tests/test_query_templates.py` - 510 lines of template engine tests (updated with dialect tests)
   - `tests/test_dialect_registry.py` - 72 lines of dialect registry tests **NEW - Jan 10, 2026**
+  - `tests/test_prompt_optimizer.py` - 600 lines of prompt optimizer tests (52 tests) **NEW - Jan 11, 2026**
 
 ## Documentation
 

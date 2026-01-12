@@ -19,6 +19,13 @@ from src.llm.prompts import (
 from src.config.settings import Settings
 from src.cache.llm_cache import get_llm_cache, LLMCache
 
+# Prompt optimization imports (Phase 2.2)
+from src.llm.prompt_optimizer import (
+    PromptOptimizer,
+    get_prompt_optimizer,
+    OptimizedPrompt,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -467,6 +474,36 @@ class SQLGenerator:
                 logger.info(f"Enhanced question with JOIN instructions")
 
             # Build prompt with enhanced question (includes location hints if enabled)
+            # Check if prompt optimization is enabled (Phase 2.2)
+            enable_prompt_optimization = (
+                quality_profile and
+                getattr(quality_profile, 'enable_prompt_optimization', False)
+            )
+            optimized_schema = schema
+            prompt_optimization_metrics = None
+
+            if enable_prompt_optimization and schema_dict:
+                try:
+                    optimizer = get_prompt_optimizer(model_name=model_to_use)
+                    optimized = optimizer.optimize_prompt(
+                        task="sql_generation",
+                        question=final_question,
+                        schema_dict=schema_dict,
+                        database_type=database_type,
+                    )
+                    # Use compressed schema if optimization succeeded
+                    optimized_schema = optimized.compressed_schema
+                    prompt_optimization_metrics = optimized.metrics
+
+                    logger.info(
+                        f"Prompt optimized: tables={len(optimized.tables_included)}, "
+                        f"excluded={len(optimized.tables_excluded)}, "
+                        f"tokens={optimized.metrics.get('total_tokens', 'N/A')}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Prompt optimization failed (using full schema): {e}")
+                    optimized_schema = schema
+
             # Use dynamic examples if schema_dict is available and quality profile enables it
             examples = ""
             if use_few_shot:
@@ -486,7 +523,7 @@ class SQLGenerator:
 
             messages = build_chat_messages(
                 question=final_question,
-                schema=schema,
+                schema=optimized_schema,  # Use optimized schema if prompt optimization enabled
                 database_type=database_type,
                 row_limit=row_limit,
                 examples=examples,

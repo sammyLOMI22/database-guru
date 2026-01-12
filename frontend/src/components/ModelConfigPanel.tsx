@@ -21,6 +21,13 @@ interface ModelConfig {
   timeout_error_correction: number;
   enable_query_templates: boolean;
   enable_location_preprocessing: boolean;
+  // Prompt Optimization (Phase 2.2)
+  enable_prompt_optimization: boolean;
+  prompt_model_size: string; // auto|small|medium|large
+  enable_schema_compression: boolean;
+  max_schema_tables: number;
+  enable_example_selection: boolean;
+  max_few_shot_examples: number;
 }
 
 interface AvailableModel {
@@ -97,7 +104,8 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
     try {
       setLoadingModels(true);
       setModelsError(null);
-      const response = await fetch('http://localhost:8000/api/models/details');
+      const baseURL = (import.meta as any).env?.VITE_API_URL || '';
+      const response = await fetch(`${baseURL}/api/models/details`);
       if (!response.ok) throw new Error('Failed to fetch models');
       const data = await response.json();
       setAvailableModels(data.models || []);
@@ -116,7 +124,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
     });
   };
 
-  const handleTimeoutChange = (key: keyof ModelConfig, value: number) => {
+  const handleNumberChange = (key: keyof ModelConfig, value: number) => {
     onChange({
       ...config,
       [key]: Math.max(1, Math.min(300, value)),
@@ -238,7 +246,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
                   max="120"
                   step="5"
                   value={currentTimeout}
-                  onChange={(e) => handleTimeoutChange(task.timeoutKey, parseInt(e.target.value))}
+                  onChange={(e) => handleNumberChange(task.timeoutKey, parseInt(e.target.value))}
                   disabled={disabled}
                   className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
@@ -303,6 +311,143 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
                 }`}
             />
           </button>
+        </div>
+
+        {/* Prompt Optimization Toggle */}
+        <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-800/50 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex-1">
+              <label className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                Prompt Optimization
+                <span className="text-xs px-2 py-0.5 bg-purple-100 dark:bg-purple-800/50 text-purple-700 dark:text-purple-300 rounded-full">
+                  Phase 2.2
+                </span>
+              </label>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Compress prompts for faster responses with smaller models (~40% token reduction)
+              </p>
+            </div>
+            <button
+              onClick={() => handleToggleChange('enable_prompt_optimization', !config.enable_prompt_optimization)}
+              disabled={disabled}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors disabled:opacity-50 ${config.enable_prompt_optimization ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${config.enable_prompt_optimization ? 'translate-x-7' : 'translate-x-1'
+                  }`}
+              />
+            </button>
+          </div>
+
+          {/* Advanced Settings (shown when enabled) */}
+          {config.enable_prompt_optimization && (
+            <div className="mt-4 pt-4 border-t border-purple-200 dark:border-purple-800/50 space-y-4">
+              {/* Model Size Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Model Size Detection
+                </label>
+                <select
+                  value={config.prompt_model_size || 'auto'}
+                  onChange={(e) => handleModelChange('prompt_model_size' as keyof ModelConfig, e.target.value)}
+                  disabled={disabled}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 dark:bg-gray-800 dark:text-gray-100 disabled:dark:bg-gray-700"
+                >
+                  <option value="auto">Auto-detect from model name</option>
+                  <option value="small">Small (&lt;7B params, 2K context)</option>
+                  <option value="medium">Medium (7-13B params, 4K context)</option>
+                  <option value="large">Large (13B+ params, 8K+ context)</option>
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                  Controls token budget allocation for prompts
+                </p>
+              </div>
+
+              {/* Schema Compression Toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Schema Compression</label>
+                  <p className="text-xs text-gray-500 dark:text-gray-500">
+                    Include only relevant tables in prompts
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleToggleChange('enable_schema_compression', !config.enable_schema_compression)}
+                  disabled={disabled}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${config.enable_schema_compression ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.enable_schema_compression ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                  />
+                </button>
+              </div>
+
+              {/* Max Schema Tables */}
+              {config.enable_schema_compression && (
+                <div className="ml-4">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Max Tables: {config.max_schema_tables || 10}
+                  </label>
+                  <input
+                    type="range"
+                    min="3"
+                    max="20"
+                    step="1"
+                    value={config.max_schema_tables || 10}
+                    onChange={(e) => handleNumberChange('max_schema_tables' as keyof ModelConfig, parseInt(e.target.value))}
+                    disabled={disabled}
+                    className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                  />
+                </div>
+              )}
+
+              {/* Example Selection Toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Smart Example Selection</label>
+                  <p className="text-xs text-gray-500 dark:text-gray-500">
+                    Choose relevant few-shot examples based on query
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleToggleChange('enable_example_selection', !config.enable_example_selection)}
+                  disabled={disabled}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${config.enable_example_selection ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.enable_example_selection ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                  />
+                </button>
+              </div>
+
+              {/* Max Few-Shot Examples */}
+              {config.enable_example_selection && (
+                <div className="ml-4">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Max Examples: {config.max_few_shot_examples || 3}
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="5"
+                    step="1"
+                    value={config.max_few_shot_examples || 3}
+                    onChange={(e) => handleNumberChange('max_few_shot_examples' as keyof ModelConfig, parseInt(e.target.value))}
+                    disabled={disabled}
+                    className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    0 = zero-shot (best for small models)
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

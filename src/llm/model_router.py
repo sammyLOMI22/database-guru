@@ -8,6 +8,7 @@ Usage:
     router = await get_model_router(db_session)
     model = router.get_model_for_task(TaskType.SQL_GENERATION)
     timeout = router.get_timeout_for_task(TaskType.SQL_GENERATION)
+    model_size = router.get_model_size(TaskType.SQL_GENERATION)
 
 Part of: Small Model Optimization Phase
 """
@@ -17,6 +18,14 @@ from typing import Optional, Dict, Any
 from dataclasses import dataclass
 
 from src.config.settings import Settings
+
+# Import model size detection from prompt_optimizer (Phase 2.2)
+from src.llm.prompt_optimizer import (
+    ModelSize,
+    get_model_size_for_model,
+    get_model_family,
+    ModelFamily,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +162,37 @@ class ModelRouter:
         key = f"model_{task.value}"
         return bool(self.model_settings.get(key))
 
+    def get_model_size(self, task: Optional[TaskType] = None) -> ModelSize:
+        """
+        Get the model size for a task (or default model).
+
+        Uses the model configured for the task and detects its size
+        based on model name patterns (e.g., "7b" → MEDIUM).
+
+        Args:
+            task: Optional task type. If None, uses default model.
+
+        Returns:
+            ModelSize enum value (SMALL, MEDIUM, or LARGE)
+        """
+        model = self.get_model_for_task(task) if task else self._default_model
+        return get_model_size_for_model(model)
+
+    def get_model_family(self, task: Optional[TaskType] = None) -> ModelFamily:
+        """
+        Get the model family for a task (or default model).
+
+        Detects the model family (Llama, Qwen, etc.) from the model name.
+
+        Args:
+            task: Optional task type. If None, uses default model.
+
+        Returns:
+            ModelFamily enum value
+        """
+        model = self.get_model_for_task(task) if task else self._default_model
+        return get_model_family(model)
+
     def get_all_configs(self) -> Dict[TaskType, TaskConfig]:
         """Get configurations for all task types."""
         return {task: self.get_config_for_task(task) for task in TaskType}
@@ -161,11 +201,15 @@ class ModelRouter:
         """Convert router configuration to dictionary for debugging/logging."""
         return {
             "default_model": self._default_model,
+            "default_model_size": self.get_model_size().value,
+            "default_model_family": self.get_model_family().value,
             "tasks": {
                 task.value: {
                     "model": self.get_model_for_task(task),
                     "timeout": self.get_timeout_for_task(task),
-                    "is_custom": self.is_per_task_configured(task)
+                    "is_custom": self.is_per_task_configured(task),
+                    "model_size": self.get_model_size(task).value,
+                    "model_family": self.get_model_family(task).value,
                 }
                 for task in TaskType
             }
