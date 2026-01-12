@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Database, GitCompare, List, RefreshCw } from 'lucide-react';
+import { Database, GitCompare, List, RefreshCw, Share2 } from 'lucide-react';
 import { connectionsAPI } from '../services/api';
 import type { DatabaseConnection } from '../types/api';
 import SchemaExplorer from './SchemaExplorer';
 import SchemaComparison from './SchemaComparison';
+import ERDiagram from './schema/ERDiagram';
 
-type ViewMode = 'explore' | 'compare';
+type ViewMode = 'explore' | 'compare' | 'diagram';
 
 export default function SchemaPanel() {
   const [connections, setConnections] = useState<DatabaseConnection[]>([]);
@@ -104,12 +105,62 @@ export default function SchemaPanel() {
               <span className="text-xs ml-1">(need 2+)</span>
             )}
           </button>
+          <button
+            onClick={() => setViewMode('diagram')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'diagram'
+                ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-transparent'
+              }`}
+          >
+            <Share2 className="w-4 h-4" />
+            ER Diagram
+          </button>
         </div>
       </div>
 
       {/* Content Area */}
       <div className="flex-1 overflow-hidden flex">
-        {viewMode === 'explore' ? (
+        {viewMode === 'diagram' ? (
+          <>
+            {/* Connection Selector Sidebar for Diagram */}
+            <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
+              <div className="p-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Select Database
+                </h3>
+                <div className="space-y-2">
+                  {connections.map((conn) => (
+                    <button
+                      key={conn.id}
+                      onClick={() => setSelectedConnectionId(conn.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${selectedConnectionId === conn.id
+                          ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                          : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                      <Database className="w-4 h-4 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{conn.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{conn.database_type}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ER Diagram */}
+            <div className="flex-1 overflow-hidden">
+              {selectedConnectionId ? (
+                <ERDiagram connectionId={selectedConnectionId} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                  Select a database to view its ER diagram
+                </div>
+              )}
+            </div>
+          </>
+        ) : viewMode === 'explore' ? (
           <>
             {/* Connection Selector Sidebar */}
             <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
