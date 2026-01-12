@@ -1405,6 +1405,14 @@ Based on PR review feedback, these small improvements can be addressed:
 | Remove debug logging | `multi_db_handler.py:505` | Low |
 | Add tests for schema-qualified SQL, CTEs | `test_multi_db_query_validator.py` | Low |
 
+### Prompt Optimization Enhancements (From Final Review)
+
+| Task | File | Priority | Effort |
+|------|------|----------|--------|
+| Word boundary matching for schema compression | `prompt_optimizer.py:_extract_table_mentions()` | Low | 1 day |
+| Configurable model size registry (DB/config file) | `prompt_optimizer.py:KNOWN_MODEL_SIZES` | Low | 2 days |
+| Lightweight tokenizer integration (tiktoken) | `prompt_optimizer.py:_count_tokens()` | Low | 1 day |
+
 ---
 
 ## Changelog
