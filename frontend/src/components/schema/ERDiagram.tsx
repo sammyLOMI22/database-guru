@@ -169,7 +169,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
 
   // Handle node click to toggle expansion
   const onNodeClick: NodeMouseHandler = useCallback(
-    (event, node) => {
+    (_event, node) => {
       setNodes((nds) => toggleNodeExpansion(nds as ERTableNode[], node.id) as any);
     },
     [setNodes]

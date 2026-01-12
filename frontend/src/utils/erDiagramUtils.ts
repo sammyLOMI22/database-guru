@@ -5,7 +5,7 @@
  */
 
 import dagre from 'dagre';
-import type { Node, Edge } from 'reactflow';
+// Node and Edge types imported for reference in JSDoc comments
 import type { SchemaTableInfo, SchemaExploreResponse } from '../types/api';
 import type {
   ERTableNode,
@@ -130,7 +130,7 @@ export function transformSchemaToNodes(
 ): ERTableNode[] {
   const color = getDatabaseColor(colorIndex);
 
-  return schema.tables.map((table, index) => {
+  return schema.tables.map((table) => {
     const nodeId = `${schema.connection_id}-${table.name}`;
 
     const nodeData: TableNodeData = {
@@ -263,11 +263,11 @@ export function applySearchFilter(
       nodes: nodes.map((node) => ({
         ...node,
         data: { ...node.data, isHighlighted: false, isDimmed: false },
-      })),
+      })) as ERTableNode[],
       edges: edges.map((edge) => ({
         ...edge,
-        data: { ...edge.data, isHighlighted: false },
-      })),
+        data: { ...edge.data!, isHighlighted: false },
+      })) as ERRelationshipEdge[],
     };
   }
 
@@ -305,16 +305,16 @@ export function applySearchFilter(
       isHighlighted: matchingNodeIds.has(node.id),
       isDimmed: !matchingNodeIds.has(node.id) && !connectedNodeIds.has(node.id),
     },
-  }));
+  })) as ERTableNode[];
 
   const updatedEdges = edges.map((edge) => ({
     ...edge,
     data: {
-      ...edge.data,
+      ...edge.data!,
       isHighlighted:
         matchingNodeIds.has(edge.source) || matchingNodeIds.has(edge.target),
     },
-  }));
+  })) as ERRelationshipEdge[];
 
   return { nodes: updatedNodes, edges: updatedEdges };
 }
@@ -435,7 +435,7 @@ export function getUniqueConnections(
     { id: number; name: string; type: string; color: string }
   >();
 
-  nodes.forEach((node, index) => {
+  nodes.forEach((node) => {
     if (!connections.has(node.data.connectionId)) {
       connections.set(node.data.connectionId, {
         id: node.data.connectionId,
