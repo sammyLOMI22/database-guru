@@ -115,7 +115,7 @@ export const SchemaComparison: React.FC<SchemaComparisonProps> = ({
   const dbNames = comparison.connections.map((c) => c.name);
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
       {/* Header */}
       <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
@@ -213,7 +213,7 @@ export const SchemaComparison: React.FC<SchemaComparisonProps> = ({
       )}
 
       {/* Table Comparison Grid */}
-      <div className="max-h-[500px] overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {/* Header row with database names */}
         <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-10">
           <div className="grid gap-0" style={{ gridTemplateColumns: `200px repeat(${dbNames.length}, 1fr)` }}>

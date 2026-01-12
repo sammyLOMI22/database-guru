@@ -120,3 +120,29 @@ pre {
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* React Flow container - ensure proper dimensions */
+.react-flow {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.react-flow__renderer {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* React Flow dark mode overrides */
+.react-flow-controls-dark .react-flow__controls-button {
+  background: #374151;
+  border-color: #4b5563;
+  fill: #d1d5db;
+}
+
+.react-flow-controls-dark .react-flow__controls-button:hover {
+  background: #4b5563;
+}
+
+.react-flow-minimap-dark {
+  background: #1f2937;
+}

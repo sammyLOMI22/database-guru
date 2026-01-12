@@ -65,7 +65,7 @@ export default function SchemaPanel() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full">
       {/* Header with View Mode Toggle */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 transition-colors">
         <div className="flex items-center justify-between">
@@ -119,11 +119,11 @@ export default function SchemaPanel() {
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-hidden flex">
+      <div className="flex-1 overflow-hidden flex min-h-0">
         {viewMode === 'diagram' ? (
           <>
             {/* Connection Selector Sidebar for Diagram */}
-            <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
+            <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
               <div className="p-4">
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                   Select Database
@@ -150,7 +150,7 @@ export default function SchemaPanel() {
             </div>
 
             {/* ER Diagram */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 h-full min-h-0">
               {selectedConnectionId ? (
                 <ERDiagram connectionId={selectedConnectionId} />
               ) : (
@@ -163,7 +163,7 @@ export default function SchemaPanel() {
         ) : viewMode === 'explore' ? (
           <>
             {/* Connection Selector Sidebar */}
-            <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
+            <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
               <div className="p-4">
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                   Select Database
@@ -190,7 +190,7 @@ export default function SchemaPanel() {
             </div>
 
             {/* Schema Explorer */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 h-full min-h-0 overflow-y-auto p-6">
               {selectedConnectionId ? (
                 <SchemaExplorer
                   connectionId={selectedConnectionId}
@@ -208,7 +208,7 @@ export default function SchemaPanel() {
         ) : (
           <>
             {/* Comparison Connection Selector */}
-            <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
+            <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
               <div className="p-4">
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Select Databases to Compare
@@ -263,7 +263,7 @@ export default function SchemaPanel() {
             </div>
 
             {/* Schema Comparison */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 h-full min-h-0 overflow-y-auto p-6">
               {compareConnectionIds.length >= 2 ? (
                 <SchemaComparison
                   connectionIds={compareConnectionIds}

@@ -241,7 +241,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full w-full flex flex-col">
       {/* Toolbar */}
       <div
         className={`
@@ -265,9 +265,10 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
         />
       </div>
 
-      {/* Diagram */}
-      <div className="flex-1">
-        <ReactFlow
+      {/* Diagram - React Flow requires explicit dimensions */}
+      <div className="flex-1 w-full relative">
+        <div className="absolute inset-0">
+          <ReactFlow
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
@@ -306,6 +307,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
             className={isDarkMode ? 'react-flow-minimap-dark' : ''}
           />
         </ReactFlow>
+        </div>
       </div>
 
       {/* Legend */}
