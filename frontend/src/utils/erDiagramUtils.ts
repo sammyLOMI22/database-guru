@@ -162,15 +162,13 @@ export function transformSchemaToNodes(
 /**
  * Determine cardinality of a relationship.
  * By default, FK relationships are one-to-many (the FK side is "many").
+ *
+ * TODO: In the future, this could analyze PKs to detect one-to-one relationships
+ * by checking if the FK column is also a PK (indicating 1:1) or if there's a
+ * unique constraint on the FK column.
  */
-function determineCardinality(
-  _sourceTable: SchemaTableInfo,
-  _sourceColumn: string,
-  _targetTable: SchemaTableInfo,
-  _targetColumn: string
-): CardinalityType {
-  // For now, assume all FK relationships are one-to-many
-  // In the future, we could analyze PKs to detect one-to-one
+function determineCardinality(): CardinalityType {
+  // Currently assumes all FK relationships are one-to-many
   return 'one-to-many';
 }
 
@@ -194,13 +192,7 @@ export function transformRelationshipsToEdges(
         return;
       }
 
-      const targetTable = tableMap.get(fk.referred_table.toLowerCase())!;
-      const cardinality = determineCardinality(
-        table,
-        fk.column,
-        targetTable,
-        fk.referred_column
-      );
+      const cardinality = determineCardinality();
 
       const edgeData: RelationshipEdgeData = {
         sourceColumn: fk.column,

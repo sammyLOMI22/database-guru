@@ -11,6 +11,9 @@ import { Key, Link, ChevronDown, ChevronRight, Database } from 'lucide-react';
 import type { TableNodeData } from '../../types/erDiagram';
 import { useDarkMode } from '../../hooks/useDarkMode';
 
+/** Maximum number of columns to display before showing "X more columns" */
+const MAX_VISIBLE_COLUMNS = 10;
+
 interface TableNodeProps extends NodeProps<TableNodeData> {}
 
 const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
@@ -33,8 +36,8 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
   const fkColumns = new Set(foreignKeys.map((fk) => fk.column));
 
   // Limit columns shown when expanded
-  const visibleColumns = isExpanded ? columns.slice(0, 10) : [];
-  const hasMoreColumns = columns.length > 10;
+  const visibleColumns = isExpanded ? columns.slice(0, MAX_VISIBLE_COLUMNS) : [];
+  const hasMoreColumns = columns.length > MAX_VISIBLE_COLUMNS;
 
   // Determine opacity based on search state
   const opacity = isDimmed ? 0.4 : 1;
@@ -162,7 +165,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
                 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}
               `}
             >
-              +{columns.length - 10} more columns
+              +{columns.length - MAX_VISIBLE_COLUMNS} more columns
             </div>
           )}
         </div>

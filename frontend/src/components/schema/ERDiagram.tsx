@@ -14,6 +14,7 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   NodeMouseHandler,
+  ReactFlowInstance,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -64,9 +65,9 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // React Flow state - using any[] for flexibility with our custom types
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  // React Flow state with proper typing
+  const [nodes, setNodes, onNodesChange] = useNodesState<ERTableNode['data']>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<ERRelationshipEdge['data']>([]);
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
@@ -140,11 +141,15 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
       nodePadding: 20,
     });
 
-    setNodes(layoutedNodes as any);
-    setEdges(allEdges as any);
+    // Type assertion needed as React Flow's generic types don't perfectly align with our custom types
+    setNodes(layoutedNodes as unknown as typeof nodes);
+    setEdges(allEdges as unknown as typeof edges);
   }, [schemas, layoutDirection, showInferred, setNodes, setEdges]);
 
   // Apply search filter
+  // NOTE: We intentionally omit nodes/edges from dependencies to avoid infinite loops.
+  // The effect reads current nodes/edges state but should only re-run when searchQuery changes.
+  // This is a controlled violation of exhaustive-deps for performance reasons.
   useEffect(() => {
     if (nodes.length === 0) return;
 
@@ -154,7 +159,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
       searchQuery
     );
 
-    // Only update if search actually changed something
+    // Only update if search actually changed something to prevent unnecessary re-renders
     const hasHighlightChanges = filteredNodes.some(
       (n, i) =>
         n.data?.isHighlighted !== (nodes[i] as ERTableNode)?.data?.isHighlighted ||
@@ -162,15 +167,16 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
     );
 
     if (hasHighlightChanges) {
-      setNodes(filteredNodes as any);
-      setEdges(filteredEdges as any);
+      setNodes(filteredNodes as unknown as typeof nodes);
+      setEdges(filteredEdges as unknown as typeof edges);
     }
-  }, [searchQuery]); // Only depend on searchQuery, not nodes/edges
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   // Handle node click to toggle expansion
   const onNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
-      setNodes((nds) => toggleNodeExpansion(nds as ERTableNode[], node.id) as any);
+      setNodes((nds) => toggleNodeExpansion(nds as ERTableNode[], node.id) as unknown as typeof nds);
     },
     [setNodes]
   );
@@ -182,15 +188,15 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
 
   // Handle expand/collapse all
   const handleExpandAll = useCallback(() => {
-    setNodes((nds) => expandAllNodes(nds as ERTableNode[]) as any);
+    setNodes((nds) => expandAllNodes(nds as ERTableNode[]) as unknown as typeof nds);
   }, [setNodes]);
 
   const handleCollapseAll = useCallback(() => {
-    setNodes((nds) => collapseAllNodes(nds as ERTableNode[]) as any);
+    setNodes((nds) => collapseAllNodes(nds as ERTableNode[]) as unknown as typeof nds);
   }, [setNodes]);
 
   // Handle fit view (exposed via ref if needed)
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
 
   const handleFitView = useCallback(() => {
     if (reactFlowInstance) {
