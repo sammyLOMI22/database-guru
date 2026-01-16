@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 // Utility function tests
@@ -399,7 +399,12 @@ describe('calculateDagreLayout', () => {
     // In some Dagre configurations, LR layout may throw with certain node dimensions
     // Just verify it returns nodes with positions
     try {
-      const layoutedNodes = calculateDagreLayout(nodes, edges, { direction: 'LR' });
+      const layoutedNodes = calculateDagreLayout(nodes, edges, {
+        direction: 'LR',
+        nodeSpacingX: 100,
+        nodeSpacingY: 80,
+        nodePadding: 20,
+      });
       layoutedNodes.forEach(node => {
         expect(node.position).toBeDefined();
       });
@@ -614,6 +619,39 @@ describe('inferRelationships', () => {
 
     expect(inferred).toHaveLength(1);
     expect(inferred[0].target).toBe('1-customers');
+  });
+
+  it('should use target table actual primary key instead of assuming id', () => {
+    // Table with non-standard primary key name
+    const tablesWithCustomPK: SchemaTableInfo[] = [
+      {
+        name: 'employees',
+        columns: [
+          { name: 'employee_number', type: 'varchar', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+          { name: 'name', type: 'varchar', nullable: false, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
+        ],
+        primary_keys: ['employee_number'], // Non-standard PK
+        foreign_keys: [],
+        row_count: 50,
+        indexes: [],
+      },
+      {
+        name: 'timesheets',
+        columns: [
+          { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+          { name: 'employee_id', type: 'varchar', nullable: false, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
+        ],
+        primary_keys: ['id'],
+        foreign_keys: [],
+        row_count: 200,
+        indexes: [],
+      },
+    ];
+
+    const inferred = inferRelationships(tablesWithCustomPK, 1, []);
+
+    expect(inferred).toHaveLength(1);
+    expect(inferred[0].data?.targetColumn).toBe('employee_number'); // Should use actual PK, not 'id'
   });
 });
 

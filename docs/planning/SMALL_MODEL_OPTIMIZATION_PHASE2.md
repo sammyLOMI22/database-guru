@@ -1418,6 +1418,22 @@ Based on PR review feedback, these small improvements can be addressed:
 | Task | File | Priority | Status |
 |------|------|----------|--------|
 | Detect one-to-one relationships | `erDiagramUtils.ts:determineCardinality()` | Low | ✅ Complete |
+| Fix MiniMap `any` type | `ERDiagram.tsx` | Low | ✅ Complete |
+| Add debounced search input | `ERDiagram.tsx` | Low | ✅ Complete |
+| Smarter target column detection | `erDiagramUtils.ts:inferRelationships()` | Low | ✅ Complete |
+
+### ER Diagram Phase 2 (Future)
+
+| Task | File | Priority | Effort |
+|------|------|----------|--------|
+| Many-to-many junction table detection | `erDiagramUtils.ts` | Medium | 1-2 hrs |
+| Configurable layout constants | `erDiagramUtils.ts`, `erDiagram.ts` | Low | 20 min |
+| Type adapter for React Flow generics | `ERDiagram.tsx`, `erDiagramUtils.ts` | Low | 1 hr |
+
+**Details:**
+- **Many-to-many detection**: Detect junction tables (2 FKs as composite PK) and display M:N cardinality
+- **Configurable constants**: Make `NODE_BASE_WIDTH`, `MAX_VISIBLE_COLUMNS` configurable via props
+- **Type adapters**: Remove `as unknown as` casts with proper adapter functions
 
 **Completed January 16, 2026**
 
@@ -1461,10 +1477,15 @@ export function determineCardinality(
 
 ## Changelog
 
-- **2026-01-16**: ✅ Completed Phase 7 ER Diagram Enhancements
+- **2026-01-16**: ✅ Completed Phase 7 ER Diagram Enhancements + Additional Improvements
   - Backend: Multi-database index introspection with `columns` and `unique` fields in `SchemaInspector.get_indexes()`
   - Frontend: `determineCardinality()` now detects 1:1 relationships (FK as PK, unique constraints)
-  - Tests: 7 new cardinality detection tests (43 total ER diagram tests)
+  - Frontend: Fixed MiniMap `any` type → `TableNodeData | undefined`
+  - Frontend: Added debounced search (300ms) via new `useDebouncedValue` hook
+  - Frontend: Smarter inferred relationship target column detection (uses actual PK, not hardcoded 'id')
+  - Tests: 8 new tests (44 total ER diagram tests)
+  - Docs: Created `ER_DIAGRAM_GENERATOR_PR_REVIEW_PHASE_7.md` with all issues resolved
+  - Added ER Diagram Phase 2 future improvements to planning doc
 - **2026-01-12**: Added ER Diagram Enhancements section with `determineCardinality()` improvement plan
 - **2026-01-11**: ✅ Completed Phase 2.2 Prompt Optimization
   - New `PromptOptimizer` module (1,013 lines) in `src/llm/prompt_optimizer.py`

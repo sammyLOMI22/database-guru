@@ -20,7 +20,7 @@ import 'reactflow/dist/style.css';
 
 import { schemaAPI } from '../../services/api';
 import type { SchemaExploreResponse } from '../../types/api';
-import type { ERTableNode, ERRelationshipEdge, LayoutDirection } from '../../types/erDiagram';
+import type { ERTableNode, ERRelationshipEdge, LayoutDirection, TableNodeData } from '../../types/erDiagram';
 import {
   transformSchemaToNodes,
   transformRelationshipsToEdges,
@@ -32,6 +32,7 @@ import {
   collapseAllNodes,
 } from '../../utils/erDiagramUtils';
 import { useDarkMode } from '../../hooks/useDarkMode';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 import TableNode from './TableNode';
 import RelationshipEdge from './RelationshipEdge';
@@ -71,6 +72,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('TB');
   const [showInferred, setShowInferred] = useState(true);
 
@@ -146,17 +148,16 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
     setEdges(allEdges as unknown as typeof edges);
   }, [schemas, layoutDirection, showInferred, setNodes, setEdges]);
 
-  // Apply search filter
+  // Apply search filter with debounced query for better performance on large schemas
   // NOTE: We intentionally omit nodes/edges from dependencies to avoid infinite loops.
-  // The effect reads current nodes/edges state but should only re-run when searchQuery changes.
-  // This is a controlled violation of exhaustive-deps for performance reasons.
+  // The effect reads current nodes/edges state but should only re-run when the debounced query changes.
   useEffect(() => {
     if (nodes.length === 0) return;
 
     const { nodes: filteredNodes, edges: filteredEdges } = applySearchFilter(
       nodes as ERTableNode[],
       edges as ERRelationshipEdge[],
-      searchQuery
+      debouncedSearchQuery
     );
 
     // Only update if search actually changed something to prevent unnecessary re-renders
@@ -171,7 +172,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
       setEdges(filteredEdges as unknown as typeof edges);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery]);
+  }, [debouncedSearchQuery]);
 
   // Handle node click to toggle expansion
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -302,7 +303,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
           />
           <MiniMap
             nodeColor={(node) => {
-              const data = node.data as any;
+              const data = node.data as TableNodeData | undefined;
               return data?.isHighlighted
                 ? '#FBBF24'
                 : data?.isDimmed

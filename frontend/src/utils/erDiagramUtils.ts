@@ -346,9 +346,11 @@ export function applySearchFilter(
 /**
  * Infer relationships from column naming conventions.
  * Patterns:
- * - user_id -> users.id
- * - customer_fk -> customers.id
- * - order_item_id -> order_items.id
+ * - user_id -> users.<primary_key>
+ * - customer_fk -> customers.<primary_key>
+ * - order_item_id -> order_items.<primary_key>
+ *
+ * Uses the target table's actual primary key instead of assuming 'id'.
  */
 export function inferRelationships(
   tables: SchemaTableInfo[],
@@ -407,6 +409,11 @@ export function inferRelationships(
         );
         if (!actualTable) return;
 
+        // Use the target table's actual primary key, fallback to 'id'
+        const targetColumn = actualTable.primary_keys.length > 0
+          ? actualTable.primary_keys[0]
+          : 'id';
+
         const sourceNodeId = `${connectionId}-${table.name}`;
         const targetNodeId = `${connectionId}-${actualTable.name}`;
         const edgeId = `${sourceNodeId}-${column.name}-${targetNodeId}-inferred`;
@@ -418,7 +425,7 @@ export function inferRelationships(
 
         const edgeData: RelationshipEdgeData = {
           sourceColumn: column.name,
-          targetColumn: 'id', // Assume target is 'id'
+          targetColumn,
           cardinality: 'one-to-many',
           source: 'inferred',
           isHighlighted: false,
