@@ -1413,26 +1413,26 @@ Based on PR review feedback, these small improvements can be addressed:
 | Configurable model size registry (DB/config file) | `prompt_optimizer.py:KNOWN_MODEL_SIZES` | Low | 2 days |
 | Lightweight tokenizer integration (tiktoken) | `prompt_optimizer.py:_count_tokens()` | Low | 1 day |
 
-### ER Diagram Enhancements (Phase 7)
+### ER Diagram Enhancements (Phase 7) - ✅ COMPLETE
 
-| Task | File | Priority | Effort |
+| Task | File | Priority | Status |
 |------|------|----------|--------|
-| Detect one-to-one relationships | `erDiagramUtils.ts:determineCardinality()` | Low | 1 day |
+| Detect one-to-one relationships | `erDiagramUtils.ts:determineCardinality()` | Low | ✅ Complete |
 
-**Implementation Notes:**
-The `determineCardinality()` function currently returns `'one-to-many'` for all FK relationships. To properly detect one-to-one relationships:
+**Completed January 16, 2026**
 
-1. Check if the FK column is also a primary key (indicates 1:1)
-2. Check if the FK column has a unique constraint
-3. Analyze bidirectional FK references between tables
+**Implementation:**
+- **Backend**: Updated `SchemaInspector.get_indexes()` to return `columns` and `unique` fields for all database types (PostgreSQL, MySQL, SQLite, DuckDB)
+- **Frontend**: Enhanced `determineCardinality()` function to detect one-to-one relationships by:
+  1. Checking if FK column is also a primary key (indicates 1:1)
+  2. Checking if FK column has a unique constraint (enforces 1:1)
+- **Tests**: Added 7 new tests for cardinality detection (43 total ER diagram tests passing)
 
 ```typescript
-// Future implementation in erDiagramUtils.ts
-function determineCardinality(
+// Implemented in erDiagramUtils.ts
+export function determineCardinality(
   sourceTable: SchemaTableInfo,
-  sourceColumn: string,
-  targetTable: SchemaTableInfo,
-  targetColumn: string
+  sourceColumn: string
 ): CardinalityType {
   // If FK column is also a PK, it's likely one-to-one
   if (sourceTable.primary_keys.includes(sourceColumn)) {
@@ -1441,7 +1441,7 @@ function determineCardinality(
 
   // If FK column has unique constraint, it's one-to-one
   const hasUniqueConstraint = sourceTable.indexes?.some(
-    idx => idx.columns.includes(sourceColumn) && idx.unique
+    idx => idx.unique && idx.columns?.includes(sourceColumn)
   );
   if (hasUniqueConstraint) {
     return 'one-to-one';
@@ -1452,14 +1452,19 @@ function determineCardinality(
 }
 ```
 
-**Prerequisites:**
-- Backend must expose unique constraint info in `SchemaTableInfo`
-- May require schema introspection enhancement in `schema_inspector.py`
+**Files Changed:**
+- `src/core/schema_inspector.py` - Multi-database index introspection with `columns` and `unique` fields
+- `frontend/src/utils/erDiagramUtils.ts` - `determineCardinality()` function with constraint detection
+- `frontend/tests/ERDiagram.test.tsx` - 7 new cardinality detection tests
 
 ---
 
 ## Changelog
 
+- **2026-01-16**: ✅ Completed Phase 7 ER Diagram Enhancements
+  - Backend: Multi-database index introspection with `columns` and `unique` fields in `SchemaInspector.get_indexes()`
+  - Frontend: `determineCardinality()` now detects 1:1 relationships (FK as PK, unique constraints)
+  - Tests: 7 new cardinality detection tests (43 total ER diagram tests)
 - **2026-01-12**: Added ER Diagram Enhancements section with `determineCardinality()` improvement plan
 - **2026-01-11**: ✅ Completed Phase 2.2 Prompt Optimization
   - New `PromptOptimizer` module (1,013 lines) in `src/llm/prompt_optimizer.py`

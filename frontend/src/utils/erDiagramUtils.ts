@@ -160,20 +160,47 @@ export function transformSchemaToNodes(
 }
 
 /**
- * Determine cardinality of a relationship.
- * By default, FK relationships are one-to-many (the FK side is "many").
+ * Determine cardinality of a relationship based on schema constraints.
  *
- * TODO: In the future, this could analyze PKs to detect one-to-one relationships
- * by checking if the FK column is also a PK (indicating 1:1) or if there's a
- * unique constraint on the FK column.
+ * One-to-one relationships are detected when:
+ * 1. The FK column is also a primary key (e.g., user_profile.user_id is both FK and PK)
+ * 2. The FK column has a unique constraint (enforces 1:1 at the database level)
+ *
+ * Otherwise, the relationship is considered one-to-many (default for FK relationships).
+ *
+ * @param sourceTable - The table containing the foreign key
+ * @param sourceColumn - The FK column name
+ * @returns 'one-to-one' if unique constraint exists, 'one-to-many' otherwise
  */
-function determineCardinality(): CardinalityType {
-  // Currently assumes all FK relationships are one-to-many
+export function determineCardinality(
+  sourceTable: SchemaTableInfo,
+  sourceColumn: string
+): CardinalityType {
+  // Check 1: Is the FK column also a primary key?
+  // This pattern is common for 1:1 relationships (e.g., user_profile extends users)
+  if (sourceTable.primary_keys.includes(sourceColumn)) {
+    return 'one-to-one';
+  }
+
+  // Check 2: Does the FK column have a unique constraint?
+  // Unique constraints on FK columns enforce one-to-one relationships
+  const hasUniqueConstraint = sourceTable.indexes?.some(
+    (idx) => idx.unique && idx.columns?.includes(sourceColumn)
+  );
+  if (hasUniqueConstraint) {
+    return 'one-to-one';
+  }
+
+  // Default: One-to-many (standard FK relationship)
   return 'one-to-many';
 }
 
 /**
  * Transform foreign keys to React Flow edges.
+ *
+ * Analyzes each FK relationship and determines cardinality based on:
+ * - Whether the FK column is also a PK (indicates 1:1)
+ * - Whether the FK column has a unique constraint (enforces 1:1)
  */
 export function transformRelationshipsToEdges(
   tables: SchemaTableInfo[],
@@ -192,7 +219,8 @@ export function transformRelationshipsToEdges(
         return;
       }
 
-      const cardinality = determineCardinality();
+      // Determine cardinality based on constraints
+      const cardinality = determineCardinality(table, fk.column);
 
       const edgeData: RelationshipEdgeData = {
         sourceColumn: fk.column,

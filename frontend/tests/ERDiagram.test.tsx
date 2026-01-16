@@ -18,6 +18,7 @@ import {
   toggleNodeExpansion,
   expandAllNodes,
   collapseAllNodes,
+  determineCardinality,
 } from '../src/utils/erDiagramUtils';
 import type { SchemaExploreResponse, SchemaTableInfo } from '../src/types/api';
 import type { ERTableNode, ERRelationshipEdge } from '../src/types/erDiagram';
@@ -34,20 +35,21 @@ const mockSchemaResponse: SchemaExploreResponse = {
     {
       name: 'users',
       columns: [
-        { name: 'id', type: 'integer', nullable: false },
-        { name: 'name', type: 'varchar', nullable: false },
-        { name: 'email', type: 'varchar', nullable: true },
+        { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+        { name: 'name', type: 'varchar', nullable: false, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
+        { name: 'email', type: 'varchar', nullable: true, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
       ],
       primary_keys: ['id'],
       foreign_keys: [],
       row_count: 100,
+      indexes: [],
     },
     {
       name: 'orders',
       columns: [
-        { name: 'id', type: 'integer', nullable: false },
-        { name: 'user_id', type: 'integer', nullable: false },
-        { name: 'total', type: 'decimal', nullable: false },
+        { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+        { name: 'user_id', type: 'integer', nullable: false, primary_key: false, foreign_key: 'users.id', sample_values: [], semantic_type: null },
+        { name: 'total', type: 'decimal', nullable: false, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
       ],
       primary_keys: ['id'],
       foreign_keys: [
@@ -58,19 +60,25 @@ const mockSchemaResponse: SchemaExploreResponse = {
         },
       ],
       row_count: 500,
+      indexes: [],
     },
     {
       name: 'products',
       columns: [
-        { name: 'id', type: 'integer', nullable: false },
-        { name: 'name', type: 'varchar', nullable: false },
-        { name: 'price', type: 'decimal', nullable: false },
+        { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+        { name: 'name', type: 'varchar', nullable: false, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
+        { name: 'price', type: 'decimal', nullable: false, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
       ],
       primary_keys: ['id'],
       foreign_keys: [],
       row_count: 50,
+      indexes: [],
     },
   ],
+  table_count: 3,
+  total_columns: 9,
+  last_updated: null,
+  cached: false,
 };
 
 // =============================================================================
@@ -181,7 +189,7 @@ describe('transformRelationshipsToEdges', () => {
     const tablesWithMissingRef: SchemaTableInfo[] = [
       {
         name: 'orphan',
-        columns: [{ name: 'id', type: 'integer', nullable: false }],
+        columns: [{ name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null }],
         primary_keys: ['id'],
         foreign_keys: [
           {
@@ -191,11 +199,156 @@ describe('transformRelationshipsToEdges', () => {
           },
         ],
         row_count: 10,
+        indexes: [],
       },
     ];
 
     const edges = transformRelationshipsToEdges(tablesWithMissingRef, 1);
     expect(edges).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// CARDINALITY DETECTION TESTS (Phase 7 Enhancement)
+// =============================================================================
+
+describe('determineCardinality', () => {
+  it('should return one-to-many for standard FK relationships', () => {
+    // Standard FK: orders.user_id -> users.id (not a PK, no unique constraint)
+    const ordersTable: SchemaTableInfo = {
+      name: 'orders',
+      columns: [
+        { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+        { name: 'user_id', type: 'integer', nullable: false, primary_key: false, foreign_key: 'users.id', sample_values: [], semantic_type: null },
+      ],
+      primary_keys: ['id'],
+      foreign_keys: [{ column: 'user_id', referred_table: 'users', referred_column: 'id' }],
+      row_count: 100,
+      indexes: [], // No unique index on user_id
+    };
+
+    const cardinality = determineCardinality(ordersTable, 'user_id');
+    expect(cardinality).toBe('one-to-many');
+  });
+
+  it('should return one-to-one when FK column is also a primary key', () => {
+    // Pattern: user_profile extends users (user_profile.user_id is both FK and PK)
+    const userProfileTable: SchemaTableInfo = {
+      name: 'user_profile',
+      columns: [
+        { name: 'user_id', type: 'integer', nullable: false, primary_key: true, foreign_key: 'users.id', sample_values: [], semantic_type: null },
+        { name: 'bio', type: 'text', nullable: true, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
+      ],
+      primary_keys: ['user_id'], // FK is also PK
+      foreign_keys: [{ column: 'user_id', referred_table: 'users', referred_column: 'id' }],
+      row_count: 50,
+      indexes: [],
+    };
+
+    const cardinality = determineCardinality(userProfileTable, 'user_id');
+    expect(cardinality).toBe('one-to-one');
+  });
+
+  it('should return one-to-one when FK column has unique constraint', () => {
+    // Pattern: employees.social_security_number has unique index
+    const employeesTable: SchemaTableInfo = {
+      name: 'employees',
+      columns: [
+        { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+        { name: 'person_id', type: 'integer', nullable: false, primary_key: false, foreign_key: 'persons.id', sample_values: [], semantic_type: null },
+      ],
+      primary_keys: ['id'],
+      foreign_keys: [{ column: 'person_id', referred_table: 'persons', referred_column: 'id' }],
+      row_count: 100,
+      indexes: [
+        { name: 'idx_person_unique', columns: ['person_id'], unique: true }, // Unique constraint on FK
+      ],
+    };
+
+    const cardinality = determineCardinality(employeesTable, 'person_id');
+    expect(cardinality).toBe('one-to-one');
+  });
+
+  it('should return one-to-many when FK column has non-unique index', () => {
+    // Pattern: orders.customer_id has index but not unique
+    const ordersTable: SchemaTableInfo = {
+      name: 'orders',
+      columns: [
+        { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+        { name: 'customer_id', type: 'integer', nullable: false, primary_key: false, foreign_key: 'customers.id', sample_values: [], semantic_type: null },
+      ],
+      primary_keys: ['id'],
+      foreign_keys: [{ column: 'customer_id', referred_table: 'customers', referred_column: 'id' }],
+      row_count: 100,
+      indexes: [
+        { name: 'idx_customer', columns: ['customer_id'], unique: false }, // Non-unique index
+      ],
+    };
+
+    const cardinality = determineCardinality(ordersTable, 'customer_id');
+    expect(cardinality).toBe('one-to-many');
+  });
+
+  it('should handle tables with no indexes gracefully', () => {
+    const simpleTable: SchemaTableInfo = {
+      name: 'simple',
+      columns: [
+        { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+        { name: 'ref_id', type: 'integer', nullable: false, primary_key: false, foreign_key: 'other.id', sample_values: [], semantic_type: null },
+      ],
+      primary_keys: ['id'],
+      foreign_keys: [{ column: 'ref_id', referred_table: 'other', referred_column: 'id' }],
+      row_count: 10,
+      indexes: undefined as any, // No indexes array
+    };
+
+    const cardinality = determineCardinality(simpleTable, 'ref_id');
+    expect(cardinality).toBe('one-to-many');
+  });
+});
+
+describe('transformRelationshipsToEdges cardinality detection', () => {
+  it('should detect one-to-one relationships in edge data', () => {
+    // Create tables where user_profile has a 1:1 relationship with users
+    const tablesWithOneToOne: SchemaTableInfo[] = [
+      {
+        name: 'users',
+        columns: [
+          { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+        ],
+        primary_keys: ['id'],
+        foreign_keys: [],
+        row_count: 100,
+        indexes: [],
+      },
+      {
+        name: 'user_profile',
+        columns: [
+          { name: 'user_id', type: 'integer', nullable: false, primary_key: true, foreign_key: 'users.id', sample_values: [], semantic_type: null },
+          { name: 'bio', type: 'text', nullable: true, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
+        ],
+        primary_keys: ['user_id'], // FK column is also PK
+        foreign_keys: [{ column: 'user_id', referred_table: 'users', referred_column: 'id' }],
+        row_count: 100,
+        indexes: [],
+      },
+    ];
+
+    const edges = transformRelationshipsToEdges(tablesWithOneToOne, 1);
+
+    expect(edges).toHaveLength(1);
+    expect(edges[0].data?.cardinality).toBe('one-to-one');
+  });
+
+  it('should detect one-to-many relationships in edge data', () => {
+    // Standard orders -> users relationship (many orders per user)
+    const edges = transformRelationshipsToEdges(
+      mockSchemaResponse.tables,
+      mockSchemaResponse.connection_id
+    );
+
+    expect(edges).toHaveLength(1);
+    expect(edges[0].data?.cardinality).toBe('one-to-many');
   });
 });
 
@@ -347,20 +500,22 @@ describe('inferRelationships', () => {
     const tablesWithInference: SchemaTableInfo[] = [
       {
         name: 'users',  // Plural form matches 'user_id' -> 'user' + 's'
-        columns: [{ name: 'id', type: 'integer', nullable: false }],
+        columns: [{ name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null }],
         primary_keys: ['id'],
         foreign_keys: [],
         row_count: 10,
+        indexes: [],
       },
       {
         name: 'posts',
         columns: [
-          { name: 'id', type: 'integer', nullable: false },
-          { name: 'user_id', type: 'integer', nullable: false },
+          { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+          { name: 'user_id', type: 'integer', nullable: false, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
         ],
         primary_keys: ['id'],
         foreign_keys: [], // No explicit FK
         row_count: 100,
+        indexes: [],
       },
     ];
 
@@ -376,20 +531,22 @@ describe('inferRelationships', () => {
     const tablesWithInference: SchemaTableInfo[] = [
       {
         name: 'users',
-        columns: [{ name: 'id', type: 'integer', nullable: false }],
+        columns: [{ name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null }],
         primary_keys: ['id'],
         foreign_keys: [],
         row_count: 10,
+        indexes: [],
       },
       {
         name: 'posts',
         columns: [
-          { name: 'id', type: 'integer', nullable: false },
-          { name: 'user_id', type: 'integer', nullable: false },
+          { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+          { name: 'user_id', type: 'integer', nullable: false, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
         ],
         primary_keys: ['id'],
         foreign_keys: [],
         row_count: 100,
+        indexes: [],
       },
     ];
 
@@ -434,20 +591,22 @@ describe('inferRelationships', () => {
     const tablesWithPlurals: SchemaTableInfo[] = [
       {
         name: 'customers',
-        columns: [{ name: 'id', type: 'integer', nullable: false }],
+        columns: [{ name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null }],
         primary_keys: ['id'],
         foreign_keys: [],
         row_count: 10,
+        indexes: [],
       },
       {
         name: 'invoices',
         columns: [
-          { name: 'id', type: 'integer', nullable: false },
-          { name: 'customer_id', type: 'integer', nullable: false },
+          { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+          { name: 'customer_id', type: 'integer', nullable: false, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
         ],
         primary_keys: ['id'],
         foreign_keys: [],
         row_count: 100,
+        indexes: [],
       },
     ];
 
