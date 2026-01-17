@@ -453,10 +453,55 @@ if not tables_valid:
 
 ### 4. Execution & Verification
 
+#### Query Compiler (`src/core/query_compiler.py`) (NEW - January 2026)
+Normalizes SQL and caches execution templates for performance optimization:
+
+**How it works:**
+1. Uses `sqlparse` for robust SQL tokenization (not regex)
+2. Replaces literals with named parameters (`:p0`, `:p1`, etc.)
+3. Caches normalized templates in thread-safe LRU cache (1000 entries)
+4. Cache hit = reuse template with new parameter values
+
+**Example:**
+```
+Query 1: SELECT * FROM users WHERE id = 123 AND name = 'Alice'
+Query 2: SELECT * FROM users WHERE id = 456 AND name = 'Bob'
+
+Both normalize to: SELECT * FROM users WHERE id = :p0 AND name = :p1
+→ Cache hit on second query, faster execution plan reuse
+```
+
+**Tokenization Handles:**
+| Input | Output | Notes |
+|-------|--------|-------|
+| `WHERE id = 123` | `WHERE id = :p0` | Integer literals |
+| `WHERE id = -100` | `WHERE id = :p0` | Negative numbers (p0 = -100) |
+| `WHERE name = 'O''Reilly'` | `WHERE name = :p0` | Escaped quotes (p0 = "O'Reilly") |
+| `WHERE x = 1e10` | `WHERE x = :p0` | Scientific notation |
+| `FROM "Order 1"` | `FROM "Order 1"` | Double-quoted identifiers preserved |
+| `WHERE tags @> ['a','b']` | `WHERE tags @> ['a','b']` | Array literals preserved |
+| `-- comment with 123` | (stripped) | Comments removed before processing |
+
+**Key Features:**
+- **sqlparse-based**: Production-grade SQL parser, not fragile regex
+- **Thread-safe singleton**: Shared cache across all requests
+- **LRU eviction**: Automatic cleanup when cache full
+- **Stats tracking**: Hit rate, execution times, eviction count
+- **Integrated with SQLExecutor**: Transparent to callers
+
+**Stats API:**
+```python
+GET /api/query/compiled-stats
+→ {"cache_size": 150, "hits": 1234, "misses": 56, "hit_rate": 0.956}
+```
+
+**Future Enhancement:** Redis persistence for cross-process cache sharing (see FUTURE_PLANS.md)
+
 #### SQL Executor (`src/core/executor.py`)
 - 30-second timeout protection
 - 1000 row limit (configurable)
 - Handles both async and sync database sessions
+- **Integrates with QueryCompiler** for SELECT query optimization
 
 #### Result Verification Agent (`src/llm/result_verification_agent.py`)
 Checks for logical issues:
@@ -658,6 +703,8 @@ System: "This database doesn't have location data. Did you mean:
 | Location Mapper | `src/core/location_mapper.py` | `enhance_query_with_location_hints()` |
 | Prompts | `src/llm/prompts.py` | `SYSTEM_PROMPT`, `SQL_GENERATION_TEMPLATE` |
 | Result Narrator | `src/llm/result_narrator.py` | `generate_narrative()` |
+| SQL Executor | `src/core/executor.py` | `execute_query()` |
+| **Query Compiler (NEW)** | `src/core/query_compiler.py` | `normalize_query()`, `get_compiled_query()`, `compile_query()` |
 | **Model Router (NEW)** | `src/llm/model_router.py` | `get_model_for_task()`, `get_timeout_for_task()` |
 | **Template Engine (NEW)** | `src/llm/query_templates.py` | `try_match()`, `TemplateMatch` |
 | **Dialect Registry (NEW - Jan 10)** | `src/llm/dialect_registry.py` | `DatabaseDialect`, `DialectRules`, `build_dialect_context()` |
@@ -683,6 +730,7 @@ The SQL generation pipeline has evolved to include:
 8. **Per-task model routing (NEW - Jan 2026)** - Specialized models for different tasks
 9. **Multi-DB pre-flight validation (NEW - Jan 2026)** - Assess query feasibility per database before execution
 10. **Dialect-aware SQL generation (NEW - Jan 10, 2026)** - Database-specific syntax for dates, booleans, strings
+11. **Query compilation & caching (NEW - Jan 2026)** - sqlparse-based SQL normalization with LRU template caching
 
 Future improvements focus on:
 - ~~Pre-generation intent classification~~ ✅ Implemented via TemplateEngine

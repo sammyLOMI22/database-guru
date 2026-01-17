@@ -7,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, DBAPIError, OperationalError
+from src.core.query_compiler import QueryCompiler
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,11 @@ class SQLExecutor:
         self.max_rows = max_rows
         self.timeout_seconds = timeout_seconds
         self.allow_write = allow_write
+        self.compiler = QueryCompiler()
+
+    def get_compiler_stats(self) -> Dict[str, Any]:
+        """Get statistics from the query compiler"""
+        return self.compiler.get_stats()
 
     async def execute_query(
         self,
@@ -62,8 +68,31 @@ class SQLExecutor:
                 - execution_time_ms: Execution time
                 - truncated: Whether results were truncated
                 - error: Error message if failed
+                - compiled: Whether query was compiled/cached
         """
         start_time = datetime.utcnow()
+
+        # Try to use compiled query if no params provided and it's a SELECT
+        compiled_query = None
+        execution_params = params
+        final_sql = sql
+
+        # Only attempt compilation for SELECT queries without explicit params
+        # (explicit params mean the caller is already handling parameterization)
+        if params is None and sql.strip().upper().startswith("SELECT"):
+            compiled_query, extracted_params = self.compiler.get_compiled_query(sql)
+
+            if compiled_query:
+                # Cache hit! Use template and extracted params
+                final_sql = compiled_query.sql_template
+                execution_params = extracted_params
+            else:
+                # Cache miss - compile it
+                compiled_query, extracted_params = self.compiler.compile_query(sql)
+
+                # Use the template for execution to cache the plan at DB level
+                final_sql = compiled_query.sql_template
+                execution_params = extracted_params
 
         try:
             # Check if this is a sync session (e.g., DuckDB)
@@ -73,18 +102,22 @@ class SQLExecutor:
                     None,
                     self._execute_with_sync_session,
                     session,
-                    sql,
-                    params
+                    final_sql,
+                    execution_params
                 )
             else:
                 # Execute with timeout for async sessions
                 result = await asyncio.wait_for(
-                    self._execute_with_session(session, sql, params),
+                    self._execute_with_session(session, final_sql, execution_params),
                     timeout=self.timeout_seconds
                 )
 
             end_time = datetime.utcnow()
             execution_time_ms = (end_time - start_time).total_seconds() * 1000
+
+            # Update compiler stats if applicable
+            if compiled_query:
+                self.compiler.update_stats(compiled_query, execution_time_ms)
 
             return {
                 "success": True,
@@ -94,6 +127,7 @@ class SQLExecutor:
                 "execution_time_ms": round(execution_time_ms, 2),
                 "truncated": result["truncated"],
                 "error": None,
+                "compiled": compiled_query is not None
             }
 
         except asyncio.TimeoutError:
@@ -107,6 +141,7 @@ class SQLExecutor:
                 "execution_time_ms": execution_time * 1000,
                 "truncated": False,
                 "error": f"Query timeout after {self.timeout_seconds} seconds",
+                "compiled": compiled_query is not None,
             }
 
         except OperationalError as e:
@@ -119,6 +154,7 @@ class SQLExecutor:
                 "execution_time_ms": 0,
                 "truncated": False,
                 "error": f"Database error: {str(e)}",
+                "compiled": compiled_query is not None,
             }
 
         except DBAPIError as e:
@@ -131,6 +167,7 @@ class SQLExecutor:
                 "execution_time_ms": 0,
                 "truncated": False,
                 "error": f"SQL error: {str(e.orig) if hasattr(e, 'orig') else str(e)}",
+                "compiled": compiled_query is not None,
             }
 
         except SQLAlchemyError as e:
@@ -143,6 +180,7 @@ class SQLExecutor:
                 "execution_time_ms": 0,
                 "truncated": False,
                 "error": f"Database error: {str(e)}",
+                "compiled": compiled_query is not None,
             }
 
         except Exception as e:
@@ -155,6 +193,7 @@ class SQLExecutor:
                 "execution_time_ms": 0,
                 "truncated": False,
                 "error": f"Execution error: {str(e)}",
+                "compiled": compiled_query is not None,
             }
 
     def _execute_with_sync_session(

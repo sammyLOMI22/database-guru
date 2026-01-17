@@ -838,6 +838,25 @@ async def get_query_by_id(
         )
 
 
+@router.get("/compiled-stats", response_model=dict)
+async def get_compiled_query_stats():
+    """
+    Get statistics for the Query Compiler (prepared statements)
+    """
+    try:
+        # Access the singleton QueryCompiler
+        # Note: In a larger app, this would be injected via dependency
+        from src.core.query_compiler import QueryCompiler
+        compiler = QueryCompiler()
+        return compiler.get_stats()
+    except Exception as e:
+        logger.error(f"Error fetching compiler stats: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch compiler stats: {str(e)}"
+        )
+
+
 @router.get("/stats", response_model=StatsResponse)
 async def get_stats(
     db: AsyncSession = Depends(get_db),
