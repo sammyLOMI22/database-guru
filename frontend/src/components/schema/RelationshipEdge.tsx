@@ -10,6 +10,7 @@ import {
   EdgeProps,
   getBezierPath,
   EdgeLabelRenderer,
+  Position,
 } from 'reactflow';
 import type { RelationshipEdgeData } from '../../types/erDiagram';
 
@@ -71,8 +72,6 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
   // Determine animation
   const edgeClassName = (selected || isHighlighted) ? 'edge-animate' : '';
 
-  // Cardinality marker size
-  const markerSize = 12;
 
   return (
     <>
@@ -105,36 +104,36 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
 
       {/* Cardinality markers */}
       <EdgeLabelRenderer>
-        {/* Source side marker */}
+        {/* Source side marker (The "Many" or "One" side with the FK) */}
         <div
           style={{
             position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${sourceX}px, ${sourceY + 18}px)`,
+            transform: `translate(-50%, -50%) translate(${sourceX}px, ${sourceY + (sourcePosition === Position.Bottom ? 22 : -22)}px)`,
             pointerEvents: 'none',
           }}
-          className="transition-opacity duration-300"
+          className="transition-all duration-300 z-10"
         >
-          {cardinality === 'one-to-many' || cardinality === 'many-to-many' ? (
-            <ManyMarker size={markerSize} color={strokeColor} />
-          ) : (
-            <OneMarker size={markerSize} color={strokeColor} />
-          )}
+          <CardinalityBadge
+            type={cardinality === 'one-to-many' || cardinality === 'many-to-many' ? 'many' : 'one'}
+            isDarkMode={isDarkMode}
+            isHighlighted={!!(isHighlighted || selected)}
+          />
         </div>
 
-        {/* Target side marker */}
+        {/* Target side marker (The "One" side with the PK) */}
         <div
           style={{
             position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${targetX}px, ${targetY - 18}px)`,
+            transform: `translate(-50%, -50%) translate(${targetX}px, ${targetY + (targetPosition === Position.Top ? -22 : 22)}px)`,
             pointerEvents: 'none',
           }}
-          className="transition-opacity duration-300"
+          className="transition-all duration-300 z-10"
         >
-          {cardinality === 'many-to-many' ? (
-            <ManyMarker size={markerSize} color={strokeColor} />
-          ) : (
-            <OneMarker size={markerSize} color={strokeColor} />
-          )}
+          <CardinalityBadge
+            type={cardinality === 'many-to-many' ? 'many' : 'one'}
+            isDarkMode={isDarkMode}
+            isHighlighted={!!(isHighlighted || selected)}
+          />
         </div>
 
         {/* Relationship label (shown on hover/select) */}
@@ -147,8 +146,8 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
             }}
             className={`
               px-3 py-1.5 rounded-xl text-[10px] font-extrabold tracking-wider uppercase
-              ${isDarkMode ? 'glass-node text-white border-blue-500/50' : 'bg-white text-gray-800 shadow-2xl border-blue-200'}
-              animate-fadeIn flex items-center gap-2
+              ${isDarkMode ? 'glass-node text-white border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.2)]' : 'bg-white text-gray-800 shadow-2xl border-blue-200'}
+              animate-fadeIn flex items-center gap-2 z-20
             `}
           >
             <span className="text-blue-500">{sourceColumn}</span>
@@ -167,23 +166,27 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
 };
 
 /**
- * "One" side cardinality marker.
+ * Cardinality Badge component for better visibility.
  */
-const OneMarker: React.FC<{ size: number; color: string }> = ({ size, color }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="drop-shadow-sm">
-    <circle cx="12" cy="12" r="4" fill={color} />
-    <circle cx="12" cy="12" r="8" stroke={color} strokeWidth="2" strokeOpacity="0.3" />
-  </svg>
-);
+const CardinalityBadge: React.FC<{
+  type: 'one' | 'many';
+  isDarkMode: boolean;
+  isHighlighted: boolean;
+}> = ({ type, isDarkMode, isHighlighted }) => {
+  const baseClasses = `
+    flex items-center justify-center w-6 h-6 rounded-full border text-[10px] font-black
+    transition-all duration-300 shadow-sm
+  `;
 
-/**
- * "Many" side cardinality marker.
- */
-const ManyMarker: React.FC<{ size: number; color: string }> = ({ size, color }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="drop-shadow-sm">
-    <path d="M12 4L12 20M4 12L20 12" stroke={color} strokeWidth="3" strokeLinecap="round" />
-    <path d="M7 7L17 17M17 7L7 17" stroke={color} strokeWidth="3" strokeLinecap="round" />
-  </svg>
-);
+  const themeClasses = isDarkMode
+    ? `${isHighlighted ? 'bg-blue-500 text-white border-blue-400 glow-primary' : 'bg-gray-800/90 text-blue-300 border-gray-700 backdrop-blur-sm'}`
+    : `${isHighlighted ? 'bg-blue-600 text-white border-blue-500 shadow-lg' : 'bg-white/90 text-blue-600 border-blue-100 backdrop-blur-sm'}`;
+
+  return (
+    <div className={`${baseClasses} ${themeClasses}`}>
+      {type === 'one' ? '1' : 'N'}
+    </div>
+  );
+};
 
 export default memo(RelationshipEdge);
