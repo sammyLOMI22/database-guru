@@ -147,8 +147,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
       direction: layoutDirection,
     });
 
-    // Type assertion needed as React Flow's generic types don't perfectly align with our custom types
-    // Apply current search filter to the new nodes/edges
+    // Apply current search filter to maintain search state when switching diagrams
     const { nodes: filteredNodes, edges: filteredEdges } = applySearchFilter(
       layoutedNodes as ERTableNode[],
       allEdges as ERRelationshipEdge[],
@@ -175,10 +174,8 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
     );
   }, [isDarkMode, setNodes, setEdges]);
 
-  // Apply search filter with debounced query for better performance on large schemas
-  // NOTE: We intentionally omit nodes/edges from dependencies to avoid infinite loops.
-  // The effect reads current nodes/edges state but should only re-run when the debounced query changes
-  // or when the nodes/edges themselves are initially loaded.
+  // Apply search filter when query changes (live filtering as user types)
+  // Note: Schema effect also applies filter to handle diagram switches
   useEffect(() => {
     if (nodes.length === 0) return;
 
@@ -188,7 +185,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
       debouncedSearchQuery
     );
 
-    // Only update if search actually changed something to prevent unnecessary re-renders
+    // Only update if highlighting actually changed to prevent unnecessary re-renders
     const hasHighlightChanges = filteredNodes.some(
       (n, i) =>
         n.data?.isHighlighted !== (nodes[i] as ERTableNode)?.data?.isHighlighted ||
@@ -199,7 +196,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
       setNodes(filteredNodes as unknown as typeof nodes);
       setEdges(filteredEdges as unknown as typeof edges);
 
-      // Add Fly-to behavior: if search query exists and we have matching nodes, zoom to the first matching node
+      // Fly-to behavior: zoom to highlighted nodes when searching
       if (debouncedSearchQuery && filteredNodes.length > 0) {
         const highlightedNodes = filteredNodes.filter(n => n.data?.isHighlighted);
         if (highlightedNodes.length > 0) {

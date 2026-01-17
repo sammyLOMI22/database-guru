@@ -58,13 +58,14 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
   const strokeDasharray = isInferred ? '5,5' : undefined;
 
   // Determine color based on state
+  // Use consistent solid colors for both light and dark modes
   const strokeColor = isHighlighted
     ? '#FBBF24'
     : selected
       ? '#3B82F6'
       : isDarkMode
-        ? 'rgba(107, 114, 128, 0.4)'
-        : '#9CA3AF';
+        ? '#4B5563' // gray-600 for dark mode (visible but not overwhelming)
+        : '#9CA3AF'; // gray-400 for light mode
 
   const strokeWidth = selected || isHighlighted ? 2.5 : 1.5;
 

@@ -33,7 +33,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
     isExpanded,
     isHighlighted,
     isDimmed,
-    isDarkMode,
+    isDarkMode = false,
   } = data;
 
   // Create a set of FK column names for quick lookup
@@ -216,10 +216,10 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
  * Format column type for display (shorten long types).
  */
 function formatColumnType(type: string): string {
-  const lower = type.toLowerCase();
+  const lower = type.toLowerCase().trim();
 
-  // Handle common type abbreviations
-  const shortTypes: Record<string, string> = {
+  // Handle exact matches and common type abbreviations first
+  const exactTypes: Record<string, string> = {
     'character varying': 'varchar',
     'timestamp without time zone': 'timestamp',
     'timestamp with time zone': 'timestamptz',
@@ -227,34 +227,47 @@ function formatColumnType(type: string): string {
     'bigint': 'bigint',
     'integer': 'int',
     'smallint': 'smallint',
+    'tinyint': 'tinyint',
+    'mediumint': 'int',
     'boolean': 'bool',
+    'interval': 'interval',
+    'point': 'point',
+    'text': 'text',
+    'clob': 'text',
   };
 
-  for (const [long, short] of Object.entries(shortTypes)) {
+  // Check exact matches first
+  if (exactTypes[lower]) {
+    return exactTypes[lower];
+  }
+
+  // Check prefix matches for compound types
+  for (const [long, short] of Object.entries(exactTypes)) {
     if (lower.startsWith(long)) {
       return type.toLowerCase().replace(long, short);
     }
   }
 
-  // Handle generic type patterns (use word boundaries to avoid false positives)
-  // Match integer types but not words like "point" or "interval" that contain "int"
-  if (/\bint\b/i.test(lower) || lower === 'tinyint' || lower === 'mediumint') {
-    // Stricter check: if it's "interval" or "point", don't map to "int"
-    if (lower === 'interval' || lower === 'point') return lower;
+  // Handle integer types explicitly (int, int4, int8, etc.)
+  // Exclude 'interval' and 'point' which contain 'int' substring
+  if (/^int\d*$/i.test(lower)) {
     return 'int';
   }
 
-  // Match text/char types
-  if (/\b(var)?char\b/i.test(lower) || lower === 'text' || lower === 'clob') return 'text';
+  // Match text/char types (varchar, char, nvarchar, nchar)
+  if (/^n?(var)?char/i.test(lower)) return 'text';
+
   // Match date/time types
-  if (/\b(date|time)\b/i.test(lower)) {
-    if (lower === 'timestamp' || lower === 'timestamptz') return 'date';
-    return lower === 'time' ? 'time' : 'date';
-  }
+  if (/^timestamp/i.test(lower)) return 'date';
+  if (/^date$/i.test(lower)) return 'date';
+  if (/^time$/i.test(lower)) return 'time';
+  if (/^datetime/i.test(lower)) return 'date';
+
   // Match boolean types
-  if (/\bbool(ean)?\b/i.test(lower)) return 'bool';
+  if (/^bool(ean)?$/i.test(lower)) return 'bool';
+
   // Match numeric types
-  if (/\b(float|double|decimal|numeric|real)\b/i.test(lower)) return 'num';
+  if (/^(float|double|decimal|numeric|real|money)/i.test(lower)) return 'num';
 
   // Truncate very long types
   if (type.length > 10) {
