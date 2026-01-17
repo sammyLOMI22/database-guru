@@ -34,6 +34,7 @@ import {
 import { useDarkMode } from '../../hooks/useDarkMode';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { DEFAULT_LAYOUT_OPTIONS } from '../../types/erDiagram';
+import ErrorBoundary from '../common/ErrorBoundary';
 
 import TableNode from './TableNode';
 import RelationshipEdge from './RelationshipEdge';
@@ -147,9 +148,16 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
     });
 
     // Type assertion needed as React Flow's generic types don't perfectly align with our custom types
-    setNodes(layoutedNodes as unknown as typeof nodes);
-    setEdges(allEdges as unknown as typeof edges);
-  }, [schemas, layoutDirection, showInferred, setNodes, setEdges, isDarkMode]);
+    // Apply current search filter to the new nodes/edges
+    const { nodes: filteredNodes, edges: filteredEdges } = applySearchFilter(
+      layoutedNodes as ERTableNode[],
+      allEdges as ERRelationshipEdge[],
+      debouncedSearchQuery
+    );
+
+    setNodes(filteredNodes as unknown as typeof nodes);
+    setEdges(filteredEdges as unknown as typeof edges);
+  }, [schemas, layoutDirection, showInferred, setNodes, setEdges, isDarkMode, debouncedSearchQuery]);
 
   // Sync isDarkMode to all nodes and edges when it changes (for theme switching)
   useEffect(() => {
@@ -169,7 +177,8 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
 
   // Apply search filter with debounced query for better performance on large schemas
   // NOTE: We intentionally omit nodes/edges from dependencies to avoid infinite loops.
-  // The effect reads current nodes/edges state but should only re-run when the debounced query changes.
+  // The effect reads current nodes/edges state but should only re-run when the debounced query changes
+  // or when the nodes/edges themselves are initially loaded.
   useEffect(() => {
     if (nodes.length === 0) return;
 
@@ -303,76 +312,78 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
       {/* Diagram - React Flow requires explicit dimensions */}
       <div className="flex-1 w-full relative">
         <div className="absolute inset-0">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onNodeClick={onNodeClick}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            fitView
-            fitViewOptions={{ padding: 0.2 }}
-            minZoom={0.1}
-            maxZoom={2}
-            defaultEdgeOptions={{
-              type: 'relationshipEdge',
-            }}
-          >
-            <Background
-              color={isDarkMode ? '#374151' : '#E5E7EB'}
-              gap={20}
-              size={1}
-            />
-            <Controls
-              className={isDarkMode ? 'react-flow-controls-dark' : ''}
-              showInteractive={false}
-            />
-            <MiniMap
-              nodeColor={(node) => {
-                const data = node.data as TableNodeData | undefined;
-                return data?.isHighlighted
-                  ? '#FBBF24'
-                  : data?.isDimmed
-                    ? '#9CA3AF'
-                    : '#3B82F6';
+          <ErrorBoundary>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onNodeClick={onNodeClick}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              fitView
+              fitViewOptions={{ padding: 0.2 }}
+              minZoom={0.1}
+              maxZoom={2}
+              defaultEdgeOptions={{
+                type: 'relationshipEdge',
               }}
-              maskColor={isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)'}
-              className={isDarkMode ? 'react-flow-minimap-dark' : ''}
-            />
-          </ReactFlow>
+            >
+              <Background
+                color={isDarkMode ? '#374151' : '#E5E7EB'}
+                gap={20}
+                size={1}
+              />
+              <Controls
+                className={isDarkMode ? 'react-flow-controls-dark' : ''}
+                showInteractive={false}
+              />
+              <MiniMap
+                nodeColor={(node) => {
+                  const data = node.data as TableNodeData | undefined;
+                  return data?.isHighlighted
+                    ? '#FBBF24'
+                    : data?.isDimmed
+                      ? '#9CA3AF'
+                      : '#3B82F6';
+                }}
+                maskColor={isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)'}
+                className={isDarkMode ? 'react-flow-minimap-dark' : ''}
+              />
+            </ReactFlow>
+          </ErrorBoundary>
         </div>
-      </div>
 
-      {/* Legend */}
-      <div
-        className={`
+        {/* Legend */}
+        <div
+          className={`
           flex items-center gap-4 px-4 py-2 text-[10px] border-t font-medium
           ${isDarkMode ? 'glass-panel border-gray-700/50 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}
           backdrop-blur-sm
         `}
-      >
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-0.5 bg-gray-400" />
-          <span>Explicit FK</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div
-            className="w-4 h-0.5 bg-gray-400"
-            style={{ borderTop: '2px dashed' }}
-          />
-          <span>Inferred</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="text-yellow-500">●</span>
-          <span>PK</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="text-purple-500">●</span>
-          <span>FK</span>
-        </div>
-        <div className="ml-auto">
-          {nodes.length} tables · {edges.length} relationships
+        >
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-0.5 bg-gray-400" />
+            <span>Explicit FK</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div
+              className="w-4 h-0.5 bg-gray-400"
+              style={{ borderTop: '2px dashed' }}
+            />
+            <span>Inferred</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-yellow-500">●</span>
+            <span>PK</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-purple-500">●</span>
+            <span>FK</span>
+          </div>
+          <div className="ml-auto">
+            {nodes.length} tables · {edges.length} relationships
+          </div>
         </div>
       </div>
     </div>

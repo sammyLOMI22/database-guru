@@ -19,7 +19,7 @@ import {
 import type { TableNodeData } from '../../types/erDiagram';
 import { NODE_BASE_WIDTH, MAX_VISIBLE_COLUMNS } from '../../types/erDiagram';
 
-interface TableNodeProps extends NodeProps<TableNodeData> {}
+interface TableNodeProps extends NodeProps<TableNodeData> { }
 
 const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
   const {
@@ -237,12 +237,20 @@ function formatColumnType(type: string): string {
   }
 
   // Handle generic type patterns (use word boundaries to avoid false positives)
-  // Match integer types but not words like "point" that contain "int"
-  if (/\bint\b/i.test(lower) || lower === 'tinyint' || lower === 'mediumint') return 'int';
+  // Match integer types but not words like "point" or "interval" that contain "int"
+  if (/\bint\b/i.test(lower) || lower === 'tinyint' || lower === 'mediumint') {
+    // Stricter check: if it's "interval" or "point", don't map to "int"
+    if (lower === 'interval' || lower === 'point') return lower;
+    return 'int';
+  }
+
   // Match text/char types
   if (/\b(var)?char\b/i.test(lower) || lower === 'text' || lower === 'clob') return 'text';
   // Match date/time types
-  if (/\b(date|time)\b/i.test(lower)) return 'date';
+  if (/\b(date|time)\b/i.test(lower)) {
+    if (lower === 'timestamp' || lower === 'timestamptz') return 'date';
+    return lower === 'time' ? 'time' : 'date';
+  }
   // Match boolean types
   if (/\bbool(ean)?\b/i.test(lower)) return 'bool';
   // Match numeric types
