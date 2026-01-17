@@ -282,7 +282,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
   }
 
   return (
-    <div className="h-full w-full relative group">
+    <div className="h-full w-full relative group flex flex-col">
       {/* Floating Toolbar */}
       <div
         className={`
@@ -307,8 +307,8 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
         />
       </div>
 
-      {/* Diagram - React Flow requires explicit dimensions */}
-      <div className="flex-1 w-full relative">
+      {/* Diagram Area */}
+      <div className="flex-1 w-full relative min-h-0 overflow-hidden">
         <div className="absolute inset-0">
           <ErrorBoundary>
             <ReactFlow
@@ -351,37 +351,37 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
             </ReactFlow>
           </ErrorBoundary>
         </div>
+      </div>
 
-        {/* Legend */}
-        <div
-          className={`
-          flex items-center gap-4 px-4 py-2 text-[10px] border-t font-medium
+      {/* Legend Footer */}
+      <div
+        className={`
+          flex items-center gap-4 px-4 py-2 text-[10px] border-t font-medium z-10
           ${isDarkMode ? 'glass-panel border-gray-700/50 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}
           backdrop-blur-sm
         `}
-        >
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-0.5 bg-gray-400" />
-            <span>Explicit FK</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div
-              className="w-4 h-0.5 bg-gray-400"
-              style={{ borderTop: '2px dashed' }}
-            />
-            <span>Inferred</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-yellow-500">●</span>
-            <span>PK</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-purple-500">●</span>
-            <span>FK</span>
-          </div>
-          <div className="ml-auto">
-            {nodes.length} tables · {edges.length} relationships
-          </div>
+      >
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-0.5 bg-gray-400" />
+          <span>Explicit FK</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div
+            className="w-4 h-0.5 bg-gray-400"
+            style={{ borderTop: '2px dashed' }}
+          />
+          <span>Inferred</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-yellow-500">●</span>
+          <span>PK</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-purple-500">●</span>
+          <span>FK</span>
+        </div>
+        <div className="ml-auto">
+          {nodes.length} tables · {edges.length} relationships
         </div>
       </div>
     </div>
