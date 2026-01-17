@@ -17,14 +17,11 @@ import {
   Tag,
 } from 'lucide-react';
 import type { TableNodeData } from '../../types/erDiagram';
-import { useDarkMode } from '../../hooks/useDarkMode';
 import { NODE_BASE_WIDTH, MAX_VISIBLE_COLUMNS } from '../../types/erDiagram';
 
 interface TableNodeProps extends NodeProps<TableNodeData> { }
 
 const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
-  const { isDarkMode } = useDarkMode();
-
   const {
     tableName,
     columns,
@@ -36,6 +33,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
     isExpanded,
     isHighlighted,
     isDimmed,
+    isDarkMode,
   } = data;
 
   // Create a set of FK column names for quick lookup

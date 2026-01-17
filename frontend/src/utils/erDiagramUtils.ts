@@ -121,7 +121,8 @@ export function calculateDagreLayout(
  */
 export function transformSchemaToNodes(
   schema: SchemaExploreResponse,
-  colorIndex: number = 0
+  colorIndex: number = 0,
+  isDarkMode: boolean = false
 ): ERTableNode[] {
   const color = getDatabaseColor(colorIndex);
 
@@ -140,6 +141,7 @@ export function transformSchemaToNodes(
       isExpanded: false, // Start collapsed for performance
       isHighlighted: false,
       isDimmed: false,
+      isDarkMode,
     };
 
     return {
@@ -199,7 +201,8 @@ export function determineCardinality(
  */
 export function transformRelationshipsToEdges(
   tables: SchemaTableInfo[],
-  connectionId: number
+  connectionId: number,
+  isDarkMode: boolean = false
 ): ERRelationshipEdge[] {
   const edges: ERRelationshipEdge[] = [];
   const tableMap = new Map(tables.map((t) => [t.name.toLowerCase(), t]));
@@ -224,6 +227,7 @@ export function transformRelationshipsToEdges(
         source: 'explicit',
         constraintName: undefined,
         isHighlighted: false,
+        isDarkMode,
       };
 
       edges.push({
@@ -350,7 +354,8 @@ export function applySearchFilter(
 export function inferRelationships(
   tables: SchemaTableInfo[],
   connectionId: number,
-  existingEdges: ERRelationshipEdge[]
+  existingEdges: ERRelationshipEdge[],
+  isDarkMode: boolean = false
 ): ERRelationshipEdge[] {
   const inferredEdges: ERRelationshipEdge[] = [];
   const existingEdgeIds = new Set(existingEdges.map((e) => e.id));
@@ -424,6 +429,7 @@ export function inferRelationships(
           cardinality: 'one-to-many',
           source: 'inferred',
           isHighlighted: false,
+          isDarkMode,
         };
 
         inferredEdges.push({

@@ -151,29 +151,36 @@ pre {
   overflow: hidden;
 }
 
-/* Glassmorphism Utilities */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+:root {
+  --glass-node-bg: rgba(255, 255, 255, 0.85);
+  --glass-node-border: rgba(255, 255, 255, 0.3);
+  --glass-node-shadow: rgba(31, 38, 135, 0.07);
+  --glass-panel-bg: rgba(255, 255, 255, 0.7);
+  --glass-panel-border: rgba(255, 255, 255, 0.3);
 }
 
-.dark .glass-panel {
-  background: rgba(31, 41, 55, 0.7);
-  border: 1px solid rgba(75, 85, 99, 0.3);
+.dark {
+  --glass-node-bg: rgba(17, 24, 39, 0.85);
+  --glass-node-border: rgba(75, 85, 99, 0.3);
+  --glass-node-shadow: rgba(0, 0, 0, 0.37);
+  --glass-panel-bg: rgba(31, 41, 55, 0.7);
+  --glass-panel-border: rgba(75, 85, 99, 0.3);
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--glass-panel-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-panel-border);
 }
 
 .glass-node {
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--glass-node-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-}
-
-.dark .glass-node {
-  background: rgba(17, 24, 39, 0.85);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  border: 1px solid var(--glass-node-border);
+  box-shadow: 0 8px 32px 0 var(--glass-node-shadow);
 }
 
 /* Edge Flow Animation */
@@ -181,6 +188,7 @@ pre {
   from {
     stroke-dashoffset: 20;
   }
+
   to {
     stroke-dashoffset: 0;
   }
@@ -197,6 +205,7 @@ pre {
     opacity: 0;
     transform: scale(0.9) translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);

@@ -12,7 +12,6 @@ import {
   EdgeLabelRenderer,
 } from 'reactflow';
 import type { RelationshipEdgeData } from '../../types/erDiagram';
-import { useDarkMode } from '../../hooks/useDarkMode';
 
 interface RelationshipEdgeProps extends EdgeProps<RelationshipEdgeData> { }
 
@@ -28,20 +27,20 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
   selected,
   style,
 }) => {
-  const { isDarkMode } = useDarkMode();
-
   const {
     sourceColumn,
     targetColumn,
     cardinality,
     source: relationshipSource,
     isHighlighted,
+    isDarkMode,
   } = data || {
     sourceColumn: '',
     targetColumn: '',
     cardinality: 'one-to-many',
     source: 'explicit',
     isHighlighted: false,
+    isDarkMode: false,
   };
 
   // Calculate the bezier path

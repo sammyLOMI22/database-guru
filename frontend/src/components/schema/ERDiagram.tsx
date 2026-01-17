@@ -118,10 +118,11 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
     let allEdges: ERRelationshipEdge[] = [];
 
     schemas.forEach((schema, index) => {
-      const schemaNodes = transformSchemaToNodes(schema, index);
+      const schemaNodes = transformSchemaToNodes(schema, index, isDarkMode);
       const schemaEdges = transformRelationshipsToEdges(
         schema.tables,
-        schema.connection_id
+        schema.connection_id,
+        isDarkMode
       );
 
       allNodes = [...allNodes, ...schemaNodes];
@@ -132,7 +133,8 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
         const inferred = inferRelationships(
           schema.tables,
           schema.connection_id,
-          schemaEdges
+          schemaEdges,
+          isDarkMode
         );
         allEdges = [...allEdges, ...inferred];
       }
@@ -147,7 +149,23 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
     // Type assertion needed as React Flow's generic types don't perfectly align with our custom types
     setNodes(layoutedNodes as unknown as typeof nodes);
     setEdges(allEdges as unknown as typeof edges);
-  }, [schemas, layoutDirection, showInferred, setNodes, setEdges]);
+  }, [schemas, layoutDirection, showInferred, setNodes, setEdges, isDarkMode]);
+
+  // Sync isDarkMode to all nodes and edges when it changes (for theme switching)
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        data: { ...node.data, isDarkMode }
+      })) as unknown as typeof nds
+    );
+    setEdges((eds) =>
+      eds.map((edge) => ({
+        ...edge,
+        data: { ...edge.data, isDarkMode }
+      })) as unknown as typeof eds
+    );
+  }, [isDarkMode, setNodes, setEdges]);
 
   // Apply search filter with debounced query for better performance on large schemas
   // NOTE: We intentionally omit nodes/edges from dependencies to avoid infinite loops.

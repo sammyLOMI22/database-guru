@@ -60,6 +60,8 @@ export interface TableNodeData {
   isHighlighted: boolean;
   /** Whether this node is dimmed (not matching search) */
   isDimmed: boolean;
+  /** Current theme mode */
+  isDarkMode: boolean;
 }
 
 /**
@@ -87,6 +89,8 @@ export interface RelationshipEdgeData {
   constraintName?: string;
   /** Whether this edge is highlighted */
   isHighlighted: boolean;
+  /** Current theme mode */
+  isDarkMode: boolean;
 }
 
 /**
