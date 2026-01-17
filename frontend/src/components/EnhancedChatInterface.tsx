@@ -7,7 +7,7 @@ import ConversationContextPanel from './ConversationContextPanel';
 import SchemaGlance from './SchemaGlance';
 import { useMultiQuery } from '../hooks/useMultiQuery';
 import { useModels } from '../hooks/useModels';
-import { connectionsAPI } from '../services/api';
+import { connectionsAPI, settingsAPI } from '../services/api';
 import type { ChatSession, MultiDatabaseQueryResponse, DatabaseConnection } from '../types/api';
 
 interface ChatMessage {
@@ -78,29 +78,31 @@ export default function EnhancedChatInterface() {
     fetchActiveConnection();
   }, []);
 
-  // Fetch per-task model settings on mount
+  // Fetch per-task model settings on mount and periodically
   useEffect(() => {
     const fetchPerTaskModels = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/settings/');
-        if (response.ok) {
-          const settings = await response.json();
-          setPerTaskModels({
-            model_sql_generation: settings.model_sql_generation,
-            model_narratives: settings.model_narratives,
-            model_query_planning: settings.model_query_planning,
-            model_error_correction: settings.model_error_correction,
-            enable_intent_classification: settings.enable_intent_classification,
-            enable_dynamic_examples: settings.enable_dynamic_examples,
-            enable_semantic_validation: settings.enable_semantic_validation,
-            enable_prompt_optimization: settings.enable_prompt_optimization,
-          });
-        }
+        const settings = await settingsAPI.getSettings();
+        setPerTaskModels({
+          model_sql_generation: settings.model_sql_generation,
+          model_narratives: settings.model_narratives,
+          model_query_planning: settings.model_query_planning,
+          model_error_correction: settings.model_error_correction,
+          enable_intent_classification: settings.enable_intent_classification,
+          enable_dynamic_examples: settings.enable_dynamic_examples,
+          enable_semantic_validation: settings.enable_semantic_validation,
+          enable_prompt_optimization: settings.enable_prompt_optimization,
+        });
       } catch (error) {
         console.error('Failed to fetch per-task model settings:', error);
       }
     };
+
     fetchPerTaskModels();
+
+    // Refresh settings every 10 seconds to catch updates from Settings tab
+    const interval = setInterval(fetchPerTaskModels, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // Save narratives preference to localStorage

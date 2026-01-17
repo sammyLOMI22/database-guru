@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, KeyboardEvent } from 'react';
 import { Send, ChevronDown, CheckCircle, AlertCircle, XCircle, Loader2 } from 'lucide-react';
 import { multiQueryAPI } from '../services/api';
 import type { ValidateMultiDBResponse } from '../types/api';
@@ -46,7 +46,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
   const [rotatingIndex, setRotatingIndex] = useState(0);
 
   // Active overrides for rotation
-  const activeOverrides = (() => {
+  const activeOverrides = useMemo(() => {
     const overrides: { label: string; model?: string; active?: boolean }[] = [];
     if (perTaskModels) {
       if (perTaskModels.sql && perTaskModels.sql !== selectedModel) overrides.push({ label: 'SQL', model: perTaskModels.sql });
@@ -61,7 +61,12 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
       if (perTaskModels.promptTuning) overrides.push({ label: 'PROMPT TUNING', active: true });
     }
     return overrides;
-  })();
+  }, [perTaskModels, selectedModel]);
+
+  // Reset rotation index when overrides change
+  useEffect(() => {
+    setRotatingIndex(0);
+  }, [activeOverrides.length]);
 
   // Rotate through overrides
   useEffect(() => {
