@@ -16,26 +16,21 @@ import type {
   LayoutOptions,
   CardinalityType,
 } from '../types/erDiagram';
-import { DEFAULT_LAYOUT_OPTIONS, getDatabaseColor } from '../types/erDiagram';
+import {
+  DEFAULT_LAYOUT_OPTIONS,
+  getDatabaseColor,
+  NODE_BASE_WIDTH,
+  COLUMN_ROW_HEIGHT,
+  NODE_HEADER_HEIGHT,
+  NODE_COLLAPSED_HEIGHT,
+  MAX_VISIBLE_COLUMNS,
+} from '../types/erDiagram';
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
 
-/** Base width for table nodes */
-const NODE_BASE_WIDTH = 220;
-
-/** Height per column row */
-const COLUMN_ROW_HEIGHT = 24;
-
-/** Header height for table name */
-const NODE_HEADER_HEIGHT = 40;
-
-/** Collapsed node height (header only) */
-const NODE_COLLAPSED_HEIGHT = 50;
-
-/** Maximum columns to show before scrolling (must match TableNode.tsx) */
-const MAX_VISIBLE_COLUMNS = 10;
+// Constants now imported from ../types/erDiagram.ts
 
 // =============================================================================
 // LAYOUT CALCULATION
@@ -126,7 +121,8 @@ export function calculateDagreLayout(
  */
 export function transformSchemaToNodes(
   schema: SchemaExploreResponse,
-  colorIndex: number = 0
+  colorIndex: number = 0,
+  isDarkMode: boolean = false
 ): ERTableNode[] {
   const color = getDatabaseColor(colorIndex);
 
@@ -145,6 +141,7 @@ export function transformSchemaToNodes(
       isExpanded: false, // Start collapsed for performance
       isHighlighted: false,
       isDimmed: false,
+      isDarkMode,
     };
 
     return {
@@ -204,7 +201,8 @@ export function determineCardinality(
  */
 export function transformRelationshipsToEdges(
   tables: SchemaTableInfo[],
-  connectionId: number
+  connectionId: number,
+  isDarkMode: boolean = false
 ): ERRelationshipEdge[] {
   const edges: ERRelationshipEdge[] = [];
   const tableMap = new Map(tables.map((t) => [t.name.toLowerCase(), t]));
@@ -229,6 +227,7 @@ export function transformRelationshipsToEdges(
         source: 'explicit',
         constraintName: undefined,
         isHighlighted: false,
+        isDarkMode,
       };
 
       edges.push({
@@ -355,7 +354,8 @@ export function applySearchFilter(
 export function inferRelationships(
   tables: SchemaTableInfo[],
   connectionId: number,
-  existingEdges: ERRelationshipEdge[]
+  existingEdges: ERRelationshipEdge[],
+  isDarkMode: boolean = false
 ): ERRelationshipEdge[] {
   const inferredEdges: ERRelationshipEdge[] = [];
   const existingEdgeIds = new Set(existingEdges.map((e) => e.id));
@@ -429,6 +429,7 @@ export function inferRelationships(
           cardinality: 'one-to-many',
           source: 'inferred',
           isHighlighted: false,
+          isDarkMode,
         };
 
         inferredEdges.push({

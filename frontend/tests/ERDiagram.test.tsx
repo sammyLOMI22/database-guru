@@ -144,6 +144,22 @@ describe('transformSchemaToNodes', () => {
       expect(node.data.databaseType).toBe('postgresql');
     });
   });
+
+  it('should propagate isDarkMode=false by default', () => {
+    const nodes = transformSchemaToNodes(mockSchemaResponse);
+
+    nodes.forEach(node => {
+      expect(node.data.isDarkMode).toBe(false);
+    });
+  });
+
+  it('should propagate isDarkMode=true when specified', () => {
+    const nodes = transformSchemaToNodes(mockSchemaResponse, 0, true);
+
+    nodes.forEach(node => {
+      expect(node.data.isDarkMode).toBe(true);
+    });
+  });
 });
 
 describe('transformRelationshipsToEdges', () => {
@@ -205,6 +221,29 @@ describe('transformRelationshipsToEdges', () => {
 
     const edges = transformRelationshipsToEdges(tablesWithMissingRef, 1);
     expect(edges).toHaveLength(0);
+  });
+
+  it('should propagate isDarkMode=false to edges by default', () => {
+    const edges = transformRelationshipsToEdges(
+      mockSchemaResponse.tables,
+      mockSchemaResponse.connection_id
+    );
+
+    edges.forEach(edge => {
+      expect(edge.data?.isDarkMode).toBe(false);
+    });
+  });
+
+  it('should propagate isDarkMode=true to edges when specified', () => {
+    const edges = transformRelationshipsToEdges(
+      mockSchemaResponse.tables,
+      mockSchemaResponse.connection_id,
+      true
+    );
+
+    edges.forEach(edge => {
+      expect(edge.data?.isDarkMode).toBe(true);
+    });
   });
 });
 
@@ -574,6 +613,7 @@ describe('inferRelationships', () => {
           cardinality: 'one-to-many',
           source: 'explicit',
           isHighlighted: false,
+          isDarkMode: false,
         },
       },
     ];
@@ -652,6 +692,36 @@ describe('inferRelationships', () => {
 
     expect(inferred).toHaveLength(1);
     expect(inferred[0].data?.targetColumn).toBe('employee_number'); // Should use actual PK, not 'id'
+  });
+
+  it('should propagate isDarkMode to inferred edges', () => {
+    const tablesWithInference: SchemaTableInfo[] = [
+      {
+        name: 'users',
+        columns: [{ name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null }],
+        primary_keys: ['id'],
+        foreign_keys: [],
+        row_count: 10,
+        indexes: [],
+      },
+      {
+        name: 'posts',
+        columns: [
+          { name: 'id', type: 'integer', nullable: false, primary_key: true, foreign_key: null, sample_values: [], semantic_type: null },
+          { name: 'user_id', type: 'integer', nullable: false, primary_key: false, foreign_key: null, sample_values: [], semantic_type: null },
+        ],
+        primary_keys: ['id'],
+        foreign_keys: [],
+        row_count: 100,
+        indexes: [],
+      },
+    ];
+
+    // Test with isDarkMode=true
+    const inferred = inferRelationships(tablesWithInference, 1, [], true);
+
+    expect(inferred).toHaveLength(1);
+    expect(inferred[0].data?.isDarkMode).toBe(true);
   });
 });
 

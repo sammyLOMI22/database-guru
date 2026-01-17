@@ -10,10 +10,8 @@ import {
   EdgeProps,
   getBezierPath,
   EdgeLabelRenderer,
-  BaseEdge,
 } from 'reactflow';
 import type { RelationshipEdgeData } from '../../types/erDiagram';
-import { useDarkMode } from '../../hooks/useDarkMode';
 
 interface RelationshipEdgeProps extends EdgeProps<RelationshipEdgeData> {}
 
@@ -29,20 +27,20 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
   selected,
   style,
 }) => {
-  const { isDarkMode } = useDarkMode();
-
   const {
     sourceColumn,
     targetColumn,
     cardinality,
     source: relationshipSource,
     isHighlighted,
+    isDarkMode,
   } = data || {
     sourceColumn: '',
     targetColumn: '',
     cardinality: 'one-to-many',
     source: 'explicit',
     isHighlighted: false,
+    isDarkMode: false,
   };
 
   // Calculate the bezier path
@@ -60,15 +58,19 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
   const strokeDasharray = isInferred ? '5,5' : undefined;
 
   // Determine color based on state
+  // Use consistent solid colors for both light and dark modes
   const strokeColor = isHighlighted
-    ? '#FBBF24' // yellow for highlighted
+    ? '#FBBF24'
     : selected
-    ? '#3B82F6' // blue for selected
-    : isDarkMode
-    ? '#6B7280' // gray-500 for dark mode
-    : '#9CA3AF'; // gray-400 for light mode
+      ? '#3B82F6'
+      : isDarkMode
+        ? '#4B5563' // gray-600 for dark mode (visible but not overwhelming)
+        : '#9CA3AF'; // gray-400 for light mode
 
-  const strokeWidth = selected || isHighlighted ? 2 : 1.5;
+  const strokeWidth = selected || isHighlighted ? 2.5 : 1.5;
+
+  // Determine animation
+  const edgeClassName = isHighlighted ? 'edge-animate' : '';
 
   // Cardinality marker size
   const markerSize = 8;
@@ -76,14 +78,18 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
   return (
     <>
       {/* Main edge path */}
-      <BaseEdge
+      <path
         id={id}
-        path={edgePath}
+        d={edgePath}
+        fill="none"
+        className={edgeClassName}
         style={{
           ...style,
           stroke: strokeColor,
           strokeWidth,
           strokeDasharray,
+          filter: isHighlighted ? 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.4))' : 'none',
+          transition: 'stroke 0.3s, stroke-width 0.3s',
         }}
       />
 
@@ -128,18 +134,18 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
               pointerEvents: 'all',
             }}
             className={`
-              px-2 py-1 rounded text-xs font-mono
-              ${isDarkMode ? 'bg-gray-800 text-gray-200' : 'bg-white text-gray-700'}
-              border ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}
-              shadow-sm
+              px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-tight
+              ${isDarkMode ? 'glass-panel text-gray-200' : 'bg-white text-gray-700 shadow-lg'}
+              border border-blue-500/30
+              flex items-center gap-1.5
             `}
           >
-            <span className="text-purple-500">{sourceColumn}</span>
-            <span className="mx-1">→</span>
-            <span className="text-blue-500">{targetColumn}</span>
+            <span className="text-blue-400 opacity-80">{sourceColumn}</span>
+            <span className="text-gray-500">→</span>
+            <span className="text-indigo-400 opacity-80">{targetColumn}</span>
             {isInferred && (
-              <span className="ml-1 text-gray-400" title="Inferred relationship">
-                *
+              <span className="ml-0.5 text-yellow-500" title="Inferred relationship">
+                ✧
               </span>
             )}
           </div>

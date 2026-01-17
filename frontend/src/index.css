@@ -134,15 +134,84 @@ pre {
 
 /* React Flow dark mode overrides */
 .react-flow-controls-dark .react-flow__controls-button {
-  background: #374151;
-  border-color: #4b5563;
+  background: rgba(55, 65, 81, 0.7);
+  backdrop-filter: blur(4px);
+  border-color: rgba(75, 85, 99, 0.5);
   fill: #d1d5db;
 }
 
 .react-flow-controls-dark .react-flow__controls-button:hover {
-  background: #4b5563;
+  background: rgba(75, 85, 99, 0.9);
 }
 
 .react-flow-minimap-dark {
-  background: #1f2937;
+  background: #111827;
+  border: 1px solid rgba(75, 85, 99, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:root {
+  --glass-node-bg: rgba(255, 255, 255, 0.85);
+  --glass-node-border: rgba(255, 255, 255, 0.3);
+  --glass-node-shadow: rgba(31, 38, 135, 0.07);
+  --glass-panel-bg: rgba(255, 255, 255, 0.7);
+  --glass-panel-border: rgba(255, 255, 255, 0.3);
+}
+
+.dark {
+  --glass-node-bg: rgba(17, 24, 39, 0.85);
+  --glass-node-border: rgba(75, 85, 99, 0.3);
+  --glass-node-shadow: rgba(0, 0, 0, 0.37);
+  --glass-panel-bg: rgba(31, 41, 55, 0.7);
+  --glass-panel-border: rgba(75, 85, 99, 0.3);
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--glass-panel-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-panel-border);
+}
+
+.glass-node {
+  background: var(--glass-node-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-node-border);
+  box-shadow: 0 8px 32px 0 var(--glass-node-shadow);
+}
+
+/* Edge Flow Animation */
+@keyframes edgeFlow {
+  from {
+    stroke-dashoffset: 20;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.edge-animate {
+  stroke-dasharray: 10, 10;
+  animation: edgeFlow 1s linear infinite;
+}
+
+/* Node Entrance Animation */
+@keyframes nodeEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.node-enter {
+  animation: nodeEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

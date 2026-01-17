@@ -60,6 +60,8 @@ export interface TableNodeData {
   isHighlighted: boolean;
   /** Whether this node is dimmed (not matching search) */
   isDimmed: boolean;
+  /** Current theme mode */
+  isDarkMode: boolean;
 }
 
 /**
@@ -87,6 +89,8 @@ export interface RelationshipEdgeData {
   constraintName?: string;
   /** Whether this edge is highlighted */
   isHighlighted: boolean;
+  /** Current theme mode */
+  isDarkMode: boolean;
 }
 
 /**
@@ -142,10 +146,29 @@ export interface LayoutOptions {
  */
 export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   direction: 'TB',
-  nodeSpacingX: 100,
-  nodeSpacingY: 80,
-  nodePadding: 20,
+  nodeSpacingX: 120, // Increased for premium look
+  nodeSpacingY: 100, // Increased for premium look
+  nodePadding: 40,   // Increased for premium look
 };
+
+// =============================================================================
+// UI CONSTANTS
+// =============================================================================
+
+/** Base width for table nodes */
+export const NODE_BASE_WIDTH = 240;
+
+/** Height per column row */
+export const COLUMN_ROW_HEIGHT = 28;
+
+/** Header height for table name */
+export const NODE_HEADER_HEIGHT = 44;
+
+/** Collapsed node height (header only) */
+export const NODE_COLLAPSED_HEIGHT = 56;
+
+/** Maximum columns to show before scrolling */
+export const MAX_VISIBLE_COLUMNS = 10;
 
 // =============================================================================
 // DIAGRAM STATE
