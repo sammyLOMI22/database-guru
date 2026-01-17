@@ -604,6 +604,38 @@ def normalize_connection_ids(connection_ids):
 - SAST/DAST integration
 - Automated security reports
 
+### 15. Query Compiler Enhancements
+**Priority**: LOW
+**Effort**: 3-4 days
+**Impact**: Performance / UX
+**Related PR**: Query Compilation & Prepared Statements (Phase 4.2)
+
+> **Note**: These enhancements were identified during PR review of the Query Compiler feature. The core feature is complete and production-ready; these are polish items for future iterations.
+
+**Enhancements**:
+
+1. **CTE (WITH clause) Support**
+   - Current: Compiler only triggers for queries starting with `SELECT`
+   - Enhancement: Expand executor trigger to support `WITH` clauses
+   - Also consider: `INSERT...RETURNING` and other query types
+   - File: `src/core/executor.py` - relax the `startswith("SELECT")` check
+
+2. **Exponential Moving Average (EMA) for Stats**
+   - Current: Simple cumulative average for execution time tracking
+   - Enhancement: Switch to EMA to better reflect recent performance changes
+   - Benefit: More responsive to database performance shifts
+
+3. **Frontend "Compiled" Indicator**
+   - Current: No UI indication when a query uses cached execution plan
+   - Enhancement: Add lightning bolt icon in QueryResults when query hit compiler cache
+   - File: `frontend/src/components/QueryResults.tsx`
+   - Pattern: Similar to existing cache hit badge implementation
+
+**Success Criteria**:
+- CTEs compile and cache correctly
+- Stats reflect recent performance trends
+- Users see visual feedback for compiled queries
+
 ---
 
 ## 🚀 Phase 2: Streaming Results
