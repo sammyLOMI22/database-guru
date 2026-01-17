@@ -8,6 +8,10 @@ interface PerTaskModels {
   narratives: string | null;
   planning: string | null;
   correction: string | null;
+  intentGuard?: boolean;
+  dynamicExamples?: boolean;
+  semanticCheck?: boolean;
+  promptTuning?: boolean;
 }
 
 interface QueryInputProps {
@@ -39,6 +43,34 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [rotatingIndex, setRotatingIndex] = useState(0);
+
+  // Active overrides for rotation
+  const activeOverrides = (() => {
+    const overrides: { label: string; model?: string; active?: boolean }[] = [];
+    if (perTaskModels) {
+      if (perTaskModels.sql && perTaskModels.sql !== selectedModel) overrides.push({ label: 'SQL', model: perTaskModels.sql });
+      if (perTaskModels.narratives && perTaskModels.narratives !== selectedModel) overrides.push({ label: 'NARRATIVE', model: perTaskModels.narratives });
+      if (perTaskModels.planning && perTaskModels.planning !== selectedModel) overrides.push({ label: 'PLAN', model: perTaskModels.planning });
+      if (perTaskModels.correction && perTaskModels.correction !== selectedModel) overrides.push({ label: 'FIX', model: perTaskModels.correction });
+
+      // Reasoning modules
+      if (perTaskModels.intentGuard) overrides.push({ label: 'INTENT GUARD', active: true });
+      if (perTaskModels.dynamicExamples) overrides.push({ label: 'DYNAMIC EXAMPLES', active: true });
+      if (perTaskModels.semanticCheck) overrides.push({ label: 'SEMANTIC CHECK', active: true });
+      if (perTaskModels.promptTuning) overrides.push({ label: 'PROMPT TUNING', active: true });
+    }
+    return overrides;
+  })();
+
+  // Rotate through overrides
+  useEffect(() => {
+    if (activeOverrides.length <= 1) return;
+    const interval = setInterval(() => {
+      setRotatingIndex(prev => (prev + 1) % activeOverrides.length);
+    }, 4000); // Rotate every 4 seconds
+    return () => clearInterval(interval);
+  }, [activeOverrides.length]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -287,33 +319,45 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
             <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">to execute</span>
           </div>
 
-          <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-widest overflow-hidden">
+          <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-widest overflow-hidden min-w-[300px]">
             {selectedModel && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <span className="text-blue-600/40 dark:text-blue-400/40">MAIN:</span>
                 <strong className="text-gray-900 dark:text-gray-200">{selectedModel}</strong>
               </div>
             )}
 
-            {perTaskModels && (
+            {activeOverrides.length > 0 && (
               <div className="flex items-center gap-3 border-l border-white/10 pl-3">
-                {Object.entries({
-                  SQL: perTaskModels.sql,
-                  NARRATIVE: perTaskModels.narratives,
-                  PLAN: perTaskModels.planning,
-                  FIX: perTaskModels.correction
-                }).map(([label, model]) => {
-                  if (!model || model === selectedModel) return null;
-                  return (
-                    <div key={label} className="flex items-center gap-1.5 animate-fadeIn">
-                      <span className="text-blue-600/60 dark:text-blue-400/60">{label}:</span>
-                      <strong className="text-gray-900 dark:text-gray-200">{model}</strong>
-                      <span className="px-1 py-0.5 rounded-md bg-blue-500/10 text-blue-500/80 text-[8px] font-black border border-blue-500/20">
-                        OPT
-                      </span>
-                    </div>
-                  );
-                })}
+                <div
+                  className="flex items-center gap-1.5 animate-fadeIn"
+                  key={rotatingIndex} // Key trigger for fade-in animation on change
+                >
+                  <span className="text-blue-600/60 dark:text-blue-400/60">
+                    {activeOverrides[rotatingIndex].label}:
+                  </span>
+                  {activeOverrides[rotatingIndex].model ? (
+                    <strong className="text-gray-900 dark:text-gray-200">
+                      {activeOverrides[rotatingIndex].model}
+                    </strong>
+                  ) : (
+                    <strong className="text-emerald-500 animate-pulse">ACTIVE</strong>
+                  )}
+                  <span className="px-1 py-0.5 rounded-md bg-blue-500/10 text-blue-500/80 text-[8px] font-black border border-blue-500/20">
+                    OPT
+                  </span>
+                </div>
+
+                {activeOverrides.length > 1 && (
+                  <div className="flex items-center gap-1 opacity-20">
+                    {activeOverrides.map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-1 h-1 rounded-full transition-all duration-500 ${i === rotatingIndex ? 'bg-blue-500 w-3' : 'bg-gray-400'}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

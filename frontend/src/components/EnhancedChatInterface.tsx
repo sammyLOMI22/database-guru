@@ -22,6 +22,11 @@ interface PerTaskModelSettings {
   model_narratives: string | null;
   model_query_planning: string | null;
   model_error_correction: string | null;
+  // Reasoning module flags
+  enable_intent_classification: boolean;
+  enable_dynamic_examples: boolean;
+  enable_semantic_validation: boolean;
+  enable_prompt_optimization: boolean;
 }
 
 export default function EnhancedChatInterface() {
@@ -85,6 +90,10 @@ export default function EnhancedChatInterface() {
             model_narratives: settings.model_narratives,
             model_query_planning: settings.model_query_planning,
             model_error_correction: settings.model_error_correction,
+            enable_intent_classification: settings.enable_intent_classification,
+            enable_dynamic_examples: settings.enable_dynamic_examples,
+            enable_semantic_validation: settings.enable_semantic_validation,
+            enable_prompt_optimization: settings.enable_prompt_optimization,
           });
         }
       } catch (error) {
@@ -419,6 +428,10 @@ export default function EnhancedChatInterface() {
             narratives: perTaskModels.model_narratives,
             planning: perTaskModels.model_query_planning,
             correction: perTaskModels.model_error_correction,
+            intentGuard: perTaskModels.enable_intent_classification,
+            dynamicExamples: perTaskModels.enable_dynamic_examples,
+            semanticCheck: perTaskModels.enable_semantic_validation,
+            promptTuning: perTaskModels.enable_prompt_optimization,
           } : null}
           connectionIds={currentSession?.connections.map(c => c.id)}
         />
