@@ -16,26 +16,21 @@ import type {
   LayoutOptions,
   CardinalityType,
 } from '../types/erDiagram';
-import { DEFAULT_LAYOUT_OPTIONS, getDatabaseColor } from '../types/erDiagram';
+import {
+  DEFAULT_LAYOUT_OPTIONS,
+  getDatabaseColor,
+  NODE_BASE_WIDTH,
+  COLUMN_ROW_HEIGHT,
+  NODE_HEADER_HEIGHT,
+  NODE_COLLAPSED_HEIGHT,
+  MAX_VISIBLE_COLUMNS,
+} from '../types/erDiagram';
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
 
-/** Base width for table nodes */
-const NODE_BASE_WIDTH = 220;
-
-/** Height per column row */
-const COLUMN_ROW_HEIGHT = 24;
-
-/** Header height for table name */
-const NODE_HEADER_HEIGHT = 40;
-
-/** Collapsed node height (header only) */
-const NODE_COLLAPSED_HEIGHT = 50;
-
-/** Maximum columns to show before scrolling (must match TableNode.tsx) */
-const MAX_VISIBLE_COLUMNS = 10;
+// Constants now imported from ../types/erDiagram.ts
 
 // =============================================================================
 // LAYOUT CALCULATION

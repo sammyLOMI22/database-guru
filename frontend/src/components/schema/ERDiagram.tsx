@@ -14,7 +14,7 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   NodeMouseHandler,
-  ReactFlowInstance,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -33,6 +33,7 @@ import {
 } from '../../utils/erDiagramUtils';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { DEFAULT_LAYOUT_OPTIONS } from '../../types/erDiagram';
 
 import TableNode from './TableNode';
 import RelationshipEdge from './RelationshipEdge';
@@ -67,8 +68,10 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // React Flow state with proper typing
-  const [nodes, setNodes, onNodesChange] = useNodesState<ERTableNode['data']>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<TableNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<ERRelationshipEdge['data']>([]);
+
+  const { fitView } = useReactFlow();
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
@@ -137,10 +140,8 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
 
     // Apply layout
     const layoutedNodes = calculateDagreLayout(allNodes, allEdges, {
+      ...DEFAULT_LAYOUT_OPTIONS,
       direction: layoutDirection,
-      nodeSpacingX: 100,
-      nodeSpacingY: 80,
-      nodePadding: 20,
     });
 
     // Type assertion needed as React Flow's generic types don't perfectly align with our custom types
@@ -170,9 +171,21 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
     if (hasHighlightChanges) {
       setNodes(filteredNodes as unknown as typeof nodes);
       setEdges(filteredEdges as unknown as typeof edges);
+
+      // Add Fly-to behavior: if search query exists and we have matching nodes, zoom to the first matching node
+      if (debouncedSearchQuery && filteredNodes.length > 0) {
+        const highlightedNodes = filteredNodes.filter(n => n.data?.isHighlighted);
+        if (highlightedNodes.length > 0) {
+          fitView({
+            nodes: highlightedNodes,
+            duration: 800,
+            padding: 0.5
+          });
+        }
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchQuery]);
+  }, [debouncedSearchQuery, fitView]);
 
   // Handle node click to toggle expansion
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -196,14 +209,10 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
     setNodes((nds) => collapseAllNodes(nds as ERTableNode[]) as unknown as typeof nds);
   }, [setNodes]);
 
-  // Handle fit view (exposed via ref if needed)
-  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
 
   const handleFitView = useCallback(() => {
-    if (reactFlowInstance) {
-      reactFlowInstance.fitView({ padding: 0.2 });
-    }
-  }, [reactFlowInstance]);
+    fitView({ padding: 0.2 });
+  }, [fitView]);
 
   // Loading state
   if (isLoading) {
@@ -253,7 +262,8 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
       <div
         className={`
           flex items-center justify-between px-4 py-2 border-b
-          ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}
+          ${isDarkMode ? 'glass-panel border-gray-700/50' : 'bg-gray-50 border-gray-200'}
+          backdrop-blur-md z-10 relative
         `}
       >
         <ERDiagramSearch
@@ -276,52 +286,52 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
       <div className="flex-1 w-full relative">
         <div className="absolute inset-0">
           <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          onInit={setReactFlowInstance}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
-          minZoom={0.1}
-          maxZoom={2}
-          defaultEdgeOptions={{
-            type: 'relationshipEdge',
-          }}
-        >
-          <Background
-            color={isDarkMode ? '#374151' : '#E5E7EB'}
-            gap={20}
-            size={1}
-          />
-          <Controls
-            className={isDarkMode ? 'react-flow-controls-dark' : ''}
-            showInteractive={false}
-          />
-          <MiniMap
-            nodeColor={(node) => {
-              const data = node.data as TableNodeData | undefined;
-              return data?.isHighlighted
-                ? '#FBBF24'
-                : data?.isDimmed
-                ? '#9CA3AF'
-                : '#3B82F6';
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeClick={onNodeClick}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+            minZoom={0.1}
+            maxZoom={2}
+            defaultEdgeOptions={{
+              type: 'relationshipEdge',
             }}
-            maskColor={isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)'}
-            className={isDarkMode ? 'react-flow-minimap-dark' : ''}
-          />
-        </ReactFlow>
+          >
+            <Background
+              color={isDarkMode ? '#374151' : '#E5E7EB'}
+              gap={20}
+              size={1}
+            />
+            <Controls
+              className={isDarkMode ? 'react-flow-controls-dark' : ''}
+              showInteractive={false}
+            />
+            <MiniMap
+              nodeColor={(node) => {
+                const data = node.data as TableNodeData | undefined;
+                return data?.isHighlighted
+                  ? '#FBBF24'
+                  : data?.isDimmed
+                    ? '#9CA3AF'
+                    : '#3B82F6';
+              }}
+              maskColor={isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)'}
+              className={isDarkMode ? 'react-flow-minimap-dark' : ''}
+            />
+          </ReactFlow>
         </div>
       </div>
 
       {/* Legend */}
       <div
         className={`
-          flex items-center gap-4 px-4 py-2 text-xs border-t
-          ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}
+          flex items-center gap-4 px-4 py-2 text-[10px] border-t font-medium
+          ${isDarkMode ? 'glass-panel border-gray-700/50 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}
+          backdrop-blur-sm
         `}
       >
         <div className="flex items-center gap-1">

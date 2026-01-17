@@ -7,14 +7,20 @@
 
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Key, Link, ChevronDown, ChevronRight, Database } from 'lucide-react';
+import {
+  Key,
+  Link,
+  ChevronDown,
+  ChevronRight,
+  Database,
+  MapPin,
+  Tag,
+} from 'lucide-react';
 import type { TableNodeData } from '../../types/erDiagram';
 import { useDarkMode } from '../../hooks/useDarkMode';
+import { NODE_BASE_WIDTH, MAX_VISIBLE_COLUMNS } from '../../types/erDiagram';
 
-/** Maximum number of columns to display before showing "X more columns" */
-const MAX_VISIBLE_COLUMNS = 10;
-
-interface TableNodeProps extends NodeProps<TableNodeData> {}
+interface TableNodeProps extends NodeProps<TableNodeData> { }
 
 const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
   const { isDarkMode } = useDarkMode();
@@ -45,19 +51,19 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
   return (
     <div
       className={`
-        rounded-lg shadow-lg border-2 overflow-hidden transition-all duration-200
-        ${selected ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
-        ${isHighlighted ? 'ring-2 ring-yellow-400 ring-offset-1' : ''}
-        ${isDarkMode ? 'bg-gray-800' : 'bg-white'}
+        rounded-xl shadow-2xl border transition-all duration-300 node-enter
+        ${selected ? 'ring-2 ring-blue-500 ring-offset-4' : ''}
+        ${isHighlighted ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
+        ${isDarkMode ? 'glass-node' : 'bg-white'}
       `}
       style={{
         opacity,
-        minWidth: 200,
+        minWidth: NODE_BASE_WIDTH,
         borderColor: isHighlighted
           ? '#FBBF24'
           : isDarkMode
-          ? '#374151'
-          : '#E5E7EB',
+            ? 'rgba(75, 85, 99, 0.4)'
+            : '#E5E7EB',
       }}
     >
       {/* Handles for connections */}
@@ -75,31 +81,32 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
       {/* Table Header */}
       <div
         className={`
-          px-3 py-2 flex items-center justify-between cursor-pointer
-          ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}
-          border-b ${isDarkMode ? 'border-gray-600' : 'border-gray-200'}
+          px-4 py-3 flex items-center justify-between cursor-pointer
+          ${isDarkMode
+            ? 'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/30 hover:to-indigo-600/30'
+            : 'bg-gray-50 hover:bg-gray-100'}
+          border-b ${isDarkMode ? 'border-gray-700/50' : 'border-gray-200'}
+          transition-colors duration-200
         `}
       >
         <div className="flex items-center gap-2">
           {isExpanded ? (
-            <ChevronDown className="w-4 h-4 text-gray-500" />
+            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
           ) : (
-            <ChevronRight className="w-4 h-4 text-gray-500" />
+            <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
           )}
-          <Database className="w-4 h-4 text-blue-500" />
+          <Database className={`w-4 h-4 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
           <span
-            className={`font-semibold text-sm ${
-              isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}
+            className={`font-bold text-sm tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'
+              }`}
           >
             {tableName}
           </span>
         </div>
         {rowCount !== null && (
           <span
-            className={`text-xs px-2 py-0.5 rounded-full ${
-              isDarkMode ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'
-            }`}
+            className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isDarkMode ? 'bg-blue-900/40 text-blue-300' : 'bg-blue-50 text-blue-600'
+              }`}
           >
             {rowCount.toLocaleString()}
           </span>
@@ -112,47 +119,53 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
           {visibleColumns.map((column) => {
             const isPK = primaryKeys.includes(column.name);
             const isFK = fkColumns.has(column.name);
+            const semanticType = (column as any).semantic_type;
 
             return (
               <div
                 key={column.name}
                 className={`
-                  px-3 py-1.5 flex items-center justify-between text-xs
+                  px-4 py-2 flex items-center justify-between text-[11px]
                   border-b last:border-b-0
-                  ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}
-                  ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}
+                  ${isDarkMode ? 'border-gray-800/50' : 'border-gray-100'}
+                  ${isDarkMode ? 'hover:bg-gray-800/40' : 'hover:bg-gray-50'}
+                  group transition-colors duration-150
                 `}
               >
-                <div className="flex items-center gap-2">
-                  {/* PK/FK indicators */}
-                  {isPK && (
-                    <span title="Primary Key">
-                      <Key className="w-3 h-3 text-yellow-500" />
-                    </span>
-                  )}
-                  {isFK && (
-                    <span title="Foreign Key">
-                      <Link className="w-3 h-3 text-purple-500" />
-                    </span>
-                  )}
-                  {!isPK && !isFK && <div className="w-3" />}
+                <div className="flex items-center gap-2.5">
+                  {/* Indicators */}
+                  <div className="flex items-center justify-center w-4">
+                    {isPK ? (
+                      <Key className="w-3.5 h-3.5 text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]" />
+                    ) : isFK ? (
+                      <Link className="w-3.5 h-3.5 text-purple-400" />
+                    ) : semanticType === 'location' ? (
+                      <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : semanticType === 'categorical' ? (
+                      <Tag className="w-3.5 h-3.5 text-orange-400" />
+                    ) : (
+                      <div className="w-3.5" />
+                    )}
+                  </div>
 
                   <span
-                    className={`${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                    } ${isPK ? 'font-medium' : ''}`}
+                    className={`${isDarkMode ? 'text-gray-300 group-hover:text-blue-300' : 'text-gray-800'
+                      } ${isPK ? 'font-semibold' : 'font-medium'} transition-colors duration-150`}
                   >
                     {column.name}
                   </span>
                 </div>
 
-                <span
-                  className={`${
-                    isDarkMode ? 'text-gray-500' : 'text-gray-400'
-                  } font-mono`}
-                >
-                  {formatColumnType(column.type)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`
+                      px-1.5 py-0.5 rounded text-[9px] font-mono leading-none
+                      ${isDarkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-100 text-gray-400'}
+                    `}
+                  >
+                    {formatColumnType(column.type)}
+                  </span>
+                </div>
               </div>
             );
           })}
@@ -174,9 +187,8 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
       {/* Collapsed summary */}
       {!isExpanded && (
         <div
-          className={`px-3 py-1.5 text-xs ${
-            isDarkMode ? 'text-gray-400' : 'text-gray-500'
-          }`}
+          className={`px-4 py-2 text-[10px] italic ${isDarkMode ? 'text-gray-500' : 'text-gray-400'
+            }`}
         >
           {columns.length} columns
           {primaryKeys.length > 0 && ` · ${primaryKeys.length} PK`}
@@ -187,12 +199,13 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
       {/* Database badge */}
       <div
         className={`
-          px-3 py-1 text-xs flex items-center gap-1
-          ${isDarkMode ? 'bg-gray-900 text-gray-500' : 'bg-gray-50 text-gray-400'}
+          px-4 py-1.5 text-[10px] flex items-center gap-1.5 font-medium
+          ${isDarkMode ? 'bg-blue-900/10 text-gray-500' : 'bg-gray-50 text-gray-400'}
         `}
       >
-        <span>{databaseType}</span>
-        <span>·</span>
+        <Database className="w-3 h-3 opacity-50" />
+        <span className="uppercase tracking-wider">{databaseType}</span>
+        <span className="opacity-30">|</span>
         <span className="truncate max-w-24" title={connectionName}>
           {connectionName}
         </span>
@@ -205,7 +218,9 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
  * Format column type for display (shorten long types).
  */
 function formatColumnType(type: string): string {
-  // Shorten common types
+  const lower = type.toLowerCase();
+
+  // Handle common type abbreviations
   const shortTypes: Record<string, string> = {
     'character varying': 'varchar',
     'timestamp without time zone': 'timestamp',
@@ -217,16 +232,22 @@ function formatColumnType(type: string): string {
     'boolean': 'bool',
   };
 
-  const lower = type.toLowerCase();
   for (const [long, short] of Object.entries(shortTypes)) {
     if (lower.startsWith(long)) {
       return type.toLowerCase().replace(long, short);
     }
   }
 
+  // Handle generic type patterns
+  if (lower.includes('int')) return 'int';
+  if (lower.includes('char')) return 'text';
+  if (lower.includes('date') || lower.includes('time')) return 'date';
+  if (lower.includes('bool')) return 'bool';
+  if (lower.includes('float') || lower.includes('decimal') || lower.includes('numeric')) return 'num';
+
   // Truncate very long types
-  if (type.length > 15) {
-    return type.substring(0, 12) + '...';
+  if (type.length > 10) {
+    return type.substring(0, 8) + '..';
   }
 
   return type.toLowerCase();

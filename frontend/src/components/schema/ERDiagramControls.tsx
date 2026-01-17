@@ -46,23 +46,30 @@ const ERDiagramControls: React.FC<ERDiagramControlsProps> = ({
   const { isDarkMode } = useDarkMode();
 
   const buttonBaseClass = `
-    p-1.5 rounded transition-colors
+    p-2 rounded-lg transition-all duration-200
     ${isDarkMode
-      ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-200'
-      : 'hover:bg-gray-200 text-gray-600 hover:text-gray-800'}
+      ? 'hover:bg-blue-500/20 text-gray-400 hover:text-blue-300'
+      : 'hover:bg-blue-50 text-gray-600 hover:text-blue-600'}
   `;
 
   const buttonActiveClass = `
-    ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-900'}
+    ${isDarkMode ? 'bg-blue-600/30 text-blue-400' : 'bg-blue-100 text-blue-700 font-bold'}
   `;
 
   return (
-    <div className="flex items-center gap-2">
+    <div
+      className={`
+        flex items-center gap-1.5 p-1 rounded-xl shadow-lg
+        ${isDarkMode
+          ? 'bg-gray-800/40 backdrop-blur-md border border-gray-700/50'
+          : 'bg-white/60 backdrop-blur-md border border-gray-200'}
+      `}
+    >
       {/* Layout direction toggle */}
       <div
         className={`
           flex items-center rounded-lg p-0.5
-          ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}
+          ${isDarkMode ? 'bg-gray-900/40' : 'bg-gray-100'}
         `}
       >
         <button
