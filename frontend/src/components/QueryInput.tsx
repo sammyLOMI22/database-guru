@@ -137,7 +137,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
   const summary = getValidationSummary();
 
   return (
-    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 transition-colors">
+    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 pb-28 transition-colors">
       <div className="max-w-4xl mx-auto">
         {/* Pre-flight validation indicator */}
         {connectionIds && connectionIds.length >= 2 && (
@@ -236,8 +236,8 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
                       setShowLimitDropdown(false);
                     }}
                     className={`w-full px-3 py-2 text-left text-sm transition-colors ${option.value === rowLimit
-                        ? 'bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-400 font-medium'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-400 font-medium'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}
                   >
                     {option.label}

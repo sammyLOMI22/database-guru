@@ -101,27 +101,27 @@ function App() {
             </div>
 
             {/* Feedback */}
-            <div className={`flex-1 overflow-auto p-6 ${activeTab === 'feedback' ? '' : 'hidden'}`}>
+            <div className={`flex-1 overflow-auto p-6 pb-32 ${activeTab === 'feedback' ? '' : 'hidden'}`}>
               <FeedbackStats />
             </div>
 
             {/* Tools */}
-            <div className={`flex-1 overflow-auto p-6 ${activeTab === 'tools' ? '' : 'hidden'}`}>
+            <div className={`flex-1 overflow-auto p-6 pb-32 ${activeTab === 'tools' ? '' : 'hidden'}`}>
               <ToolsPanel />
             </div>
 
             {/* Cache */}
-            <div className={`flex-1 overflow-auto p-6 ${activeTab === 'cache' ? '' : 'hidden'}`}>
+            <div className={`flex-1 overflow-auto p-6 pb-32 ${activeTab === 'cache' ? '' : 'hidden'}`}>
               <SemanticCachePanel />
             </div>
 
             {/* Pools */}
-            <div className={`flex-1 overflow-auto p-6 ${activeTab === 'pools' ? '' : 'hidden'}`}>
+            <div className={`flex-1 overflow-auto p-6 pb-32 ${activeTab === 'pools' ? '' : 'hidden'}`}>
               <ConnectionPoolMetrics />
             </div>
 
             {/* Settings */}
-            <div className={`flex-1 overflow-auto ${activeTab === 'settings' ? '' : 'hidden'}`}>
+            <div className={`flex-1 overflow-auto pb-32 ${activeTab === 'settings' ? '' : 'hidden'}`}>
               <SettingsPanel />
             </div>
           </main>
