@@ -108,6 +108,7 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
               <SchemaExplorer
                 connectionId={selectedConnId}
                 connectionName={connections.find(c => c.id === selectedConnId)?.name}
+                compact={true}
               />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-50 py-20">
