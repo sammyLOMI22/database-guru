@@ -19,7 +19,7 @@ import {
 import type { TableNodeData } from '../../types/erDiagram';
 import { NODE_BASE_WIDTH, MAX_VISIBLE_COLUMNS } from '../../types/erDiagram';
 
-interface TableNodeProps extends NodeProps<TableNodeData> { }
+interface TableNodeProps extends NodeProps<TableNodeData> {}
 
 const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
   const {
@@ -117,7 +117,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
           {visibleColumns.map((column) => {
             const isPK = primaryKeys.includes(column.name);
             const isFK = fkColumns.has(column.name);
-            const semanticType = (column as any).semantic_type;
+            const semanticType = column.semantic_type;
 
             return (
               <div
@@ -236,12 +236,17 @@ function formatColumnType(type: string): string {
     }
   }
 
-  // Handle generic type patterns
-  if (lower.includes('int')) return 'int';
-  if (lower.includes('char')) return 'text';
-  if (lower.includes('date') || lower.includes('time')) return 'date';
-  if (lower.includes('bool')) return 'bool';
-  if (lower.includes('float') || lower.includes('decimal') || lower.includes('numeric')) return 'num';
+  // Handle generic type patterns (use word boundaries to avoid false positives)
+  // Match integer types but not words like "point" that contain "int"
+  if (/\bint\b/i.test(lower) || lower === 'tinyint' || lower === 'mediumint') return 'int';
+  // Match text/char types
+  if (/\b(var)?char\b/i.test(lower) || lower === 'text' || lower === 'clob') return 'text';
+  // Match date/time types
+  if (/\b(date|time)\b/i.test(lower)) return 'date';
+  // Match boolean types
+  if (/\bbool(ean)?\b/i.test(lower)) return 'bool';
+  // Match numeric types
+  if (/\b(float|double|decimal|numeric|real)\b/i.test(lower)) return 'num';
 
   // Truncate very long types
   if (type.length > 10) {

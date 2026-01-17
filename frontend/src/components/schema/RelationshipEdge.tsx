@@ -13,7 +13,7 @@ import {
 } from 'reactflow';
 import type { RelationshipEdgeData } from '../../types/erDiagram';
 
-interface RelationshipEdgeProps extends EdgeProps<RelationshipEdgeData> { }
+interface RelationshipEdgeProps extends EdgeProps<RelationshipEdgeData> {}
 
 const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
   id,
