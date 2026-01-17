@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import QueryInput from './QueryInput';
 import ChatSessionSelector from './ChatSessionSelector';
 import Sidebar from './Sidebar';
@@ -29,7 +29,11 @@ interface PerTaskModelSettings {
   enable_prompt_optimization: boolean;
 }
 
-export default function EnhancedChatInterface() {
+interface EnhancedChatInterfaceProps {
+  activeTab?: string;
+}
+
+export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -78,32 +82,43 @@ export default function EnhancedChatInterface() {
     fetchActiveConnection();
   }, []);
 
-  // Fetch per-task model settings on mount and periodically
-  useEffect(() => {
-    const fetchPerTaskModels = async () => {
-      try {
-        const settings = await settingsAPI.getSettings();
-        setPerTaskModels({
-          model_sql_generation: settings.model_sql_generation,
-          model_narratives: settings.model_narratives,
-          model_query_planning: settings.model_query_planning,
-          model_error_correction: settings.model_error_correction,
-          enable_intent_classification: settings.enable_intent_classification,
-          enable_dynamic_examples: settings.enable_dynamic_examples,
-          enable_semantic_validation: settings.enable_semantic_validation,
-          enable_prompt_optimization: settings.enable_prompt_optimization,
-        });
-      } catch (error) {
-        console.error('Failed to fetch per-task model settings:', error);
-      }
-    };
+  // Fetch per-task model settings
+  const fetchPerTaskModels = useCallback(async () => {
+    try {
+      const settings = await settingsAPI.getSettings();
+      setPerTaskModels({
+        model_sql_generation: settings.model_sql_generation,
+        model_narratives: settings.model_narratives,
+        model_query_planning: settings.model_query_planning,
+        model_error_correction: settings.model_error_correction,
+        enable_intent_classification: settings.enable_intent_classification,
+        enable_dynamic_examples: settings.enable_dynamic_examples,
+        enable_semantic_validation: settings.enable_semantic_validation,
+        enable_prompt_optimization: settings.enable_prompt_optimization,
+      });
+    } catch (error) {
+      console.error('Failed to fetch per-task model settings:', error);
+    }
+  }, []);
 
+  useEffect(() => {
     fetchPerTaskModels();
 
-    // Refresh settings every 10 seconds to catch updates from Settings tab
+    // Refresh settings when tab becomes active
+    if (activeTab === 'chat') {
+      fetchPerTaskModels();
+    }
+
+    // Listener for immediate updates from SettingsPanel
+    window.addEventListener('settingsUpdated', fetchPerTaskModels);
+
+    // Refresh settings periodically
     const interval = setInterval(fetchPerTaskModels, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('settingsUpdated', fetchPerTaskModels);
+    };
+  }, [activeTab, fetchPerTaskModels]);
 
   // Save narratives preference to localStorage
   useEffect(() => {

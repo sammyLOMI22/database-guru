@@ -114,6 +114,9 @@ export function SettingsPanel() {
       setSettings(updatedSettings);
       setSuccessMessage('Settings saved successfully!');
 
+      // Notify other components (like EnhancedChatInterface) to refresh
+      window.dispatchEvent(new CustomEvent('settingsUpdated'));
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -142,6 +145,9 @@ export function SettingsPanel() {
       const resetSettings = await response.json();
       setSettings(resetSettings);
       setSuccessMessage('Settings reset to defaults!');
+
+      // Notify other components (like EnhancedChatInterface) to refresh
+      window.dispatchEvent(new CustomEvent('settingsUpdated'));
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(null), 3000);
