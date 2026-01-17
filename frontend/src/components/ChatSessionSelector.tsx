@@ -40,75 +40,75 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
   };
 
   return (
-    <div className="p-4 border-b border-gray-200 dark:border-gray-700 transition-colors">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Chat Sessions</h3>
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-4 px-1">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">Sessions</h3>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="px-3 py-1 text-xs bg-primary-600 dark:bg-primary-700 text-white rounded hover:bg-primary-700 dark:hover:bg-primary-600 transition-colors"
+          className="px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-lg hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/20"
         >
           + New
         </button>
       </div>
 
-      <div className="space-y-2">
-        {/* Default session (no chat context) */}
+      <div className="space-y-2 custom-scrollbar">
+        {/* Default session */}
         <button
           onClick={() => onSessionChange(null)}
-          className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${!currentSession
-              ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-medium'
-              : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-400'
+          className={`w-full text-left p-3 rounded-xl transition-all duration-300 border ${!currentSession
+            ? 'glass-card border-blue-500/30 bg-blue-500/5 text-blue-600 dark:text-blue-400 font-bold shadow-md shadow-blue-500/5'
+            : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-white/5 hover:border-white/10'
             }`}
         >
-          <div className="flex items-center">
-            <span className="text-lg mr-2">💬</span>
-            <span>Default Query</span>
+          <div className="flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${!currentSession ? 'bg-blue-500/10' : 'bg-gray-100 dark:bg-gray-800'}`}>
+              <span className="text-base">🚀</span>
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider">Default Query</p>
+              <p className="text-[10px] opacity-60 font-bold">Single database context</p>
+            </div>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Single database mode</p>
         </button>
 
         {/* Chat sessions */}
         {sessions.map((session) => (
           <div
             key={session.id}
-            className={`relative group rounded transition-all duration-200 ${currentSession?.id === session.id
-                ? 'bg-primary-100 dark:bg-primary-900/30 ring-2 ring-primary-500 dark:ring-primary-700'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+            className={`group rounded-xl transition-all duration-300 border ${currentSession?.id === session.id
+              ? 'glass-card border-indigo-500/30 bg-indigo-500/5 shadow-md shadow-indigo-500/5'
+              : 'border-transparent hover:bg-white/5 hover:border-white/10'
               }`}
           >
             <div className="flex items-stretch">
               <button
                 onClick={() => onSessionChange(session)}
-                className="flex-1 text-left px-3 py-2 text-sm"
+                className="flex-1 text-left p-3"
               >
-                <div className="flex items-center">
-                  <span className="text-lg mr-2">💬</span>
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${currentSession?.id === session.id ? 'bg-indigo-500/10' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                    <span className="text-base font-bold text-gray-600 dark:text-gray-400">
+                      {session.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`font-medium truncate ${currentSession?.id === session.id ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>{session.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {session.connections.length} database{session.connections.length !== 1 ? 's' : ''} • {session.message_count} messages
+                    <p className={`text-xs font-black uppercase tracking-wider truncate ${currentSession?.id === session.id ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      {session.name}
                     </p>
+                    <div className="flex items-center gap-2 mt-1 opacity-60">
+                      <p className="text-[10px] font-bold">
+                        {session.connections.length} DBs • {session.message_count} MSG
+                      </p>
+                    </div>
                   </div>
                 </div>
-                {session.connections.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {session.connections.map((conn) => (
-                      <span
-                        key={conn.id}
-                        className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 transition-colors"
-                      >
-                        {conn.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </button>
               <button
                 onClick={(e) => handleDeleteSession(session.id, e)}
-                className="opacity-0 group-hover:opacity-100 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-all"
+                className="opacity-0 group-hover:opacity-100 px-3 flex items-center justify-center text-red-500/50 hover:text-red-500 transition-all"
                 title="Delete session"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
@@ -181,23 +181,23 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden transition-colors">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">New Chat Session</h3>
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-xl flex items-center justify-center z-[100] animate-fadeIn p-4">
+      <div className="glass-card max-w-md w-full shadow-2xl animate-scaleUp border-white/10">
+        <div className="flex items-center justify-between p-6 border-b border-white/5">
+          <h3 className="text-lg font-black uppercase tracking-tight text-gray-900 dark:text-white">New Session</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="p-2 glass-panel rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4">
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 ml-1">
               Session Name
             </label>
             <input
@@ -205,35 +205,45 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Production Analysis"
-              className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-white focus:ring-primary-500 focus:border-primary-500 transition-colors"
+              className="w-full px-4 py-3 glass-panel bg-white/5 dark:bg-black/20 border-white/10 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500/50 outline-none transition-all font-medium"
               required
             />
           </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Select Databases ({selectedConnections.length} selected)
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 ml-1">
+              Connect Databases ({selectedConnections.length})
             </label>
-            <div className="border border-gray-300 dark:border-gray-700 rounded-md max-h-48 overflow-y-auto">
+            <div className="glass-panel bg-white/5 dark:bg-black/20 border-white/10 rounded-xl max-h-48 overflow-y-auto custom-scrollbar p-2 space-y-1">
               {connections.length === 0 ? (
-                <p className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                  No database connections found. Please add a connection first.
+                <p className="p-4 text-xs text-gray-500 dark:text-gray-400 text-center font-bold">
+                  No connections found.
                 </p>
               ) : (
                 connections.map((conn) => (
                   <label
                     key={conn.id}
-                    className="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors"
+                    className={`flex items-center p-3 rounded-lg cursor-pointer transition-all ${selectedConnections.includes(conn.id)
+                      ? 'bg-blue-600/10 border border-blue-500/30'
+                      : 'hover:bg-white/5 border border-transparent'
+                      }`}
                   >
                     <input
                       type="checkbox"
                       checked={selectedConnections.includes(conn.id)}
                       onChange={() => toggleConnection(conn.id)}
-                      className="mr-3 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded"
+                      className="hidden"
                     />
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center mr-3 transition-all ${selectedConnections.includes(conn.id) ? 'bg-blue-600 border-blue-600' : 'border-white/20'}`}>
+                      {selectedConnections.includes(conn.id) && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{conn.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">{conn.name}</p>
+                      <p className="text-[10px] text-gray-500 font-bold uppercase opacity-60">
                         {conn.database_type} • {conn.database_name}
                       </p>
                     </div>
@@ -243,20 +253,20 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
             </div>
           </div>
 
-          <div className="flex justify-end space-x-2">
+          <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+              className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !name.trim() || selectedConnections.length === 0}
-              className="px-4 py-2 text-sm bg-primary-600 dark:bg-primary-700 text-white rounded-md hover:bg-primary-700 dark:hover:bg-primary-600 disabled:opacity-50 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed transition-colors"
+              className="px-6 py-3 text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/20 disabled:opacity-30 disabled:hover:scale-100"
             >
-              {loading ? 'Creating...' : 'Create Session'}
+              {loading ? 'Creating...' : 'Launch Session'}
             </button>
           </div>
         </form>

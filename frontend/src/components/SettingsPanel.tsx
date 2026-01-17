@@ -169,31 +169,33 @@ export function SettingsPanel() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 min-h-full transition-colors">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+    <div className="max-w-4xl mx-auto p-6 min-h-full transition-colors animate-fadeIn">
+      <div className="glass-panel rounded-[2rem] shadow-2xl border-white/10 overflow-hidden">
         {/* Header */}
-        <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+        <div className="border-b border-white/5 px-8 py-6 bg-white/5 dark:bg-black/20">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <SettingsIcon className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-2xl glass-panel flex items-center justify-center text-blue-500 shadow-lg shadow-blue-500/10">
+                <SettingsIcon className="w-6 h-6" />
+              </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">System Settings</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Configure auto-learning and feedback behavior</p>
+                <h2 className="text-2xl font-black uppercase tracking-tight text-gray-900 dark:text-white">System Settings</h2>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Configure engine behavior and intelligence</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               <button
                 onClick={resetSettings}
                 disabled={saving}
-                className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg disabled:opacity-50 transition-colors"
+                className="flex items-center space-x-2 px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 glass-panel rounded-xl disabled:opacity-50 transition-all hover:scale-105 active:scale-95"
               >
                 <RotateCcw className="w-4 h-4" />
-                <span>Reset to Defaults</span>
+                <span>Reset</span>
               </button>
               <button
                 onClick={saveSettings}
                 disabled={saving}
-                className="flex items-center space-x-2 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
+                className="flex items-center space-x-2 px-6 py-2.5 text-[10px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl disabled:opacity-50 shadow-xl shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all"
               >
                 <Save className="w-4 h-4" />
                 <span>{saving ? 'Saving...' : 'Save Changes'}</span>
@@ -215,23 +217,27 @@ export function SettingsPanel() {
         )}
 
         {/* Settings Form */}
-        <div className="p-6 space-y-8">
+        <div className="p-8 space-y-10">
           {/* Query Quality Section */}
-          <div className="space-y-4 pb-6 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-              <span>🎯 Query Quality</span>
+          <div className="space-y-6">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white flex items-center gap-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              Query Intelligence
             </h3>
 
-            <div className="p-4 bg-gradient-to-r from-green-50 via-blue-50 to-purple-50 dark:from-green-900/10 dark:via-blue-900/10 dark:to-purple-900/10 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
-              <label className="block font-semibold text-gray-900 dark:text-white mb-2">
-                Quality Level: {settings.query_quality_level}%
-              </label>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Balance between query speed and accuracy
+            <div className="p-6 glass-panel bg-gradient-to-br from-blue-500/5 via-transparent to-indigo-500/5 border-white/10 rounded-2xl transition-all">
+              <div className="flex justify-between mb-4">
+                <label className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">
+                  Target Quality Level
+                </label>
+                <span className="text-lg font-black text-blue-600 dark:text-blue-400">{settings.query_quality_level}%</span>
+              </div>
+              <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">
+                Optimizes for speed at lower levels and precision at higher levels
               </p>
 
-              <div className="flex items-center space-x-4">
-                <span className="text-xs font-medium text-green-600">Fast</span>
+              <div className="flex items-center space-x-4 mb-8">
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Fast</span>
                 <input
                   type="range"
                   min="0"
@@ -242,40 +248,43 @@ export function SettingsPanel() {
                     ...settings,
                     query_quality_level: parseInt(e.target.value)
                   })}
-                  className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  className="flex-1 h-1.5 bg-gray-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-blue-600 focus:outline-none"
                 />
-                <span className="text-xs font-medium text-purple-600">Thorough</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Thorough</span>
               </div>
 
               {/* Mode Description */}
-              <div className="mt-4 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm transition-colors">
+              <div className="p-4 glass-panel bg-white/5 dark:bg-black/20 rounded-xl border-white/5 transition-all">
                 {settings.query_quality_level <= 30 && (
-                  <div className="text-green-700 dark:text-green-400">
-                    <strong className="block">Fast Mode (0-30%)</strong>
-                    <ul className="mt-1 ml-4 list-disc text-xs">
-                      <li>Minimal query planning</li>
-                      <li>Basic prompts, 1 retry max</li>
-                      <li>Best for simple queries</li>
+                  <div className="animate-fadeIn">
+                    <strong className="text-[10px] font-black uppercase tracking-widest text-emerald-500 block mb-2">Performance Focus</strong>
+                    <ul className="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-emerald-500" /> Minimal planning</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-emerald-500" /> Max 1 retry</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-emerald-500" /> Basic prompting</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-emerald-500" /> Low latency</li>
                     </ul>
                   </div>
                 )}
                 {settings.query_quality_level > 30 && settings.query_quality_level <= 70 && (
-                  <div className="text-blue-700 dark:text-blue-400">
-                    <strong className="block">Balanced Mode (31-70%) - Recommended</strong>
-                    <ul className="mt-1 ml-4 list-disc text-xs">
-                      <li>Smart query planning for complex queries</li>
-                      <li>Location-aware hints (NY, CA, etc.)</li>
-                      <li>Result verification, 3 retries</li>
+                  <div className="animate-fadeIn">
+                    <strong className="text-[10px] font-black uppercase tracking-widest text-blue-500 block mb-2">Balanced Engine (Optimal)</strong>
+                    <ul className="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-blue-500" /> Multi-step planning</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-blue-500" /> Up to 3 retries</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-blue-500" /> Semantic verification</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-blue-500" /> Dynamic examples</li>
                     </ul>
                   </div>
                 )}
                 {settings.query_quality_level > 70 && (
-                  <div className="text-purple-700 dark:text-purple-400">
-                    <strong className="block">Thorough Mode (71-100%)</strong>
-                    <ul className="mt-1 ml-4 list-disc text-xs">
-                      <li>Full planning for all queries</li>
-                      <li>Rich context, tool exploration</li>
-                      <li>Maximum retries, best accuracy</li>
+                  <div className="animate-fadeIn">
+                    <strong className="text-[10px] font-black uppercase tracking-widest text-indigo-500 block mb-2">Deep Intelligence</strong>
+                    <ul className="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-indigo-500" /> Full schema exploration</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-indigo-500" /> Tool-augmented reasoning</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-indigo-500" /> Parallel correction paths</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-indigo-500" /> Highest accuracy</li>
                     </ul>
                   </div>
                 )}
@@ -284,81 +293,70 @@ export function SettingsPanel() {
           </div>
 
           {/* SQL Generation Intelligence Section */}
-          <div className="space-y-4 pb-6 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-              <span>🧠 SQL Generation Intelligence</span>
+          <div className="space-y-6">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white flex items-center gap-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              Reasoning Modules
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Advanced features that improve SQL generation accuracy. Disable for faster responses.
-            </p>
 
-            {/* Toggle components (Generic styling for all blue toggles in this section) */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
-              <div className="flex-1">
-                <label className="font-semibold text-gray-900 dark:text-white">Intent Classification</label>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Detect impossible queries before SQL generation (e.g., "Show me data we don't have")
-                </p>
-              </div>
-              <button
-                onClick={() => setSettings({ ...settings, enable_intent_classification: !settings.enable_intent_classification })}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${settings.enable_intent_classification ? 'bg-blue-600' : 'bg-gray-300'
-                  }`}
-              >
-                <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.enable_intent_classification ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                />
-              </button>
-            </div>
-
-            {/* Dynamic Examples Toggle */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
-              <div className="flex-1">
-                <label className="font-semibold text-gray-900 dark:text-white">Dynamic Examples</label>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Generate schema-specific few-shot examples for better SQL accuracy
-                </p>
-              </div>
-              <button
-                onClick={() => setSettings({ ...settings, enable_dynamic_examples: !settings.enable_dynamic_examples })}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${settings.enable_dynamic_examples ? 'bg-blue-600' : 'bg-gray-300'
-                  }`}
-              >
-                <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.enable_dynamic_examples ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                />
-              </button>
-            </div>
-
-            {/* Semantic Validation Toggle */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
-              <div className="flex-1">
-                <label className="font-semibold text-gray-900 dark:text-white">Semantic Validation</label>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Validate that generated SQL matches your question's intent before execution
-                </p>
-              </div>
-              <button
-                onClick={() => setSettings({ ...settings, enable_semantic_validation: !settings.enable_semantic_validation })}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${settings.enable_semantic_validation ? 'bg-blue-600' : 'bg-gray-300'
-                  }`}
-              >
-                <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.enable_semantic_validation ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                />
-              </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                {
+                  key: 'enable_intent_classification',
+                  label: 'Intent Guard',
+                  desc: 'Auto-detect impossible or malformed queries',
+                  icon: '🛡️'
+                },
+                {
+                  key: 'enable_dynamic_examples',
+                  label: 'Dynamic Few-shot',
+                  desc: 'Fetch schema-specific examples for accuracy',
+                  icon: '📚'
+                },
+                {
+                  key: 'enable_semantic_validation',
+                  label: 'Semantic Check',
+                  desc: 'Final pass to verify SQL against natural intent',
+                  icon: '⚖️'
+                },
+                {
+                  key: 'enable_prompt_optimization',
+                  label: 'Prompt Tuning',
+                  desc: 'Compress schema and optimize instructions',
+                  icon: '⚡'
+                }
+              ].map((mod) => (
+                <div
+                  key={mod.key}
+                  className="p-5 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl flex items-center justify-between group hover:border-blue-500/30 transition-all duration-300"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl glass-panel flex items-center justify-center text-lg shadow-sm">
+                      {mod.icon}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">{mod.label}</h4>
+                      <p className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mt-0.5">{mod.desc}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSettings({ ...settings, [mod.key]: !settings[mod.key as keyof SystemSettings] })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-500 ${settings[mod.key as keyof SystemSettings] ? 'bg-blue-600 shadow-lg shadow-blue-500/20' : 'bg-gray-300 dark:bg-white/10'}`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-500 ${settings[mod.key as keyof SystemSettings] ? 'translate-x-6' : 'translate-x-1'}`}
+                    />
+                  </button>
+                </div>
+              ))}
             </div>
 
             {/* Info box */}
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm transition-colors">
-              <Info className="w-4 h-4 inline mr-2 text-blue-500 dark:text-blue-400" />
-              <span className="text-blue-800 dark:text-blue-300">
-                These features are automatically enabled for Balanced and Thorough quality levels.
-                Override here to customize behavior.
-              </span>
+            <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-2xl flex items-start gap-3 transition-colors">
+              <Info className="w-4 h-4 text-blue-500 mt-0.5" />
+              <p className="text-[10px] font-bold text-blue-600/80 dark:text-blue-400/80 uppercase tracking-widest leading-relaxed">
+                Note: Reasoning modules are calibrated automatically based on your Query Quality setting, but can be manually overridden here for specific workload requirements.
+              </p>
             </div>
           </div>
 
@@ -390,156 +388,126 @@ export function SettingsPanel() {
           </div>
 
           {/* Auto-Learning Section */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-              <span>🤖 Smart Auto-Learning (Option 3)</span>
+          <div className="space-y-6">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white flex items-center gap-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Auto-Evolution Engine
             </h3>
 
             {/* Master Toggle */}
-            <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors">
+            <div className="p-6 glass-panel bg-emerald-500/5 border-emerald-500/10 rounded-2xl flex items-center justify-between transition-all">
               <div className="flex-1">
-                <label className="font-semibold text-gray-900 dark:text-white">Enable Auto-Learning</label>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Automatically apply high-confidence user feedback to the learning system
+                <label className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">Active Learning</label>
+                <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mt-1">
+                  Automatically integrate high-confidence feedback into core models
                 </p>
               </div>
               <button
                 onClick={() => setSettings({ ...settings, auto_learning_enabled: !settings.auto_learning_enabled })}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${settings.auto_learning_enabled ? 'bg-blue-600' : 'bg-gray-300'
-                  }`}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-500 ${settings.auto_learning_enabled ? 'bg-emerald-600 shadow-lg shadow-emerald-500/20' : 'bg-gray-300 dark:bg-white/10'}`}
               >
                 <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.auto_learning_enabled ? 'translate-x-7' : 'translate-x-1'
-                    }`}
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-500 ${settings.auto_learning_enabled ? 'translate-x-6' : 'translate-x-1'}`}
                 />
               </button>
             </div>
 
-            {/* Confidence Threshold Slider */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
-              <label className="block font-semibold text-gray-900 dark:text-white mb-2">
-                Confidence Threshold: {(settings.confidence_threshold * 100).toFixed(0)}%
-              </label>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Minimum confidence required for auto-application (50-100%)
-              </p>
-              <div className="flex items-center space-x-4">
-                <span className="text-xs text-gray-500">50%</span>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="1.0"
-                  step="0.05"
-                  value={settings.confidence_threshold}
-                  onChange={(e) => setSettings({ ...settings, confidence_threshold: parseFloat(e.target.value) })}
-                  className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  disabled={!settings.auto_learning_enabled}
-                />
-                <span className="text-xs text-gray-500 dark:text-gray-400">100%</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Confidence Threshold Slider */}
+              <div className="p-6 glass-panel bg-white/5 border-white/5 rounded-2xl transition-all">
+                <div className="flex justify-between mb-4">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-900 dark:text-white">
+                    Confidence Floor
+                  </label>
+                  <span className="text-xs font-black text-emerald-600">{(settings.confidence_threshold * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-[10px] font-bold text-gray-400">50%</span>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="1.0"
+                    step="0.05"
+                    value={settings.confidence_threshold}
+                    onChange={(e) => setSettings({ ...settings, confidence_threshold: parseFloat(e.target.value) })}
+                    className="flex-1 h-1 bg-gray-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-emerald-600 focus:outline-none"
+                    disabled={!settings.auto_learning_enabled}
+                  />
+                  <span className="text-[10px] font-bold text-gray-400">100%</span>
+                </div>
               </div>
-              <div className="mt-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm transition-colors">
-                <Info className="w-4 h-4 inline mr-2 text-blue-500 dark:text-blue-400" />
-                <strong className="text-gray-900 dark:text-white">Auto-Learning Rules:</strong>
-                <ul className="mt-2 ml-6 list-disc space-y-1 text-gray-700 dark:text-gray-300">
-                  <li>High confidence (≥90%): Auto-apply immediately</li>
-                  <li>Medium confidence (70-89%): Queue for batch (deferred mode)</li>
-                  <li>Low confidence (&lt;70%): Manual review required</li>
-                </ul>
+
+              {/* Apply Mode */}
+              <div className="p-6 glass-panel bg-white/5 border-white/5 rounded-2xl transition-all">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-900 dark:text-white block mb-4">Strategy</label>
+                <div className="flex gap-4">
+                  {['immediate', 'deferred'].map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setSettings({ ...settings, apply_mode: mode as 'immediate' | 'deferred' })}
+                      disabled={!settings.auto_learning_enabled}
+                      className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest border rounded-xl transition-all ${settings.apply_mode === mode
+                        ? 'bg-emerald-600/10 border-emerald-500/30 text-emerald-600 font-black shadow-sm'
+                        : 'border-white/5 text-gray-500 hover:bg-white/5'}`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Apply Mode */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
-              <label className="block font-semibold text-gray-900 dark:text-white mb-2">Apply Mode</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                How to handle medium-confidence feedback (70-89%)
-              </p>
-              <div className="flex space-x-4">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="apply_mode"
-                    value="immediate"
-                    checked={settings.apply_mode === 'immediate'}
-                    onChange={(e) => setSettings({ ...settings, apply_mode: e.target.value as 'immediate' | 'deferred' })}
-                    className="w-4 h-4 text-blue-600"
-                    disabled={!settings.auto_learning_enabled}
-                  />
-                  <span className="text-sm">
-                    <strong>Immediate</strong> - Manual review only
-                  </span>
-                </label>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="apply_mode"
-                    value="deferred"
-                    checked={settings.apply_mode === 'deferred'}
-                    onChange={(e) => setSettings({ ...settings, apply_mode: e.target.value as 'immediate' | 'deferred' })}
-                    className="w-4 h-4 text-blue-600"
-                    disabled={!settings.auto_learning_enabled}
-                  />
-                  <span className="text-sm text-gray-800 dark:text-gray-200">
-                    <strong>Deferred</strong> - Queue for batch processing
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {/* Test Before Learning */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
-              <div className="flex-1">
-                <label className="font-semibold text-gray-900 dark:text-white">Test Before Learning</label>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Execute corrected SQL to verify it works before adding to learning system
-                </p>
+            {/* Test Before Learning Toggle */}
+            <div className="p-5 glass-panel bg-white/5 border-white/5 rounded-2xl flex items-center justify-between group transition-all">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl glass-panel flex items-center justify-center text-lg shadow-sm">
+                  🔬
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">Pre-flight Validation</h4>
+                  <p className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mt-0.5">Test SQL execution before integrating knowledge</p>
+                </div>
               </div>
               <button
                 onClick={() => setSettings({ ...settings, test_before_learning: !settings.test_before_learning })}
                 disabled={!settings.auto_learning_enabled}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors disabled:opacity-50 ${settings.test_before_learning ? 'bg-green-600' : 'bg-gray-300'
-                  }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-500 disabled:opacity-20 ${settings.test_before_learning ? 'bg-emerald-600 shadow-lg shadow-emerald-500/20' : 'bg-gray-300 dark:bg-white/10'}`}
               >
                 <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.test_before_learning ? 'translate-x-7' : 'translate-x-1'
-                    }`}
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-500 ${settings.test_before_learning ? 'translate-x-6' : 'translate-x-1'}`}
                 />
               </button>
             </div>
           </div>
 
           {/* Audit Settings Section */}
-          <div className="space-y-4 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">📋 Audit & Logging</h3>
+          <div className="space-y-6 pt-4 border-t border-white/5">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white flex items-center gap-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+              Transparency & Logs
+            </h3>
 
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
-              <div className="flex-1">
-                <label className="font-semibold text-gray-900 dark:text-white">Enable Audit Log</label>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Track all auto-applied feedback for review and rollback
-                </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-6 glass-panel bg-white/5 border-white/5 rounded-2xl flex items-center justify-between group transition-all">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">Audit Trail</h4>
+                  <p className="text-[10px] font-bold text-gray-500  uppercase tracking-widest mt-0.5">Log all auto-adjustments</p>
+                </div>
+                <button
+                  onClick={() => setSettings({ ...settings, enable_audit_log: !settings.enable_audit_log })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-500 ${settings.enable_audit_log ? 'bg-blue-600 shadow-lg shadow-blue-500/20' : 'bg-gray-300 dark:bg-white/10'}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-500 ${settings.enable_audit_log ? 'translate-x-6' : 'translate-x-1'}`}
+                  />
+                </button>
               </div>
-              <button
-                onClick={() => setSettings({ ...settings, enable_audit_log: !settings.enable_audit_log })}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${settings.enable_audit_log ? 'bg-blue-600' : 'bg-gray-300'
-                  }`}
-              >
-                <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.enable_audit_log ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                />
-              </button>
-            </div>
 
-            <div className="p-4 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
-              <label className="block font-semibold text-gray-900 dark:text-white mb-2">
-                Audit Log Retention: {settings.max_audit_log_days} days
-              </label>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                How long to keep audit logs (1-365 days)
-              </p>
-              <div className="flex items-center space-x-4">
-                <span className="text-xs text-gray-500">1 day</span>
+              <div className="p-6 glass-panel bg-white/5 border-white/5 rounded-2xl transition-all">
+                <div className="flex justify-between mb-4">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-900 dark:text-white">Retention Policy</label>
+                  <span className="text-xs font-black text-gray-500">{settings.max_audit_log_days} Days</span>
+                </div>
                 <input
                   type="range"
                   min="1"
@@ -547,32 +515,38 @@ export function SettingsPanel() {
                   step="1"
                   value={settings.max_audit_log_days}
                   onChange={(e) => setSettings({ ...settings, max_audit_log_days: parseInt(e.target.value) })}
-                  className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  className="w-full h-1 bg-gray-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-gray-500 focus:outline-none"
                   disabled={!settings.enable_audit_log}
                 />
-                <span className="text-xs text-gray-500 dark:text-gray-400">365 days</span>
               </div>
             </div>
           </div>
 
           {/* Info Section */}
-          <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors">
-              <h4 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">ℹ️ How Auto-Learning Works</h4>
-              <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-2 ml-4 list-disc">
-                <li>When users submit feedback with high confidence (≥90%), the system automatically applies it</li>
-                <li>The corrected SQL is tested before learning (if enabled) to ensure it works</li>
-                <li>Future similar errors will automatically use the learned correction</li>
-                <li>All auto-applied feedback is logged for audit and can be reviewed in the dashboard</li>
-                <li>You can always manually review and apply medium/low confidence feedback</li>
-              </ul>
+          <div className="p-6 glass-panel bg-blue-500/5 border-blue-500/10 rounded-3xl transition-all">
+            <h4 className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-4 flex items-center gap-2">
+              <Info className="w-4 h-4" />
+              Evolution Protocol
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+              {[
+                'High confidence (≥90%) auto-applies immediately.',
+                'Medium confidence (70-89%) queues for batch review.',
+                'Low confidence requires manual intervention.',
+                'Rollback any change from the core audit dashboard.'
+              ].map((text, idx) => (
+                <div key={idx} className="flex gap-3 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest leading-relaxed">
+                  <div className="w-1 h-1 rounded-full bg-blue-500/50 mt-1.5 flex-shrink-0" />
+                  {text}
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Metadata */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
-            <p>Last updated: {new Date(settings.updated_at).toLocaleString()}</p>
-            <p>Created: {new Date(settings.created_at).toLocaleString()}</p>
+          <div className="pt-2 flex justify-between items-center text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">
+            <p>LAST_SYNC: {new Date(settings.updated_at).toLocaleTimeString()}</p>
+            <p className="text-gray-300 dark:text-gray-600">ID: {settings.id.toString(16).toUpperCase()}</p>
           </div>
         </div>
       </div>
