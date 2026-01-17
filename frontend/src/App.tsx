@@ -52,38 +52,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <div className="flex flex-col h-screen bg-transparent transition-colors duration-500">
-        <Header isHealthy={isHealthy} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />
-
-        {/* Tab Navigation - Premium Floating Segmented Control */}
-        <div className="fixed top-28 left-1/2 -translate-x-1/2 z-50 pointer-events-none w-full max-w-2xl px-4">
-          <div className="flex p-2 glass-card rounded-[2rem] shadow-2xl pointer-events-auto border-white/10 dark:border-white/5 backdrop-blur-3xl">
-            {[
-              { id: 'chat', label: 'Chat', icon: '💬' },
-              { id: 'schema', label: 'Schema', icon: '🗂️' },
-              { id: 'feedback', label: 'Stats', icon: '📊' },
-              { id: 'tools', label: 'Tools', icon: '🔧' },
-              { id: 'settings', label: 'Config', icon: '⚙️' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`
-                  relative flex-1 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 flex flex-col items-center gap-1.5
-                  ${activeTab === tab.id
-                    ? 'text-white shadow-xl shadow-blue-500/20'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-white/5'
-                  }
-                `}
-              >
-                {activeTab === tab.id && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl -z-10 animate-scaleUp shadow-[0_0_20px_rgba(59,130,246,0.4)]" />
-                )}
-                <span className="text-xl leading-none">{tab.icon}</span>
-                <span className="opacity-80 font-black">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <Header
+          isHealthy={isHealthy}
+          isDarkMode={isDarkMode}
+          toggleDarkMode={toggleDarkMode}
+          activeTab={activeTab}
+          onTabChange={(id) => setActiveTab(id as any)}
+        />
 
         {/* Content Area - Keep all components mounted to preserve state */}
         <div className="flex flex-1 overflow-hidden min-h-0">
