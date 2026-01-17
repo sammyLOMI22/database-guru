@@ -357,7 +357,7 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 pt-24 pb-6 space-y-6">
           {/* Conversation Context Panel */}
           {currentSession && showContextPanel && (
             <div className="mb-4">

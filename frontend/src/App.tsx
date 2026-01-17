@@ -55,7 +55,7 @@ function App() {
         <Header isHealthy={isHealthy} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />
 
         {/* Tab Navigation - Premium Floating Segmented Control */}
-        <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-50 pointer-events-none w-full max-w-2xl px-4">
+        <div className="fixed top-28 left-1/2 -translate-x-1/2 z-50 pointer-events-none w-full max-w-2xl px-4">
           <div className="flex p-2 glass-card rounded-[2rem] shadow-2xl pointer-events-auto border-white/10 dark:border-white/5 backdrop-blur-3xl">
             {[
               { id: 'chat', label: 'Chat', icon: '💬' },
