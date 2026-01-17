@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import QueryInput from './QueryInput';
 import ChatSessionSelector from './ChatSessionSelector';
 import Sidebar from './Sidebar';
-import MultiDatabaseResults from './MultiDatabaseResults';
+import Message from './Message';
 import ConversationContextPanel from './ConversationContextPanel';
 import SchemaGlance from './SchemaGlance';
 import { useMultiQuery } from '../hooks/useMultiQuery';
@@ -368,58 +368,29 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
             </div>
           )}
 
-          {messages.map((message) => (
-            <div key={message.id} className="flex items-start space-x-3">
-              {/* Avatar */}
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${message.type === 'user'
-                ? 'bg-primary-100 text-primary-700'
-                : 'bg-gray-100 text-gray-700'
-                }`}>
-                {message.type === 'user' ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                ) : (
-                  <span className="text-lg">🧙‍♂️</span>
-                )}
-              </div>
-
-              {/* Message content */}
-              <div className="flex-1 min-w-0">
-                <div className="px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm transition-colors">
-                  <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">{message.content}</p>
-                </div>
-
-                {/* Multi-database results */}
-                {message.multiQueryResponse && (
-                  <div className="mt-3">
-                    <MultiDatabaseResults
-                      results={message.multiQueryResponse.database_results}
-                      totalRows={message.multiQueryResponse.total_rows}
-                      totalExecutionTime={message.multiQueryResponse.total_execution_time_ms}
-                      question={message.multiQueryResponse.question}
-                      cacheInfo={message.multiQueryResponse.cache_info}
-                      combinedAnalysis={message.multiQueryResponse.combined_analysis}
-                    />
-                  </div>
-                )}
-              </div>
+          {messages.map((message, idx) => (
+            <div key={message.id} className={`flex items-start gap-4 animate-fadeIn delay-${Math.min(idx, 5) * 100} opacity-0 fill-mode-forwards`}>
+              <Message
+                type={message.type}
+                content={message.content}
+                multiQueryResponse={message.multiQueryResponse}
+              />
             </div>
           ))}
 
           {/* Loading indicator */}
           {loading && (
-            <div className="flex items-start space-x-4 animate-fadeIn">
-              <div className="w-10 h-10 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center shadow-sm transition-transform duration-300 hover:scale-110">
+            <div className="flex items-start gap-4 animate-fadeIn">
+              <div className="w-10 h-10 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110">
                 <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               </div>
               <div className="flex-1">
-                <div className="px-5 py-3.5 glass-node rounded-t-[20px] rounded-br-[20px] rounded-bl-[4px] shadow-xl">
-                  <div className="flex items-center space-x-2">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                <div className="px-6 py-4 glass-card rounded-2xl shadow-2xl border-white/10">
+                  <div className="flex items-center space-x-3">
+                    <p className="text-sm font-bold text-blue-600 dark:text-blue-400 tracking-tight">
                       {currentSession && currentSession.connections.length > 1
-                        ? `Consulting ${currentSession.connections.length} databases...`
-                        : 'Summoning knowledge...'}
+                        ? `CONSULTING ${currentSession.connections.length} DATABASES...`
+                        : 'SUMMONING KNOWLEDGE...'}
                     </p>
                     <div className="flex space-x-1">
                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>

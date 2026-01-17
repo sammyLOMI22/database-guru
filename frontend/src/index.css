@@ -149,6 +149,39 @@ pre {
   animation: float 3s ease-in-out infinite;
 }
 
+/* Stagger Delay Utilities */
+.delay-0 {
+  animation-delay: 0ms;
+}
+
+.delay-100 {
+  animation-delay: 100ms;
+}
+
+.delay-200 {
+  animation-delay: 200ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
+
+.delay-400 {
+  animation-delay: 400ms;
+}
+
+.delay-500 {
+  animation-delay: 500ms;
+}
+
+.delay-700 {
+  animation-delay: 700ms;
+}
+
+.delay-1000 {
+  animation-delay: 1000ms;
+}
+
 /* Loading spinner - Refined */
 @keyframes spin {
   to {

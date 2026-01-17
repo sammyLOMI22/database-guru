@@ -230,7 +230,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
         )}
 
         {/* Input Area - Premium Glass Card */}
-        <div className="glass-card rounded-[2.5rem] p-2 pr-4 pl-6 shadow-2xl flex items-end space-x-3 border-white/20 dark:border-white/10 group-focus-within:border-blue-500/50 group-focus-within:shadow-blue-500/10 transition-all duration-500">
+        <div className="glass-card rounded-[2.5rem] p-2 pr-4 pl-6 shadow-2xl flex items-end space-x-3 border-white/20 dark:border-white/10 group-focus-within:border-blue-500/50 group-focus-within:ring-4 group-focus-within:ring-blue-500/10 group-focus-within:shadow-blue-500/10 transition-all duration-500 backdrop-blur-2xl">
           {/* Textarea */}
           <div className="flex-1 relative py-2">
             <textarea
