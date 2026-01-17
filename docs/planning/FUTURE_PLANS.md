@@ -681,6 +681,53 @@ async def stream_query_results(query_id: str):
 - Reduced database load
 - Better performance
 
+### 1.5. Query Compiler Redis Persistence
+**Priority**: LOW
+**Effort**: 2-3 days
+**Impact**: Performance (cross-process cache sharing)
+
+**Problem**: The QueryCompiler's in-memory LRU cache is not shared across application restarts or multiple worker processes. Each process maintains its own cache, leading to redundant cache misses.
+
+**Proposed Solution**:
+```python
+# src/core/query_compiler.py - Redis persistence layer
+class RedisQueryCompiler(QueryCompiler):
+    def __init__(self, redis_client, max_cache_size: int = 1000):
+        self.redis = redis_client
+        self.cache_key_prefix = "query_compiler:"
+
+    def get_compiled_query(self, sql: str):
+        template, params = self.normalize_query(sql)
+        query_hash = self._generate_hash(template)
+
+        # Check Redis first
+        cached = self.redis.get(f"{self.cache_key_prefix}{query_hash}")
+        if cached:
+            return CompiledQuery.from_json(cached), params
+
+        # Fall back to local cache or create new
+        return super().get_compiled_query(sql)
+```
+
+**Key Features**:
+- Shared cache across all application workers
+- Persistence across restarts (configurable TTL)
+- Fallback to in-memory cache if Redis unavailable
+- Metrics: cross-process hit rate tracking
+- Configuration: `QUERY_COMPILER_REDIS_TTL` (default: 24 hours)
+
+**Benefits**:
+- Higher cache hit rates in multi-worker deployments
+- Warm cache after application restarts
+- Reduced SQL parsing overhead across processes
+
+**Files to Create/Modify**:
+- `src/core/query_compiler.py` - Add Redis persistence layer
+- `src/config/settings.py` - Add Redis config for query compiler
+- `tests/test_query_compiler_redis.py` - Integration tests
+
+**Dependencies**: Redis (already used for semantic caching)
+
 ### 2. Query Suggestions
 **Effort**: 2 weeks
 

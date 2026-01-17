@@ -141,6 +141,7 @@ class SQLExecutor:
                 "execution_time_ms": execution_time * 1000,
                 "truncated": False,
                 "error": f"Query timeout after {self.timeout_seconds} seconds",
+                "compiled": compiled_query is not None,
             }
 
         except OperationalError as e:
@@ -153,6 +154,7 @@ class SQLExecutor:
                 "execution_time_ms": 0,
                 "truncated": False,
                 "error": f"Database error: {str(e)}",
+                "compiled": compiled_query is not None,
             }
 
         except DBAPIError as e:
@@ -165,6 +167,7 @@ class SQLExecutor:
                 "execution_time_ms": 0,
                 "truncated": False,
                 "error": f"SQL error: {str(e.orig) if hasattr(e, 'orig') else str(e)}",
+                "compiled": compiled_query is not None,
             }
 
         except SQLAlchemyError as e:
@@ -177,6 +180,7 @@ class SQLExecutor:
                 "execution_time_ms": 0,
                 "truncated": False,
                 "error": f"Database error: {str(e)}",
+                "compiled": compiled_query is not None,
             }
 
         except Exception as e:
@@ -189,6 +193,7 @@ class SQLExecutor:
                 "execution_time_ms": 0,
                 "truncated": False,
                 "error": f"Execution error: {str(e)}",
+                "compiled": compiled_query is not None,
             }
 
     def _execute_with_sync_session(

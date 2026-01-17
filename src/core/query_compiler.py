@@ -1,15 +1,19 @@
 """
 Query Compiler Module
 Handles normalization, compilation, and caching of SQL queries for performance optimization.
+
+Uses sqlparse for robust SQL tokenization instead of regex patterns.
 """
 import hashlib
-import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Any, Tuple, Optional
 import logging
 import threading
 from collections import OrderedDict
+
+import sqlparse
+from sqlparse import tokens as T
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +36,31 @@ class QueryCompiler:
     1. Normalizing raw SQL into parameterized templates
     2. Caching these templates to avoid re-parsing/re-planning
     3. Tracking performance metrics for compiled queries
+
+    Supported SQL Features:
+    - String literals: 'value' → :p0 (including escaped quotes like 'O''Reilly')
+    - Numeric literals: 123, -99.99, 1e10 → :p0
+    - Double-quoted identifiers: "Order 1" preserved as-is
+    - SQL comments: -- and /* */ stripped before processing
+    - Column/table names with numbers: col1, table2 preserved
+
+    Known Limitations:
+    - Array literals: PostgreSQL/DuckDB array syntax like ['a', 'b'] is preserved
+      as-is and NOT parameterized. This is intentional because array parameter
+      binding varies by database driver and converting to :p0 would produce
+      invalid SQL. Queries with array literals will have lower cache hit rates
+      since the array values remain in the template.
+    - Hex literals: 0xFF is not parameterized (uncommon in typical queries)
+    - Complex expressions: Nested parentheses with arithmetic may not be
+      fully captured in all cases.
+
+    Thread Safety:
+    - Singleton pattern with thread-safe initialization
+    - Cache operations protected by _cache_lock
+
+    Future Enhancement:
+    - Consider Redis persistence for cross-process cache sharing
+      (see docs/planning/FUTURE_PLANS.md)
     """
 
     _instance = None
@@ -61,60 +90,75 @@ class QueryCompiler:
         """
         Convert raw SQL to a parameterized template with named parameters.
 
-        Replaces literals (strings, numbers) with ':pX' placeholders.
-        Returns tuple of (template_sql, params_dict).
+        Uses sqlparse for robust tokenization. Replaces literals (strings, numbers)
+        with ':pX' placeholders while preserving all other SQL structure.
 
         Example:
             Input: "SELECT * FROM users WHERE id = 123 AND name = 'Alice'"
             Output: ("SELECT * FROM users WHERE id = :p0 AND name = :p1", {'p0': 123, 'p1': 'Alice'})
+
+        Handles:
+            - Negative numbers: -100 → :p0 with value -100
+            - Escaped quotes: 'O''Reilly' → :p0 with value "O'Reilly"
+            - Double-quoted identifiers: "Order 1" preserved as-is
+            - Array literals: ['a', 'b'] preserved as-is (dialect-specific)
+            - SQL comments: automatically skipped by sqlparse
+            - Scientific notation: 1e10 → :p0 with value 10000000000.0
         """
         params = {}
         counter = 0
+        result_tokens = []
 
-        def replace_token(match):
+        # Parse SQL into tokens
+        parsed = sqlparse.parse(sql)
+        if not parsed:
+            return sql, {}
+
+        statement = parsed[0]
+
+        def process_token(token):
+            """Process a single token, replacing literals with parameters."""
             nonlocal counter
 
-            # Check which group matched
-            # Group 1: Double quoted identifier (e.g. "Order 1") - IGNORE
-            if match.group(1) is not None:
-                return match.group(1)
+            # Skip comments entirely
+            if token.ttype in (T.Comment.Single, T.Comment.Multiline):
+                result_tokens.append(' ')  # Preserve whitespace
+                return
 
-            param_name = f"p{counter}"
-            counter += 1
-
-            # Group 2: Single quoted string (e.g. 'Alice' or 'O''Reilly')
-            if match.group(2) is not None:
-                # String match - extract content (group 3) and unescape quotes
-                val = match.group(3).replace("''", "'")
-                params[param_name] = val
-                return f":{param_name}"
-
-            # Group 4: Number (e.g. 123 or 99.99)
-            if match.group(4) is not None:
-                # Number match
-                val = match.group(4)
+            # Handle number literals (includes negative numbers like -100)
+            if token.ttype in (T.Literal.Number.Integer, T.Literal.Number.Float):
+                param_name = f"p{counter}"
+                counter += 1
+                val = token.value
                 try:
-                    if '.' in val:
+                    if '.' in val or 'e' in val.lower():
                         params[param_name] = float(val)
                     else:
                         params[param_name] = int(val)
                 except ValueError:
                     params[param_name] = val
-                return f":{param_name}"
+                result_tokens.append(f":{param_name}")
+                return
 
-            return match.group(0)
+            # Handle single-quoted string literals only
+            # Double-quoted strings (T.Literal.String.Symbol) are identifiers, not values
+            if token.ttype == T.Literal.String.Single:
+                param_name = f"p{counter}"
+                counter += 1
+                # Remove quotes and unescape doubled quotes
+                val = token.value[1:-1].replace("''", "'")
+                params[param_name] = val
+                result_tokens.append(f":{param_name}")
+                return
 
-        # Improved Regex:
-        # ("[^"]*")             -> Group 1: Double-quoted identifiers (ignore)
-        # |                     -> OR
-        # ('((?:''|[^'])*)')    -> Group 2: Single-quoted strings (parameterize). Group 3 is content.
-        #                          Handles escaped quotes like 'O''Reilly'.
-        # |                     -> OR
-        # (\b\d+(?:\.\d+)?\b)   -> Group 4: Numbers (parameterize).
-        pattern = r'("[^"]*")|(\'((?:\'\'|[^\'])*)\')|(\b\d+(?:\.\d+)?\b)'
+            # Preserve everything else as-is
+            result_tokens.append(token.value)
 
-        template = re.sub(pattern, replace_token, sql)
+        # Flatten and process all tokens
+        for token in statement.flatten():
+            process_token(token)
 
+        template = ''.join(result_tokens)
         return template, params
 
     def get_compiled_query(self, sql: str) -> Tuple[Optional[CompiledQuery], Dict[str, Any]]:
