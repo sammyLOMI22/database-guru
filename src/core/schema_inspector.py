@@ -558,7 +558,7 @@ class SchemaInspector:
         schema_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Get indexes for a table
+        Get indexes for a table with columns and unique constraint info.
 
         Args:
             session: Database session
@@ -566,35 +566,149 @@ class SchemaInspector:
             schema_name: Schema name
 
         Returns:
-            List of index dictionaries
+            List of index dictionaries with:
+            - name: Index name
+            - columns: List of column names in the index
+            - unique: Whether the index has a unique constraint
         """
         try:
-            query = """
-                SELECT
-                    indexname,
-                    indexdef
-                FROM pg_indexes
-                WHERE tablename = :table_name
-                AND schemaname = COALESCE(:schema_name, 'public')
-            """
+            db_name = session.bind.dialect.name if session.bind else "unknown"
 
-            result = await self._execute_query(session, text(query), {
+            if db_name == "sqlite":
+                # SQLite - use PRAGMA index_list and index_info
+                # First get list of indexes
+                query = f"PRAGMA index_list({table_name})"
+                result = await self._execute_query(session, text(query))
+
+                indexes = []
+                for row in result.all():
+                    # index_list returns: seq, name, unique, origin, partial
+                    index_name = row[1]
+                    is_unique = row[2] == 1
+
+                    # Get columns for this index
+                    col_query = f"PRAGMA index_info({index_name})"
+                    col_result = await self._execute_query(session, text(col_query))
+                    columns = [col_row[2] for col_row in col_result.all()]  # column name at index 2
+
+                    indexes.append({
+                        "name": index_name,
+                        "columns": columns,
+                        "unique": is_unique,
+                    })
+
+                return indexes
+
+            elif db_name == "duckdb":
+                # DuckDB - use duckdb_indexes()
+                query = f"""
+                    SELECT
+                        index_name,
+                        is_unique,
+                        sql
+                    FROM duckdb_indexes()
+                    WHERE table_name = '{table_name}'
+                """
+                result = await self._execute_query(session, text(query))
+
+                indexes = []
+                for row in result.all():
+                    index_name = row[0]
+                    is_unique = row[1]
+                    sql = row[2] if len(row) > 2 else ""
+
+                    # Parse columns from SQL if available
+                    columns = self._parse_index_columns_from_sql(sql)
+
+                    indexes.append({
+                        "name": index_name,
+                        "columns": columns,
+                        "unique": is_unique,
+                    })
+
+                return indexes
+
+            elif db_name == "mysql":
+                # MySQL - use SHOW INDEX
+                query = f"SHOW INDEX FROM {table_name}"
+                result = await self._execute_query(session, text(query))
+
+                # Group by index name
+                index_map = {}
+                for row in result.all():
+                    # SHOW INDEX returns: Table, Non_unique, Key_name, Seq_in_index, Column_name, ...
+                    index_name = row[2]
+                    is_unique = row[1] == 0  # Non_unique: 0 means unique
+                    column_name = row[4]
+
+                    if index_name not in index_map:
+                        index_map[index_name] = {
+                            "name": index_name,
+                            "columns": [],
+                            "unique": is_unique,
+                        }
+                    index_map[index_name]["columns"].append(column_name)
+
+                return list(index_map.values())
+
+            else:
+                # PostgreSQL - query pg_indexes with column info
+                query = """
+                    SELECT
+                        i.relname AS index_name,
+                        ix.indisunique AS is_unique,
+                        array_agg(a.attname ORDER BY array_position(ix.indkey, a.attnum)) AS columns
+                    FROM pg_class t
+                    JOIN pg_index ix ON t.oid = ix.indrelid
+                    JOIN pg_class i ON i.oid = ix.indexrelid
+                    JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+                    JOIN pg_namespace n ON n.oid = t.relnamespace
+                    WHERE t.relname = :table_name
+                    AND n.nspname = COALESCE(:schema_name, 'public')
+                    AND NOT ix.indisprimary
+                    GROUP BY i.relname, ix.indisunique
+                """
+
+                result = await self._execute_query(session, text(query), {
                     "table_name": table_name,
                     "schema_name": schema_name or "public"
                 })
 
-            indexes = []
-            for row in result.all():
-                indexes.append({
-                    "name": row[0],
-                    "definition": row[1],
-                })
+                indexes = []
+                for row in result.all():
+                    indexes.append({
+                        "name": row[0],
+                        "columns": list(row[2]) if row[2] else [],
+                        "unique": row[1],
+                    })
 
-            return indexes
+                return indexes
 
         except Exception as e:
             logger.debug(f"Error getting indexes for {table_name}: {e}")
             return []
+
+    def _parse_index_columns_from_sql(self, sql: str) -> List[str]:
+        """
+        Parse column names from CREATE INDEX SQL statement.
+
+        Args:
+            sql: CREATE INDEX SQL statement
+
+        Returns:
+            List of column names
+        """
+        if not sql:
+            return []
+
+        # Pattern: CREATE ... INDEX ... ON table_name (col1, col2, ...)
+        match = re.search(r'\(([^)]+)\)\s*$', sql)
+        if match:
+            columns_str = match.group(1)
+            # Split by comma and clean up
+            columns = [col.strip().strip('"').strip('`') for col in columns_str.split(',')]
+            return columns
+        return []
 
     def format_schema_for_llm(self, schema: Dict[str, Any]) -> str:
         """

@@ -1413,10 +1413,89 @@ Based on PR review feedback, these small improvements can be addressed:
 | Configurable model size registry (DB/config file) | `prompt_optimizer.py:KNOWN_MODEL_SIZES` | Low | 2 days |
 | Lightweight tokenizer integration (tiktoken) | `prompt_optimizer.py:_count_tokens()` | Low | 1 day |
 
+### ER Diagram Enhancements (Phase 7) - ✅ COMPLETE
+
+| Task | File | Priority | Status |
+|------|------|----------|--------|
+| Detect one-to-one relationships | `erDiagramUtils.ts:determineCardinality()` | Low | ✅ Complete |
+| Fix MiniMap `any` type | `ERDiagram.tsx` | Low | ✅ Complete |
+| Add debounced search input | `ERDiagram.tsx` | Low | ✅ Complete |
+| Smarter target column detection | `erDiagramUtils.ts:inferRelationships()` | Low | ✅ Complete |
+| Fix MAX_VISIBLE_COLUMNS mismatch | `erDiagramUtils.ts` | Low | ✅ Complete |
+
+### ER Diagram Phase 2 (Future)
+
+| Task | File | Priority | Effort |
+|------|------|----------|--------|
+| Many-to-many junction table detection | `erDiagramUtils.ts` | Medium | 1-2 hrs |
+| Centralize constants to shared file | `types/erDiagram.ts` | Medium | 30 min |
+| Error Boundary around ReactFlow | `ERDiagram.tsx` | Medium | 30 min |
+| Type adapter for React Flow generics | `ERDiagram.tsx`, `erDiagramUtils.ts` | Low | 1 hr |
+| Zoom-to-search animation | `ERDiagram.tsx` | Low | 1 hr |
+| Export to PDF/SVG | `ERDiagram.tsx` | Low | 2-3 hrs |
+| Search memoization for 1000+ tables | `erDiagramUtils.ts` | Low | 1 hr |
+
+**Details:**
+- **Many-to-many detection**: Detect junction tables (2 FKs as composite PK) and display M:N cardinality
+- **Centralize constants**: Move `NODE_WIDTH`, `HEADER_HEIGHT`, `MAX_VISIBLE_COLUMNS` to shared `types/erDiagram.ts`
+- **Error Boundary**: Wrap ReactFlow canvas to prevent white screen on corrupted schema
+- **Type adapters**: Remove `as unknown as` casts with proper adapter functions
+- **Zoom-to-search**: Smooth animate camera to frame searched table
+- **Export**: Allow users to download schema diagrams as PDF/SVG for documentation
+- **Search memoization**: For extremely large schemas (1000+ tables), memoize filter logic or use Web Worker
+
+**Completed January 16, 2026**
+
+**Implementation:**
+- **Backend**: Updated `SchemaInspector.get_indexes()` to return `columns` and `unique` fields for all database types (PostgreSQL, MySQL, SQLite, DuckDB)
+- **Frontend**: Enhanced `determineCardinality()` function to detect one-to-one relationships by:
+  1. Checking if FK column is also a primary key (indicates 1:1)
+  2. Checking if FK column has a unique constraint (enforces 1:1)
+- **Tests**: Added 7 new tests for cardinality detection (43 total ER diagram tests passing)
+
+```typescript
+// Implemented in erDiagramUtils.ts
+export function determineCardinality(
+  sourceTable: SchemaTableInfo,
+  sourceColumn: string
+): CardinalityType {
+  // If FK column is also a PK, it's likely one-to-one
+  if (sourceTable.primary_keys.includes(sourceColumn)) {
+    return 'one-to-one';
+  }
+
+  // If FK column has unique constraint, it's one-to-one
+  const hasUniqueConstraint = sourceTable.indexes?.some(
+    idx => idx.unique && idx.columns?.includes(sourceColumn)
+  );
+  if (hasUniqueConstraint) {
+    return 'one-to-one';
+  }
+
+  // Default to one-to-many
+  return 'one-to-many';
+}
+```
+
+**Files Changed:**
+- `src/core/schema_inspector.py` - Multi-database index introspection with `columns` and `unique` fields
+- `frontend/src/utils/erDiagramUtils.ts` - `determineCardinality()` function with constraint detection
+- `frontend/tests/ERDiagram.test.tsx` - 7 new cardinality detection tests
+
 ---
 
 ## Changelog
 
+- **2026-01-16**: ✅ Completed Phase 7 ER Diagram Enhancements + Additional Improvements
+  - Backend: Multi-database index introspection with `columns` and `unique` fields in `SchemaInspector.get_indexes()`
+  - Frontend: `determineCardinality()` now detects 1:1 relationships (FK as PK, unique constraints)
+  - Frontend: Fixed MiniMap `any` type → `TableNodeData | undefined`
+  - Frontend: Added debounced search (300ms) via new `useDebouncedValue` hook
+  - Frontend: Smarter inferred relationship target column detection (uses actual PK, not hardcoded 'id')
+  - Tests: 8 new tests (44 total ER diagram tests)
+  - Docs: Created `ER_DIAGRAM_GENERATOR_PR_REVIEW_PHASE_7.md` with all issues resolved
+  - Added ER Diagram Phase 2 future improvements to planning doc
+- **2026-01-12**: Added ER Diagram Enhancements section with `determineCardinality()` improvement plan
 - **2026-01-11**: ✅ Completed Phase 2.2 Prompt Optimization
   - New `PromptOptimizer` module (1,013 lines) in `src/llm/prompt_optimizer.py`
   - Token budgeting by model size: SMALL (~2K), MEDIUM (~4K), LARGE (~7K)

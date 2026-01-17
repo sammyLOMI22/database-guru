@@ -124,15 +124,15 @@ function App() {
         </div>
 
         {/* Content Area - Keep all components mounted to preserve state */}
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 flex">
+        <div className="flex flex-1 overflow-hidden min-h-0">
+          <main className="flex-1 flex h-full">
             {/* Chat - always mounted to preserve history */}
             <div className={`flex-1 flex ${activeTab === 'chat' ? '' : 'hidden'}`}>
               <EnhancedChatInterface />
             </div>
 
             {/* Schema */}
-            <div className={`flex-1 flex ${activeTab === 'schema' ? '' : 'hidden'}`}>
+            <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'schema' ? '' : 'hidden'}`}>
               <SchemaPanel />
             </div>
 

@@ -2,13 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Database,
   Activity,
-  CheckCircle,
   AlertTriangle,
   RefreshCw,
-  Clock,
   Gauge,
-  Zap,
-  Info,
   BarChart3,
   ShieldCheck,
   Trash2,
