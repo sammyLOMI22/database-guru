@@ -237,6 +237,9 @@ function formatColumnType(type: string): string {
     'point': 'point',
     'text': 'text',
     'clob': 'text',
+    'blob': 'blob',
+    'jsonb': 'jsonb',
+    'uuid': 'uuid',
   };
 
   // Check exact matches first
@@ -244,37 +247,23 @@ function formatColumnType(type: string): string {
     return exactTypes[lower];
   }
 
-  // Check prefix matches for compound types
-  for (const [long, short] of Object.entries(exactTypes)) {
-    if (lower.startsWith(long)) {
-      return type.toLowerCase().replace(long, short);
-    }
-  }
+  // Handle common prefix matches for compound types
+  if (lower.startsWith('varchar')) return 'varchar';
+  if (lower.startsWith('nvarchar')) return 'nvarchar';
+  if (lower.startsWith('char')) return 'char';
+  if (lower.startsWith('timestamp')) return 'timestamp';
+  if (lower.startsWith('datetime')) return 'datetime';
+  if (lower.startsWith('date')) return 'date';
+  if (lower.startsWith('decimal') || lower.startsWith('numeric')) return 'num';
 
   // Handle integer types explicitly (int, int4, int8, etc.)
-  // Exclude 'interval' and 'point' which contain 'int' substring
   if (/^int\d*$/i.test(lower)) {
     return 'int';
   }
 
-  // Match text/char types (varchar, char, nvarchar, nchar)
-  if (/^n?(var)?char/i.test(lower)) return 'text';
-
-  // Match date/time types
-  if (/^timestamp/i.test(lower)) return 'date';
-  if (/^date$/i.test(lower)) return 'date';
-  if (/^time$/i.test(lower)) return 'time';
-  if (/^datetime/i.test(lower)) return 'date';
-
-  // Match boolean types
-  if (/^bool(ean)?$/i.test(lower)) return 'bool';
-
-  // Match numeric types
-  if (/^(float|double|decimal|numeric|real|money)/i.test(lower)) return 'num';
-
-  // Truncate very long types
-  if (type.length > 10) {
-    return type.substring(0, 8) + '..';
+  // Truncate very long types if no better match was found
+  if (type.length > 12) {
+    return type.substring(0, 10).trim() + '..';
   }
 
   return type.toLowerCase();

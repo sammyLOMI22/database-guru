@@ -175,24 +175,26 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
   }, [isDarkMode, setNodes, setEdges]);
 
   // Apply search filter when query changes (live filtering as user types)
-  // Note: Schema effect also applies filter to handle diagram switches
   useEffect(() => {
     if (nodes.length === 0) return;
 
+    // Apply the filter (handles empty query by resetting)
     const { nodes: filteredNodes, edges: filteredEdges } = applySearchFilter(
       nodes as ERTableNode[],
       edges as ERRelationshipEdge[],
       debouncedSearchQuery
     );
 
-    // Only update if highlighting actually changed to prevent unnecessary re-renders
-    const hasHighlightChanges = filteredNodes.some(
-      (n, i) =>
-        n.data?.isHighlighted !== (nodes[i] as ERTableNode)?.data?.isHighlighted ||
-        n.data?.isDimmed !== (nodes[i] as ERTableNode)?.data?.isDimmed
-    );
+    // Check if any node's highlight/dimmed state changed
+    const highlightStateChanged = filteredNodes.some((n) => {
+      const existingNode = nodes.find((node) => node.id === n.id);
+      return (
+        n.data?.isHighlighted !== existingNode?.data?.isHighlighted ||
+        n.data?.isDimmed !== existingNode?.data?.isDimmed
+      );
+    });
 
-    if (hasHighlightChanges) {
+    if (highlightStateChanged || (!debouncedSearchQuery && nodes.some(n => n.data?.isHighlighted || n.data?.isDimmed))) {
       setNodes(filteredNodes as unknown as typeof nodes);
       setEdges(filteredEdges as unknown as typeof edges);
 
@@ -208,8 +210,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchQuery, fitView]);
+  }, [debouncedSearchQuery, fitView, setNodes, setEdges]);
 
   // Handle node click to toggle expansion
   const onNodeClick: NodeMouseHandler = useCallback(
