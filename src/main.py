@@ -103,7 +103,7 @@ app.add_middleware(
 # Add rate limiting middleware
 app.add_middleware(
     RateLimitMiddleware,
-    calls=100,  # 100 requests
+    calls=500,  # Increased to 500 to support concurrent polling from multiple components
     period=60,  # per 60 seconds
 )
 
