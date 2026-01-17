@@ -8,15 +8,18 @@ interface HeaderProps {
 
 export default function Header({ isHealthy, isDarkMode, toggleDarkMode }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-40 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50 px-8 py-4 transition-all duration-300">
+    <header className="sticky top-0 z-40 bg-white/60 dark:bg-gray-900/60 backdrop-blur-2xl border-b border-white/20 dark:border-white/5 px-8 py-4 transition-all duration-500 animate-fadeIn">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center space-x-4 group cursor-default">
-          <div className="text-4xl transform transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">🧙‍♂️</div>
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
+          <div className="relative">
+            <div className="text-4xl transform transition-all duration-700 group-hover:scale-125 group-hover:rotate-12 animate-float">🧙‍♂️</div>
+            <div className="absolute -inset-2 bg-blue-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-2xl font-black tracking-tight text-gradient">
               Database Guru
             </h1>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 opacity-80">
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-blue-600/70 dark:text-blue-400/70">
               AI-Powered SQL Assistant
             </p>
           </div>
@@ -26,21 +29,21 @@ export default function Header({ isHealthy, isDarkMode, toggleDarkMode }: Header
           {/* Theme Toggle */}
           <button
             onClick={toggleDarkMode}
-            className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-300 shadow-sm"
+            className="p-2.5 rounded-2xl glass-panel text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:scale-110 active:scale-95 transition-all duration-300 shadow-sm"
             title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDarkMode ? <Sun className="w-5 h-5 animate-spin-slow" /> : <Moon className="w-5 h-5" />}
           </button>
 
           {/* Database Status */}
-          <div className="flex items-center space-x-3 px-4 py-2 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-gray-200/50 dark:border-gray-700/50 transition-all duration-300 shadow-sm">
+          <div className="flex items-center space-x-3 px-4 py-2 glass-panel rounded-2xl transition-all duration-500 hover:shadow-lg hover:shadow-blue-500/10">
             <div className="relative">
-              <Database className={`w-4 h-4 ${isHealthy ? 'text-blue-500' : 'text-gray-400'}`} />
+              <Database className={`w-4 h-4 transition-colors duration-500 ${isHealthy ? 'text-blue-500 animate-pulse' : 'text-gray-400'}`} />
               {isHealthy && <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-ping"></div>}
-              {isHealthy && <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></div>}
+              {isHealthy && <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>}
             </div>
-            <span className="text-xs font-bold tracking-wide text-gray-700 dark:text-gray-300">
-              {isHealthy ? 'SYSTEM ONLINE' : 'OFFLINE'}
+            <span className="text-[11px] font-extrabold tracking-wider text-gray-700 dark:text-gray-300 uppercase">
+              {isHealthy ? 'System Online' : 'Offline'}
             </span>
           </div>
 

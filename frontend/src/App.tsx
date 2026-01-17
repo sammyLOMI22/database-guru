@@ -51,37 +51,35 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+      <div className="flex flex-col h-screen bg-transparent transition-colors duration-500">
         <Header isHealthy={isHealthy} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />
 
         {/* Tab Navigation - Premium Floating Segmented Control */}
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-          <div className="flex p-1.5 glass-panel rounded-2xl shadow-2xl pointer-events-auto backdrop-blur-2xl bg-white/40 dark:bg-gray-800/40 border-white/20 dark:border-white/10">
+        <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-50 pointer-events-none w-full max-w-2xl px-4">
+          <div className="flex p-2 glass-card rounded-[2rem] shadow-2xl pointer-events-auto border-white/10 dark:border-white/5 backdrop-blur-3xl">
             {[
               { id: 'chat', label: 'Chat', icon: '💬' },
               { id: 'schema', label: 'Schema', icon: '🗂️' },
-              { id: 'feedback', label: 'Feedback', icon: '📊' },
+              { id: 'feedback', label: 'Stats', icon: '📊' },
               { id: 'tools', label: 'Tools', icon: '🔧' },
-              { id: 'cache', label: 'Cache', icon: '💾' },
-              { id: 'pools', label: 'Pools', icon: '🔗' },
-              { id: 'settings', label: 'Settings', icon: '⚙️' },
+              { id: 'settings', label: 'Config', icon: '⚙️' },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`
-                  relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2
+                  relative flex-1 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 flex flex-col items-center gap-1.5
                   ${activeTab === tab.id
-                    ? 'text-white shadow-lg shadow-blue-500/20'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-white/10'
+                    ? 'text-white shadow-xl shadow-blue-500/20'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-white/5'
                   }
                 `}
               >
                 {activeTab === tab.id && (
-                  <div className="absolute inset-0 bg-blue-600 dark:bg-blue-500 rounded-xl -z-10 animate-fadeIn" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl -z-10 animate-scaleUp shadow-[0_0_20px_rgba(59,130,246,0.4)]" />
                 )}
-                <span className="text-base">{tab.icon}</span>
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="text-xl leading-none">{tab.icon}</span>
+                <span className="opacity-80 font-black">{tab.label}</span>
               </button>
             ))}
           </div>

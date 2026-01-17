@@ -164,7 +164,7 @@ export default function EnhancedChatInterface() {
 
       {/* Session Selector Sidebar */}
       {showSessionSelector && (
-        <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0 transition-colors">
+        <div className="w-80 glass-panel border-r border-white/10 overflow-y-auto flex-shrink-0 transition-all duration-500 animate-slideInLeft relative z-30">
           <ChatSessionSelector
             currentSession={currentSession}
             onSessionChange={setCurrentSession}
@@ -173,18 +173,18 @@ export default function EnhancedChatInterface() {
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <div className="px-6 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors">
+      <div className="flex-1 flex flex-col min-w-0 bg-transparent relative z-10">
+        {/* Header - Sub Header for Chat Info */}
+        <div className="px-6 py-3 glass-panel border-b border-white/10 transition-colors duration-500">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
               {/* Toggle connections sidebar button */}
               <button
                 onClick={() => setShowSidebar(!showSidebar)}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                className="p-2 glass-panel rounded-xl hover:scale-110 active:scale-95 transition-all text-gray-600 dark:text-gray-400 group"
                 title="Toggle database connections"
               >
-                <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
                 </svg>
               </button>
@@ -192,10 +192,10 @@ export default function EnhancedChatInterface() {
               {/* Toggle sessions sidebar button */}
               <button
                 onClick={() => setShowSessionSelector(!showSessionSelector)}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                className="p-2 glass-panel rounded-xl hover:scale-110 active:scale-95 transition-all text-gray-600 dark:text-gray-400 group"
                 title="Toggle sessions panel"
               >
-                <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </button>
