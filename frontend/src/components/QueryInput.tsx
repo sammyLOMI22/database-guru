@@ -288,11 +288,18 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
           </div>
 
           <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
-            {perTaskModels && (
+            {perTaskModels ? (
+              <span className="text-blue-600/60 dark:text-blue-400/60">
+                AI ENGINE: <strong className="text-gray-900 dark:text-gray-200">{perTaskModels.sql || selectedModel}</strong>
+                {perTaskModels.sql && selectedModel && perTaskModels.sql !== selectedModel && (
+                  <span className="ml-2 opacity-50">(SQL OPTIMIZED)</span>
+                )}
+              </span>
+            ) : selectedModel ? (
               <span className="text-blue-600/60 dark:text-blue-400/60">
                 AI ENGINE: <strong className="text-gray-900 dark:text-gray-200">{selectedModel}</strong>
               </span>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
