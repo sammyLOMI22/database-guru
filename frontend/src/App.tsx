@@ -54,72 +54,36 @@ function App() {
       <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
         <Header isHealthy={isHealthy} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />
 
-        {/* Tab Navigation */}
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors">
-          <div className="flex px-6 overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('chat')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'chat'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-            >
-              💬 Query Interface
-            </button>
-            <button
-              onClick={() => setActiveTab('schema')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'schema'
-                  ? 'border-green-500 text-green-600 dark:text-green-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-            >
-              🗂️ Schema
-            </button>
-            <button
-              onClick={() => setActiveTab('feedback')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'feedback'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-            >
-              📊 Feedback
-            </button>
-            <button
-              onClick={() => setActiveTab('tools')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'tools'
-                  ? 'border-orange-500 text-orange-600 dark:text-orange-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-            >
-              🔧 Tools
-            </button>
-            <button
-              onClick={() => setActiveTab('cache')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'cache'
-                  ? 'border-amber-500 text-amber-600 dark:text-amber-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-            >
-              💾 Cache
-            </button>
-            <button
-              onClick={() => setActiveTab('pools')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'pools'
-                  ? 'border-cyan-500 text-cyan-600 dark:text-cyan-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-            >
-              🔗 Pools
-            </button>
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'settings'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-            >
-              ⚙️ Settings
-            </button>
+        {/* Tab Navigation - Premium Floating Segmented Control */}
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="flex p-1.5 glass-panel rounded-2xl shadow-2xl pointer-events-auto backdrop-blur-2xl bg-white/40 dark:bg-gray-800/40 border-white/20 dark:border-white/10">
+            {[
+              { id: 'chat', label: 'Chat', icon: '💬' },
+              { id: 'schema', label: 'Schema', icon: '🗂️' },
+              { id: 'feedback', label: 'Feedback', icon: '📊' },
+              { id: 'tools', label: 'Tools', icon: '🔧' },
+              { id: 'cache', label: 'Cache', icon: '💾' },
+              { id: 'pools', label: 'Pools', icon: '🔗' },
+              { id: 'settings', label: 'Settings', icon: '⚙️' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`
+                  relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2
+                  ${activeTab === tab.id
+                    ? 'text-white shadow-lg shadow-blue-500/20'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-white/10'
+                  }
+                `}
+              >
+                {activeTab === tab.id && (
+                  <div className="absolute inset-0 bg-blue-600 dark:bg-blue-500 rounded-xl -z-10 animate-fadeIn" />
+                )}
+                <span className="text-base">{tab.icon}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            ))}
           </div>
         </div>
 

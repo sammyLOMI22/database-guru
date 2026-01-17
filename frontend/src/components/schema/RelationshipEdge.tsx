@@ -13,7 +13,7 @@ import {
 } from 'reactflow';
 import type { RelationshipEdgeData } from '../../types/erDiagram';
 
-interface RelationshipEdgeProps extends EdgeProps<RelationshipEdgeData> {}
+interface RelationshipEdgeProps extends EdgeProps<RelationshipEdgeData> { }
 
 const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
   id,
@@ -58,25 +58,33 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
   const strokeDasharray = isInferred ? '5,5' : undefined;
 
   // Determine color based on state
-  // Use consistent solid colors for both light and dark modes
   const strokeColor = isHighlighted
     ? '#FBBF24'
     : selected
       ? '#3B82F6'
       : isDarkMode
-        ? '#4B5563' // gray-600 for dark mode (visible but not overwhelming)
-        : '#9CA3AF'; // gray-400 for light mode
+        ? 'rgba(96, 165, 250, 0.4)'
+        : 'rgba(59, 130, 246, 0.3)';
 
-  const strokeWidth = selected || isHighlighted ? 2.5 : 1.5;
+  const strokeWidth = selected || isHighlighted ? 3 : 2;
 
   // Determine animation
-  const edgeClassName = isHighlighted ? 'edge-animate' : '';
+  const edgeClassName = (selected || isHighlighted) ? 'edge-animate' : '';
 
   // Cardinality marker size
-  const markerSize = 8;
+  const markerSize = 12;
 
   return (
     <>
+      {/* Background interaction path (wider for easier clicking) */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={20}
+        className="cursor-pointer"
+      />
+
       {/* Main edge path */}
       <path
         id={id}
@@ -88,20 +96,23 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
           stroke: strokeColor,
           strokeWidth,
           strokeDasharray,
-          filter: isHighlighted ? 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.4))' : 'none',
-          transition: 'stroke 0.3s, stroke-width 0.3s',
+          filter: isHighlighted || selected
+            ? `drop-shadow(0 0 12px ${selected ? 'rgba(59, 130, 246, 0.6)' : 'rgba(251, 191, 36, 0.6)'})`
+            : 'none',
+          transition: 'stroke 0.5s, stroke-width 0.5s, filter 0.5s',
         }}
       />
 
       {/* Cardinality markers */}
       <EdgeLabelRenderer>
-        {/* Source side marker (many side for one-to-many) */}
+        {/* Source side marker */}
         <div
           style={{
             position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${sourceX}px, ${sourceY + 15}px)`,
+            transform: `translate(-50%, -50%) translate(${sourceX}px, ${sourceY + 18}px)`,
             pointerEvents: 'none',
           }}
+          className="transition-opacity duration-300"
         >
           {cardinality === 'one-to-many' || cardinality === 'many-to-many' ? (
             <ManyMarker size={markerSize} color={strokeColor} />
@@ -110,13 +121,14 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
           )}
         </div>
 
-        {/* Target side marker (one side for one-to-many) */}
+        {/* Target side marker */}
         <div
           style={{
             position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${targetX}px, ${targetY - 15}px)`,
+            transform: `translate(-50%, -50%) translate(${targetX}px, ${targetY - 18}px)`,
             pointerEvents: 'none',
           }}
+          className="transition-opacity duration-300"
         >
           {cardinality === 'many-to-many' ? (
             <ManyMarker size={markerSize} color={strokeColor} />
@@ -134,18 +146,17 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
               pointerEvents: 'all',
             }}
             className={`
-              px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-tight
-              ${isDarkMode ? 'glass-panel text-gray-200' : 'bg-white text-gray-700 shadow-lg'}
-              border border-blue-500/30
-              flex items-center gap-1.5
+              px-3 py-1.5 rounded-xl text-[10px] font-extrabold tracking-wider uppercase
+              ${isDarkMode ? 'glass-node text-white border-blue-500/50' : 'bg-white text-gray-800 shadow-2xl border-blue-200'}
+              animate-fadeIn flex items-center gap-2
             `}
           >
-            <span className="text-blue-400 opacity-80">{sourceColumn}</span>
-            <span className="text-gray-500">→</span>
-            <span className="text-indigo-400 opacity-80">{targetColumn}</span>
+            <span className="text-blue-500">{sourceColumn}</span>
+            <span className="opacity-40">→</span>
+            <span className="text-indigo-500">{targetColumn}</span>
             {isInferred && (
-              <span className="ml-0.5 text-yellow-500" title="Inferred relationship">
-                ✧
+              <span className="ml-1 px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-500 text-[8px]" title="Inferred relationship">
+                AI INFERRED
               </span>
             )}
           </div>
@@ -156,30 +167,22 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
 };
 
 /**
- * "One" side cardinality marker (single line).
+ * "One" side cardinality marker.
  */
 const OneMarker: React.FC<{ size: number; color: string }> = ({ size, color }) => (
-  <svg width={size} height={size} viewBox="0 0 10 10">
-    <line
-      x1="5"
-      y1="0"
-      x2="5"
-      y2="10"
-      stroke={color}
-      strokeWidth="2"
-    />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="drop-shadow-sm">
+    <circle cx="12" cy="12" r="4" fill={color} />
+    <circle cx="12" cy="12" r="8" stroke={color} strokeWidth="2" strokeOpacity="0.3" />
   </svg>
 );
 
 /**
- * "Many" side cardinality marker (crow's foot).
+ * "Many" side cardinality marker.
  */
 const ManyMarker: React.FC<{ size: number; color: string }> = ({ size, color }) => (
-  <svg width={size} height={size} viewBox="0 0 10 10">
-    {/* Crow's foot shape */}
-    <line x1="5" y1="5" x2="0" y2="0" stroke={color} strokeWidth="1.5" />
-    <line x1="5" y1="5" x2="10" y2="0" stroke={color} strokeWidth="1.5" />
-    <line x1="5" y1="5" x2="5" y2="10" stroke={color} strokeWidth="1.5" />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="drop-shadow-sm">
+    <path d="M12 4L12 20M4 12L20 12" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    <path d="M7 7L17 17M17 7L7 17" stroke={color} strokeWidth="3" strokeLinecap="round" />
   </svg>
 );
 

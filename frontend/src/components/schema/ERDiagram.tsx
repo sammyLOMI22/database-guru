@@ -281,13 +281,13 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
   }
 
   return (
-    <div className="h-full w-full flex flex-col">
-      {/* Toolbar */}
+    <div className="h-full w-full relative group">
+      {/* Floating Toolbar */}
       <div
         className={`
-          flex items-center justify-between px-4 py-2 border-b
-          ${isDarkMode ? 'glass-panel border-gray-700/50' : 'bg-gray-50 border-gray-200'}
-          backdrop-blur-md z-10 relative
+          absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-6 px-6 py-3 
+          glass-panel rounded-2xl shadow-2xl z-40 transition-all duration-500
+          hover:scale-[1.02]
         `}
       >
         <ERDiagramSearch

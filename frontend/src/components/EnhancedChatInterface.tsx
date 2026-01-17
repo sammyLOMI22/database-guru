@@ -383,17 +383,24 @@ export default function EnhancedChatInterface() {
 
           {/* Loading indicator */}
           {loading && (
-            <div className="flex items-start space-x-3">
-              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-gray-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="flex items-start space-x-4 animate-fadeIn">
+              <div className="w-10 h-10 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center shadow-sm transition-transform duration-300 hover:scale-110">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               </div>
               <div className="flex-1">
-                <div className="px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {currentSession && currentSession.connections.length > 1
-                      ? `Querying ${currentSession.connections.length} databases...`
-                      : 'Thinking...'}
-                  </p>
+                <div className="px-5 py-3.5 glass-node rounded-t-[20px] rounded-br-[20px] rounded-bl-[4px] shadow-xl">
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {currentSession && currentSession.connections.length > 1
+                        ? `Consulting ${currentSession.connections.length} databases...`
+                        : 'Summoning knowledge...'}
+                    </p>
+                    <div className="flex space-x-1">
+                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
