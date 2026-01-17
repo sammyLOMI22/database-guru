@@ -65,25 +65,25 @@ const ChartInfoBadge: React.FC<{ recommendation: IntelligentChartRecommendation 
   recommendation,
 }) => {
   return (
-    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-900/50 flex items-start gap-3">
-      <div className="mt-0.5">
+    <div className="mb-4 p-3 glass-card bg-blue-500/5 dark:bg-blue-500/10 border-blue-500/20 rounded-xl flex items-start gap-3 animate-fadeIn">
+      <div className="mt-0.5 p-1 bg-blue-500/10 rounded-lg">
         <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
       </div>
       <div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest bg-blue-500/10 px-1.5 py-0.5 rounded">
             AI Recommendation
           </span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded font-medium">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded-full font-bold border border-blue-500/30">
               {chartTypeLabels[recommendation.primaryChart]}
             </span>
-            <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded font-medium">
+            <span className="text-xs px-2 py-0.5 bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 rounded-full font-bold border border-indigo-500/30">
               {Math.round(recommendation.confidence)}% Confidence
             </span>
           </div>
         </div>
-        <p className="text-sm text-blue-800 dark:text-blue-300 mt-0.5">{recommendation.reason}</p>
+        <p className="text-sm text-blue-800 dark:text-blue-300 mt-1.5 font-medium leading-tight">{recommendation.reason}</p>
       </div>
     </div>
   );
@@ -93,19 +93,21 @@ const InsightsBadge: React.FC<{ insights: DataInsight[] }> = ({ insights }) => {
   if (!insights || insights.length === 0) return null;
 
   return (
-    <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-900/50">
-      <div className="flex items-center gap-2 mb-2">
-        <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-        <span className="text-xs font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider">
+    <div className="mb-4 p-3 glass-card bg-purple-500/5 dark:bg-purple-500/10 border-purple-500/20 rounded-xl animate-fadeIn delay-100">
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className="p-1 bg-purple-500/10 rounded-lg">
+          <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+        </div>
+        <span className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest bg-purple-500/10 px-1.5 py-0.5 rounded">
           Data Insights
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
         {insights.map((insight, index) => (
-          <div key={index} className="flex items-center gap-2 px-2 py-1 bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 rounded text-xs">
-            {insight.type === 'trend' && <TrendingUp className="w-3 h-3" />}
-            {insight.type === 'outlier' && <AlertTriangle className="w-3 h-3" />}
-            {insight.type === 'pattern' && <Lightbulb className="w-3 h-3" />}
+          <div key={index} className="flex items-center gap-2 px-2.5 py-1 bg-white/50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200 rounded-full text-xs font-medium border border-purple-200/50 dark:border-purple-800/50">
+            {insight.type === 'trend' && <TrendingUp className="w-3.5 h-3.5" />}
+            {insight.type === 'outlier' && <AlertTriangle className="w-3.5 h-3.5" />}
+            {insight.type === 'pattern' && <Lightbulb className="w-3.5 h-3.5" />}
             <span>{insight.message}</span>
           </div>
         ))}
@@ -164,12 +166,14 @@ export const ChartVisualization: React.FC<ChartVisualizationProps> = ({
   // No chart available
   if (recommendation.primaryChart === 'table') {
     return (
-      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 text-center">
-        <AlertCircle className="w-8 h-8 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
-        <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">
+      <div className="glass-card bg-gray-500/5 rounded-2xl border-gray-500/10 p-8 text-center animate-fadeIn">
+        <div className="w-12 h-12 bg-gray-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+          <AlertCircle className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+        </div>
+        <p className="text-base text-gray-700 dark:text-gray-200 font-bold tracking-tight">
           No Visualization Available
         </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{recommendation.reason}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-xs mx-auto">{recommendation.reason}</p>
       </div>
     );
   }

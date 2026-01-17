@@ -255,10 +255,11 @@ function scoreChartTypes(
   // BAR CHART scoring
   if (categoricalColumns.length > 0 && numericColumns.length > 0) {
     const uniqueCategories = getUniqueCount(categoricalColumns[0], results);
-    if (uniqueCategories >= 2 && uniqueCategories <= 15) {
-      scores.bar += 35;
+    // Increased threshold from 15 to 30 for better coverage of diverse datasets
+    if (uniqueCategories >= 2 && uniqueCategories <= 30) {
+      scores.bar += 45; // Increased base score
       // Optimal range for bar charts
-      if (uniqueCategories >= 3 && uniqueCategories <= 10) {
+      if (uniqueCategories >= 3 && uniqueCategories <= 12) {
         scores.bar += 15;
       }
     }
@@ -271,23 +272,23 @@ function scoreChartTypes(
   // PIE CHART scoring
   if (categoricalColumns.length > 0 && numericColumns.length > 0) {
     const uniqueCategories = getUniqueCount(categoricalColumns[0], results);
-    // Pie is best for 2-8 categories
-    if (uniqueCategories >= 2 && uniqueCategories <= 8) {
-      scores.pie += 40;
+    // Pie is best for 2-12 categories (increased from 8)
+    if (uniqueCategories >= 2 && uniqueCategories <= 12) {
+      scores.pie += 45; // Increased base score
       // Check if values are proportional (sum to 100 or represent parts)
       if (isProbablyProportional(results, numericColumns[0])) {
-        scores.pie += 20;
+        scores.pie += 25;
       }
     }
     // Penalize pie for too many categories
-    if (uniqueCategories > 8) {
+    if (uniqueCategories > 12) {
       scores.pie -= 30;
     }
   }
 
   // SCATTER PLOT scoring
   if (numericColumns.length >= 2) {
-    scores.scatter += 30;
+    scores.scatter += 40; // Increased base score
     if (patterns.hasCorrelation) {
       scores.scatter += 25;
     }
@@ -297,7 +298,7 @@ function scoreChartTypes(
     }
     // Two numeric columns strongly suggests scatter
     if (numericColumns.length === 2 && categoricalColumns.length === 0) {
-      scores.scatter += 20;
+      scores.scatter += 25;
     }
   }
 

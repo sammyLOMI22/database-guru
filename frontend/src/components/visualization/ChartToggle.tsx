@@ -17,6 +17,7 @@ import {
   BarChart3,
   Activity,
   Circle,
+  Sparkles,
 } from 'lucide-react';
 import { ChartType } from '../../utils/chartUtils';
 
@@ -107,23 +108,22 @@ export const ChartToggle: React.FC<ChartToggleProps> = ({
   };
 
   return (
-    <div className="inline-flex items-center gap-1">
-      <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+    <div className="inline-flex items-center gap-1.5 animate-fadeIn">
+      <div className="inline-flex rounded-xl glass-card bg-gray-500/5 border-gray-500/10 p-1 shadow-inner">
         {/* Table View Button */}
         <button
           onClick={() => onModeChange('table')}
           className={`
-            inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md
-            transition-all duration-150
-            ${
-              mode === 'table'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+            inline-flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-bold rounded-lg
+            transition-all duration-300
+            ${mode === 'table'
+              ? 'glass-card bg-white/40 dark:bg-white/10 text-gray-900 dark:text-gray-100 shadow-sm border-white/30 scale-105 z-10'
+              : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-white/10'
             }
           `}
           title="View as table"
         >
-          <Table className="w-4 h-4" />
+          <Table className={`w-4 h-4 transition-transform duration-300 ${mode === 'table' ? 'scale-110' : ''}`} />
           <span className="hidden sm:inline">Table</span>
         </button>
 
@@ -132,14 +132,13 @@ export const ChartToggle: React.FC<ChartToggleProps> = ({
           onClick={() => chartAvailable && onModeChange('chart')}
           disabled={!chartAvailable}
           className={`
-            inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md
-            transition-all duration-150
-            ${
-              !chartAvailable
-                ? 'text-gray-400 cursor-not-allowed'
-                : mode === 'chart'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+            inline-flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-bold rounded-lg
+            transition-all duration-300
+            ${!chartAvailable
+              ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              : mode === 'chart'
+                ? 'glass-card bg-blue-500/20 text-blue-600 dark:text-blue-400 shadow-sm border-blue-500/20 scale-105 z-10 glow-sm'
+                : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-white/10'
             }
           `}
           title={
@@ -149,8 +148,10 @@ export const ChartToggle: React.FC<ChartToggleProps> = ({
           }
         >
           {effectiveChartType && effectiveChartType !== 'table'
-            ? chartTypeIcons[effectiveChartType]
-            : <BarChart2 className="w-4 h-4" />}
+            ? React.cloneElement(chartTypeIcons[effectiveChartType] as React.ReactElement, {
+              className: `w-4 h-4 transition-transform duration-300 ${mode === 'chart' ? 'scale-110' : ''}`
+            })
+            : <BarChart2 className={`w-4 h-4 transition-transform duration-300 ${mode === 'chart' ? 'scale-110' : ''}`} />}
           <span className="hidden sm:inline">
             {effectiveChartType && effectiveChartType !== 'table'
               ? chartTypeLabels[effectiveChartType].replace(' Chart', '').replace(' Plot', '')
@@ -171,26 +172,31 @@ export const ChartToggle: React.FC<ChartToggleProps> = ({
           </button>
 
           {dropdownOpen && (
-            <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-              <div className="py-1">
-                <div className="px-3 py-1.5 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Chart Type
+            <div className="absolute right-0 mt-2 w-52 glass-card bg-white/95 dark:bg-gray-900/95 border-gray-500/20 rounded-xl shadow-2xl z-50 overflow-hidden animate-scaleUp">
+              <div className="py-1.5">
+                <div className="px-4 py-2 text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">
+                  Visualization Selection
                 </div>
                 {availableChartTypes.map((type) => (
                   <button
                     key={type}
                     onClick={() => handleChartTypeSelect(type)}
                     className={`
-                      w-full flex items-center gap-2 px-3 py-2 text-sm text-left
+                      w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left
+                      transition-colors duration-200
                       ${effectiveChartType === type
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-700 hover:bg-gray-50'}
+                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-500/10'}
                     `}
                   >
-                    {chartTypeIcons[type]}
-                    <span className="flex-1">{chartTypeLabels[type]}</span>
+                    <div className={`${effectiveChartType === type ? 'text-blue-500' : 'text-gray-400'}`}>
+                      {chartTypeIcons[type]}
+                    </div>
+                    <span className="flex-1 capitalize">{chartTypeLabels[type].replace(' Chart', '').replace(' Plot', '')}</span>
                     {chartType === type && (
-                      <span className="text-xs text-blue-500 font-medium">(recommended)</span>
+                      <div className="p-1 bg-blue-500/10 rounded">
+                        <Sparkles className="w-3 h-3 text-blue-500" />
+                      </div>
                     )}
                   </button>
                 ))}
