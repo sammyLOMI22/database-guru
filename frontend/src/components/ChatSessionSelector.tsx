@@ -1,10 +1,30 @@
 import { useState, useEffect } from 'react';
 import { chatAPI, connectionsAPI } from '../services/api';
-import type { ChatSession, DatabaseConnection } from '../types/api';
+import type { ChatSession, DatabaseConnection, ConnectionInfo } from '../types/api';
 
 interface ChatSessionSelectorProps {
   currentSession: ChatSession | null;
   onSessionChange: (session: ChatSession | null) => void;
+}
+
+function RotatingConnection({ connections }: { connections: ConnectionInfo[] }) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (connections.length <= 1) return;
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % connections.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [connections.length]);
+
+  if (connections.length === 0) return <span>No DBs</span>;
+
+  return (
+    <span className="animate-fadeIn inline-block" key={index}>
+      {connections[index].name}
+    </span>
+  );
 }
 
 export default function ChatSessionSelector({ currentSession, onSessionChange }: ChatSessionSelectorProps) {
@@ -66,7 +86,7 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
             </div>
             <div>
               <p className="text-xs font-black uppercase tracking-wider">Default Query</p>
-              <p className="text-[10px] opacity-60 font-bold">Single database context</p>
+              <p className="text-[10px] opacity-60 font-bold uppercase tracking-tight">Global Context</p>
             </div>
           </div>
         </button>
@@ -92,13 +112,20 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-black uppercase tracking-wider truncate ${currentSession?.id === session.id ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                    <p className={`text-xs font-black uppercase tracking-wider truncate mb-0.5 ${currentSession?.id === session.id ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}>
                       {session.name}
                     </p>
-                    <div className="flex items-center gap-2 mt-1 opacity-60">
-                      <p className="text-[10px] font-bold">
-                        {session.connections.length} DBs • {session.message_count} MSG
-                      </p>
+                    <div className="flex items-center gap-2 opacity-60 overflow-hidden whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-1 bg-white/10 dark:bg-black/20 px-1.5 py-0.5 rounded-md border border-white/5">
+                          <span className="text-blue-500">{session.connections.length}</span>
+                          <span>DBs</span>
+                        </div>
+                        <span className="opacity-30">•</span>
+                        <div className="text-gray-600 dark:text-gray-300 flex-1 truncate">
+                          <RotatingConnection connections={session.connections} />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
