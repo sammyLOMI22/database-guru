@@ -7,6 +7,21 @@ interface ChatSessionSelectorProps {
   onSessionChange: (session: ChatSession | null) => void;
 }
 
+const CONNECTION_COLORS = [
+  'text-blue-500',
+  'text-emerald-500',
+  'text-amber-500',
+  'text-rose-500',
+  'text-cyan-500',
+  'text-violet-500',
+  'text-orange-500',
+  'text-indigo-500',
+];
+
+function getConnectionColor(id: number) {
+  return CONNECTION_COLORS[id % CONNECTION_COLORS.length];
+}
+
 function RotatingConnection({ connections }: { connections: ConnectionInfo[] }) {
   const [index, setIndex] = useState(0);
 
@@ -21,7 +36,7 @@ function RotatingConnection({ connections }: { connections: ConnectionInfo[] }) 
   if (connections.length === 0) return <span>No DBs</span>;
 
   return (
-    <span className="animate-fadeIn inline-block" key={index}>
+    <span className={`animate-fadeIn inline-block ${getConnectionColor(connections[index].id)}`} key={index}>
       {connections[index].name}
     </span>
   );
@@ -84,9 +99,11 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${!currentSession ? 'bg-blue-500/10' : 'bg-gray-100 dark:bg-gray-800'}`}>
               <span className="text-base">🚀</span>
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-xs font-black uppercase tracking-wider">Default Query</p>
-              <p className="text-[10px] opacity-60 font-bold uppercase tracking-tight">Global Context</p>
+              <div className="flex items-center gap-2 opacity-60">
+                <p className="text-[10px] font-bold uppercase tracking-tight">Global Context</p>
+              </div>
             </div>
           </div>
         </button>
@@ -121,8 +138,12 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
                           <span className="text-blue-500">{session.connections.length}</span>
                           <span>DBs</span>
                         </div>
+                        <div className="flex items-center gap-1 bg-white/10 dark:bg-black/20 px-1.5 py-0.5 rounded-md border border-white/5">
+                          <span className="text-indigo-500">{session.message_count || 0}</span>
+                          <span>MSGs</span>
+                        </div>
                         <span className="opacity-30">•</span>
-                        <div className="text-gray-600 dark:text-gray-300 flex-1 truncate">
+                        <div className="font-black flex-1 truncate">
                           <RotatingConnection connections={session.connections} />
                         </div>
                       </div>
