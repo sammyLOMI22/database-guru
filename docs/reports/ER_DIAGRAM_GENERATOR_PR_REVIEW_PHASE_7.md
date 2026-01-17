@@ -141,4 +141,21 @@ Schema inspector handles index introspection across PostgreSQL, MySQL, SQLite, a
 | `frontend/tests/ERDiagram.test.tsx` | Fixed TS errors, added new test |
 | `frontend/src/components/schema/ERDiagram.tsx` | Type fix, debounced search |
 | `frontend/src/hooks/useDebouncedValue.ts` | New hook (29 lines) |
-| `frontend/src/utils/erDiagramUtils.ts` | Smarter target column detection |
+| `frontend/src/utils/erDiagramUtils.ts` | Smarter target column detection, fixed MAX_VISIBLE_COLUMNS mismatch (8→10) |
+
+---
+
+## Additional Reviews Incorporated
+
+### Jules AntiGravity Review (9/10)
+- ✅ **MAX_VISIBLE_COLUMNS mismatch** - Fixed (was 8 in utils, 10 in component)
+- ⏳ Centralize constants - Added to Phase 2 plan
+- ⏳ Error Boundary around ReactFlow - Added to Phase 2 plan
+- ⏳ Zoom-to-search animation - Added to Phase 2 plan
+- ⏳ Export to PDF/SVG - Added to Phase 2 plan
+
+### Jules Review (APPROVED)
+- ✅ Debounced search - Already implemented
+- ✅ Intelligent relationship inference - Working well
+- ⏳ Search memoization for 1000+ tables - Added to Phase 2 plan
+- ⏳ Type safety improvements - Added to Phase 2 plan

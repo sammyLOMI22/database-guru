@@ -1421,19 +1421,28 @@ Based on PR review feedback, these small improvements can be addressed:
 | Fix MiniMap `any` type | `ERDiagram.tsx` | Low | ✅ Complete |
 | Add debounced search input | `ERDiagram.tsx` | Low | ✅ Complete |
 | Smarter target column detection | `erDiagramUtils.ts:inferRelationships()` | Low | ✅ Complete |
+| Fix MAX_VISIBLE_COLUMNS mismatch | `erDiagramUtils.ts` | Low | ✅ Complete |
 
 ### ER Diagram Phase 2 (Future)
 
 | Task | File | Priority | Effort |
 |------|------|----------|--------|
 | Many-to-many junction table detection | `erDiagramUtils.ts` | Medium | 1-2 hrs |
-| Configurable layout constants | `erDiagramUtils.ts`, `erDiagram.ts` | Low | 20 min |
+| Centralize constants to shared file | `types/erDiagram.ts` | Medium | 30 min |
+| Error Boundary around ReactFlow | `ERDiagram.tsx` | Medium | 30 min |
 | Type adapter for React Flow generics | `ERDiagram.tsx`, `erDiagramUtils.ts` | Low | 1 hr |
+| Zoom-to-search animation | `ERDiagram.tsx` | Low | 1 hr |
+| Export to PDF/SVG | `ERDiagram.tsx` | Low | 2-3 hrs |
+| Search memoization for 1000+ tables | `erDiagramUtils.ts` | Low | 1 hr |
 
 **Details:**
 - **Many-to-many detection**: Detect junction tables (2 FKs as composite PK) and display M:N cardinality
-- **Configurable constants**: Make `NODE_BASE_WIDTH`, `MAX_VISIBLE_COLUMNS` configurable via props
+- **Centralize constants**: Move `NODE_WIDTH`, `HEADER_HEIGHT`, `MAX_VISIBLE_COLUMNS` to shared `types/erDiagram.ts`
+- **Error Boundary**: Wrap ReactFlow canvas to prevent white screen on corrupted schema
 - **Type adapters**: Remove `as unknown as` casts with proper adapter functions
+- **Zoom-to-search**: Smooth animate camera to frame searched table
+- **Export**: Allow users to download schema diagrams as PDF/SVG for documentation
+- **Search memoization**: For extremely large schemas (1000+ tables), memoize filter logic or use Web Worker
 
 **Completed January 16, 2026**
 

@@ -34,8 +34,8 @@ const NODE_HEADER_HEIGHT = 40;
 /** Collapsed node height (header only) */
 const NODE_COLLAPSED_HEIGHT = 50;
 
-/** Maximum columns to show before scrolling */
-const MAX_VISIBLE_COLUMNS = 8;
+/** Maximum columns to show before scrolling (must match TableNode.tsx) */
+const MAX_VISIBLE_COLUMNS = 10;
 
 // =============================================================================
 // LAYOUT CALCULATION
