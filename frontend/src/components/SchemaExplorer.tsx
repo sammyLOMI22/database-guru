@@ -198,7 +198,7 @@ export const SchemaExplorer: React.FC<SchemaExplorerProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder={compact ? "Search..." : "Search tables and columns..."}
-            className={`w-full ${compact ? 'pl-8 pr-2 py-1.5 text-xs rounded-lg' : 'pl-10 pr-4 py-2.5 text-xs rounded-[1.25rem]'} font-bold bg-black/5 dark:bg-white/5 border border-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500`}
+            className={`w-full ${compact ? 'pl-8 pr-2 py-1.5 text-xs rounded-lg' : 'pl-10 pr-4 py-2.5 text-xs rounded-2xl'} font-bold bg-black/5 dark:bg-white/5 border border-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500`}
           />
         </div>
         <div className="flex gap-2">
@@ -285,7 +285,7 @@ const TableRow: React.FC<TableRowProps> = ({
         <div className="flex-1 min-w-0">
           <div className={`${compact ? 'flex-col items-start gap-0.5' : 'items-center gap-2'} flex`}>
             <span
-              className={`${compact ? 'text-xs' : 'text-sm'} font-black uppercase tracking-wider transition-colors ${expanded ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-200 group-hover:text-blue-500'} truncate`}
+              className={`${compact ? 'text-xs' : 'text-[13px]'} font-black uppercase tracking-wider transition-colors ${expanded ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-200 group-hover:text-blue-500'} truncate`}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect?.();
@@ -294,7 +294,7 @@ const TableRow: React.FC<TableRowProps> = ({
               {table.name}
             </span>
             {table.row_count !== null && (
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest opacity-60">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] opacity-60">
                 {table.row_count.toLocaleString()} ROWS
               </span>
             )}
@@ -356,9 +356,9 @@ const ColumnRow: React.FC<ColumnRowProps> = ({ column, searchTerm, compact }) =>
         </div>
 
         {/* Column name & type */}
-        <div className={`flex ${compact ? 'flex-col items-start gap-0.5' : 'items-center gap-2'} flex-1 min-w-0`}>
-          <span className="font-black text-gray-700 dark:text-gray-300 uppercase tracking-wider truncate">{highlightMatch(column.name)}</span>
-          <span className={`${compact ? 'text-xs' : 'text-xs'} font-bold text-gray-400 dark:text-gray-500 uppercase`}>{column.type}</span>
+        <div className={`flex ${compact ? 'flex-col items-start gap-0.5' : 'items-center gap-2.5'} flex-1 min-w-0`}>
+          <span className="text-[11px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-widest truncate">{highlightMatch(column.name)}</span>
+          <span className={`${compact ? 'text-[9px]' : 'text-[10px]'} font-black text-gray-400 dark:text-gray-500 uppercase tracking-tight`}>{column.type}</span>
         </div>
 
         {/* Nullable indicator */}
@@ -369,13 +369,13 @@ const ColumnRow: React.FC<ColumnRowProps> = ({ column, searchTerm, compact }) =>
         {/* Semantic type badge */}
         {column.semantic_type && (
           <span
-            className={`${compact ? 'text-xs px-1.5' : 'text-xs px-2'} font-black uppercase tracking-widest py-0.5 rounded-full ${column.semantic_type === 'location'
-              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+            className={`${compact ? 'text-[8px] px-1.5' : 'text-[9px] px-2'} font-black uppercase tracking-[0.2em] py-0.5 rounded-full shadow-sm ${column.semantic_type === 'location'
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10'
               : column.semantic_type === 'categorical'
-                ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/10'
                 : column.semantic_type === 'temporal'
-                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                  : 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
+                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10'
+                  : 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/10'
               }`}
           >
             {column.semantic_type}

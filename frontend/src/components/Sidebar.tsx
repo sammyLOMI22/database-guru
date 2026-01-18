@@ -35,24 +35,27 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
   }, []);
 
   return (
-    <aside className="w-80 glass-panel border-r border-white/10 flex flex-col transition-all duration-500 relative z-20 overflow-hidden">
+    <aside className="w-80 glass-panel border-r border-white/10 flex flex-col transition-all duration-500 relative z-20 overflow-hidden shadow-[20px_0_50px_rgba(0,0,0,0.3)]">
       {/* Header */}
-      <div className="p-5 border-b border-white/5 bg-white/5 dark:bg-black/10">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+      <div className="p-6 border-b border-white/5 bg-white/5 dark:bg-black/20">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-900 dark:text-white flex items-center gap-3">
+            <div className="relative">
+              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <div className="absolute inset-0 w-2 h-2 rounded-full bg-blue-500 animate-ping opacity-20" />
+            </div>
             Workspace
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors md:hidden glass-panel rounded-lg"
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all md:hidden glass-panel rounded-xl hover:scale-110 active:scale-95"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tabs - Premium Segmented Control */}
-        <div className="flex p-1 glass-panel rounded-xl border-white/5 bg-black/5 dark:bg-white/5">
+        <div className="flex p-1.5 glass-panel rounded-2xl border-white/10 bg-black/5 dark:bg-white/5 shadow-inner">
           {[
             { id: 'connections', label: 'DBs' },
             { id: 'schema', label: 'Schema' },
@@ -62,10 +65,10 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
               key={tab.id}
               onClick={() => setActiveTab(tab.id as Tab)}
               className={`
-                flex-1 px-2 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all duration-300
+                flex-1 px-2 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300
                 ${activeTab === tab.id
-                  ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-xl'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                  ? 'glass-card bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-[0_10px_20px_rgba(0,0,0,0.1)] dark:shadow-[0_10_20px_rgba(0,0,0,0.3)] scale-105 z-10'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/5 dark:hover:bg-white/5'
                 }
               `}
             >
@@ -83,9 +86,9 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
               <button
                 key={conn.id}
                 onClick={() => setSelectedConnId(conn.id)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all border ${selectedConnId === conn.id
-                  ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20'
-                  : 'bg-white/5 border-white/5 text-gray-500 hover:border-white/10'
+                className={`flex-shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all border ${selectedConnId === conn.id
+                  ? 'bg-blue-600 border-blue-500 text-white shadow-[0_5px_15px_rgba(59,130,246,0.3)]'
+                  : 'glass-panel bg-white/5 border-white/5 text-gray-500 hover:border-white/20 hover:text-gray-300'
                   }`}
               >
                 {conn.name}

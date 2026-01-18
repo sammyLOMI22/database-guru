@@ -33,43 +33,51 @@ export default function HistoryPanel({ onSelectQuery }: HistoryPanelProps) {
         <button
           key={item.id}
           onClick={() => onSelectQuery(item.natural_language_query)}
-          className="text-left p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-300 dark:hover:border-primary-500 hover:shadow-sm transition-all duration-200"
+          className="text-left p-4 glass-card bg-white/5 dark:bg-white/5 border-white/5 rounded-2xl hover:border-blue-500/30 hover:bg-white/10 transition-all duration-300 group relative overflow-hidden"
         >
+          <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 blur-2xl -mr-8 -mt-8 opacity-0 group-hover:opacity-100 transition-opacity" />
+
           {/* Query text */}
-          <p className="text-sm text-gray-900 dark:text-gray-100 line-clamp-2 mb-2 font-medium">
+          <p className="text-xs font-black uppercase tracking-tight text-gray-900 dark:text-white line-clamp-2 mb-3 leading-relaxed">
             {item.natural_language_query}
           </p>
 
           {/* SQL preview */}
-          <p className="text-xs font-mono text-gray-500 dark:text-gray-400 line-clamp-1 mb-2 bg-gray-50 dark:bg-gray-900/50 p-1.5 rounded">
-            {item.generated_sql}
-          </p>
+          <div className="relative mb-3">
+            <p className="text-[10px] font-mono text-blue-500 dark:text-blue-400 line-clamp-1 bg-black/20 dark:bg-black/40 p-2 rounded-lg border border-white/5">
+              {item.generated_sql}
+            </p>
+          </div>
 
           {/* Metadata */}
-          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-            <div className="flex items-center space-x-2">
-              {item.executed ? (
-                <CheckCircle className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
-              ) : (
-                <XCircle className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
-              )}
-              {item.execution_time_ms !== null && (
-                <span className="bg-gray-100 dark:bg-gray-700 px-1 rounded">{item.execution_time_ms.toFixed(2)}ms</span>
-              )}
-              {item.result_count !== null && (
-                <span className="bg-gray-100 dark:bg-gray-700 px-1 rounded">{item.result_count} rows</span>
-              )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`p-1 rounded-md ${item.executed ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                {item.executed ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+              </div>
+              <div className="flex items-center gap-1.5">
+                {item.execution_time_ms !== null && (
+                  <span className="text-[10pt] font-black uppercase tracking-widest text-gray-500 bg-black/10 dark:bg-white/5 px-1.5 py-0.5 rounded-md">
+                    {item.execution_time_ms.toFixed(0)}MS
+                  </span>
+                )}
+                {item.result_count !== null && (
+                  <span className="text-[10pt] font-black uppercase tracking-widest text-gray-500 bg-black/10 dark:bg-white/5 px-1.5 py-0.5 rounded-md">
+                    {item.result_count}R
+                  </span>
+                )}
+              </div>
             </div>
             {item.model_used && (
-              <span className="text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded transition-colors">
-                {item.model_used}
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">
+                {item.model_used.split(':')[0]}
               </span>
             )}
           </div>
 
           {/* Timestamp */}
-          <div className="mt-2 text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-            {new Date(item.created_at).toLocaleString()}
+          <div className="mt-3 text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-600 border-t border-white/5 pt-2">
+            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         </button>
       ))}
