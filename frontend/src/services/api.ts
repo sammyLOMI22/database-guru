@@ -159,7 +159,7 @@ export const queryAPI = {
 
   // Get specific query by ID
   async getQueryById(id: number): Promise<QueryHistoryItem> {
-    const { data} = await api.get<QueryHistoryItem>(`/api/query/history/${id}`);
+    const { data } = await api.get<QueryHistoryItem>(`/api/query/history/${id}`);
     return data;
   },
 
@@ -450,6 +450,20 @@ export const feedbackAPI = {
   // Delete feedback
   async deleteFeedback(feedbackId: number): Promise<void> {
     await api.delete(`/api/feedback/${feedbackId}`);
+  },
+};
+
+export const settingsAPI = {
+  // Get all application settings
+  async getSettings() {
+    const { data } = await api.get('/api/settings/');
+    return data;
+  },
+
+  // Update specific setting
+  async updateSetting(key: string, value: any) {
+    const { data } = await api.patch(`/api/settings/`, { [key]: value });
+    return data;
   },
 };
 

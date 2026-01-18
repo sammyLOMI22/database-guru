@@ -107,17 +107,19 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
   return (
     <div className="flex flex-col h-full relative">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-          <Database className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+      <div className="flex items-center justify-between p-5 border-b border-white/5 bg-white/5 dark:bg-black/20">
+        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white flex items-center gap-2.5">
+          <div className="p-1 px-1.5 glass-panel rounded-lg text-blue-500 shadow-lg shadow-blue-500/10">
+            <Database className="w-4 h-4" />
+          </div>
           Connections
         </h3>
         <button
           onClick={handleAddConnection}
-          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          className="p-2 glass-panel rounded-xl text-blue-500 hover:text-blue-600 hover:scale-110 active:scale-95 transition-all shadow-lg shadow-blue-500/5 group"
           title="Add Connection"
         >
-          <Plus className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+          <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
         </button>
       </div>
 
@@ -142,36 +144,37 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
                 <div
                   key={conn.id}
                   onClick={() => handleSelectConnection(conn.id)}
-                  className={`group p-3 rounded-lg border-2 cursor-pointer transition-all ${conn.is_active
-                      ? 'border-primary-500 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/20'
-                      : isSelected
-                        ? 'border-blue-400 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  className={`group p-4 rounded-2xl border transition-all duration-300 cursor-pointer relative overflow-hidden ${conn.is_active
+                    ? 'glass-card bg-blue-500/5 border-blue-500/30 shadow-[0_10px_30px_rgba(59,130,246,0.1)]'
+                    : isSelected
+                      ? 'glass-card bg-white/10 border-white/20'
+                      : 'glass-panel bg-transparent border-transparent hover:bg-white/5 hover:border-white/10'
                     }`}
                 >
+                  {conn.is_active && (
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 blur-3xl -mr-12 -mt-12 pointer-events-none" />
+                  )}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        {conn.is_active ? (
-                          <Check className="w-4 h-4 text-primary-600 dark:text-primary-400 flex-shrink-0" />
-                        ) : (
-                          <Circle className="w-4 h-4 text-gray-400 dark:text-gray-600 flex-shrink-0" />
-                        )}
-                        <span className="font-medium text-gray-900 dark:text-white truncate">{conn.name}</span>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`p-1.5 rounded-lg transition-all ${conn.is_active ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30 scale-110' : 'bg-black/5 dark:bg-white/5 text-gray-400'}`}>
+                          {conn.is_active ? <Check className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
+                        </div>
+                        <span className="text-sm font-black uppercase tracking-tight text-gray-900 dark:text-white truncate">{conn.name}</span>
                       </div>
-                      <div className="ml-6 space-y-1">
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 transition-colors">
+                      <div className="pl-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-black/10 dark:bg-white/10 text-gray-600 dark:text-gray-400 transition-colors">
                             {conn.database_type.toUpperCase()}
                           </span>
-                        </p>
-                        {conn.host && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400 font-mono">
-                            {conn.host}:{conn.port}
-                          </p>
-                        )}
-                        <p className="text-xs text-gray-700 dark:text-gray-300 font-medium truncate" title={conn.database_name}>
-                          {conn.database_name}
+                          {conn.host && (
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">
+                              {conn.host}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest truncate max-w-[180px]" title={conn.database_name}>
+                          DB: {conn.database_name}
                         </p>
                       </div>
                     </div>

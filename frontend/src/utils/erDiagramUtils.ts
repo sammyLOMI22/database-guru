@@ -248,14 +248,19 @@ export function transformRelationshipsToEdges(
  * Transform multiple database schemas to a combined ER diagram.
  */
 export function transformMultiSchemaToERDiagram(
-  schemas: SchemaExploreResponse[]
+  schemas: SchemaExploreResponse[],
+  isDarkMode: boolean = false
 ): ERDiagramData {
   const allNodes: ERTableNode[] = [];
   const allEdges: ERRelationshipEdge[] = [];
 
   schemas.forEach((schema, index) => {
-    const nodes = transformSchemaToNodes(schema, index);
-    const edges = transformRelationshipsToEdges(schema.tables, schema.connection_id);
+    const nodes = transformSchemaToNodes(schema, index, isDarkMode);
+    const edges = transformRelationshipsToEdges(
+      schema.tables,
+      schema.connection_id,
+      isDarkMode
+    );
 
     allNodes.push(...nodes);
     allEdges.push(...edges);

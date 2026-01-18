@@ -120,18 +120,29 @@ export function classifyColumns(
     idColumns: [],
   };
 
+  const statsKeys = Object.keys(statistics);
+  const lowerStatsKeys = statsKeys.map(k => k.toLowerCase());
+
   for (const column of columns) {
+    const lowerColumn = column.toLowerCase();
+
     // Skip ID columns
     if (isIdColumn(column)) {
       classification.idColumns.push(column);
       continue;
     }
 
-    // Check if statistics has type info
-    const columnStats = statistics[column] as Record<string, unknown> | undefined;
+    // Find statistics using case-insensitive match
+    const statsIndex = lowerStatsKeys.indexOf(lowerColumn);
+    const statsKey = statsIndex !== -1 ? statsKeys[statsIndex] : null;
+    const columnStats = statsKey ? (statistics[statsKey] as Record<string, unknown>) : undefined;
 
     // Check for temporal columns first (by name or value pattern)
-    if (isTemporalColumn(column) || looksLikeDate(results[0][column])) {
+    // Also check first few values if the first one is null
+    const samples = results.slice(0, 5).map(r => r[column]).filter(v => v !== null);
+    const firstNonNullValue = samples[0];
+
+    if (isTemporalColumn(column) || looksLikeDate(firstNonNullValue)) {
       classification.temporalColumns.push(column);
       continue;
     }
@@ -143,16 +154,19 @@ export function classifyColumns(
       classification.categoricalColumns.push(column);
     } else {
       // Fallback: inspect first non-null value
-      const firstValue = results.find(r => r[column] != null)?.[column];
-      if (typeof firstValue === 'number') {
+      if (typeof firstNonNullValue === 'number') {
         classification.numericColumns.push(column);
-      } else if (typeof firstValue === 'string') {
+      } else if (typeof firstNonNullValue === 'string') {
         // Check if it's numeric string
-        if (!isNaN(Number(firstValue)) && firstValue.trim() !== '') {
+        const trimmed = firstNonNullValue.trim();
+        if (trimmed !== '' && !isNaN(Number(trimmed))) {
           classification.numericColumns.push(column);
         } else {
           classification.categoricalColumns.push(column);
         }
+      } else if (firstNonNullValue === undefined && results.length > 0) {
+        // If all samples were null but column exists, treat as categorical fallback
+        classification.categoricalColumns.push(column);
       }
     }
   }

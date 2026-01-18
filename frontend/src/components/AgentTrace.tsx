@@ -54,44 +54,50 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
   };
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mt-4 shadow-sm transition-colors">
+    <div className="glass-card rounded-xl overflow-hidden mt-4 shadow-lg border border-white/10 dark:border-white/5">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        className="flex items-center justify-between w-full text-left px-5 py-4 hover:bg-white/5 transition-all group"
         aria-expanded={expanded}
         aria-label="Toggle agent execution trace"
       >
-        <div className="flex items-center gap-3">
-          <span className="text-xl" role="img" aria-label="Trace">📊</span>
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <span className="text-xl" role="img" aria-label="Trace">📊</span>
+          </div>
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+            <h3 className="font-bold text-gray-900 dark:text-gray-100 text-base">
               Agent Execution Trace
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {steps.length} steps • {totalElapsedMs.toFixed(0)}ms
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+              {steps.length} steps • <span className="font-mono">{totalElapsedMs.toFixed(0)}ms</span>
             </p>
           </div>
         </div>
-        <svg
-          className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''
-            }`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        <div className={`p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 transition-all ${expanded ? 'rotate-180 bg-blue-500/10 text-blue-500' : 'text-gray-500'}`}>
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2.5}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-gray-200 dark:border-gray-700 p-4">
-          <div className="space-y-3">
+        <div className="px-5 py-6 bg-white/30 dark:bg-black/20 backdrop-blur-sm border-t border-white/10 dark:border-white/5">
+          <div className="relative space-y-6 ml-4">
+            {/* Vertical Flow Line */}
+            <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-gradient-to-b from-blue-500/50 via-purple-500/50 to-blue-500/50 dark:from-blue-500/30 dark:via-purple-500/30 dark:to-blue-500/30 rounded-full" />
+
             {steps.map((step, idx) => {
               // Defensive: ensure step has required properties
               const stepType = step?.type || 'unknown';
@@ -100,43 +106,52 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
               const stepMetadata = step?.metadata || {};
               const stepIcon = step?.icon || getStepIcon(stepType) || '•';
 
+              const staggerClass = idx < 8 ? `delay-${idx * 100}` : 'delay-700';
+
               return (
                 <div
                   key={idx}
-                  className={`flex items-start gap-3 p-3 rounded-lg border ${getStepColor(stepType)} ${getStepBorderColor(stepType)}`}
+                  className={`relative flex items-start gap-5 animate-fadeIn ${staggerClass} opacity-0 fill-mode-forwards`}
                 >
-                  {/* Icon */}
-                  <span className="text-2xl flex-shrink-0" role="img" aria-label={stepType}>
-                    {stepIcon}
-                  </span>
+                  {/* Step Connector Node */}
+                  <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm border-2 ${getStepBorderColor(stepType)} ${getStepColor(stepType)}`}>
+                    <span className="text-sm" role="img" aria-label={stepType}>
+                      {stepIcon}
+                    </span>
+                  </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-medium text-sm flex-1">
+                  {/* Content Card */}
+                  <div className="flex-1 min-w-0 glass-card p-3.5 rounded-xl border-white/5 hover:border-white/20 transition-all group/step">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-semibold text-sm text-gray-800 dark:text-gray-200 leading-snug">
                         {stepMessage}
                       </p>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                      <span className="text-xs font-bold font-mono text-gray-400 dark:text-gray-500 tracking-tighter bg-gray-100 dark:bg-gray-800/50 px-1.5 py-0.5 rounded">
                         +{stepElapsedMs.toFixed(0)}ms
                       </span>
                     </div>
 
                     {/* Step Type Badge */}
-                    <div className="mt-1">
-                      <span className="inline-block text-xs px-2 py-0.5 rounded bg-white dark:bg-black/20 bg-opacity-50">
-                        {stepType}
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold tracking-wider uppercase ${getStepColor(stepType)} bg-opacity-10 dark:bg-opacity-20`}>
+                        {stepType.replace('_', ' ')}
                       </span>
                     </div>
 
                     {/* Metadata (expandable) */}
                     {stepMetadata && typeof stepMetadata === 'object' && Object.keys(stepMetadata).length > 0 && (
-                      <details className="mt-2">
-                        <summary className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-900 dark:hover:text-gray-200">
-                          Show details
+                      <details className="mt-2.5 group">
+                        <summary className="text-xs font-bold text-gray-500 dark:text-gray-400 cursor-pointer hover:text-blue-500 transition-colors list-none flex items-center gap-1">
+                          <svg className="w-3 h-3 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                          </svg>
+                          TECHNICAL DETAILS
                         </summary>
-                        <pre className="text-xs bg-white dark:bg-gray-900/50 p-2 rounded mt-1 overflow-x-auto border border-gray-100 dark:border-gray-800">
-                          {JSON.stringify(stepMetadata, null, 2)}
-                        </pre>
+                        <div className="mt-2 overflow-hidden rounded-lg border border-white/5">
+                          <pre className="text-xs font-mono bg-black/40 text-blue-300 p-3 overflow-x-auto scrollbar-thin">
+                            {JSON.stringify(stepMetadata, null, 2)}
+                          </pre>
+                        </div>
                       </details>
                     )}
                   </div>
@@ -145,10 +160,14 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
             })}
           </div>
 
-          {/* Summary */}
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              <strong>Total execution time:</strong> {totalElapsedMs.toFixed(2)}ms
+          {/* Summary Footer */}
+          <div className="mt-8 pt-4 border-t border-white/10 dark:border-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              Process completed successfully
+            </div>
+            <p className="text-xs font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg">
+              Total Time: <span className="font-mono text-blue-500">{totalElapsedMs.toFixed(2)}ms</span>
             </p>
           </div>
         </div>

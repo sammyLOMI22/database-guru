@@ -477,11 +477,17 @@ class SystemSettingsResponse(BaseModel):
 
     # Prompt Optimization (Phase 2.2)
     enable_prompt_optimization: bool = False  # OFF by default, user opt-in
-    prompt_model_size: str = "auto"  # auto|small|medium|large
+    prompt_model_size: Optional[str] = "auto"  # auto|small|medium|large
     enable_schema_compression: bool = True  # Compress schema to relevant tables
     max_schema_tables: int = 10  # Max tables before compression
     enable_example_selection: bool = True  # Select relevant few-shot examples
     max_few_shot_examples: int = 3  # Max examples to include
+
+    @field_validator('prompt_model_size', mode='before')
+    @classmethod
+    def default_prompt_model_size(cls, v):
+        """Handle NULL values from database by providing default"""
+        return v if v is not None else "auto"
 
     # Multi-Database Query Intelligence (Phase 2.4)
     enable_multi_db_validation: bool = True  # Pre-flight schema validation
