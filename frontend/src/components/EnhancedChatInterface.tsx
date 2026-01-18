@@ -193,7 +193,7 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
 
       {/* Session Selector Sidebar */}
       {showSessionSelector && (
-        <div className="w-80 glass-panel border-r border-white/10 overflow-y-auto flex-shrink-0 transition-all duration-500 animate-slideInLeft relative z-30">
+        <div className="w-[400px] glass-panel border-r border-white/10 overflow-y-auto flex-shrink-0 transition-all duration-500 animate-slideInLeft relative z-30">
           <ChatSessionSelector
             currentSession={currentSession}
             onSessionChange={setCurrentSession}

@@ -482,7 +482,7 @@ export function SettingsPanel() {
                 />
               </button>
             </div>
-            旋          </div>
+          </div>
 
           {/* Audit Settings Section */}
           <div className="space-y-6 pt-4 border-t border-white/5">
