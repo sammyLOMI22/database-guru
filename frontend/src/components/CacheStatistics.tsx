@@ -123,17 +123,21 @@ export const CacheStatistics: React.FC = () => {
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { label: 'Hit Rate', value: `${llm?.hit_rate_percent?.toFixed(1) || 0}%`, sub: `${llm?.hits || 0} / ${llm?.total_lookups || 0}`, color: 'blue' },
-            { label: 'LLM Calls Saved', value: llm?.hits || 0, sub: 'Saves 2-5s each', color: 'emerald' },
-            { label: 'Stored Entries', value: llm?.total_stores || 0, sub: `Threshold: ${llm?.similarity_threshold || 0.88}`, color: 'purple' },
-          ].map((item) => (
-            <div key={item.label} className={`glass-card rounded-xl p-5 bg-gradient-to-br from-${item.color}-500/10 via-transparent to-${item.color}-500/5 border-${item.color}-500/20`}>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">{item.label}</p>
-              <p className="text-3xl font-black text-gray-900 dark:text-white mt-2">{item.value}</p>
-              <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{item.sub}</p>
-            </div>
-          ))}
+          <div className="glass-card rounded-xl p-5 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-500/5 border-blue-500/20">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Hit Rate</p>
+            <p className="text-3xl font-black text-gray-900 dark:text-white mt-2">{llm?.hit_rate_percent?.toFixed(1) || 0}%</p>
+            <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{llm?.hits || 0} / {llm?.total_lookups || 0}</p>
+          </div>
+          <div className="glass-card rounded-xl p-5 bg-gradient-to-br from-emerald-500/10 via-transparent to-emerald-500/5 border-emerald-500/20">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">LLM Calls Saved</p>
+            <p className="text-3xl font-black text-gray-900 dark:text-white mt-2">{llm?.hits || 0}</p>
+            <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Saves 2-5s each</p>
+          </div>
+          <div className="glass-card rounded-xl p-5 bg-gradient-to-br from-purple-500/10 via-transparent to-purple-500/5 border-purple-500/20">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Stored Entries</p>
+            <p className="text-3xl font-black text-gray-900 dark:text-white mt-2">{llm?.total_stores || 0}</p>
+            <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Threshold: {llm?.similarity_threshold || 0.88}</p>
+          </div>
         </div>
       </div>
 
@@ -185,17 +189,25 @@ export const CacheStatistics: React.FC = () => {
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { label: 'Time Saved', value: estimatedTimeSaved >= 60 ? `${(estimatedTimeSaved / 60).toFixed(1)}m` : `${estimatedTimeSaved.toFixed(0)}s`, sub: '~2.5s per hit', color: 'amber' },
-            { label: 'Total Hits', value: totalHits + (llm?.hits || 0), sub: 'Semantic + LLM', color: 'emerald' },
-            { label: 'Efficiency', value: totalLookups > 0 ? `${(((exactHits + semanticHits) / totalLookups) * 100).toFixed(0)}%` : '0%', sub: 'From cache', color: 'blue' },
-          ].map((item) => (
-            <div key={item.label} className="glass-card rounded-xl p-5 text-center">
-              <p className={`text-4xl font-black text-${item.color}-600 dark:text-${item.color}-400`}>{item.value}</p>
-              <p className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300 mt-2">{item.label}</p>
-              <p className="text-[10px] font-medium text-gray-400 mt-1">{item.sub}</p>
-            </div>
-          ))}
+          <div className="glass-card rounded-xl p-5 text-center">
+            <p className="text-4xl font-black text-amber-600 dark:text-amber-400">
+              {estimatedTimeSaved >= 60 ? `${(estimatedTimeSaved / 60).toFixed(1)}m` : `${estimatedTimeSaved.toFixed(0)}s`}
+            </p>
+            <p className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300 mt-2">Time Saved</p>
+            <p className="text-[10px] font-medium text-gray-400 mt-1">~2.5s per hit</p>
+          </div>
+          <div className="glass-card rounded-xl p-5 text-center">
+            <p className="text-4xl font-black text-emerald-600 dark:text-emerald-400">{totalHits + (llm?.hits || 0)}</p>
+            <p className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300 mt-2">Total Hits</p>
+            <p className="text-[10px] font-medium text-gray-400 mt-1">Semantic + LLM</p>
+          </div>
+          <div className="glass-card rounded-xl p-5 text-center">
+            <p className="text-4xl font-black text-blue-600 dark:text-blue-400">
+              {totalLookups > 0 ? `${(((exactHits + semanticHits) / totalLookups) * 100).toFixed(0)}%` : '0%'}
+            </p>
+            <p className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300 mt-2">Efficiency</p>
+            <p className="text-[10px] font-medium text-gray-400 mt-1">From cache</p>
+          </div>
         </div>
       </div>
 
