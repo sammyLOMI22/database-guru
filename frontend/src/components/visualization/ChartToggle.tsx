@@ -5,7 +5,8 @@
  * with optional chart type selector dropdown.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Table,
   BarChart2,
@@ -82,19 +83,75 @@ export const ChartToggle: React.FC<ChartToggleProps> = ({
   showChartTypeSelector = true,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Calculate dropdown position when opening
+  const updateDropdownPosition = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const dropdownWidth = 208;
+      let left = rect.right - dropdownWidth;
+
+      // Keep within viewport
+      if (left < 8) left = 8;
+      if (left + dropdownWidth > window.innerWidth - 8) {
+        left = window.innerWidth - dropdownWidth - 8;
+      }
+
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        left: left,
+      });
+    }
+  }, []);
+
+  // Update position when dropdown opens
+  useEffect(() => {
+    if (dropdownOpen) {
+      updateDropdownPosition();
+    }
+  }, [dropdownOpen, updateDropdownPosition]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
+    if (!dropdownOpen) return;
+
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        buttonRef.current && !buttonRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) {
         setDropdownOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    // Use setTimeout to avoid the click that opened the dropdown from closing it
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [dropdownOpen]);
+
+  // Close on escape key
+  useEffect(() => {
+    if (!dropdownOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [dropdownOpen]);
 
   const effectiveChartType = selectedChartType || chartType;
 
@@ -106,6 +163,53 @@ export const ChartToggle: React.FC<ChartToggleProps> = ({
       onModeChange('chart');
     }
   };
+
+  const handleToggleDropdown = () => {
+    setDropdownOpen(prev => !prev);
+  };
+
+  // Dropdown portal content
+  const dropdownContent = dropdownOpen ? createPortal(
+    <div
+      ref={dropdownRef}
+      className="fixed w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden"
+      style={{
+        top: dropdownPosition.top,
+        left: dropdownPosition.left,
+        zIndex: 99999,
+      }}
+    >
+      <div className="py-1.5 max-h-[400px] overflow-y-auto">
+        <div className="px-4 py-2 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">
+          Visualization
+        </div>
+        {availableChartTypes.map((type) => (
+          <button
+            key={type}
+            onClick={() => handleChartTypeSelect(type)}
+            className={`
+              w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left
+              transition-colors duration-200
+              ${effectiveChartType === type
+                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}
+            `}
+          >
+            <div className={`${effectiveChartType === type ? 'text-blue-500' : 'text-gray-400'}`}>
+              {chartTypeIcons[type]}
+            </div>
+            <span className="flex-1 capitalize">{chartTypeLabels[type].replace(' Chart', '').replace(' Plot', '')}</span>
+            {chartType === type && (
+              <div className="p-1 bg-blue-500/10 rounded">
+                <Sparkles className="w-3 h-3 text-blue-500" />
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>,
+    document.body
+  ) : null;
 
   return (
     <div className="inline-flex items-center gap-1.5 animate-fadeIn">
@@ -160,51 +264,24 @@ export const ChartToggle: React.FC<ChartToggleProps> = ({
         </button>
       </div>
 
-      {/* Chart Type Selector Dropdown */}
+      {/* Chart Type Selector Dropdown Trigger */}
       {showChartTypeSelector && chartAvailable && onChartTypeChange && (
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="inline-flex items-center gap-1 px-2 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-            title="Select chart type"
-          >
-            <ChevronDown className={`w-4 h-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          {dropdownOpen && (
-            <div className="absolute right-0 mt-2 w-52 glass-card bg-white/95 dark:bg-gray-900/95 border-gray-500/20 rounded-xl shadow-2xl z-50 overflow-hidden animate-scaleUp">
-              <div className="py-1.5">
-                <div className="px-4 py-2 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">
-                  Visualization Selection
-                </div>
-                {availableChartTypes.map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => handleChartTypeSelect(type)}
-                    className={`
-                      w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left
-                      transition-colors duration-200
-                      ${effectiveChartType === type
-                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-500/10'}
-                    `}
-                  >
-                    <div className={`${effectiveChartType === type ? 'text-blue-500' : 'text-gray-400'}`}>
-                      {chartTypeIcons[type]}
-                    </div>
-                    <span className="flex-1 capitalize">{chartTypeLabels[type].replace(' Chart', '').replace(' Plot', '')}</span>
-                    {chartType === type && (
-                      <div className="p-1 bg-blue-500/10 rounded">
-                        <Sparkles className="w-3 h-3 text-blue-500" />
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <button
+          ref={buttonRef}
+          onClick={handleToggleDropdown}
+          className={`inline-flex items-center gap-1 px-2 py-1.5 text-sm rounded-lg transition-colors glass-card border-gray-500/10 ${
+            dropdownOpen
+              ? 'text-blue-600 dark:text-blue-400 bg-blue-500/10'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+          }`}
+          title="Select chart type"
+        >
+          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
+        </button>
       )}
+
+      {/* Dropdown rendered via portal */}
+      {dropdownContent}
     </div>
   );
 };

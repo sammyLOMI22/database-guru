@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { feedbackAPI, FeedbackStatsResponse, FeedbackResponse } from '../services/api';
-import { CheckCircle, Clock, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, Clock, TrendingUp, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 
 export const FeedbackStats: React.FC = () => {
   const [stats, setStats] = useState<FeedbackStatsResponse | null>(null);
@@ -61,13 +61,13 @@ export const FeedbackStats: React.FC = () => {
   // Get tier information based on confidence
   const getTierInfo = (confidence: number) => {
     if (confidence >= 0.90) {
-      return { tier: 1, label: 'Tier 1', color: 'bg-green-100 text-green-800', emoji: '🚀', description: 'Auto-applied (STRICT)' };
+      return { tier: 1, label: 'Tier 1', color: 'from-emerald-500/20 to-green-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', emoji: '🚀', description: 'Auto-applied (STRICT)' };
     } else if (confidence >= 0.80) {
-      return { tier: 2, label: 'Tier 2', color: 'bg-blue-100 text-blue-800', emoji: '⚡', description: 'Auto-applied (MODERATE)' };
+      return { tier: 2, label: 'Tier 2', color: 'from-blue-500/20 to-cyan-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30', emoji: '⚡', description: 'Auto-applied (MODERATE)' };
     } else if (confidence >= 0.70) {
-      return { tier: 3, label: 'Tier 3', color: 'bg-yellow-100 text-yellow-800', emoji: '📋', description: 'Queued for batch' };
+      return { tier: 3, label: 'Tier 3', color: 'from-amber-500/20 to-yellow-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30', emoji: '📋', description: 'Queued for batch' };
     } else {
-      return { tier: 0, label: 'Manual', color: 'bg-gray-100 text-gray-800', emoji: '👁️', description: 'Manual review' };
+      return { tier: 0, label: 'Manual', color: 'from-gray-500/20 to-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/30', emoji: '👁️', description: 'Manual review' };
     }
   };
 
@@ -125,20 +125,30 @@ export const FeedbackStats: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-          <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
-          <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+      <div className="animate-pulse space-y-6">
+        <div className="h-16 glass-panel rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-32 glass-panel rounded-2xl" />
+          ))}
         </div>
+        <div className="h-48 glass-panel rounded-2xl" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="text-red-600 dark:text-red-400">Error: {error}</div>
+      <div className="text-center py-12">
+        <div className="glass-panel rounded-2xl p-8 max-w-md mx-auto">
+          <div className="text-red-500 mb-4 text-sm font-bold uppercase tracking-widest">Error: {error}</div>
+          <button
+            onClick={() => loadStats()}
+            className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-500/20"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -148,32 +158,40 @@ export const FeedbackStats: React.FC = () => {
   }
 
   const feedbackTypes = [
-    { key: 'sql_correction', label: 'SQL Corrections', color: 'blue' },
-    { key: 'column_name', label: 'Column Names', color: 'green' },
-    { key: 'table_name', label: 'Table Names', color: 'yellow' },
-    { key: 'result_issue', label: 'Result Issues', color: 'red' },
+    { key: 'sql_correction', label: 'SQL Corrections', gradient: 'from-blue-500 to-cyan-500' },
+    { key: 'column_name', label: 'Column Names', gradient: 'from-emerald-500 to-green-500' },
+    { key: 'table_name', label: 'Table Names', gradient: 'from-amber-500 to-yellow-500' },
+    { key: 'result_issue', label: 'Result Issues', gradient: 'from-red-500 to-rose-500' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Feedback Dashboard</h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">User corrections and continuous learning insights</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 cursor-pointer bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-lg text-sm transition-colors">
-            <Clock className={`w-4 h-4 ${autoRefresh ? 'text-blue-500 animate-pulse' : 'text-gray-400'}`} />
-            <span className="text-gray-700 dark:text-gray-300 font-medium">Auto-Refresh</span>
+      <div className="glass-panel rounded-2xl p-6 border-white/10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl glass-card flex items-center justify-center text-indigo-500 shadow-xl shadow-indigo-500/10">
+              <MessageSquare className="w-7 h-7" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-gray-900 dark:text-white">Feedback Dashboard</h2>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                User corrections and continuous learning
+              </p>
+            </div>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer glass-card px-4 py-2.5 rounded-xl transition-all hover:scale-105">
+            <Clock className={`w-4 h-4 ${autoRefresh ? 'text-indigo-500 animate-pulse' : 'text-gray-400'}`} />
+            <span className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300">Auto-Refresh</span>
             <input
               type="checkbox"
               className="sr-only"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
             />
-            <div className={`w-8 h-4 rounded-full transition-colors relative ${autoRefresh ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
-              <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${autoRefresh ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            <div className={`w-10 h-5 rounded-full transition-all relative ${autoRefresh ? 'bg-gradient-to-r from-indigo-500 to-purple-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${autoRefresh ? 'translate-x-5' : 'translate-x-0.5'}`} />
             </div>
           </label>
         </div>
@@ -182,79 +200,94 @@ export const FeedbackStats: React.FC = () => {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Total Feedback */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-blue-500 overflow-hidden border border-gray-100 dark:border-gray-700 transition-colors">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Feedback</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.total_feedback}</p>
+        <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-500/5 hover:border-blue-500/30 transition-all duration-300 group">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Total Feedback</p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-4xl font-black text-gray-900 dark:text-white">{stats.total_feedback}</p>
+            <div className="w-12 h-12 rounded-xl glass-panel flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+              <TrendingUp className="w-6 h-6" />
             </div>
-            <TrendingUp className="w-10 h-10 text-blue-500 opacity-50 dark:opacity-30" />
           </div>
+          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
+            All submitted corrections
+          </p>
         </div>
 
         {/* Applied to Learning */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-green-500 overflow-hidden border border-gray-100 dark:border-gray-700 transition-colors">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Applied to Learning</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.applied_to_learning}</p>
+        <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-emerald-500/10 via-transparent to-emerald-500/5 hover:border-emerald-500/30 transition-all duration-300 group">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Applied to Learning</p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-4xl font-black text-gray-900 dark:text-white">{stats.applied_to_learning}</p>
+            <div className="w-12 h-12 rounded-xl glass-panel flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
+              <CheckCircle className="w-6 h-6" />
             </div>
-            <CheckCircle className="w-10 h-10 text-green-500 opacity-50 dark:opacity-30" />
           </div>
+          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
+            Learned from feedback
+          </p>
         </div>
 
         {/* Pending Review */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-yellow-500 overflow-hidden border border-gray-100 dark:border-gray-700 transition-colors">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Review</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.pending}</p>
+        <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-amber-500/10 via-transparent to-amber-500/5 hover:border-amber-500/30 transition-all duration-300 group">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Pending Review</p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-4xl font-black text-gray-900 dark:text-white">{stats.pending}</p>
+            <div className="w-12 h-12 rounded-xl glass-panel flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
+              <Clock className="w-6 h-6" />
             </div>
-            <Clock className="w-10 h-10 text-yellow-500 opacity-50 dark:opacity-30" />
           </div>
+          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
+            Awaiting approval
+          </p>
         </div>
       </div>
 
       {/* Tier Distribution */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Auto-Approval Tiers (Phase 1)</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-lg p-3">
-            <div className="text-xs text-green-600 dark:text-green-400 font-medium mb-1">🚀 Tier 1 (≥90%)</div>
-            <div className="text-lg font-bold text-green-700 dark:text-green-300">
+      <div className="glass-panel rounded-2xl p-6 border-white/10">
+        <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white mb-5 flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+          Auto-Approval Tiers (Phase 1)
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="glass-card rounded-xl p-4 bg-gradient-to-br from-emerald-500/10 via-transparent to-green-500/5 border-emerald-500/20 hover:border-emerald-500/40 transition-all">
+            <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-2">🚀 Tier 1 (≥90%)</div>
+            <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
               {recentFeedback.filter(f => f.user_confidence >= 0.90).length}
             </div>
-            <div className="text-xs text-green-600 dark:text-green-500 mt-1">Auto-apply (STRICT)</div>
+            <div className="text-[9px] font-bold text-emerald-500/70 mt-2 uppercase tracking-widest">Auto-apply (STRICT)</div>
           </div>
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-lg p-3">
-            <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">⚡ Tier 2 (≥80%)</div>
-            <div className="text-lg font-bold text-blue-700 dark:text-blue-300">
+          <div className="glass-card rounded-xl p-4 bg-gradient-to-br from-blue-500/10 via-transparent to-cyan-500/5 border-blue-500/20 hover:border-blue-500/40 transition-all">
+            <div className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-2">⚡ Tier 2 (≥80%)</div>
+            <div className="text-3xl font-black text-blue-600 dark:text-blue-400">
               {recentFeedback.filter(f => f.user_confidence >= 0.80 && f.user_confidence < 0.90).length}
             </div>
-            <div className="text-xs text-blue-600 dark:text-blue-500 mt-1">Auto-apply (MODERATE)</div>
+            <div className="text-[9px] font-bold text-blue-500/70 mt-2 uppercase tracking-widest">Auto-apply (MODERATE)</div>
           </div>
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg p-3">
-            <div className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mb-1">📋 Tier 3 (≥70%)</div>
-            <div className="text-lg font-bold text-yellow-700 dark:text-yellow-300">
+          <div className="glass-card rounded-xl p-4 bg-gradient-to-br from-amber-500/10 via-transparent to-yellow-500/5 border-amber-500/20 hover:border-amber-500/40 transition-all">
+            <div className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">📋 Tier 3 (≥70%)</div>
+            <div className="text-3xl font-black text-amber-600 dark:text-amber-400">
               {recentFeedback.filter(f => f.user_confidence >= 0.70 && f.user_confidence < 0.80).length}
             </div>
-            <div className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">Batch queue</div>
+            <div className="text-[9px] font-bold text-amber-500/70 mt-2 uppercase tracking-widest">Batch queue</div>
           </div>
-          <div className="bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-            <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">👁 Manual (&lt;70%)</div>
-            <div className="text-lg font-bold text-gray-700 dark:text-gray-200">
+          <div className="glass-card rounded-xl p-4 bg-gradient-to-br from-gray-500/10 via-transparent to-gray-500/5 border-gray-500/20 hover:border-gray-500/40 transition-all">
+            <div className="text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-2">👁 Manual (&lt;70%)</div>
+            <div className="text-3xl font-black text-gray-600 dark:text-gray-300">
               {recentFeedback.filter(f => f.user_confidence < 0.70).length}
             </div>
-            <div className="text-xs text-gray-600 dark:text-gray-500 mt-1">Manual review</div>
+            <div className="text-[9px] font-bold text-gray-500/70 mt-2 uppercase tracking-widest">Manual review</div>
           </div>
         </div>
       </div>
 
       {/* Feedback by Type */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Feedback by Type</h3>
-        <div className="space-y-3">
-          {feedbackTypes.map(({ key, label, color }) => {
+      <div className="glass-panel rounded-2xl p-6 border-white/10">
+        <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white mb-5 flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+          Feedback by Type
+        </h3>
+        <div className="space-y-4">
+          {feedbackTypes.map(({ key, label, gradient }) => {
             const count = stats.by_type[key] || 0;
             const percentage = stats.total_feedback > 0
               ? (count / stats.total_feedback) * 100
@@ -262,15 +295,15 @@ export const FeedbackStats: React.FC = () => {
 
             return (
               <div key={key}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{count}</span>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300">{label}</span>
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{count} ({percentage.toFixed(0)}%)</span>
                 </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-2.5 overflow-hidden">
                   <div
-                    className={`bg-${color}-500 dark:bg-${color}-400 h-2 rounded-full transition-all duration-300`}
+                    className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${gradient}`}
                     style={{ width: `${percentage}%` }}
-                  ></div>
+                  />
                 </div>
               </div>
             );
@@ -279,140 +312,137 @@ export const FeedbackStats: React.FC = () => {
       </div>
 
       {/* Recent Feedback */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+      <div className="glass-panel rounded-2xl overflow-hidden border-white/10">
+        <div className="px-6 py-5 border-b border-white/10 bg-black/5 dark:bg-white/5">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
               Recent Feedback
             </h3>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => { setFilterMode('all'); setCurrentPage(0); }}
-                  className={`px-3 py-1 text-xs rounded font-medium transition-all ${filterMode === 'all'
-                    ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
-                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+              <div className="flex p-1 glass-panel rounded-xl border-white/10 bg-black/5 dark:bg-white/5">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'pending', label: 'Pending' },
+                  { key: 'applied', label: 'Applied' },
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => { setFilterMode(key as typeof filterMode); setCurrentPage(0); }}
+                    className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-300 ${
+                      filterMode === key
+                        ? key === 'pending'
+                          ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-lg shadow-amber-500/20'
+                          : key === 'applied'
+                          ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/20'
+                          : 'bg-gradient-to-r from-gray-700 to-gray-800 text-white shadow-lg'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/10'
                     }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => { setFilterMode('pending'); setCurrentPage(0); }}
-                  className={`px-3 py-1 text-xs rounded font-medium transition-all ${filterMode === 'pending'
-                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 shadow-sm'
-                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                >
-                  Pending
-                </button>
-                <button
-                  onClick={() => { setFilterMode('applied'); setCurrentPage(0); }}
-                  className={`px-3 py-1 text-xs rounded font-medium transition-all ${filterMode === 'applied'
-                    ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 shadow-sm'
-                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                >
-                  Applied
-                </button>
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest glass-panel px-3 py-1.5 rounded-lg">
                 Page {currentPage + 1}
-              </div>
+              </span>
             </div>
           </div>
         </div>
-        <div className="divide-y divide-gray-200 dark:divide-gray-700 overflow-x-hidden">
+        <div className="divide-y divide-white/10 overflow-x-hidden">
           {recentFeedback.length === 0 ? (
-            <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-              {filterMode === 'pending' ? 'No pending feedback' :
-                filterMode === 'applied' ? 'No applied feedback yet' :
-                  'No feedback submitted yet'}
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 rounded-2xl glass-card flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="w-8 h-8 text-gray-400" />
+              </div>
+              <p className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                {filterMode === 'pending' ? 'No pending feedback' :
+                  filterMode === 'applied' ? 'No applied feedback yet' :
+                    'No feedback submitted yet'}
+              </p>
             </div>
           ) : (
             recentFeedback.map((feedback) => (
-              <div key={feedback.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors overflow-x-hidden">
-                <div className="flex flex-col sm:flex-row items-start gap-3">
+              <div key={feedback.id} className="p-5 hover:bg-white/5 dark:hover:bg-white/5 transition-colors overflow-x-hidden">
+                <div className="flex flex-col sm:flex-row items-start gap-4">
                   <div className="flex-1 min-w-0 overflow-hidden" style={{ maxWidth: "calc(100% - 100px)" }}>
 
-                    <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                      <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${feedback.feedback_type === 'sql_correction' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' :
-                        feedback.feedback_type === 'column_name' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' :
-                          feedback.feedback_type === 'table_name' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300' :
-                            'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
-                        }`}>
-                        {feedback.feedback_type.replace('_', ' ').toUpperCase()}
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r border ${
+                        feedback.feedback_type === 'sql_correction' ? 'from-blue-500/20 to-cyan-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30' :
+                        feedback.feedback_type === 'column_name' ? 'from-emerald-500/20 to-green-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' :
+                        feedback.feedback_type === 'table_name' ? 'from-amber-500/20 to-yellow-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30' :
+                        'from-red-500/20 to-rose-500/20 text-red-600 dark:text-red-400 border-red-500/30'
+                      }`}>
+                        {feedback.feedback_type.replace('_', ' ')}
                       </span>
                       {(() => {
                         const tierInfo = getTierInfo(feedback.user_confidence);
-                        const darkColor = feedback.user_confidence >= 0.90 ? 'dark:bg-green-900/40 dark:text-green-300' :
-                          feedback.user_confidence >= 0.80 ? 'dark:bg-blue-900/40 dark:text-blue-300' :
-                            feedback.user_confidence >= 0.70 ? 'dark:bg-yellow-900/40 dark:text-yellow-300' :
-                              'dark:bg-gray-800 dark:text-gray-300';
                         return (
-                          <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${tierInfo.color} ${darkColor}`} title={tierInfo.description}>
+                          <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r border ${tierInfo.color}`} title={tierInfo.description}>
                             {tierInfo.emoji} {tierInfo.label}
                           </span>
                         );
                       })()}
                       {feedback.applied_successfully && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300">
+                        <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                           ✓ Applied
                         </span>
                       )}
                       {feedback.learned_correction_id && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300" title="Learned Correction ID">
+                        <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30" title="Learned Correction ID">
                           🧠 LC-{feedback.learned_correction_id}
                         </span>
                       )}
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
                         {Math.round(feedback.user_confidence * 100)}% conf
                       </span>
                     </div>
 
                     {feedback.correction_description && (
-                      <p className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 break-all overflow-hidden">
+                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 break-all overflow-hidden">
                         {feedback.correction_description}
                       </p>
                     )}
 
                     {/* Show validation rejection message if present */}
                     {feedback.user_notes && feedback.user_notes.includes('[AUTO-APPLY REJECTED]') && (
-                      <div className="text-xs bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded p-2 mb-2 overflow-hidden">
-                        <span className="font-semibold text-red-900 dark:text-red-200">⚠️ Validation Rejected: </span>
-                        <span className="text-red-700 dark:text-red-300">{feedback.user_notes.replace('[AUTO-APPLY REJECTED]', '').trim()}</span>
+                      <div className="text-xs glass-panel bg-gradient-to-r from-red-500/10 to-rose-500/10 border border-red-500/30 rounded-xl p-3 mb-3 overflow-hidden">
+                        <span className="font-black text-red-600 dark:text-red-400">⚠️ Validation Rejected: </span>
+                        <span className="font-medium text-red-700 dark:text-red-300">{feedback.user_notes.replace('[AUTO-APPLY REJECTED]', '').trim()}</span>
                       </div>
                     )}
 
                     {/* Show correction details for table_name/column_name feedback */}
                     {feedback.correction_details && (feedback.feedback_type === 'table_name' || feedback.feedback_type === 'column_name') && (
-                      <div className="text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded p-2 mb-2 overflow-hidden">
-                        <span className="font-semibold text-blue-900 dark:text-blue-200">Correction: </span>
-                        <span className="text-red-700 dark:text-red-400 line-through">{feedback.correction_details.from || 'N/A'}</span>
+                      <div className="text-xs glass-panel bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl p-3 mb-3 overflow-hidden">
+                        <span className="font-black text-blue-600 dark:text-blue-400">Correction: </span>
+                        <span className="text-red-600 dark:text-red-400 line-through font-medium">{feedback.correction_details.from || 'N/A'}</span>
                         {' → '}
-                        <span className="text-green-700 dark:text-green-400 font-medium">{feedback.correction_details.to || 'N/A'}</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-black">{feedback.correction_details.to || 'N/A'}</span>
                       </div>
                     )}
 
                     {/* Show user notes if available and no description */}
                     {!feedback.correction_description && feedback.user_notes && (
-                      <p className="text-xs text-gray-600 dark:text-gray-400 italic mb-1.5 break-all overflow-hidden">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 italic mb-2 break-all overflow-hidden">
                         Note: {feedback.user_notes}
                       </p>
                     )}
 
                     {/* Show placeholder if no meaningful content */}
                     {!feedback.correction_description && !feedback.user_notes && !feedback.correction_details && !feedback.corrected_sql && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 italic mb-1.5">
+                      <p className="text-xs font-medium text-gray-400 dark:text-gray-500 italic mb-2">
                         No detailed information provided for this feedback.
                       </p>
                     )}
 
                     {/* Show SQL comparison if available */}
                     {feedback.corrected_sql && (
-                      <div className="mt-2 overflow-hidden">
+                      <div className="mt-3 overflow-hidden">
                         <button
                           onClick={() => toggleSqlExpanded(feedback.id)}
-                          className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium transition-colors"
+                          className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 transition-colors glass-panel px-3 py-1.5 rounded-lg"
                         >
                           {expandedSql.has(feedback.id) ? (
                             <>
@@ -428,17 +458,17 @@ export const FeedbackStats: React.FC = () => {
                         </button>
 
                         {expandedSql.has(feedback.id) && (
-                          <div className="mt-2 space-y-2 max-w-full">
-                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded p-2 overflow-hidden">
-                              <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">Original SQL:</p>
+                          <div className="mt-3 space-y-3 max-w-full animate-fadeIn">
+                            <div className="glass-panel bg-gradient-to-r from-red-500/10 to-rose-500/10 border border-red-500/30 rounded-xl p-4 overflow-hidden">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-red-600 dark:text-red-400 mb-2">Original SQL:</p>
                               <div className="max-w-full overflow-hidden">
                                 <pre className="text-xs text-gray-800 dark:text-gray-300 whitespace-pre-wrap break-all font-mono max-h-48 overflow-y-auto w-full">
                                   {feedback.original_sql}
                                 </pre>
                               </div>
                             </div>
-                            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded p-2 overflow-hidden">
-                              <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">Corrected SQL:</p>
+                            <div className="glass-panel bg-gradient-to-r from-emerald-500/10 to-green-500/10 border border-emerald-500/30 rounded-xl p-4 overflow-hidden">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-2">Corrected SQL:</p>
                               <div className="max-w-full overflow-hidden">
                                 <pre className="text-xs text-gray-800 dark:text-gray-300 whitespace-pre-wrap break-all font-mono max-h-48 overflow-y-auto w-full">
                                   {feedback.corrected_sql}
@@ -450,7 +480,7 @@ export const FeedbackStats: React.FC = () => {
                       </div>
                     )}
 
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
                       {new Date(feedback.created_at).toLocaleString()}
                     </p>
                   </div>
@@ -461,18 +491,18 @@ export const FeedbackStats: React.FC = () => {
                         {feedback.corrected_sql ? (
                           <button
                             onClick={() => handleApplyFeedback(feedback.id)}
-                            className="flex-1 sm:flex-initial px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap"
+                            className="flex-1 sm:flex-initial px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-500/20"
                           >
                             Apply
                           </button>
                         ) : (
-                          <div className="flex-1 sm:flex-initial px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-center whitespace-nowrap">
+                          <div className="flex-1 sm:flex-initial px-4 py-2 text-[10px] font-black uppercase tracking-widest glass-panel text-gray-500 dark:text-gray-400 rounded-xl text-center">
                             Info Only
                           </div>
                         )}
                         <button
                           onClick={() => handleRejectFeedback(feedback.id)}
-                          className="flex-1 sm:flex-initial px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors whitespace-nowrap"
+                          className="flex-1 sm:flex-initial px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-red-500/20"
                         >
                           {feedback.corrected_sql ? 'Reject' : 'Dismiss'}
                         </button>
@@ -480,7 +510,7 @@ export const FeedbackStats: React.FC = () => {
                     ) : (
                       <button
                         onClick={() => handleRejectFeedback(feedback.id)}
-                        className="flex-1 sm:flex-initial px-3 py-1.5 text-xs bg-gray-600 dark:bg-gray-700 text-white rounded hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors whitespace-nowrap"
+                        className="flex-1 sm:flex-initial px-4 py-2 text-[10px] font-black uppercase tracking-widest glass-panel text-gray-600 dark:text-gray-400 rounded-xl hover:scale-105 active:scale-95 transition-all hover:bg-gray-500/10"
                         title="Delete this feedback record"
                       >
                         Delete
@@ -495,19 +525,19 @@ export const FeedbackStats: React.FC = () => {
 
         {/* Pagination Controls */}
         {recentFeedback.length > 0 && (
-          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between bg-black/5 dark:bg-white/5">
             <button
               onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
               disabled={currentPage === 0}
-              className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-5 py-2.5 text-[10px] font-black uppercase tracking-widest glass-card rounded-xl text-gray-700 dark:text-gray-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
             >
               Previous
             </button>
 
-            <div className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
               Showing {recentFeedback.length} items on page {currentPage + 1}
               {stats && (
-                <span className="ml-2 text-gray-500 dark:text-gray-500">
+                <span className="ml-2 text-gray-400">
                   ({filterMode === 'pending' ? `${stats.pending} total pending` :
                     filterMode === 'applied' ? `${stats.applied_to_learning} total applied` :
                       `${stats.total_feedback} total`})
@@ -518,7 +548,7 @@ export const FeedbackStats: React.FC = () => {
             <button
               onClick={() => setCurrentPage(prev => prev + 1)}
               disabled={recentFeedback.length < pageSize}
-              className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-5 py-2.5 text-[10px] font-black uppercase tracking-widest glass-card rounded-xl text-gray-700 dark:text-gray-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
             >
               Next
             </button>

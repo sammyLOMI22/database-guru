@@ -5,7 +5,6 @@ import {
   Search,
   CheckCircle,
   ChevronDown,
-  ChevronRight,
   Clock,
   Zap,
   Filter,
@@ -95,15 +94,15 @@ export const ToolDirectory: React.FC = () => {
     validation: <CheckCircle className="w-5 h-5" />,
   };
 
-  const categoryColors: Record<string, { bg: string; text: string; border: string }> = {
-    schema: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-    data: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
-    query: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-    validation: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+  const categoryStyles: Record<string, { icon: string; bg: string; border: string }> = {
+    schema: { icon: 'text-blue-500', bg: 'from-blue-500/10 to-blue-500/5', border: 'border-blue-500/20' },
+    data: { icon: 'text-emerald-500', bg: 'from-emerald-500/10 to-emerald-500/5', border: 'border-emerald-500/20' },
+    query: { icon: 'text-purple-500', bg: 'from-purple-500/10 to-purple-500/5', border: 'border-purple-500/20' },
+    validation: { icon: 'text-orange-500', bg: 'from-orange-500/10 to-orange-500/5', border: 'border-orange-500/20' },
   };
 
   const categories: Array<{ value: ToolCategory | 'all'; label: string }> = [
-    { value: 'all', label: 'All Categories' },
+    { value: 'all', label: 'All' },
     { value: 'schema', label: 'Schema' },
     { value: 'data', label: 'Data' },
     { value: 'query', label: 'Query' },
@@ -114,7 +113,7 @@ export const ToolDirectory: React.FC = () => {
     return (
       <div className="animate-pulse space-y-4">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+          <div key={i} className="h-20 glass-panel rounded-2xl" />
         ))}
       </div>
     );
@@ -123,34 +122,37 @@ export const ToolDirectory: React.FC = () => {
   if (error) {
     return (
       <div className="text-center py-12">
-        <div className="text-red-500 mb-4">Error: {error}</div>
-        <button
-          onClick={() => loadTools(true)}
-          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
-        >
-          Retry
-        </button>
+        <div className="glass-panel rounded-2xl p-8 max-w-md mx-auto">
+          <div className="text-red-500 mb-4 text-sm font-bold uppercase tracking-widest">Error: {error}</div>
+          <button
+            onClick={() => loadTools(true)}
+            className="px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-orange-500/20"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Filter Bar */}
-      <div className="flex items-center gap-4 pb-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+      <div className="flex items-center gap-4 pb-5 border-b border-white/10">
+        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
           <Filter className="w-4 h-4" />
-          <span className="text-sm font-medium">Filter:</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Filter</span>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex p-1 glass-panel rounded-xl border-white/10 bg-black/5 dark:bg-white/5">
           {categories.map((cat) => (
             <button
               key={cat.value}
               onClick={() => setCategoryFilter(cat.value)}
-              className={`px-3 py-1.5 text-sm rounded-full transition-colors ${categoryFilter === cat.value
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
+              className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all duration-300 ${
+                categoryFilter === cat.value
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/20'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/10'
+              }`}
             >
               {cat.label}
             </button>
@@ -160,76 +162,79 @@ export const ToolDirectory: React.FC = () => {
 
       {/* Tools List */}
       {!tools || tools.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p>No tools found in this category</p>
+        <div className="text-center py-12">
+          <div className="glass-panel rounded-2xl p-8 max-w-md mx-auto">
+            <Search className="w-12 h-12 mx-auto mb-3 text-gray-400 opacity-50" />
+            <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">No tools found</p>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
           {tools.map((tool) => {
             const isExpanded = expandedTools.has(tool.name);
-            const colors = categoryColors[tool.category] || categoryColors.validation;
+            const style = categoryStyles[tool.category] || categoryStyles.validation;
 
             return (
               <div
                 key={tool.name}
-                className={`rounded-lg border ${colors.border} overflow-hidden`}
+                className={`glass-card rounded-2xl overflow-hidden ${style.border} transition-all duration-300 ${isExpanded ? 'shadow-xl' : ''}`}
               >
                 {/* Tool Header */}
                 <button
                   onClick={() => toggleTool(tool.name)}
-                  className={`w-full flex items-center justify-between p-4 text-left ${colors.bg} dark:bg-opacity-10 dark:hover:bg-opacity-20 transition-all`}
+                  className={`w-full flex items-center justify-between p-5 text-left bg-gradient-to-r ${style.bg} hover:opacity-90 transition-all group`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg bg-white dark:bg-gray-800 ${colors.text} shadow-sm border border-transparent dark:border-gray-700`}>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-xl glass-panel flex items-center justify-center ${style.icon} group-hover:scale-110 transition-transform`}>
                       {categoryIcons[tool.category] || <Zap className="w-5 h-5" />}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className={`font-semibold ${colors.text} dark:text-white`}>{tool.name}</h3>
-                        <span className={`text-xs px-2 py-0.5 rounded-full bg-white dark:bg-gray-700 ${colors.text} dark:text-gray-300 border border-transparent dark:border-gray-600`}>
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">{tool.name}</h3>
+                        <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg glass-panel ${style.icon}`}>
                           {tool.category}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{tool.description}</p>
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">{tool.description}</p>
                     </div>
                   </div>
-                  <div className={`flex-shrink-0 ${colors.text}`}>
-                    {isExpanded ? (
-                      <ChevronDown className="w-5 h-5" />
-                    ) : (
-                      <ChevronRight className="w-5 h-5" />
-                    )}
+                  <div className={`flex-shrink-0 ${style.icon} transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                    <ChevronDown className="w-5 h-5" />
                   </div>
                 </button>
 
                 {/* Expanded Details */}
                 {isExpanded && (
-                  <div className="p-4 bg-white dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700">
+                  <div className="p-5 border-t border-white/10 bg-black/5 dark:bg-white/5 animate-fadeIn">
                     {/* Parameters */}
-                    <div className="mb-4">
-                      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Parameters</h4>
+                    <div className="mb-5">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2">
+                        <div className="w-1 h-1 rounded-full bg-orange-500" />
+                        Parameters
+                      </h4>
                       {Object.keys(tool.parameters).length === 0 ? (
-                        <p className="text-sm text-gray-500 dark:text-gray-500">No parameters required</p>
+                        <p className="text-xs font-medium text-gray-400 dark:text-gray-500 italic">No parameters required</p>
                       ) : (
                         <div className="space-y-2">
                           {Object.entries(tool.parameters).map(([name, param]) => (
                             <div
                               key={name}
-                              className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700"
+                              className="flex items-start gap-3 p-4 glass-panel rounded-xl border-white/10"
                             >
-                              <code className="text-sm font-mono bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-green-400 px-2 py-0.5 rounded">
+                              <code className="text-xs font-mono font-bold bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-lg border border-orange-500/20">
                                 {name}
                               </code>
-                              <div className="flex-1 text-sm">
-                                <span className="text-gray-500 dark:text-gray-400">({param.type})</span>
-                                {tool.required_params.includes(name) && (
-                                  <span className="ml-2 text-red-500 dark:text-red-400 text-xs">required</span>
-                                )}
-                                <p className="text-gray-600 dark:text-gray-300 mt-1">{param.description}</p>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">({param.type})</span>
+                                  {tool.required_params.includes(name) && (
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-red-500 bg-red-500/10 px-2 py-0.5 rounded">required</span>
+                                  )}
+                                </div>
+                                <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mt-1">{param.description}</p>
                                 {param.default !== undefined && (
-                                  <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
-                                    Default: {JSON.stringify(param.default)}
+                                  <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">
+                                    Default: <span className="text-gray-500">{JSON.stringify(param.default)}</span>
                                   </p>
                                 )}
                               </div>
@@ -240,11 +245,11 @@ export const ToolDirectory: React.FC = () => {
                     </div>
 
                     {/* Cache Info */}
-                    <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                      <div className="flex items-center gap-2 glass-panel px-3 py-2 rounded-lg">
                         <Clock className="w-4 h-4" />
                         <span>
-                          Cache TTL: {tool.cache_ttl}s
+                          TTL: {tool.cache_ttl}s
                           {!tool.cacheable && ' (disabled)'}
                         </span>
                       </div>
