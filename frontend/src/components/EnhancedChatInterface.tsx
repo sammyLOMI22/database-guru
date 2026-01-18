@@ -202,7 +202,7 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-transparent relative z-10">
+      <div className={`flex-1 flex flex-col min-w-0 bg-transparent relative z-10 ${!showSidebar && !showSessionSelector ? 'mx-auto w-full max-w-7xl items-center' : ''}`} >
         {/* Header - Sub Header for Chat Info */}
         <div className="px-6 py-3 glass-panel border-b border-white/10 transition-colors duration-500">
           <div className="flex items-center justify-between">
