@@ -181,7 +181,7 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
   };
 
   return (
-    <div className="flex h-full">
+    <div className={`flex h-full ${!showSidebar && !showSessionSelector ? 'justify-center' : ''}`}>
       {/* Left Sidebar - Connections/Schema/History */}
       {showSidebar && (
         <Sidebar
@@ -202,7 +202,11 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
       )}
 
       {/* Main Chat Area */}
-      <div className={`flex-1 flex flex-col min-w-0 bg-transparent relative z-10 ${!showSidebar && !showSessionSelector ? 'mx-auto w-full max-w-7xl items-center' : ''}`} >
+      <div className={
+        !showSidebar && !showSessionSelector
+          ? 'mx-auto max-w-7xl bg-transparent relative z-10 flex flex-col min-w-0'
+          : 'flex-1 flex flex-col min-w-0 bg-transparent relative z-10'
+      }>
         {/* Header - Sub Header for Chat Info */}
         <div className="px-6 py-3 glass-panel border-b border-white/10 transition-colors duration-500">
           <div className="flex items-center justify-between">
