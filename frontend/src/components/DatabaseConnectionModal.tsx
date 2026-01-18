@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 
 interface DatabaseConnection {
   id?: number;
@@ -197,25 +197,32 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto transition-colors">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {connection ? 'Edit Database Connection' : 'Add Database Connection'}
-          </h2>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-xl animate-fadeIn p-4">
+      <div className="glass-panel bg-white/5 dark:bg-black/40 rounded-[2.5rem] shadow-2xl border-white/10 max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col relative transition-all duration-500 scale-100 shadow-[0_30px_100px_rgba(0,0,0,0.5)]">
+        {/* Glow Effects */}
+        <div className="absolute top-0 left-0 w-64 h-64 bg-blue-500/5 blur-[100px] -ml-32 -mt-32 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-500/5 blur-[100px] -mr-32 -mb-32 pointer-events-none" />
+
+        <div className="flex items-center justify-between p-8 border-b border-white/5 bg-white/5 dark:bg-black/20">
+          <div>
+            <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400 mb-2">Database Engine</h2>
+            <h3 className="text-2xl font-black uppercase tracking-tight text-gray-900 dark:text-white">
+              {connection ? 'Edit Connection' : 'Register New Connection'}
+            </h3>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="p-3 text-gray-400 hover:text-gray-200 glass-panel rounded-2xl hover:scale-110 active:scale-95 transition-all shadow-lg"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8 bg-transparent flex flex-col">
           {/* Connection Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Connection Name *
+          <div className="space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+              Connection Identifier *
             </label>
             <input
               type="text"
@@ -223,38 +230,38 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
               value={formData.name}
               onChange={handleChange}
               required
-              placeholder="My Production Database"
-              className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+              placeholder="e.g., Production Analytics"
+              className="w-full px-6 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
             />
           </div>
 
           {/* Database Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Database Type *
+          <div className="space-y-4">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+              Select Protocol *
             </label>
-            <div className="grid grid-cols-5 gap-3">
+            <div className="flex flex-wrap gap-2.5">
               {['postgresql', 'mysql', 'sqlite', 'mongodb', 'duckdb'].map((type) => (
                 <button
                   key={type}
                   type="button"
                   onClick={() => handleDatabaseTypeChange(type)}
-                  className={`px-4 py-2 rounded-lg border-2 transition-all ${formData.database_type === type
-                      ? 'border-primary-500 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-medium'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 text-gray-700 dark:text-gray-400'
+                  className={`px-4 py-2.5 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${formData.database_type === type
+                    ? 'border-blue-500/50 bg-blue-500/20 text-blue-500 shadow-[0_5px_15px_rgba(59,130,246,0.2)] scale-105'
+                    : 'border-white/5 glass-panel bg-black/5 dark:bg-white/5 text-gray-500 hover:border-white/10 hover:text-gray-300'
                     }`}
                 >
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                  {type}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* File Path for SQLite and DuckDB */}
+          {/* Dynamic Fields */}
           {(formData.database_type === 'sqlite' || formData.database_type === 'duckdb') ? (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Database File Path *
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                Database Target Path *
               </label>
               <input
                 type="text"
@@ -262,21 +269,22 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                 value={formData.database_name}
                 onChange={handleChange}
                 required
-                placeholder={formData.database_type === 'duckdb' ? '/path/to/database.duckdb' : '/path/to/database.db'}
-                className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                placeholder={formData.database_type === 'duckdb' ? 'e.g., /data/analytics.duckdb' : 'e.g., /data/local.db'}
+                className="w-full px-6 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
               />
               {formData.database_type === 'duckdb' && (
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  Tip: Use <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">:memory:</code> for an in-memory database
-                </p>
+                <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-xl text-[10px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  Tip: Use :memory: for an ephemeral in-memory database
+                </div>
               )}
             </div>
           ) : (
             <>
               {/* Host and Port */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Host *</label>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="md:col-span-3 space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Host Address *</label>
                   <input
                     type="text"
                     name="host"
@@ -284,26 +292,26 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                     onChange={handleChange}
                     required
                     placeholder="localhost"
-                    className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                    className="w-full px-6 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Port *</label>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Port *</label>
                   <input
                     type="number"
                     name="port"
                     value={formData.port}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                    className="w-full px-6 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-bold"
                   />
                 </div>
               </div>
 
               {/* Database Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Database Name *
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                  Database Schema Name *
                 </label>
                 <input
                   type="text"
@@ -311,16 +319,16 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                   value={formData.database_name}
                   onChange={handleChange}
                   required
-                  placeholder="myapp_production"
-                  className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                  placeholder="e.g., app_production"
+                  className="w-full px-6 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
                 />
               </div>
 
               {/* Username and Password */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Username *
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                    Authority Username *
                   </label>
                   <input
                     type="text"
@@ -328,13 +336,13 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                     value={formData.username}
                     onChange={handleChange}
                     required
-                    placeholder="dbuser"
-                    className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                    placeholder="e.g., db_admin"
+                    className="w-full px-6 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Password *
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                    Authority Secret *
                   </label>
                   <input
                     type="password"
@@ -343,7 +351,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                     onChange={handleChange}
                     required
                     placeholder="••••••••"
-                    className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                    className="w-full px-6 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold font-mono"
                   />
                 </div>
               </div>
@@ -351,26 +359,26 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
           )}
 
           {/* Connection String Preview */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Connection String Preview
+          <div className="border-t border-white/5 pt-8">
+            <div className="flex items-center justify-between mb-4">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                Connection String Protocol
               </label>
               <button
                 type="button"
                 onClick={() => setShowConnectionString(!showConnectionString)}
-                className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium transition-colors"
+                className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors"
               >
-                {showConnectionString ? 'Hide' : 'Show'}
+                {showConnectionString ? 'Hide Protocol' : 'Inspect Protocol'}
               </button>
             </div>
             {showConnectionString && (
-              <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors">
-                <code className="text-xs text-gray-700 dark:text-gray-300 break-all font-mono">
+              <div className="mt-2 p-6 glass-panel bg-black/20 dark:bg-black/40 rounded-2xl border-white/5 animate-slideDown overflow-hidden">
+                <code className="text-[11px] text-blue-400/90 break-all font-mono leading-relaxed block">
                   {getConnectionString()}
                 </code>
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  This is how your database connection string will look. The password is masked for security.
+                <p className="mt-4 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                  Synchronized protocol string for engine registration. Password tokens are protected.
                 </p>
               </div>
             )}
@@ -380,37 +388,38 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
           {testResult && (
             <div
               className={`p-4 rounded-lg transition-colors ${testResult.success
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800/50'
-                  : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800/50'
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800/50'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800/50'
                 }`}
             >
-              <p className="font-medium">{testResult.message}</p>
+              <p className="font-medium text-[11px] font-black uppercase tracking-widest">{testResult.message}</p>
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-4 pt-8 border-t border-white/5 mt-auto pb-4">
             <button
               type="button"
               onClick={handleTestConnection}
               disabled={testing}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+              className="px-6 py-4 glass-panel border-white/10 text-[10px] font-black uppercase tracking-widest text-gray-900 dark:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:cursor-not-allowed group flex items-center gap-2"
             >
-              {testing ? 'Testing...' : 'Test Connection'}
+              {testing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {testing ? 'Verifying...' : 'Verify Engine'}
             </button>
             <div className="flex-1" />
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+              className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-primary-500 dark:bg-primary-600 text-white rounded-lg hover:bg-primary-600 dark:hover:bg-primary-500 transition-colors shadow-sm"
+              className="px-8 py-4 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-blue-500 transition-all shadow-xl shadow-blue-500/20 active:scale-95"
             >
-              Save Connection
+              Synchronize connection
             </button>
           </div>
         </form>
