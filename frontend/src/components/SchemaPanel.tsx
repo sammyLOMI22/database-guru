@@ -140,9 +140,9 @@ export default function SchemaPanel() {
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedConnectionId === conn.id ? 'bg-emerald-500/10' : 'bg-gray-100 dark:bg-gray-800'}`}>
                       <Database className="w-4 h-4" />
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-black uppercase tracking-wider truncate">{conn.name}</p>
-                      <p className="text-xs opacity-60 font-bold uppercase">{conn.database_type}</p>
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <p className="text-xs font-black uppercase tracking-wider truncate block w-full">{conn.name}</p>
+                      <p className="text-[9px] opacity-60 font-bold uppercase tracking-widest truncate block w-full">{conn.database_type}</p>
                     </div>
                   </button>
                 ))}
@@ -193,7 +193,7 @@ export default function SchemaPanel() {
             {/* Schema Explorer */}
             <div className="flex-1 h-full min-h-0 overflow-y-auto p-6 bg-gray-50/30 dark:bg-black/20 custom-scrollbar">
               {selectedConnectionId ? (
-                <div className="max-w-6xl mx-auto animate-fadeIn">
+                <div className="max-w-[1600px] mx-auto animate-fadeIn">
                   <SchemaExplorer
                     connectionId={selectedConnectionId}
                     connectionName={
@@ -273,7 +273,7 @@ export default function SchemaPanel() {
             {/* Schema Comparison */}
             <div className="flex-1 h-full min-h-0 overflow-y-auto p-6 bg-gray-50/30 dark:bg-black/20 custom-scrollbar">
               {compareConnectionIds.length >= 2 ? (
-                <div className="max-w-6xl mx-auto animate-fadeIn">
+                <div className="max-w-[1600px] mx-auto animate-fadeIn">
                   <SchemaComparison
                     connectionIds={compareConnectionIds}
                     connectionNames={Object.fromEntries(

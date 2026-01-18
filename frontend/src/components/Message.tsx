@@ -54,7 +54,7 @@ export default function Message({ type, content, queryResponse, multiQueryRespon
 
       {/* Message content */}
       <div className={`flex-1 min-w-0 ${isUser ? 'flex justify-end' : ''}`}>
-        <div className={`max-w-[85%] group ${isUser ? 'ml-auto' : ''}`}>
+        <div className={`max-w-[1100px] w-full group ${isUser ? 'ml-auto' : ''}`}>
           {/* Text content */}
           <div className={`px-6 py-4 shadow-2xl transition-all duration-300 ${isUser
             ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl rounded-tr-none border-b-2 border-indigo-800/50'
