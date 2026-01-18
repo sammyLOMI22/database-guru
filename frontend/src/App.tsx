@@ -65,7 +65,7 @@ function App() {
           <main className="flex-1 flex h-full">
             {/* Chat - always mounted to preserve history */}
             <div className={`flex-1 flex ${activeTab === 'chat' ? '' : 'hidden'}`}>
-              <EnhancedChatInterface activeTab={activeTab} />
+              <EnhancedChatInterface />
             </div>
 
             {/* Schema */}

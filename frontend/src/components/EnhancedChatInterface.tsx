@@ -29,14 +29,7 @@ interface PerTaskModelSettings {
   enable_prompt_optimization: boolean;
 }
 
-interface EnhancedChatInterfaceProps {
-  activeTab?: string;
-}
-
-// Polling interval constants
-const SETTINGS_POLL_INTERVAL_MS = 30000; // 30 seconds - reduced from 10s for performance
-
-export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfaceProps) {
+export default function EnhancedChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -105,23 +98,16 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
   }, []);
 
   useEffect(() => {
+    // Initial fetch on mount
     fetchPerTaskModels();
-
-    // Refresh settings when tab becomes active
-    if (activeTab === 'chat') {
-      fetchPerTaskModels();
-    }
 
     // Listener for immediate updates from SettingsPanel
     window.addEventListener('settingsUpdated', fetchPerTaskModels);
 
-    // Refresh settings periodically (30 seconds)
-    const interval = setInterval(fetchPerTaskModels, SETTINGS_POLL_INTERVAL_MS);
     return () => {
-      clearInterval(interval);
       window.removeEventListener('settingsUpdated', fetchPerTaskModels);
     };
-  }, [activeTab, fetchPerTaskModels]);
+  }, [fetchPerTaskModels]);
 
   // Save narratives preference to localStorage
   useEffect(() => {
@@ -380,8 +366,8 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
             </div>
           )}
 
-          {messages.map((message, idx) => (
-            <div key={message.id} className={`flex items-start gap-4 animate-fadeIn delay-${Math.min(idx, 5) * 100} opacity-0 fill-mode-forwards`}>
+          {messages.map((message) => (
+            <div key={message.id} className="flex items-start gap-4 animate-fadeIn">
               <Message
                 type={message.type}
                 content={message.content}

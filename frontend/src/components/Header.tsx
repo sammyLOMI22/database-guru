@@ -13,6 +13,8 @@ const TABS = [
   { id: 'schema', label: 'Schema', icon: '🗂️' },
   { id: 'feedback', label: 'Stats', icon: '📊' },
   { id: 'tools', label: 'Tools', icon: '🔧' },
+  { id: 'cache', label: 'Cache', icon: '💾' },
+  { id: 'pools', label: 'Pools', icon: '🔗' },
   { id: 'settings', label: 'Config', icon: '⚙️' },
 ];
 
