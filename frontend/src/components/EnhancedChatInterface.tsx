@@ -181,7 +181,7 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
   };
 
   return (
-    <div className={`flex h-full ${!showSidebar && !showSessionSelector ? 'justify-center' : ''}`}>
+    <div className={`flex h-full w-full ${!showSidebar && !showSessionSelector ? 'justify-center' : ''}`}>
       {/* Left Sidebar - Connections/Schema/History */}
       {showSidebar && (
         <Sidebar
@@ -204,7 +204,7 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
       {/* Main Chat Area */}
       <div className={
         !showSidebar && !showSessionSelector
-          ? 'mx-auto max-w-7xl bg-transparent relative z-10 flex flex-col min-w-0'
+          ? 'flex-none mx-auto max-w-7xl bg-transparent relative z-10 flex flex-col min-w-0'
           : 'flex-1 flex flex-col min-w-0 bg-transparent relative z-10'
       }>
         {/* Header - Sub Header for Chat Info */}
