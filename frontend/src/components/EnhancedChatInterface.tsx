@@ -193,7 +193,7 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
 
       {/* Session Selector Sidebar */}
       {showSessionSelector && (
-        <div className="w-[400px] glass-panel border-r border-white/10 overflow-y-auto flex-shrink-0 transition-all duration-500 animate-slideInLeft relative z-30">
+        <div className="w-[450px] glass-panel border-r border-white/10 overflow-y-auto flex-shrink-0 transition-all duration-500 animate-slideInLeft relative z-30">
           <ChatSessionSelector
             currentSession={currentSession}
             onSessionChange={setCurrentSession}
@@ -204,7 +204,7 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
       {/* Main Chat Area */}
       <div className={
         !showSidebar && !showSessionSelector
-          ? 'flex-none mx-auto max-w-7xl bg-transparent relative z-10 flex flex-col min-w-0'
+          ? 'flex-none mx-auto max-w-[1600px] bg-transparent relative z-10 flex flex-col min-w-0'
           : 'flex-1 flex flex-col min-w-0 bg-transparent relative z-10'
       }>
         {/* Header - Sub Header for Chat Info */}

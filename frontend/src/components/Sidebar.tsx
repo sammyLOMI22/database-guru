@@ -35,7 +35,7 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
   }, []);
 
   return (
-    <aside className="w-[400px] flex-shrink-0 glass-panel border-r border-white/10 flex flex-col transition-all duration-500 relative z-20 overflow-hidden shadow-[20px_0_50px_rgba(0,0,0,0.3)]">
+    <aside className="w-[450px] flex-shrink-0 glass-panel border-r border-white/10 flex flex-col transition-all duration-500 relative z-20 overflow-hidden shadow-[20px_0_50px_rgba(0,0,0,0.3)]">
       {/* Header */}
       <div className="p-6 border-b border-white/5 bg-white/5 dark:bg-black/20">
         <div className="flex items-center justify-between mb-6">

@@ -175,7 +175,7 @@ export function SettingsPanel() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6 min-h-full transition-colors animate-fadeIn">
+    <div className="max-w-[1600px] mx-auto p-6 min-h-full transition-colors animate-fadeIn">
       <div className="glass-panel rounded-[2rem] shadow-2xl border-white/10 overflow-hidden">
         {/* Header */}
         <div className="border-b border-white/5 px-8 py-8 bg-white/5 dark:bg-black/20">

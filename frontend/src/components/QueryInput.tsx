@@ -178,7 +178,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
 
   return (
     <div className="relative z-40 px-4 pb-8 pt-4 transition-all duration-300 w-full">
-      <div className="max-w-7xl mx-auto animate-fadeIn group">
+      <div className="max-w-[1600px] mx-auto animate-fadeIn group">
         {/* Pre-flight validation indicator - Glass Panel */}
         {connectionIds && connectionIds.length >= 2 && (
           <div className="mb-3 px-4 py-2 glass-panel rounded-xl shadow-lg border-white/10 animate-slideInLeft">
