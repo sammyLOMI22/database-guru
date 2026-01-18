@@ -282,8 +282,8 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
           ) : (
             <>
               {/* Host and Port */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="md:col-span-3 space-y-3">
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex-1 space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Host Address *</label>
                   <input
                     type="text"
@@ -295,7 +295,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                     className="w-full px-6 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
                   />
                 </div>
-                <div className="space-y-3">
+                <div className="w-full md:w-32 space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Port *</label>
                   <input
                     type="number"
@@ -303,7 +303,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                     value={formData.port}
                     onChange={handleChange}
                     required
-                    className="w-full px-6 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-bold"
+                    className="w-full px-4 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-bold text-center"
                   />
                 </div>
               </div>
