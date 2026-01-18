@@ -198,7 +198,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-xl animate-fadeIn p-4">
-      <div className="glass-panel bg-white/5 dark:bg-black/40 rounded-[2.5rem] shadow-2xl border-white/10 max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col relative transition-all duration-500 scale-100 shadow-[0_30px_100px_rgba(0,0,0,0.5)]">
+      <div className="glass-panel bg-white/5 dark:bg-black/40 rounded-[2.5rem] shadow-2xl border-white/10 max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col relative transition-all duration-500 scale-100 shadow-[0_30px_100px_rgba(0,0,0,0.5)]">
         {/* Glow Effects */}
         <div className="absolute top-0 left-0 w-64 h-64 bg-blue-500/5 blur-[100px] -ml-32 -mt-32 pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-500/5 blur-[100px] -mr-32 -mb-32 pointer-events-none" />
