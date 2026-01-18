@@ -126,14 +126,14 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
                       <p className="font-semibold text-sm text-gray-800 dark:text-gray-200 leading-snug">
                         {stepMessage}
                       </p>
-                      <span className="text-[10px] font-bold font-mono text-gray-400 dark:text-gray-500 tracking-tighter bg-gray-100 dark:bg-gray-800/50 px-1.5 py-0.5 rounded">
+                      <span className="text-xs font-bold font-mono text-gray-400 dark:text-gray-500 tracking-tighter bg-gray-100 dark:bg-gray-800/50 px-1.5 py-0.5 rounded">
                         +{stepElapsedMs.toFixed(0)}ms
                       </span>
                     </div>
 
                     {/* Step Type Badge */}
                     <div className="mt-2 flex items-center gap-2">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase ${getStepColor(stepType)} bg-opacity-10 dark:bg-opacity-20`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold tracking-wider uppercase ${getStepColor(stepType)} bg-opacity-10 dark:bg-opacity-20`}>
                         {stepType.replace('_', ' ')}
                       </span>
                     </div>
@@ -141,14 +141,14 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
                     {/* Metadata (expandable) */}
                     {stepMetadata && typeof stepMetadata === 'object' && Object.keys(stepMetadata).length > 0 && (
                       <details className="mt-2.5 group">
-                        <summary className="text-[11px] font-bold text-gray-500 dark:text-gray-400 cursor-pointer hover:text-blue-500 transition-colors list-none flex items-center gap-1">
+                        <summary className="text-xs font-bold text-gray-500 dark:text-gray-400 cursor-pointer hover:text-blue-500 transition-colors list-none flex items-center gap-1">
                           <svg className="w-3 h-3 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
                           </svg>
                           TECHNICAL DETAILS
                         </summary>
                         <div className="mt-2 overflow-hidden rounded-lg border border-white/5">
-                          <pre className="text-[10px] font-mono bg-black/40 text-blue-300 p-3 overflow-x-auto scrollbar-thin">
+                          <pre className="text-xs font-mono bg-black/40 text-blue-300 p-3 overflow-x-auto scrollbar-thin">
                             {JSON.stringify(stepMetadata, null, 2)}
                           </pre>
                         </div>

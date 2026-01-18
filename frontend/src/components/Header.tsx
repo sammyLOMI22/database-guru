@@ -30,7 +30,7 @@ export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTa
             <h1 className="text-lg font-black tracking-tight text-gradient leading-none">
               Database Guru
             </h1>
-            <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-blue-600/70 dark:text-blue-400/70 mt-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-blue-600/70 dark:text-blue-400/70 mt-0.5">
               AI SQL Assistant
             </p>
           </div>
@@ -43,7 +43,7 @@ export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTa
               <button
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
-                className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${activeTab === tab.id
+                className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all duration-500 ${activeTab === tab.id
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105 active:scale-95'
                   : 'text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-white/10'
                   }`}
@@ -73,7 +73,7 @@ export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTa
               {isHealthy && <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></div>}
               {isHealthy && <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>}
             </div>
-            <span className="text-[9px] font-black tracking-widest text-gray-700 dark:text-gray-300 uppercase">
+            <span className="text-xs font-bold tracking-wide text-gray-700 dark:text-gray-300 uppercase">
               {isHealthy ? 'Online' : 'Offline'}
             </span>
           </div>

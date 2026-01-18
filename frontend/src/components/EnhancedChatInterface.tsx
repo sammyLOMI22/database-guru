@@ -33,6 +33,9 @@ interface EnhancedChatInterfaceProps {
   activeTab?: string;
 }
 
+// Polling interval constants
+const SETTINGS_POLL_INTERVAL_MS = 30000; // 30 seconds - reduced from 10s for performance
+
 export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -112,8 +115,8 @@ export default function EnhancedChatInterface({ activeTab }: EnhancedChatInterfa
     // Listener for immediate updates from SettingsPanel
     window.addEventListener('settingsUpdated', fetchPerTaskModels);
 
-    // Refresh settings periodically
-    const interval = setInterval(fetchPerTaskModels, 10000);
+    // Refresh settings periodically (30 seconds)
+    const interval = setInterval(fetchPerTaskModels, SETTINGS_POLL_INTERVAL_MS);
     return () => {
       clearInterval(interval);
       window.removeEventListener('settingsUpdated', fetchPerTaskModels);

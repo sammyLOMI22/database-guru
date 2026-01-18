@@ -99,14 +99,14 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
             >
               {tableName}
             </span>
-            <span className={`text-[9px] font-bold uppercase tracking-widest opacity-60 ${isDarkMode ? 'text-blue-300' : 'text-blue-600'}`}>
+            <span className={`text-xs font-bold uppercase tracking-widest opacity-60 ${isDarkMode ? 'text-blue-300' : 'text-blue-600'}`}>
               {databaseType}
             </span>
           </div>
         </div>
         {rowCount !== null && (
           <span
-            className={`text-[10px] px-2.5 py-1 rounded-full font-bold shadow-sm ${isDarkMode ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-100'
+            className={`text-xs px-2.5 py-1 rounded-full font-bold shadow-sm ${isDarkMode ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-100'
               }`}
           >
             {rowCount.toLocaleString()}
@@ -126,7 +126,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
               <div
                 key={column.name}
                 className={`
-                  px-4 py-2 flex items-center justify-between text-[11px]
+                  px-4 py-2 flex items-center justify-between text-xs
                   border-b last:border-b-0
                   ${isDarkMode ? 'border-gray-800/50' : 'border-gray-100'}
                   ${isDarkMode ? 'hover:bg-gray-800/40' : 'hover:bg-gray-50'}
@@ -160,7 +160,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
                 <div className="flex items-center gap-2">
                   <span
                     className={`
-                      px-1.5 py-0.5 rounded text-[9px] font-mono leading-none
+                      px-1.5 py-0.5 rounded text-xs font-mono leading-none
                       ${isDarkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-100 text-gray-400'}
                     `}
                   >
@@ -188,7 +188,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
       {/* Collapsed summary */}
       {!isExpanded && (
         <div
-          className={`px-4 py-2 text-[10px] italic ${isDarkMode ? 'text-gray-500' : 'text-gray-400'
+          className={`px-4 py-2 text-xs italic ${isDarkMode ? 'text-gray-500' : 'text-gray-400'
             }`}
         >
           {columns.length} columns
@@ -200,7 +200,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
       {/* Database badge */}
       <div
         className={`
-          px-4 py-1.5 text-[10px] flex items-center gap-1.5 font-medium
+          px-4 py-1.5 text-xs flex items-center gap-1.5 font-medium
           ${isDarkMode ? 'bg-blue-900/10 text-gray-500' : 'bg-gray-50 text-gray-400'}
         `}
       >

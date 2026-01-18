@@ -68,7 +68,7 @@ export default function HistoryPanel({ onSelectQuery }: HistoryPanelProps) {
           </div>
 
           {/* Timestamp */}
-          <div className="mt-2 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+          <div className="mt-2 text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider">
             {new Date(item.created_at).toLocaleString()}
           </div>
         </button>

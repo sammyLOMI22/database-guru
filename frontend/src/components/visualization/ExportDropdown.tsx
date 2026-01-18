@@ -94,7 +94,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
       {isOpen && hasData && (
         <div className="absolute right-0 mt-2 w-56 glass-card bg-white/95 dark:bg-gray-900/95 border-gray-500/20 rounded-2xl shadow-2xl z-50 overflow-hidden animate-scaleUp">
           <div className="py-2">
-            <div className="px-4 py-2 text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em] bg-gray-500/5">
+            <div className="px-4 py-2 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em] bg-gray-500/5">
               Available Formats
             </div>
             {/* CSV Export */}
@@ -146,7 +146,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
 
           {/* Row count info */}
           <div className="px-5 py-2.5 bg-gray-500/5 border-t border-gray-500/10 mt-1">
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider flex items-center justify-between">
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider flex items-center justify-between">
               <span>Total Data Size</span>
               <span>{data.length.toLocaleString()} row{data.length !== 1 ? 's' : ''}</span>
             </p>

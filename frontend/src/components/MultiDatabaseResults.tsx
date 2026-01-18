@@ -180,19 +180,19 @@ export default function MultiDatabaseResults({
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           <div className="bg-white/40 dark:bg-black/20 p-3 rounded-xl border border-white/30 dark:border-white/5">
-            <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">Sources</p>
+            <p className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">Sources</p>
             <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">{results.length}</p>
           </div>
           <div className="bg-white/40 dark:bg-black/20 p-3 rounded-xl border border-white/30 dark:border-white/5">
-            <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">Total Rows</p>
+            <p className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">Total Rows</p>
             <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">{totalRows.toLocaleString()}</p>
           </div>
           <div className="bg-white/40 dark:bg-black/20 p-3 rounded-xl border border-white/30 dark:border-white/5">
-            <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">Execution</p>
+            <p className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">Execution</p>
             <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">{totalExecutionTime.toFixed(0)}<span className="text-xs font-medium ml-0.5">ms</span></p>
           </div>
           <div className="bg-white/40 dark:bg-black/20 p-3 rounded-xl border border-white/30 dark:border-white/5">
-            <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">Status</p>
+            <p className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">Status</p>
             <div className="flex items-center gap-2 mt-1">
               {successfulQueries > 0 && <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20 text-green-600 dark:text-green-400 text-xs font-bold ring-2 ring-green-500/10">✓</span>}
               {cannotAnswerQueries > 0 && <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-bold ring-2 ring-amber-500/10">⊘</span>}
@@ -389,7 +389,7 @@ export default function MultiDatabaseResults({
                       <div>
                         {/* Results header with controls */}
                         <div className="flex items-center justify-between mb-4 bg-gray-500/5 p-2 rounded-xl border border-gray-500/10">
-                          <h5 className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest ml-2">
+                          <h5 className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest ml-2">
                             Dataset Analytics ({result.row_count} row{result.row_count !== 1 ? 's' : ''})
                           </h5>
                           <div className="flex items-center gap-2">

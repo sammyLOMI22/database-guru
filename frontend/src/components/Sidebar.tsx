@@ -62,7 +62,7 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
               key={tab.id}
               onClick={() => setActiveTab(tab.id as Tab)}
               className={`
-                flex-1 px-2 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-300
+                flex-1 px-2 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all duration-300
                 ${activeTab === tab.id
                   ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-xl'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
@@ -83,7 +83,7 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
               <button
                 key={conn.id}
                 onClick={() => setSelectedConnId(conn.id)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${selectedConnId === conn.id
+                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all border ${selectedConnId === conn.id
                   ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20'
                   : 'bg-white/5 border-white/5 text-gray-500 hover:border-white/10'
                   }`}
@@ -113,7 +113,7 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-50 py-20">
                 <Database className="w-8 h-8 mb-3" />
-                <p className="text-[10px] font-black uppercase tracking-widest text-center">Select a database to explore schema</p>
+                <p className="text-xs font-black uppercase tracking-widest text-center">Select a database to explore schema</p>
               </div>
             )
           )}

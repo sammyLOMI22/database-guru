@@ -294,3 +294,81 @@ pre {
 .node-enter {
   animation: nodeEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Animation Fill Mode Utilities */
+.fill-mode-forwards {
+  animation-fill-mode: forwards;
+}
+
+.fill-mode-backwards {
+  animation-fill-mode: backwards;
+}
+
+.fill-mode-both {
+  animation-fill-mode: both;
+}
+
+/* Pulse animation for status indicators */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* React Flow container - ensure proper dimensions */
+.react-flow {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.react-flow__renderer {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* React Flow dark mode overrides */
+.react-flow-controls-dark .react-flow__controls-button {
+  background: rgba(55, 65, 81, 0.7);
+  backdrop-filter: blur(4px);
+  border-color: rgba(75, 85, 99, 0.5);
+  fill: #d1d5db;
+}
+
+.react-flow-controls-dark .react-flow__controls-button:hover {
+  background: rgba(75, 85, 99, 0.9);
+}
+
+.react-flow-minimap-dark {
+  background: #111827;
+  border: 1px solid rgba(75, 85, 99, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fadeIn,
+  .animate-slideInRight,
+  .animate-slideInLeft,
+  .animate-scaleUp,
+  .animate-float,
+  .animate-spin-slow,
+  .animate-pulse-slow,
+  .edge-animate,
+  .node-enter {
+    animation: none;
+  }
+
+  .glass-card:hover {
+    transform: none;
+  }
+}

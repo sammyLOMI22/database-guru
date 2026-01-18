@@ -186,14 +186,14 @@ export function SettingsPanel() {
               </div>
               <div>
                 <h2 className="text-2xl font-black uppercase tracking-tight text-gray-900 dark:text-white">System Settings</h2>
-                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Configure engine behavior and intelligence</p>
+                <p className="text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Configure engine behavior and intelligence</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
               <button
                 onClick={resetSettings}
                 disabled={saving}
-                className="flex items-center space-x-2 px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 glass-panel rounded-xl disabled:opacity-50 transition-all hover:scale-105 active:scale-95"
+                className="flex items-center space-x-2 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 glass-panel rounded-xl disabled:opacity-50 transition-all hover:scale-105 active:scale-95"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Reset</span>
@@ -201,7 +201,7 @@ export function SettingsPanel() {
               <button
                 onClick={saveSettings}
                 disabled={saving}
-                className="flex items-center space-x-2 px-6 py-2.5 text-[10px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl disabled:opacity-50 shadow-xl shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all"
+                className="flex items-center space-x-2 px-6 py-2.5 text-xs font-black uppercase tracking-widest text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl disabled:opacity-50 shadow-xl shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all"
               >
                 <Save className="w-4 h-4" />
                 <span>{saving ? 'Saving...' : 'Save Changes'}</span>
@@ -238,12 +238,12 @@ export function SettingsPanel() {
                 </label>
                 <span className="text-lg font-black text-blue-600 dark:text-blue-400">{settings.query_quality_level}%</span>
               </div>
-              <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">
+              <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">
                 Optimizes for speed at lower levels and precision at higher levels
               </p>
 
               <div className="flex items-center space-x-4 mb-8">
-                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Fast</span>
+                <span className="text-xs font-black uppercase tracking-widest text-emerald-500">Fast</span>
                 <input
                   type="range"
                   min="0"
@@ -256,15 +256,15 @@ export function SettingsPanel() {
                   })}
                   className="flex-1 h-1.5 bg-gray-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-blue-600 focus:outline-none"
                 />
-                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Thorough</span>
+                <span className="text-xs font-black uppercase tracking-widest text-indigo-500">Thorough</span>
               </div>
 
               {/* Mode Description */}
               <div className="p-4 glass-panel bg-white/5 dark:bg-black/20 rounded-xl border-white/5 transition-all">
                 {settings.query_quality_level <= 30 && (
                   <div className="animate-fadeIn">
-                    <strong className="text-[10px] font-black uppercase tracking-widest text-emerald-500 block mb-2">Performance Focus</strong>
-                    <ul className="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
+                    <strong className="text-xs font-black uppercase tracking-widest text-emerald-500 block mb-2">Performance Focus</strong>
+                    <ul className="grid grid-cols-2 gap-2 text-xs font-bold text-gray-600 dark:text-gray-400">
                       <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-emerald-500" /> Minimal planning</li>
                       <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-emerald-500" /> Max 1 retry</li>
                       <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-emerald-500" /> Basic prompting</li>
@@ -274,8 +274,8 @@ export function SettingsPanel() {
                 )}
                 {settings.query_quality_level > 30 && settings.query_quality_level <= 70 && (
                   <div className="animate-fadeIn">
-                    <strong className="text-[10px] font-black uppercase tracking-widest text-blue-500 block mb-2">Balanced Engine (Optimal)</strong>
-                    <ul className="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
+                    <strong className="text-xs font-black uppercase tracking-widest text-blue-500 block mb-2">Balanced Engine (Optimal)</strong>
+                    <ul className="grid grid-cols-2 gap-2 text-xs font-bold text-gray-600 dark:text-gray-400">
                       <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-blue-500" /> Multi-step planning</li>
                       <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-blue-500" /> Up to 3 retries</li>
                       <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-blue-500" /> Semantic verification</li>
@@ -285,8 +285,8 @@ export function SettingsPanel() {
                 )}
                 {settings.query_quality_level > 70 && (
                   <div className="animate-fadeIn">
-                    <strong className="text-[10px] font-black uppercase tracking-widest text-indigo-500 block mb-2">Deep Intelligence</strong>
-                    <ul className="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
+                    <strong className="text-xs font-black uppercase tracking-widest text-indigo-500 block mb-2">Deep Intelligence</strong>
+                    <ul className="grid grid-cols-2 gap-2 text-xs font-bold text-gray-600 dark:text-gray-400">
                       <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-indigo-500" /> Full schema exploration</li>
                       <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-indigo-500" /> Tool-augmented reasoning</li>
                       <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-indigo-500" /> Parallel correction paths</li>
@@ -342,7 +342,7 @@ export function SettingsPanel() {
                     </div>
                     <div>
                       <h4 className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">{mod.label}</h4>
-                      <p className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mt-0.5">{mod.desc}</p>
+                      <p className="text-xs font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mt-0.5">{mod.desc}</p>
                     </div>
                   </div>
                   <button
@@ -360,7 +360,7 @@ export function SettingsPanel() {
             {/* Info box */}
             <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-2xl flex items-start gap-3 transition-colors">
               <Info className="w-4 h-4 text-blue-500 mt-0.5" />
-              <p className="text-[10px] font-bold text-blue-600/80 dark:text-blue-400/80 uppercase tracking-widest leading-relaxed">
+              <p className="text-xs font-bold text-blue-600/80 dark:text-blue-400/80 uppercase tracking-widest leading-relaxed">
                 Note: Reasoning modules are calibrated automatically based on your Query Quality setting, but can be manually overridden here for specific workload requirements.
               </p>
             </div>
@@ -404,7 +404,7 @@ export function SettingsPanel() {
             <div className="p-6 glass-panel bg-emerald-500/5 border-emerald-500/10 rounded-2xl flex items-center justify-between transition-all">
               <div className="flex-1">
                 <label className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">Active Learning</label>
-                <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mt-1">
+                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mt-1">
                   Automatically integrate high-confidence feedback into core models
                 </p>
               </div>
@@ -422,13 +422,13 @@ export function SettingsPanel() {
               {/* Confidence Threshold Slider */}
               <div className="p-6 glass-panel bg-white/5 border-white/5 rounded-2xl transition-all">
                 <div className="flex justify-between mb-4">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-900 dark:text-white">
+                  <label className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">
                     Confidence Floor
                   </label>
                   <span className="text-xs font-black text-emerald-600">{(settings.confidence_threshold * 100).toFixed(0)}%</span>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <span className="text-[10px] font-bold text-gray-400">50%</span>
+                  <span className="text-xs font-bold text-gray-400">50%</span>
                   <input
                     type="range"
                     min="0.5"
@@ -439,20 +439,20 @@ export function SettingsPanel() {
                     className="flex-1 h-1 bg-gray-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-emerald-600 focus:outline-none"
                     disabled={!settings.auto_learning_enabled}
                   />
-                  <span className="text-[10px] font-bold text-gray-400">100%</span>
+                  <span className="text-xs font-bold text-gray-400">100%</span>
                 </div>
               </div>
 
               {/* Apply Mode */}
               <div className="p-6 glass-panel bg-white/5 border-white/5 rounded-2xl transition-all">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-900 dark:text-white block mb-4">Strategy</label>
+                <label className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white block mb-4">Strategy</label>
                 <div className="flex gap-4">
                   {['immediate', 'deferred'].map((mode) => (
                     <button
                       key={mode}
                       onClick={() => setSettings({ ...settings, apply_mode: mode as 'immediate' | 'deferred' })}
                       disabled={!settings.auto_learning_enabled}
-                      className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest border rounded-xl transition-all ${settings.apply_mode === mode
+                      className={`flex-1 py-2 text-xs font-black uppercase tracking-widest border rounded-xl transition-all ${settings.apply_mode === mode
                         ? 'bg-emerald-600/10 border-emerald-500/30 text-emerald-600 font-black shadow-sm'
                         : 'border-white/5 text-gray-500 hover:bg-white/5'}`}
                     >
@@ -471,7 +471,7 @@ export function SettingsPanel() {
                 </div>
                 <div>
                   <h4 className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">Pre-flight Validation</h4>
-                  <p className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mt-0.5">Test SQL execution before integrating knowledge</p>
+                  <p className="text-xs font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mt-0.5">Test SQL execution before integrating knowledge</p>
                 </div>
               </div>
               <button
@@ -497,7 +497,7 @@ export function SettingsPanel() {
               <div className="p-6 glass-panel bg-white/5 border-white/5 rounded-2xl flex items-center justify-between group transition-all">
                 <div>
                   <h4 className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">Audit Trail</h4>
-                  <p className="text-[10px] font-bold text-gray-500  uppercase tracking-widest mt-0.5">Log all auto-adjustments</p>
+                  <p className="text-xs font-bold text-gray-500  uppercase tracking-widest mt-0.5">Log all auto-adjustments</p>
                 </div>
                 <button
                   onClick={() => setSettings({ ...settings, enable_audit_log: !settings.enable_audit_log })}
@@ -511,7 +511,7 @@ export function SettingsPanel() {
 
               <div className="p-6 glass-panel bg-white/5 border-white/5 rounded-2xl transition-all">
                 <div className="flex justify-between mb-4">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-900 dark:text-white">Retention Policy</label>
+                  <label className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Retention Policy</label>
                   <span className="text-xs font-black text-gray-500">{settings.max_audit_log_days} Days</span>
                 </div>
                 <input
@@ -541,7 +541,7 @@ export function SettingsPanel() {
                 'Low confidence requires manual intervention.',
                 'Rollback any change from the core audit dashboard.'
               ].map((text, idx) => (
-                <div key={idx} className="flex gap-3 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest leading-relaxed">
+                <div key={idx} className="flex gap-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest leading-relaxed">
                   <div className="w-1 h-1 rounded-full bg-blue-500/50 mt-1.5 flex-shrink-0" />
                   {text}
                 </div>
@@ -550,7 +550,7 @@ export function SettingsPanel() {
           </div>
 
           {/* Metadata */}
-          <div className="pt-2 flex justify-between items-center text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">
+          <div className="pt-2 flex justify-between items-center text-xs font-black uppercase tracking-[0.2em] text-gray-400">
             <p>LAST_SYNC: {new Date(settings.updated_at).toLocaleTimeString()}</p>
             <p className="text-gray-300 dark:text-gray-600">ID: {settings.id.toString(16).toUpperCase()}</p>
           </div>

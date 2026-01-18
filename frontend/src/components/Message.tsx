@@ -1,14 +1,41 @@
+import { useMemo } from 'react';
 import { User } from 'lucide-react';
 import MultiDatabaseResults from './MultiDatabaseResults';
-import type { MultiDatabaseQueryResponse } from '../types/api';
+import type { MultiDatabaseQueryResponse, QueryResponse } from '../types/api';
 
 interface MessageProps {
   type: 'user' | 'assistant';
   content: string;
-  multiQueryResponse?: MultiDatabaseQueryResponse;
+  queryResponse?: QueryResponse;  // Legacy single-database response
+  multiQueryResponse?: MultiDatabaseQueryResponse;  // Multi-database response
 }
 
-export default function Message({ type, content, multiQueryResponse }: MessageProps) {
+export default function Message({ type, content, queryResponse, multiQueryResponse }: MessageProps) {
+  // Convert legacy single-database response to multi-database format for unified rendering
+  const effectiveMultiResponse = useMemo(() => {
+    if (multiQueryResponse) return multiQueryResponse;
+    if (!queryResponse) return undefined;
+
+    // Convert single QueryResponse to MultiDatabaseQueryResponse format
+    return {
+      question: queryResponse.question || '',
+      database_results: [{
+        connection_id: 0,
+        connection_name: 'Database',
+        database_type: 'unknown',
+        success: queryResponse.is_valid,
+        sql: queryResponse.sql || '',
+        results: queryResponse.results || [],
+        row_count: queryResponse.row_count || 0,
+        execution_time_ms: queryResponse.execution_time_ms || 0,
+        error: queryResponse.warnings?.join(', ') || undefined,
+        result_analysis: queryResponse.result_analysis,
+      }],
+      total_rows: queryResponse.row_count || 0,
+      total_execution_time_ms: queryResponse.execution_time_ms || 0,
+      cache_info: queryResponse.cached ? { hit: true, type: 'exact' as const } : undefined,
+    } as MultiDatabaseQueryResponse;
+  }, [queryResponse, multiQueryResponse]);
   const isUser = type === 'user';
 
   return (
@@ -38,16 +65,16 @@ export default function Message({ type, content, multiQueryResponse }: MessagePr
             </p>
           </div>
 
-          {/* Multi-database results (only for assistant messages) */}
-          {!isUser && multiQueryResponse && (
+          {/* Query results (only for assistant messages) */}
+          {!isUser && effectiveMultiResponse && (
             <div className="mt-4 animate-scaleUp fill-mode-forwards opacity-0">
               <MultiDatabaseResults
-                results={multiQueryResponse.database_results}
-                totalRows={multiQueryResponse.total_rows}
-                totalExecutionTime={multiQueryResponse.total_execution_time_ms}
-                question={multiQueryResponse.question}
-                cacheInfo={multiQueryResponse.cache_info}
-                combinedAnalysis={multiQueryResponse.combined_analysis}
+                results={effectiveMultiResponse.database_results}
+                totalRows={effectiveMultiResponse.total_rows}
+                totalExecutionTime={effectiveMultiResponse.total_execution_time_ms}
+                question={effectiveMultiResponse.question}
+                cacheInfo={effectiveMultiResponse.cache_info}
+                combinedAnalysis={effectiveMultiResponse.combined_analysis}
               />
             </div>
           )}

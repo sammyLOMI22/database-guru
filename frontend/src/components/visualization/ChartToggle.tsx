@@ -174,7 +174,7 @@ export const ChartToggle: React.FC<ChartToggleProps> = ({
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-52 glass-card bg-white/95 dark:bg-gray-900/95 border-gray-500/20 rounded-xl shadow-2xl z-50 overflow-hidden animate-scaleUp">
               <div className="py-1.5">
-                <div className="px-4 py-2 text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">
+                <div className="px-4 py-2 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">
                   Visualization Selection
                 </div>
                 {availableChartTypes.map((type) => (

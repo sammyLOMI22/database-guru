@@ -71,7 +71,7 @@ const ChartInfoBadge: React.FC<{ recommendation: IntelligentChartRecommendation 
       </div>
       <div>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest bg-blue-500/10 px-1.5 py-0.5 rounded">
+          <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest bg-blue-500/10 px-1.5 py-0.5 rounded">
             AI Recommendation
           </span>
           <div className="flex items-center gap-1.5">
@@ -98,7 +98,7 @@ const InsightsBadge: React.FC<{ insights: DataInsight[] }> = ({ insights }) => {
         <div className="p-1 bg-purple-500/10 rounded-lg">
           <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
         </div>
-        <span className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest bg-purple-500/10 px-1.5 py-0.5 rounded">
+        <span className="text-xs font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest bg-purple-500/10 px-1.5 py-0.5 rounded">
           Data Insights
         </span>
       </div>

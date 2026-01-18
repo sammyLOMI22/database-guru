@@ -75,7 +75,7 @@ export default function SchemaPanel() {
             </div>
             <div>
               <h2 className="text-xl font-black uppercase tracking-tight text-gray-900 dark:text-white">Schema Explorer</h2>
-              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">Visualize and compare structures</p>
+              <p className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">Visualize and compare structures</p>
             </div>
           </div>
           <button
@@ -102,7 +102,7 @@ export default function SchemaPanel() {
                 onClick={() => setViewMode(tab.id as ViewMode)}
                 disabled={tab.disabled}
                 className={`
-                  flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300
+                  flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300
                   ${isActive
                     ? `bg-white dark:bg-gray-800 text-${tab.color}-600 dark:text-${tab.color}-400 shadow-xl`
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
@@ -124,7 +124,7 @@ export default function SchemaPanel() {
           <>
             {/* Connection Selector Sidebar for Diagram */}
             <div className="w-72 flex-shrink-0 border-r border-white/5 glass-panel overflow-y-auto transition-all animate-slideInLeft p-4 space-y-4">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 ml-1">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 ml-1">
                 Select Database
               </h3>
               <div className="space-y-2">
@@ -142,7 +142,7 @@ export default function SchemaPanel() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-black uppercase tracking-wider truncate">{conn.name}</p>
-                      <p className="text-[10px] opacity-60 font-bold uppercase">{conn.database_type}</p>
+                      <p className="text-xs opacity-60 font-bold uppercase">{conn.database_type}</p>
                     </div>
                   </button>
                 ))}
@@ -165,7 +165,7 @@ export default function SchemaPanel() {
           <>
             {/* Connection Selector Sidebar */}
             <div className="w-72 flex-shrink-0 border-r border-white/5 glass-panel overflow-y-auto transition-all animate-slideInLeft p-4 space-y-4">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 ml-1">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 ml-1">
                 Select Database
               </h3>
               <div className="space-y-2">
@@ -183,7 +183,7 @@ export default function SchemaPanel() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-black uppercase tracking-wider truncate">{conn.name}</p>
-                      <p className="text-[10px] opacity-60 font-bold uppercase">{conn.database_type}</p>
+                      <p className="text-xs opacity-60 font-bold uppercase">{conn.database_type}</p>
                     </div>
                   </button>
                 ))}
@@ -213,10 +213,10 @@ export default function SchemaPanel() {
           <>
             {/* Comparison Connection Selector */}
             <div className="w-72 flex-shrink-0 border-r border-white/5 glass-panel overflow-y-auto transition-all animate-slideInLeft p-4 flex flex-col">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 ml-1 mb-1">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 ml-1 mb-1">
                 Compare Structures
               </h3>
-              <p className="text-[10px] font-bold text-purple-500 uppercase tracking-widest mb-4 ml-1">
+              <p className="text-xs font-bold text-purple-500 uppercase tracking-widest mb-4 ml-1">
                 {compareConnectionIds.length} SELECTED
               </p>
 
@@ -246,7 +246,7 @@ export default function SchemaPanel() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-black uppercase tracking-wider truncate">{conn.name}</p>
-                        <p className="text-[10px] opacity-60 font-bold uppercase">{conn.database_type}</p>
+                        <p className="text-xs opacity-60 font-bold uppercase">{conn.database_type}</p>
                       </div>
                     </label>
                   );
@@ -257,13 +257,13 @@ export default function SchemaPanel() {
               <div className="mt-4 pt-4 border-t border-white/5 flex gap-4 ml-1">
                 <button
                   onClick={() => setCompareConnectionIds(connections.map((c) => c.id))}
-                  className="text-[10px] font-black uppercase tracking-widest text-purple-500 hover:text-purple-600 transition-colors"
+                  className="text-xs font-black uppercase tracking-widest text-purple-500 hover:text-purple-600 transition-colors"
                 >
                   Select All
                 </button>
                 <button
                   onClick={() => setCompareConnectionIds([])}
-                  className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 transition-colors"
+                  className="text-xs font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   Clear
                 </button>

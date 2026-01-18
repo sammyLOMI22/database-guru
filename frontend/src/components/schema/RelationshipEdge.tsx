@@ -108,10 +108,12 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
         <div
           style={{
             position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${sourceX}px, ${sourceY + (sourcePosition === Position.Bottom ? 22 : -22)}px)`,
+            left: sourceX,
+            top: sourceY + (sourcePosition === Position.Bottom ? 22 : -22),
+            transform: 'translate(-50%, -50%)',
             pointerEvents: 'none',
           }}
-          className="transition-all duration-300 z-10"
+          className="nodrag nopan transition-all duration-300"
         >
           <CardinalityBadge
             type={cardinality === 'one-to-many' || cardinality === 'many-to-many' ? 'many' : 'one'}
@@ -124,10 +126,12 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
         <div
           style={{
             position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${targetX}px, ${targetY + (targetPosition === Position.Top ? -22 : 22)}px)`,
+            left: targetX,
+            top: targetY + (targetPosition === Position.Top ? -22 : 22),
+            transform: 'translate(-50%, -50%)',
             pointerEvents: 'none',
           }}
-          className="transition-all duration-300 z-10"
+          className="nodrag nopan transition-all duration-300"
         >
           <CardinalityBadge
             type={cardinality === 'many-to-many' ? 'many' : 'one'}
@@ -141,20 +145,22 @@ const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              left: labelX,
+              top: labelY,
+              transform: 'translate(-50%, -50%)',
               pointerEvents: 'all',
             }}
             className={`
-              px-3 py-1.5 rounded-xl text-[10px] font-extrabold tracking-wider uppercase
-              ${isDarkMode ? 'glass-node text-white border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.2)]' : 'bg-white text-gray-800 shadow-2xl border-blue-200'}
-              animate-fadeIn flex items-center gap-2 z-20
+              nodrag nopan px-3 py-1.5 rounded-xl text-xs font-extrabold tracking-wider uppercase border
+              ${isDarkMode ? 'bg-gray-900/95 text-white border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'bg-white text-gray-800 shadow-2xl border-blue-200'}
+              animate-fadeIn flex items-center gap-2
             `}
           >
             <span className="text-blue-500">{sourceColumn}</span>
             <span className="opacity-40">→</span>
             <span className="text-indigo-500">{targetColumn}</span>
             {isInferred && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-500 text-[8px]" title="Inferred relationship">
+              <span className="ml-1 px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-500 text-xs" title="Inferred relationship">
                 AI INFERRED
               </span>
             )}
@@ -174,7 +180,7 @@ const CardinalityBadge: React.FC<{
   isHighlighted: boolean;
 }> = ({ type, isDarkMode, isHighlighted }) => {
   const baseClasses = `
-    flex items-center justify-center w-6 h-6 rounded-full border text-[10px] font-black
+    flex items-center justify-center w-6 h-6 rounded-full border text-xs font-black
     transition-all duration-300 shadow-sm
   `;
 

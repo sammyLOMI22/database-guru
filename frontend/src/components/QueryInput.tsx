@@ -22,6 +22,9 @@ interface QueryInputProps {
   connectionIds?: number[];  // For pre-flight validation
 }
 
+// UI rotation interval for displaying active model overrides
+const OVERRIDE_ROTATION_INTERVAL_MS = 4000; // 4 seconds
+
 const ROW_LIMIT_OPTIONS = [
   { value: 10, label: '10 rows' },
   { value: 25, label: '25 rows' },
@@ -73,7 +76,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
     if (activeOverrides.length <= 1) return;
     const interval = setInterval(() => {
       setRotatingIndex(prev => (prev + 1) % activeOverrides.length);
-    }, 4000); // Rotate every 4 seconds
+    }, OVERRIDE_ROTATION_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [activeOverrides.length]);
 
@@ -185,7 +188,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
                 <span>Synchronizing database schemas...</span>
               </div>
             ) : validation && summary ? (
-              <div className="flex items-center gap-4 text-[11px] font-bold tracking-tight">
+              <div className="flex items-center gap-4 text-xs font-bold tracking-tight">
                 {/* Full support */}
                 {summary.full > 0 && (
                   <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
@@ -222,7 +225,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
                 )}
               </div>
             ) : question.trim() ? (
-              <div className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 font-bold">
+              <div className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500 font-bold">
                 Analyzing query intent...
               </div>
             ) : null}
@@ -247,7 +250,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
 
             {/* Character count */}
             {question.length > 0 && (
-              <div className="absolute -top-1 right-0 text-[10px] font-bold text-blue-500/50 animate-fadeIn">
+              <div className="absolute -top-1 right-0 text-xs font-bold text-blue-500/50 animate-fadeIn">
                 {question.length} / 500
               </div>
             )}
@@ -317,14 +320,14 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
         <div className="mt-3 flex items-center justify-between px-6">
           <div className="flex items-center space-x-4 opacity-50">
             <div className="flex items-center space-x-1.5">
-              <span className="px-1.5 py-0.5 rounded border border-gray-400 dark:border-gray-600 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">Cmd</span>
-              <span className="text-gray-400 dark:text-gray-600 text-[10px] font-bold">+</span>
-              <span className="px-1.5 py-0.5 rounded border border-gray-400 dark:border-gray-600 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">Enter</span>
+              <span className="px-1.5 py-0.5 rounded border border-gray-400 dark:border-gray-600 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Cmd</span>
+              <span className="text-gray-400 dark:text-gray-600 text-xs font-bold">+</span>
+              <span className="px-1.5 py-0.5 rounded border border-gray-400 dark:border-gray-600 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Enter</span>
             </div>
-            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">to execute</span>
+            <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">to execute</span>
           </div>
 
-          <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-widest overflow-hidden min-w-[300px]">
+          <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest overflow-hidden min-w-[300px]">
             {selectedModel && (
               <div className="flex items-center gap-2 flex-shrink-0">
                 <span className="text-blue-600/40 dark:text-blue-400/40">MAIN:</span>
@@ -348,7 +351,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
                   ) : (
                     <strong className="text-emerald-500 animate-pulse">ACTIVE</strong>
                   )}
-                  <span className="px-1 py-0.5 rounded-md bg-blue-500/10 text-blue-500/80 text-[8px] font-black border border-blue-500/20">
+                  <span className="px-1 py-0.5 rounded-md bg-blue-500/10 text-blue-500/80 text-xs font-black border border-blue-500/20">
                     OPT
                   </span>
                 </div>

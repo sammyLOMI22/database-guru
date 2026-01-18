@@ -136,15 +136,15 @@ export const SchemaExplorer: React.FC<SchemaExplorerProps> = ({
               </div>
             )}
             <div>
-              <h3 className={`${compact ? 'text-[11px]' : 'text-sm'} font-black uppercase tracking-tight text-gray-900 dark:text-white`}>
+              <h3 className={`${compact ? 'text-xs' : 'text-sm'} font-black uppercase tracking-tight text-gray-900 dark:text-white`}>
                 {connectionName || schema.connection_name}
               </h3>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">
+                <span className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">
                   {schema.database_type}
                 </span>
                 {schema.cached && !compact && (
-                  <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-1">
+                  <span className="text-xs font-bold text-blue-500 uppercase tracking-widest flex items-center gap-1">
                     <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
                     Cached
                   </span>
@@ -178,7 +178,7 @@ export const SchemaExplorer: React.FC<SchemaExplorerProps> = ({
 
         {/* Stats */}
         {!compact && (
-          <div className="mt-4 flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-500">
+          <div className="mt-4 flex items-center gap-6 text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-500">
             <div className="flex items-center gap-2">
               <span className="text-gray-900 dark:text-gray-300">{schema.table_count}</span> Tables
             </div>
@@ -198,20 +198,20 @@ export const SchemaExplorer: React.FC<SchemaExplorerProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder={compact ? "Search..." : "Search tables and columns..."}
-            className={`w-full ${compact ? 'pl-8 pr-2 py-1.5 text-[10px] rounded-lg' : 'pl-10 pr-4 py-2.5 text-xs rounded-[1.25rem]'} font-bold bg-black/5 dark:bg-white/5 border border-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500`}
+            className={`w-full ${compact ? 'pl-8 pr-2 py-1.5 text-xs rounded-lg' : 'pl-10 pr-4 py-2.5 text-xs rounded-[1.25rem]'} font-bold bg-black/5 dark:bg-white/5 border border-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500`}
           />
         </div>
         <div className="flex gap-2">
           <button
             onClick={expandAll}
-            className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-600 transition-colors whitespace-nowrap"
+            className="text-xs font-black uppercase tracking-widest text-blue-500 hover:text-blue-600 transition-colors whitespace-nowrap"
           >
             {compact ? 'All' : 'Expand All'}
           </button>
           {!compact && (
             <button
               onClick={collapseAll}
-              className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              className="text-xs font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
             >
               Collapse All
             </button>
@@ -238,7 +238,7 @@ export const SchemaExplorer: React.FC<SchemaExplorerProps> = ({
         {filteredTables?.length === 0 && (
           <div className="py-10 text-center animate-fadeIn">
             <Search className="w-8 h-8 mx-auto mb-3 text-gray-300 opacity-20" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-4">No matches for "{searchTerm}"</p>
+            <p className="text-xs font-black uppercase tracking-widest text-gray-400 px-4">No matches for "{searchTerm}"</p>
           </div>
         )}
       </div>
@@ -285,7 +285,7 @@ const TableRow: React.FC<TableRowProps> = ({
         <div className="flex-1 min-w-0">
           <div className={`${compact ? 'flex-col items-start gap-0.5' : 'items-center gap-2'} flex`}>
             <span
-              className={`${compact ? 'text-[11px]' : 'text-sm'} font-black uppercase tracking-wider transition-colors ${expanded ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-200 group-hover:text-blue-500'} truncate`}
+              className={`${compact ? 'text-xs' : 'text-sm'} font-black uppercase tracking-wider transition-colors ${expanded ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-200 group-hover:text-blue-500'} truncate`}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect?.();
@@ -294,7 +294,7 @@ const TableRow: React.FC<TableRowProps> = ({
               {table.name}
             </span>
             {table.row_count !== null && (
-              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest opacity-60">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest opacity-60">
                 {table.row_count.toLocaleString()} ROWS
               </span>
             )}
@@ -340,7 +340,7 @@ const ColumnRow: React.FC<ColumnRowProps> = ({ column, searchTerm, compact }) =>
 
   return (
     <div className="group/col py-1 border-b border-white/[0.03] last:border-0">
-      <div className={`flex items-wrap items-center gap-2 ${compact ? 'text-[10px]' : 'text-xs'}`}>
+      <div className={`flex items-wrap items-center gap-2 ${compact ? 'text-xs' : 'text-xs'}`}>
         {/* Column indicators */}
         <div className="flex items-center gap-1 min-w-[20px] justify-end">
           {column.primary_key && (
@@ -358,7 +358,7 @@ const ColumnRow: React.FC<ColumnRowProps> = ({ column, searchTerm, compact }) =>
         {/* Column name & type */}
         <div className={`flex ${compact ? 'flex-col items-start gap-0.5' : 'items-center gap-2'} flex-1 min-w-0`}>
           <span className="font-black text-gray-700 dark:text-gray-300 uppercase tracking-wider truncate">{highlightMatch(column.name)}</span>
-          <span className={`${compact ? 'text-[8px]' : 'text-[10px]'} font-bold text-gray-400 dark:text-gray-500 uppercase`}>{column.type}</span>
+          <span className={`${compact ? 'text-xs' : 'text-xs'} font-bold text-gray-400 dark:text-gray-500 uppercase`}>{column.type}</span>
         </div>
 
         {/* Nullable indicator */}
@@ -369,7 +369,7 @@ const ColumnRow: React.FC<ColumnRowProps> = ({ column, searchTerm, compact }) =>
         {/* Semantic type badge */}
         {column.semantic_type && (
           <span
-            className={`${compact ? 'text-[8px] px-1.5' : 'text-[9px] px-2'} font-black uppercase tracking-widest py-0.5 rounded-full ${column.semantic_type === 'location'
+            className={`${compact ? 'text-xs px-1.5' : 'text-xs px-2'} font-black uppercase tracking-widest py-0.5 rounded-full ${column.semantic_type === 'location'
               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
               : column.semantic_type === 'categorical'
                 ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
@@ -386,7 +386,7 @@ const ColumnRow: React.FC<ColumnRowProps> = ({ column, searchTerm, compact }) =>
         {column.sample_values.length > 0 && (
           <button
             onClick={() => setShowSamples(!showSamples)}
-            className={`ml-auto ${compact ? 'text-[8px]' : 'text-[9px]'} font-black uppercase tracking-widest text-blue-500/60 hover:text-blue-500 transition-colors whitespace-nowrap`}
+            className={`ml-auto ${compact ? 'text-xs' : 'text-xs'} font-black uppercase tracking-widest text-blue-500/60 hover:text-blue-500 transition-colors whitespace-nowrap`}
           >
             {showSamples ? 'HIDE' : `${column.sample_values.length} VALS`}
           </button>
@@ -397,7 +397,7 @@ const ColumnRow: React.FC<ColumnRowProps> = ({ column, searchTerm, compact }) =>
       {showSamples && column.sample_values.length > 0 && (
         <div className={`mt-1.5 ${compact ? 'ml-6' : 'ml-11'} flex flex-wrap gap-1 animate-slideInLeft`}>
           {column.sample_values.map((v, i) => (
-            <span key={i} className="px-1.5 py-0.5 bg-black/5 dark:bg-white/5 border border-white/5 rounded text-[8px] font-bold text-gray-500 dark:text-gray-400">
+            <span key={i} className="px-1.5 py-0.5 bg-black/5 dark:bg-white/5 border border-white/5 rounded text-xs font-bold text-gray-500 dark:text-gray-400">
               {String(v)}
             </span>
           ))}

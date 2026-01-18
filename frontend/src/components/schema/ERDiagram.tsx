@@ -356,7 +356,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
       {/* Legend Footer */}
       <div
         className={`
-          flex items-center gap-4 px-4 py-2 text-[10px] border-t font-medium z-10
+          flex items-center gap-4 px-4 py-2 text-xs border-t font-medium z-10
           ${isDarkMode ? 'glass-panel border-gray-700/50 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}
           backdrop-blur-sm
         `}

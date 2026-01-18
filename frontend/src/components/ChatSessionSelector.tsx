@@ -7,6 +7,9 @@ interface ChatSessionSelectorProps {
   onSessionChange: (session: ChatSession | null) => void;
 }
 
+// UI rotation interval for cycling through connected databases
+const CONNECTION_ROTATION_INTERVAL_MS = 3000; // 3 seconds
+
 const CONNECTION_COLORS = [
   'text-blue-500',
   'text-emerald-500',
@@ -29,7 +32,7 @@ function RotatingConnection({ connections }: { connections: ConnectionInfo[] }) 
     if (connections.length <= 1) return;
     const interval = setInterval(() => {
       setIndex((prev) => (prev + 1) % connections.length);
-    }, 3000);
+    }, CONNECTION_ROTATION_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [connections.length]);
 
@@ -77,10 +80,10 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-4 px-1">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">Sessions</h3>
+        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">Sessions</h3>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-lg hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/20"
+          className="px-3 py-1 text-xs font-black uppercase tracking-widest bg-blue-600 text-white rounded-lg hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/20"
         >
           + New
         </button>
@@ -102,7 +105,7 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
             <div className="flex-1 min-w-0">
               <p className="text-xs font-black uppercase tracking-wider">Default Query</p>
               <div className="flex items-center gap-2 opacity-60">
-                <p className="text-[10px] font-bold uppercase tracking-tight">Global Context</p>
+                <p className="text-xs font-bold uppercase tracking-tight">Global Context</p>
               </div>
             </div>
           </div>
@@ -133,7 +136,7 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
                       {session.name}
                     </p>
                     <div className="flex items-center gap-2 opacity-60 overflow-hidden whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
                         <div className="flex items-center gap-1 bg-white/10 dark:bg-black/20 px-1.5 py-0.5 rounded-md border border-white/5">
                           <span className="text-blue-500">{session.connections.length}</span>
                           <span>DBs</span>
@@ -245,7 +248,7 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 ml-1">
+            <label className="block text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 ml-1">
               Session Name
             </label>
             <input
@@ -259,7 +262,7 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
           </div>
 
           <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 ml-1">
+            <label className="block text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 ml-1">
               Connect Databases ({selectedConnections.length})
             </label>
             <div className="glass-panel bg-white/5 dark:bg-black/20 border-white/10 rounded-xl max-h-48 overflow-y-auto custom-scrollbar p-2 space-y-1">
@@ -291,7 +294,7 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
                     </div>
                     <div className="flex-1">
                       <p className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">{conn.name}</p>
-                      <p className="text-[10px] text-gray-500 font-bold uppercase opacity-60">
+                      <p className="text-xs text-gray-500 font-bold uppercase opacity-60">
                         {conn.database_type} • {conn.database_name}
                       </p>
                     </div>
@@ -305,14 +308,14 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              className="px-6 py-3 text-xs font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !name.trim() || selectedConnections.length === 0}
-              className="px-6 py-3 text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/20 disabled:opacity-30 disabled:hover:scale-100"
+              className="px-6 py-3 text-xs font-black uppercase tracking-widest bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/20 disabled:opacity-30 disabled:hover:scale-100"
             >
               {loading ? 'Creating...' : 'Launch Session'}
             </button>
