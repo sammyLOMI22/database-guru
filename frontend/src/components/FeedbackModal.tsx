@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { MessageSquarePlus, X, AlertCircle, ChevronRight } from 'lucide-react';
 import { SQLEditor } from './SQLEditor';
 
 interface FeedbackModalProps {
@@ -66,52 +67,58 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="glass-card rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border-white/20 bg-gradient-to-br from-blue-500/5 via-transparent to-indigo-500/5">
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">
-              Provide Feedback
-            </h2>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl glass-panel flex items-center justify-center text-blue-500">
+                <MessageSquarePlus className="w-5 h-5" />
+              </div>
+              <h2 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">
+                Provide Feedback
+              </h2>
+            </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="w-8 h-8 rounded-lg glass-panel flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:scale-105 active:scale-95 transition-all"
             >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-4 bg-red-100 border-2 border-red-500 rounded-lg animate-pulse">
-              <div className="flex items-center">
-                <span className="text-2xl mr-2">⚠️</span>
-                <p className="text-base font-bold text-red-900">{error}</p>
+            <div className="mb-4 glass-card rounded-xl p-4 bg-gradient-to-r from-red-500/10 via-transparent to-rose-500/5 border-red-500/30 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-500">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+                <p className="text-xs font-bold text-red-600 dark:text-red-400">{error}</p>
               </div>
             </div>
           )}
 
           {/* Feedback Type */}
           <div className="mb-6">
-            <label className="block font-semibold text-gray-900 mb-2">
-              What type of feedback are you providing?
+            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
+              Feedback Type
             </label>
             <select
               value={feedbackType}
               onChange={(e) => setFeedbackType(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full glass-panel rounded-xl px-4 py-3 text-sm font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 border-white/10 bg-transparent appearance-none cursor-pointer"
             >
-              <option value="sql_correction">SQL Correction</option>
-              <option value="column_name">Column Name Issue</option>
-              <option value="table_name">Table Name Issue</option>
-              <option value="result_issue">Result Issue</option>
+              <option value="sql_correction" className="bg-gray-800 text-white">SQL Correction</option>
+              <option value="column_name" className="bg-gray-800 text-white">Column Name Issue</option>
+              <option value="table_name" className="bg-gray-800 text-white">Table Name Issue</option>
+              <option value="result_issue" className="bg-gray-800 text-white">Result Issue</option>
             </select>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-[10px] font-medium text-gray-400 mt-2 flex items-center gap-1">
+              <ChevronRight className="w-3 h-3" />
               {feedbackType === 'sql_correction' && 'Provide a corrected version of the SQL query'}
               {feedbackType === 'column_name' && 'Report an incorrect column name'}
               {feedbackType === 'table_name' && 'Report an incorrect table name'}
@@ -141,78 +148,88 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
           {/* Description */}
           <div className="mb-6">
-            <label className="block font-semibold text-gray-900 mb-2">
-              What's wrong? / What should change? <span className="text-red-600 font-bold">*REQUIRED*</span>
+            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
+              What's Wrong? <span className="text-red-500">*</span>
             </label>
             <textarea
               value={description}
               onChange={(e) => {
                 setDescription(e.target.value);
                 if (error && e.target.value.trim()) {
-                  setError(null); // Clear error when user starts typing
+                  setError(null);
                 }
               }}
-              className={`w-full border-2 rounded-lg px-4 py-2 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                !description.trim() && error ? 'border-red-500 bg-red-50' : 'border-gray-300'
+              className={`w-full glass-panel rounded-xl px-4 py-3 min-h-[100px] text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all ${
+                !description.trim() && error ? 'border-red-500/50 bg-red-500/5' : 'border-white/10'
               }`}
               placeholder="E.g., Should use 'category_name' instead of 'category' in the WHERE clause"
               required
             />
             {!description.trim() && (
-              <p className="text-sm text-red-600 mt-1 font-semibold">⚠️ This field is required</p>
+              <p className="text-[10px] font-bold text-red-500 mt-2 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                Required field
+              </p>
             )}
           </div>
 
           {/* Additional Notes */}
           <div className="mb-6">
-            <label className="block font-semibold text-gray-900 mb-2">
-              Additional Notes (optional)
+            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
+              Additional Notes
+              <span className="text-gray-400 font-medium normal-case tracking-normal ml-2">(optional)</span>
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full glass-panel rounded-xl px-4 py-3 min-h-[80px] text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 border-white/10 transition-all"
               placeholder="Any additional context or information..."
             />
           </div>
 
           {/* Confidence Slider */}
           <div className="mb-6">
-            <label className="block font-semibold text-gray-900 mb-2">
-              How confident are you in this correction?
+            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-3">
+              Confidence Level
             </label>
-            <div className="flex items-center gap-4">
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={confidence}
-                onChange={(e) => setConfidence(parseFloat(e.target.value))}
-                className="flex-1"
-              />
-              <span className="text-lg font-semibold text-gray-900 w-16 text-right">
-                {Math.round(confidence * 100)}%
-              </span>
-            </div>
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>Not sure</span>
-              <span>Very confident</span>
+            <div className="glass-panel rounded-xl p-4 border-white/10">
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={confidence}
+                  onChange={(e) => setConfidence(parseFloat(e.target.value))}
+                  className="flex-1 h-2 rounded-full appearance-none bg-gradient-to-r from-gray-300 to-blue-500 cursor-pointer"
+                />
+                <span className={`text-xl font-black w-16 text-right ${
+                  confidence >= 0.8 ? 'text-emerald-500' :
+                  confidence >= 0.5 ? 'text-blue-500' :
+                  'text-amber-500'
+                }`}>
+                  {Math.round(confidence * 100)}%
+                </span>
+              </div>
+              <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest text-gray-400 mt-2">
+                <span>Not sure</span>
+                <span>Very confident</span>
+              </div>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex justify-end gap-3 pt-6 border-t border-white/10">
             <button
               onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-6 py-2.5 glass-panel rounded-xl text-xs font-black uppercase tracking-widest text-gray-600 dark:text-gray-400 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={submitting}
             >
               Cancel
             </button>
             <button
               onClick={handleSubmit}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               disabled={submitting}
             >
               {submitting ? 'Submitting...' : 'Submit Feedback'}

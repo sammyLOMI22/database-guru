@@ -136,39 +136,40 @@ export default function QueryResults({
     <div className="space-y-4">
       {/* Cache Badge */}
       {cacheType && (
-        <div className={`rounded-lg p-3 border ${cacheType === 'exact'
-          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50'
-          : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50'
+        <div className={`glass-card rounded-2xl p-4 border-white/10 bg-gradient-to-r ${cacheType === 'exact'
+          ? 'from-emerald-500/10 via-transparent to-green-500/5'
+          : 'from-amber-500/10 via-transparent to-yellow-500/5'
           }`}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {cacheType === 'exact' ? (
-                <Database className="w-5 h-5 text-green-600 dark:text-green-400" />
-              ) : (
-                <Zap className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              )}
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl glass-panel flex items-center justify-center ${cacheType === 'exact' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                {cacheType === 'exact' ? (
+                  <Database className="w-5 h-5" />
+                ) : (
+                  <Zap className="w-5 h-5" />
+                )}
+              </div>
               <div>
-                <span className={`font-medium ${cacheType === 'exact' ? 'text-green-800 dark:text-green-300' : 'text-amber-800 dark:text-amber-300'
-                  }`}>
+                <span className={`text-xs font-black uppercase tracking-widest ${cacheType === 'exact' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
                   {cacheType === 'exact' ? 'Exact Cache Hit' : 'Semantic Cache Hit'}
                 </span>
                 {semanticSimilarity && cacheType === 'semantic' && (
-                  <span className="ml-2 text-sm text-amber-600 dark:text-amber-400">
+                  <span className="ml-2 text-[10px] font-bold text-amber-500 uppercase tracking-widest">
                     ({(semanticSimilarity * 100).toFixed(0)}% match)
                   </span>
                 )}
               </div>
             </div>
-            <span className={`text-xs px-2 py-1 rounded-full ${cacheType === 'exact'
-              ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
-              : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg glass-panel ${cacheType === 'exact'
+              ? 'text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+              : 'text-amber-600 dark:text-amber-400 border-amber-500/20'
               }`}>
-              Instant Response
+              Instant
             </span>
           </div>
           {matchedQuestion && cacheType === 'semantic' && (
-            <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
-              <span className="font-medium">Matched:</span> "{matchedQuestion}"
+            <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 mt-3 pl-13">
+              <span className="font-bold uppercase tracking-widest">Matched:</span> "{matchedQuestion}"
             </p>
           )}
         </div>
@@ -184,44 +185,55 @@ export default function QueryResults({
       )}
 
       {/* SQL Display */}
-      <div className="bg-gray-900 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-gray-400 uppercase">Generated SQL</span>
-          <div className="flex items-center gap-2">
+      <div className="glass-panel rounded-2xl overflow-hidden border-white/10">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 bg-black/20">
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Generated SQL
+          </span>
+          <div className="flex items-center gap-1">
             {queryId && (
               <button
                 onClick={() => setShowFeedbackModal(true)}
-                className="text-gray-400 hover:text-white transition-colors p-1 flex items-center gap-1 text-xs"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white hover:bg-white/10 transition-all"
                 title="Provide Feedback"
               >
-                <MessageSquare className="w-4 h-4" />
+                <MessageSquare className="w-3.5 h-3.5" />
                 <span>Feedback</span>
               </button>
             )}
             <button
               onClick={handleCopy}
-              className="text-gray-400 hover:text-white transition-colors p-1"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-emerald-400 hover:bg-white/10 transition-all"
               title="Copy SQL"
             >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? 'Copied' : 'Copy'}</span>
             </button>
           </div>
         </div>
-        <pre className="text-sm text-green-400 font-mono overflow-x-auto">
-          {sql}
-        </pre>
+        <div className="p-5 bg-gray-900 dark:bg-black">
+          <pre className="text-sm text-emerald-400 font-mono overflow-x-auto">
+            {sql}
+          </pre>
+        </div>
       </div>
 
       {/* Warnings */}
       {warnings.length > 0 && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg p-4">
-          <div className="flex items-start space-x-2">
-            <span className="text-yellow-600 dark:text-yellow-400">⚠️</span>
+        <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-r from-amber-500/10 via-transparent to-yellow-500/5">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl glass-panel flex items-center justify-center text-amber-500 flex-shrink-0">
+              <span className="text-lg">⚠️</span>
+            </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-yellow-800 dark:text-yellow-400">Warnings:</p>
-              <ul className="mt-1 text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside">
+              <p className="text-xs font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">Warnings</p>
+              <ul className="mt-2 space-y-1">
                 {warnings.map((warning, index) => (
-                  <li key={index}>{warning}</li>
+                  <li key={index} className="text-sm font-medium text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                    <span className="text-amber-500 mt-1.5">•</span>
+                    {warning}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -262,17 +274,19 @@ export default function QueryResults({
 
       {/* Results */}
       {results && results.length > 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+        <div className="glass-panel rounded-2xl border-white/10 overflow-hidden">
           {/* Header with stats, toggle, and export */}
-          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-              <span>
-                <strong className="text-gray-900 dark:text-white">{rowCount}</strong> rows
-              </span>
+          <div className="px-5 py-4 border-b border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 glass-panel px-3 py-1.5 rounded-lg">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Rows</span>
+                <span className="text-sm font-black text-gray-900 dark:text-white">{rowCount}</span>
+              </div>
               {executionTime !== null && (
-                <span>
-                  <strong className="text-gray-900 dark:text-white">{executionTime.toFixed(2)}</strong> ms
-                </span>
+                <div className="flex items-center gap-2 glass-panel px-3 py-1.5 rounded-lg">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Time</span>
+                  <span className="text-sm font-black text-gray-900 dark:text-white">{executionTime.toFixed(2)}ms</span>
+                </div>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -312,31 +326,31 @@ export default function QueryResults({
                 return (
                   <>
                     <table className="w-full">
-                      <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                      <thead className="border-b border-white/10 bg-black/5 dark:bg-white/5">
                         <tr>
                           {Object.keys(results[0]).map((column) => (
                             <th
                               key={column}
-                              className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider"
+                              className="px-5 py-3 text-left text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-[0.15em]"
                             >
                               {column}
                             </th>
                           ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      <tbody className="divide-y divide-white/5">
                         {paginatedResults.map((row, rowIndex) => (
                           <tr
                             key={startIdx + rowIndex}
-                            className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                            className="hover:bg-white/5 dark:hover:bg-white/5 transition-colors"
                           >
                             {Object.values(row).map((value, colIndex) => (
                               <td
                                 key={colIndex}
-                                className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 font-mono"
+                                className="px-5 py-3 text-sm text-gray-900 dark:text-gray-100 font-mono"
                               >
                                 {value === null ? (
-                                  <span className="text-gray-400 dark:text-gray-500 italic">null</span>
+                                  <span className="text-gray-400 dark:text-gray-500 italic text-xs">null</span>
                                 ) : typeof value === 'object' ? (
                                   JSON.stringify(value)
                                 ) : (
@@ -351,42 +365,45 @@ export default function QueryResults({
 
                     {/* Pagination Controls */}
                     {totalRows > 10 && (
-                      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                          <span>Rows per page:</span>
-                          <select
-                            value={pageSize}
-                            onChange={(e) => {
-                              setPageSize(parseInt(e.target.value));
-                              setCurrentPage(1);
-                            }}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded px-2 py-1 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                          >
-                            <option value={10}>10</option>
-                            <option value={25}>25</option>
-                            <option value={50}>50</option>
-                            <option value={100}>100</option>
-                          </select>
+                      <div className="flex items-center justify-between px-5 py-4 border-t border-white/5 bg-black/5 dark:bg-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Per page</span>
+                          <div className="relative">
+                            <select
+                              value={pageSize}
+                              onChange={(e) => {
+                                setPageSize(parseInt(e.target.value));
+                                setCurrentPage(1);
+                              }}
+                              className="appearance-none glass-panel rounded-lg px-3 py-1.5 pr-8 text-xs font-bold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all cursor-pointer border-white/10"
+                            >
+                              <option value={10}>10</option>
+                              <option value={25}>25</option>
+                              <option value={50}>50</option>
+                              <option value={100}>100</option>
+                            </select>
+                            <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 rotate-90 pointer-events-none" />
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                          <span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                             {startIdx + 1}-{endIdx} of {totalRows}
                           </span>
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                               disabled={currentPage === 1}
-                              className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              className="p-1.5 rounded-lg glass-panel hover:bg-white/10 text-gray-600 dark:text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
                             >
-                              <ChevronLeft className="w-5 h-5" />
+                              <ChevronLeft className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                               disabled={currentPage === totalPages}
-                              className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              className="p-1.5 rounded-lg glass-panel hover:bg-white/10 text-gray-600 dark:text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
                             >
-                              <ChevronRight className="w-5 h-5" />
+                              <ChevronRight className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
@@ -399,8 +416,11 @@ export default function QueryResults({
           )}
         </div>
       ) : (
-        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-8 text-center border border-gray-100 dark:border-gray-800">
-          <p className="text-gray-500 dark:text-gray-400">
+        <div className="glass-panel rounded-2xl p-12 text-center border-white/10">
+          <div className="w-16 h-16 rounded-2xl glass-card flex items-center justify-center mx-auto mb-4">
+            <Database className="w-8 h-8 text-gray-400" />
+          </div>
+          <p className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
             {isValid ? 'No results returned' : 'Query could not be executed'}
           </p>
         </div>

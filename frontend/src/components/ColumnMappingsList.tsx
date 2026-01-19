@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Trash2, ArrowRight, Database, CheckCircle } from 'lucide-react';
+import { Trash2, ArrowRight, Database, CheckCircle, Search } from 'lucide-react';
 import { mappingsAPI } from '../services/mappingsApi';
 import type { ColumnMapping } from '../types/api';
 
@@ -52,101 +52,119 @@ export const ColumnMappingsList: React.FC<ColumnMappingsListProps> = ({ connecti
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-6 bg-gray-200 rounded w-1/3"></div>
-        <div className="h-20 bg-gray-200 rounded"></div>
-        <div className="h-20 bg-gray-200 rounded"></div>
+        <div className="h-10 glass-panel rounded-2xl"></div>
+        <div className="h-24 glass-panel rounded-2xl"></div>
+        <div className="h-24 glass-panel rounded-2xl"></div>
       </div>
     );
   }
 
   if (error) {
-    return <div className="text-red-600">Error: {error}</div>;
+    return (
+      <div className="glass-card rounded-2xl p-4 bg-gradient-to-r from-red-500/10 via-transparent to-rose-500/5 border-red-500/20">
+        <p className="text-xs font-black uppercase tracking-[0.15em] text-red-600 dark:text-red-400">Error: {error}</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex gap-4">
-        <input
-          type="text"
-          placeholder="Filter by table name..."
-          value={filterTable}
-          onChange={(e) => setFilterTable(e.target.value)}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <input
-          type="text"
-          placeholder="Filter by database type..."
-          value={filterDbType}
-          onChange={(e) => setFilterDbType(e.target.value)}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div className="flex gap-3">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Filter by table..."
+            value={filterTable}
+            onChange={(e) => setFilterTable(e.target.value)}
+            className="w-full glass-panel rounded-xl pl-10 pr-4 py-2.5 text-xs font-medium text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 border-white/5 transition-all"
+          />
+        </div>
+        <div className="flex-1 relative">
+          <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Filter by database type..."
+            value={filterDbType}
+            onChange={(e) => setFilterDbType(e.target.value)}
+            className="w-full glass-panel rounded-xl pl-10 pr-4 py-2.5 text-xs font-medium text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 border-white/5 transition-all"
+          />
+        </div>
       </div>
 
       {/* Mappings List */}
       {mappings.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          <Database className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p>No column mappings learned yet</p>
-          <p className="text-sm mt-1">
-            Submit column name corrections via feedback to start learning patterns
+        <div className="text-center py-12 glass-card rounded-2xl border-white/10">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl glass-panel flex items-center justify-center text-gray-400">
+            <Database className="w-7 h-7" />
+          </div>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">No column mappings</p>
+          <p className="text-[10px] font-medium text-gray-400 mt-2">
+            Submit column name corrections via feedback to start learning
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {mappings.map((mapping) => (
             <div
               key={mapping.id}
-              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+              className="glass-card rounded-2xl p-4 hover:scale-[1.005] transition-all border-white/10 hover:border-blue-500/20"
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="font-mono text-sm text-red-700 line-through">
-                    {mapping.source_column}
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-gray-400" />
-                  <span className="font-mono text-sm text-green-700 font-semibold">
-                    {mapping.target_column}
-                  </span>
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="font-mono text-xs text-red-500 line-through bg-red-500/10 px-2.5 py-1 rounded-lg">
+                      {mapping.source_column}
+                    </span>
+                    <ArrowRight className="w-4 h-4 text-gray-400" />
+                    <span className="font-mono text-xs text-emerald-500 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-lg">
+                      {mapping.target_column}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {mapping.table_name && (
+                      <span className="text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                        {mapping.table_name}
+                      </span>
+                    )}
+                    {mapping.connection_name && (
+                      <span className="text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                        {mapping.connection_name}
+                      </span>
+                    )}
+                    <span className="text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-gray-500/10 text-gray-600 dark:text-gray-400">
+                      {mapping.database_type}
+                    </span>
+                    {mapping.times_applied > 0 && (
+                      <span className="text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        {mapping.times_applied}x
+                      </span>
+                    )}
+                    <span className={`text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg ${
+                      mapping.confidence_score >= 0.8 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                      mapping.confidence_score >= 0.5 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                      'bg-red-500/10 text-red-600 dark:text-red-400'
+                    }`}>
+                      {Math.round(mapping.confidence_score * 100)}%
+                    </span>
+                  </div>
+
+                  {mapping.description && (
+                    <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-2">{mapping.description}</p>
+                  )}
                 </div>
 
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {mapping.table_name && (
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                      Table: {mapping.table_name}
-                    </span>
-                  )}
-                  {mapping.connection_name && (
-                    <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">
-                      {mapping.connection_name}
-                    </span>
-                  )}
-                  <span className="px-2 py-1 bg-gray-200 text-gray-700 rounded">
-                    {mapping.database_type}
-                  </span>
-                  {mapping.times_applied > 0 && (
-                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" />
-                      Used {mapping.times_applied}x
-                    </span>
-                  )}
-                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
-                    {Math.round(mapping.confidence_score * 100)}% confidence
-                  </span>
-                </div>
-
-                {mapping.description && (
-                  <p className="text-xs text-gray-600 mt-2">{mapping.description}</p>
-                )}
+                <button
+                  onClick={() => handleDelete(mapping.id)}
+                  className="flex-shrink-0 ml-4 w-9 h-9 rounded-xl glass-panel flex items-center justify-center text-gray-400 hover:text-red-500 hover:scale-105 active:scale-95 transition-all"
+                  title="Delete mapping"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
-
-              <button
-                onClick={() => handleDelete(mapping.id)}
-                className="flex-shrink-0 ml-4 p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                title="Delete mapping"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
             </div>
           ))}
         </div>
@@ -154,8 +172,8 @@ export const ColumnMappingsList: React.FC<ColumnMappingsListProps> = ({ connecti
 
       {/* Summary */}
       {mappings.length > 0 && (
-        <div className="text-sm text-gray-600 text-center pt-4 border-t border-gray-200">
-          Showing {mappings.length} column mapping{mappings.length !== 1 ? 's' : ''}
+        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center pt-4 border-t border-white/5">
+          {mappings.length} mapping{mappings.length !== 1 ? 's' : ''}
         </div>
       )}
     </div>

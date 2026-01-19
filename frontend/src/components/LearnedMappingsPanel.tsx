@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Table, AlertCircle, BarChart3 } from 'lucide-react';
+import { Database, Table, AlertCircle, BarChart3, BookOpen } from 'lucide-react';
 import { ColumnMappingsList } from './ColumnMappingsList';
 import { TableMappingsList } from './TableMappingsList';
 import { ResultPatternsList } from './ResultPatternsList';
@@ -16,80 +16,89 @@ export const LearnedMappingsPanel: React.FC<LearnedMappingsPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('columns');
 
-  const tabs: { key: TabType; label: string; icon: React.ReactNode; description: string }[] = [
+  const tabs: { key: TabType; label: string; icon: React.ReactNode; description: string; color: string }[] = [
     {
       key: 'columns',
-      label: 'Column Mappings',
-      icon: <Database className="w-4 h-4" />,
+      label: 'Columns',
+      icon: <Database className="w-3.5 h-3.5" />,
       description: 'Learned column name corrections and aliases',
+      color: 'blue',
     },
     {
       key: 'tables',
-      label: 'Table Mappings',
-      icon: <Table className="w-4 h-4" />,
+      label: 'Tables',
+      icon: <Table className="w-3.5 h-3.5" />,
       description: 'Learned table name corrections and aliases',
+      color: 'emerald',
     },
     {
       key: 'patterns',
-      label: 'Result Patterns',
-      icon: <AlertCircle className="w-4 h-4" />,
+      label: 'Patterns',
+      icon: <AlertCircle className="w-3.5 h-3.5" />,
       description: 'Learned validation patterns for common issues',
+      color: 'purple',
     },
     {
       key: 'stats',
-      label: 'Statistics',
-      icon: <BarChart3 className="w-4 h-4" />,
+      label: 'Stats',
+      icon: <BarChart3 className="w-3.5 h-3.5" />,
       description: 'Overall mapping usage and effectiveness metrics',
+      color: 'amber',
     },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeIn">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Learned Patterns</h2>
-        <p className="text-gray-600 mt-1">
-          Column/table mappings and result validation patterns learned from your feedback
-        </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl glass-panel flex items-center justify-center text-indigo-500">
+            <BookOpen className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">Learned Patterns</h2>
+            <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+              Mappings and patterns learned from your feedback
+            </p>
+          </div>
+        </div>
         {connectionName && (
-          <p className="text-sm text-blue-600 mt-2">
-            Filtered by connection: <span className="font-semibold">{connectionName}</span>
-          </p>
+          <span className="text-[10px] font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-xl glass-card text-blue-600 dark:text-blue-400 border-blue-500/20">
+            {connectionName}
+          </span>
         )}
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="glass-panel rounded-2xl border-white/10 overflow-hidden">
         {/* Tab Headers */}
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px overflow-x-auto" aria-label="Tabs">
+        <div className="border-b border-white/5 p-2 bg-black/5 dark:bg-white/5">
+          <nav className="flex gap-2" aria-label="Tabs">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={`
-                  group relative min-w-0 flex-1 overflow-hidden py-4 px-4 text-sm font-medium text-center
-                  hover:bg-gray-50 transition-colors
+                  flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-[10px] font-black uppercase tracking-[0.15em]
+                  transition-all hover:scale-[1.02] active:scale-[0.98]
                   ${
                     activeTab === tab.key
-                      ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'glass-card bg-gradient-to-r from-indigo-500/10 via-transparent to-purple-500/5 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                   }
                 `}
                 aria-current={activeTab === tab.key ? 'page' : undefined}
               >
-                <span className="flex items-center justify-center gap-2">
-                  {tab.icon}
-                  <span className="whitespace-nowrap">{tab.label}</span>
-                </span>
+                {tab.icon}
+                <span className="whitespace-nowrap">{tab.label}</span>
               </button>
             ))}
           </nav>
         </div>
 
         {/* Tab Description */}
-        <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-          <p className="text-sm text-gray-600">
+        <div className="px-6 py-3 border-b border-white/5 bg-gradient-to-r from-indigo-500/5 via-transparent to-transparent">
+          <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
             {tabs.find((t) => t.key === activeTab)?.description}
           </p>
         </div>
