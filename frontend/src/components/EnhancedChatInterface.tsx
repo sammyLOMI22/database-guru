@@ -34,7 +34,7 @@ export default function EnhancedChatInterface() {
     {
       id: '1',
       type: 'assistant',
-      content: "👋 Hello! I'm Database Guru with multi-database support! Ask me about one or multiple databases at once!",
+      content: "👋 Hello! I'm your Database Guru! Ask me to help you fetch some data!",
     },
   ]);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
@@ -388,7 +388,7 @@ export default function EnhancedChatInterface() {
                     <p className="text-sm font-bold text-blue-600 dark:text-blue-400 tracking-tight">
                       {currentSession && currentSession.connections.length > 1
                         ? `CONSULTING ${currentSession.connections.length} DATABASES...`
-                        : 'SUMMONING KNOWLEDGE...'}
+                        : 'SNIFFING OUT DATA...'}
                     </p>
                     <div className="flex space-x-1">
                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
