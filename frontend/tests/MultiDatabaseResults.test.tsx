@@ -116,7 +116,7 @@ describe('MultiDatabaseResults', () => {
     it('renders summary header', () => {
       render(<MultiDatabaseResults {...defaultProps} />);
 
-      expect(screen.getByText('Multi-Database Query Results')).toBeInTheDocument();
+      expect(screen.getByText('Multi-Database Insights')).toBeInTheDocument();
     });
 
     it('renders database result cards', () => {

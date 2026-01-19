@@ -184,8 +184,8 @@ describe('EnhancedChatInterface', () => {
       renderWithClient(<EnhancedChatInterface />);
 
       // Find the input field and submit a query
-      const input = screen.getByPlaceholderText(/ask a question about your database/i);
-      const sendButton = screen.getByRole('button', { name: /send/i });
+      const input = screen.getByPlaceholderText(/query the guru/i);
+      const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
       fireEvent.click(sendButton);
@@ -209,8 +209,8 @@ describe('EnhancedChatInterface', () => {
       fireEvent.click(checkbox);
 
       // Submit a query
-      const input = screen.getByPlaceholderText(/ask a question about your database/i);
-      const sendButton = screen.getByRole('button', { name: /send/i });
+      const input = screen.getByPlaceholderText(/query the guru/i);
+      const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
       fireEvent.click(sendButton);
@@ -235,8 +235,8 @@ describe('EnhancedChatInterface', () => {
       expect(checkbox.checked).toBe(true);
 
       // Submit a query
-      const input = screen.getByPlaceholderText(/ask a question about your database/i);
-      const sendButton = screen.getByRole('button', { name: /send/i });
+      const input = screen.getByPlaceholderText(/query the guru/i);
+      const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
       fireEvent.click(sendButton);
@@ -255,8 +255,8 @@ describe('EnhancedChatInterface', () => {
       fireEvent.click(checkbox);
 
       // Submit a query
-      const input = screen.getByPlaceholderText(/ask a question about your database/i);
-      const sendButton = screen.getByRole('button', { name: /send/i });
+      const input = screen.getByPlaceholderText(/query the guru/i);
+      const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
       fireEvent.click(sendButton);
@@ -295,8 +295,8 @@ describe('EnhancedChatInterface', () => {
       expect(checkbox.checked).toBe(true);
 
       // Submit a query
-      const input = screen.getByPlaceholderText(/ask a question about your database/i);
-      const sendButton = screen.getByRole('button', { name: /send/i });
+      const input = screen.getByPlaceholderText(/query the guru/i);
+      const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
       fireEvent.click(sendButton);
@@ -384,8 +384,8 @@ describe('EnhancedChatInterface', () => {
     it('adds user message to chat when query is submitted', async () => {
       renderWithClient(<EnhancedChatInterface />);
 
-      const input = screen.getByPlaceholderText(/ask a question about your database/i);
-      const sendButton = screen.getByRole('button', { name: /send/i });
+      const input = screen.getByPlaceholderText(/query the guru/i);
+      const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
       fireEvent.click(sendButton);
@@ -398,8 +398,8 @@ describe('EnhancedChatInterface', () => {
     it('adds assistant response after successful query', async () => {
       renderWithClient(<EnhancedChatInterface />);
 
-      const input = screen.getByPlaceholderText(/ask a question about your database/i);
-      const sendButton = screen.getByRole('button', { name: /send/i });
+      const input = screen.getByPlaceholderText(/query the guru/i);
+      const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
       fireEvent.click(sendButton);
@@ -424,8 +424,8 @@ describe('EnhancedChatInterface', () => {
 
       renderWithClient(<EnhancedChatInterface />);
 
-      const input = screen.getByPlaceholderText(/ask a question about your database/i);
-      const sendButton = screen.getByRole('button', { name: /send/i });
+      const input = screen.getByPlaceholderText(/query the guru/i);
+      const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
       fireEvent.click(sendButton);

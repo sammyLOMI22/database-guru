@@ -289,7 +289,7 @@ describe('ExportDropdown', () => {
 
     expect(screen.getByText('Export as CSV')).toBeInTheDocument();
     expect(screen.getByText('Export as JSON')).toBeInTheDocument();
-    expect(screen.getByText('Copy to Clipboard')).toBeInTheDocument();
+    expect(screen.getByText('Copy Raw Results')).toBeInTheDocument();
   });
 
   it('shows row count in dropdown', () => {

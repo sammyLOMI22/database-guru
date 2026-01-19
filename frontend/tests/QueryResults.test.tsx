@@ -234,7 +234,7 @@ describe('QueryResults', () => {
       };
       render(<QueryResults {...propsWithWarnings} />);
 
-      expect(screen.getByText('Warnings:')).toBeInTheDocument();
+      expect(screen.getByText('Warnings')).toBeInTheDocument();
       expect(screen.getByText('This query may be slow')).toBeInTheDocument();
       expect(screen.getByText('Missing index on column')).toBeInTheDocument();
     });
@@ -572,7 +572,7 @@ describe('QueryResults', () => {
     it('shows pagination controls when more than 10 rows', () => {
       render(<QueryResults {...paginationProps} />);
 
-      expect(screen.getByText('Rows per page:')).toBeInTheDocument();
+      expect(screen.getByText('Per page')).toBeInTheDocument();
       expect(screen.getByText('1-10 of 25')).toBeInTheDocument();
     });
 
