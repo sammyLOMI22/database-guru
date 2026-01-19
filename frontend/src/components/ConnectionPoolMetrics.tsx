@@ -194,7 +194,7 @@ export const ConnectionPoolMetrics: React.FC = () => {
           {refreshing && (
             <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />
           )}
-          <span className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg ${isHealthy
+          <span className={`px-3 py-1.5 text-[11px] font-black uppercase tracking-widest rounded-lg ${isHealthy
               ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
               : 'bg-gradient-to-r from-red-500/20 to-rose-500/20 text-red-600 dark:text-red-400 border border-red-500/30'
             }`}>
@@ -207,7 +207,7 @@ export const ConnectionPoolMetrics: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Total Pools Card */}
         <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-500/5 hover:border-blue-500/30 transition-all duration-300 group">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Total Pools</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Total Pools</p>
           <div className="flex items-center justify-between mt-2">
             <p className="text-4xl font-black text-gray-900 dark:text-white">
               {stats?.total_pools || 0}
@@ -216,14 +216,14 @@ export const ConnectionPoolMetrics: React.FC = () => {
               <Database className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
+          <p className="text-[11px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
             Active connection pools
           </p>
         </div>
 
         {/* Active Connections Card */}
         <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-emerald-500/10 via-transparent to-emerald-500/5 hover:border-emerald-500/30 transition-all duration-300 group">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Active Connections</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Active Connections</p>
           <div className="flex items-center justify-between mt-2">
             <p className="text-4xl font-black text-gray-900 dark:text-white">
               {stats?.global_metrics.total_active_connections || 0}
@@ -232,14 +232,14 @@ export const ConnectionPoolMetrics: React.FC = () => {
               <Activity className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
+          <p className="text-[11px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
             Currently processing queries
           </p>
         </div>
 
         {/* Idle Connections Card */}
         <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-gray-500/10 via-transparent to-gray-500/5 hover:border-gray-500/30 transition-all duration-300 group">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Idle Connections</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Idle Connections</p>
           <div className="flex items-center justify-between mt-2">
             <p className="text-4xl font-black text-gray-900 dark:text-white">
               {stats?.global_metrics.total_idle_connections || 0}
@@ -248,14 +248,14 @@ export const ConnectionPoolMetrics: React.FC = () => {
               <BarChart3 className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
+          <p className="text-[11px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
             Available in pool
           </p>
         </div>
 
         {/* Average Utilization Card */}
         <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-purple-500/10 via-transparent to-purple-500/5 hover:border-purple-500/30 transition-all duration-300 group">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Average Utilization</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Average Utilization</p>
           <div className="flex items-center justify-between mt-2">
             <p className="text-4xl font-black text-gray-900 dark:text-white">
               {stats?.global_metrics.avg_utilization_percent.toFixed(0) || 0}%
@@ -264,7 +264,7 @@ export const ConnectionPoolMetrics: React.FC = () => {
               <Gauge className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
+          <p className="text-[11px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
             Average across pools
           </p>
         </div>
@@ -278,7 +278,7 @@ export const ConnectionPoolMetrics: React.FC = () => {
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
             Active Pools
           </h3>
-          <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest glass-panel px-3 py-1.5 rounded-lg">
+          <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest glass-panel px-3 py-1.5 rounded-lg">
             {stats?.pools.length || 0} pools monitored
           </span>
         </div>
@@ -296,14 +296,14 @@ export const ConnectionPoolMetrics: React.FC = () => {
             <table className="w-full text-left border-collapse">
               <thead className="bg-black/5 dark:bg-white/5">
                 <tr>
-                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Connection</th>
-                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Active</th>
-                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Idle</th>
-                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Utilization</th>
-                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Status</th>
-                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Wait Time</th>
-                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Age</th>
-                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Actions</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Connection</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Active</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Idle</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Utilization</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Status</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Wait Time</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Age</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
@@ -312,7 +312,7 @@ export const ConnectionPoolMetrics: React.FC = () => {
                     <td className="px-6 py-4">
                       <div>
                         <div className="font-bold text-gray-900 dark:text-white">#{pool.connection_id}</div>
-                        <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">{pool.connection_name} ({pool.database_type})</div>
+                        <div className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">{pool.connection_name} ({pool.database_type})</div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -338,7 +338,7 @@ export const ConnectionPoolMetrics: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${pool.metrics.health_status === 'healthy'
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest ${pool.metrics.health_status === 'healthy'
                           ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
                           : 'bg-gradient-to-r from-red-500/20 to-rose-500/20 text-red-600 dark:text-red-400 border border-red-500/30'
                         }`}>
@@ -354,7 +354,7 @@ export const ConnectionPoolMetrics: React.FC = () => {
                       <div className="text-sm font-bold text-gray-900 dark:text-white">
                         {pool.metrics.avg_wait_time_ms.toFixed(1)}ms
                       </div>
-                      <div className="text-[10px] font-medium text-gray-400 mt-0.5">
+                      <div className="text-[11px] font-medium text-gray-400 mt-0.5">
                         max: {pool.metrics.max_wait_time_ms.toFixed(0)}ms
                       </div>
                     </td>

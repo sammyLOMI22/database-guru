@@ -67,7 +67,7 @@ export const SemanticCachePanel: React.FC = () => {
                 <h2 className="text-3xl font-black uppercase tracking-tight text-gray-900 dark:text-white">
                   Semantic Cache
                 </h2>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
+                <p className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                   Intelligent Similarity Matching
                 </p>

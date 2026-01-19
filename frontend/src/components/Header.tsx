@@ -1,4 +1,5 @@
 import { Database, Sun, Moon } from 'lucide-react';
+import mascot from '../assets/boxer_mascot.png';
 
 interface HeaderProps {
   isHealthy: boolean;
@@ -25,8 +26,14 @@ export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTa
         {/* Left Side: Logo */}
         <div className="flex items-center space-x-4 group cursor-default min-w-[240px]">
           <div className="relative">
-            <div className="text-3xl transform transition-all duration-700 group-hover:scale-125 group-hover:rotate-12 animate-float">🧙‍♂️</div>
-            <div className="absolute -inset-2 bg-blue-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+            <div className="w-12 h-12 transform transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 animate-float flex items-center justify-center">
+              <img
+                src={mascot}
+                alt="Boxer Mascot"
+                className="w-full h-full object-contain drop-shadow-xl"
+              />
+            </div>
+            <div className="absolute -inset-2 bg-blue-500/10 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
           </div>
           <div className="flex flex-col">
             <h1 className="text-lg font-black tracking-tight text-gradient leading-none">

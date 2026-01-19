@@ -34,7 +34,7 @@ export default function EnhancedChatInterface() {
     {
       id: '1',
       type: 'assistant',
-      content: "👋 Hello! I'm Database Guru with multi-database support! Ask me about one or multiple databases at once!",
+      content: "👋 Hello! I'm your Database Guru! Ask me to help you fetch some data!",
     },
   ]);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
@@ -307,7 +307,7 @@ export default function EnhancedChatInterface() {
                   {currentSession.connections.map((conn) => (
                     <span
                       key={conn.id}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 transition-all border border-blue-200/50 dark:border-blue-400/10"
+                      className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 transition-all border border-blue-200/50 dark:border-blue-400/10"
                     >
                       <span className="w-1.5 h-1.5 bg-blue-500 dark:bg-blue-400 rounded-full mr-2 animate-pulse"></span>
                       {conn.name}
@@ -335,7 +335,7 @@ export default function EnhancedChatInterface() {
 
               {/* Context awareness indicator */}
               {hasContext && (
-                <div className="mt-3 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 px-4 py-2 rounded-xl border border-blue-100/50 dark:border-blue-800/30 backdrop-blur-md transition-all">
+                <div className="mt-3 flex items-center justify-between text-[11px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 px-4 py-2 rounded-xl border border-blue-100/50 dark:border-blue-800/30 backdrop-blur-md transition-all">
                   <div className="flex items-center">
                     <svg className="w-4 h-4 mr-2 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
@@ -388,7 +388,7 @@ export default function EnhancedChatInterface() {
                     <p className="text-sm font-bold text-blue-600 dark:text-blue-400 tracking-tight">
                       {currentSession && currentSession.connections.length > 1
                         ? `CONSULTING ${currentSession.connections.length} DATABASES...`
-                        : 'SUMMONING KNOWLEDGE...'}
+                        : 'SNIFFING OUT DATA...'}
                     </p>
                     <div className="flex space-x-1">
                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>

@@ -108,7 +108,7 @@ export const CacheStatistics: React.FC = () => {
                   style={{ width: `${Math.min(item.percent, 100)}%` }}
                 />
               </div>
-              <p className="text-[10px] font-medium text-gray-400 mt-1">{item.desc}</p>
+              <p className="text-[11px] font-medium text-gray-400 mt-1">{item.desc}</p>
             </div>
           ))}
         </div>
@@ -124,19 +124,19 @@ export const CacheStatistics: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="glass-card rounded-xl p-5 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-500/5 border-blue-500/20">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Hit Rate</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Hit Rate</p>
             <p className="text-3xl font-black text-gray-900 dark:text-white mt-2">{llm?.hit_rate_percent?.toFixed(1) || 0}%</p>
-            <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{llm?.hits || 0} / {llm?.total_lookups || 0}</p>
+            <p className="text-[11px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{llm?.hits || 0} / {llm?.total_lookups || 0}</p>
           </div>
           <div className="glass-card rounded-xl p-5 bg-gradient-to-br from-emerald-500/10 via-transparent to-emerald-500/5 border-emerald-500/20">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">LLM Calls Saved</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">LLM Calls Saved</p>
             <p className="text-3xl font-black text-gray-900 dark:text-white mt-2">{llm?.hits || 0}</p>
-            <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Saves 2-5s each</p>
+            <p className="text-[11px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Saves 2-5s each</p>
           </div>
           <div className="glass-card rounded-xl p-5 bg-gradient-to-br from-purple-500/10 via-transparent to-purple-500/5 border-purple-500/20">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Stored Entries</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Stored Entries</p>
             <p className="text-3xl font-black text-gray-900 dark:text-white mt-2">{llm?.total_stores || 0}</p>
-            <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Threshold: {llm?.similarity_threshold || 0.88}</p>
+            <p className="text-[11px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Threshold: {llm?.similarity_threshold || 0.88}</p>
           </div>
         </div>
       </div>
@@ -162,7 +162,7 @@ export const CacheStatistics: React.FC = () => {
               style={{ width: `${Math.min(embedding?.cache_hit_rate_percent || 0, 100)}%` }}
             />
           </div>
-          <p className="text-[10px] font-medium text-gray-400 mt-1">Cached embeddings save 50-200ms each</p>
+          <p className="text-[11px] font-medium text-gray-400 mt-1">Cached embeddings save 50-200ms each</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -174,7 +174,7 @@ export const CacheStatistics: React.FC = () => {
           ].map((item) => (
             <div key={item.label} className="glass-panel rounded-xl p-3 border-white/10 text-center">
               <p className={`text-xl font-black ${item.color}`}>{item.value}</p>
-              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{item.label}</p>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">{item.label}</p>
             </div>
           ))}
         </div>
@@ -194,19 +194,19 @@ export const CacheStatistics: React.FC = () => {
               {estimatedTimeSaved >= 60 ? `${(estimatedTimeSaved / 60).toFixed(1)}m` : `${estimatedTimeSaved.toFixed(0)}s`}
             </p>
             <p className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300 mt-2">Time Saved</p>
-            <p className="text-[10px] font-medium text-gray-400 mt-1">~2.5s per hit</p>
+            <p className="text-[11px] font-medium text-gray-400 mt-1">~2.5s per hit</p>
           </div>
           <div className="glass-card rounded-xl p-5 text-center">
             <p className="text-4xl font-black text-emerald-600 dark:text-emerald-400">{totalHits + (llm?.hits || 0)}</p>
             <p className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300 mt-2">Total Hits</p>
-            <p className="text-[10px] font-medium text-gray-400 mt-1">Semantic + LLM</p>
+            <p className="text-[11px] font-medium text-gray-400 mt-1">Semantic + LLM</p>
           </div>
           <div className="glass-card rounded-xl p-5 text-center">
             <p className="text-4xl font-black text-blue-600 dark:text-blue-400">
               {totalLookups > 0 ? `${(((exactHits + semanticHits) / totalLookups) * 100).toFixed(0)}%` : '0%'}
             </p>
             <p className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300 mt-2">Efficiency</p>
-            <p className="text-[10px] font-medium text-gray-400 mt-1">From cache</p>
+            <p className="text-[11px] font-medium text-gray-400 mt-1">From cache</p>
           </div>
         </div>
       </div>

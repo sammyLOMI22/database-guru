@@ -141,7 +141,7 @@ export const ToolUsageStats: React.FC = () => {
       {/* Sort Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Sort</span>
+          <span className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Sort</span>
           <div className="flex p-1 glass-panel rounded-xl border-white/10 bg-black/5 dark:bg-white/5">
             {[
               { key: 'executions', label: 'Runs', icon: TrendingUp },
@@ -193,7 +193,7 @@ export const ToolUsageStats: React.FC = () => {
                   <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">{toolName}</h3>
                 </div>
                 {toolStats.last_executed && (
-                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest glass-panel px-2 py-1 rounded-lg">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest glass-panel px-2 py-1 rounded-lg">
                     {new Date(toolStats.last_executed).toLocaleString()}
                   </span>
                 )}
@@ -203,7 +203,7 @@ export const ToolUsageStats: React.FC = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {/* Executions */}
                 <div className="glass-panel rounded-xl p-3 border-white/10">
-                  <div className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">Runs</div>
+                  <div className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">Runs</div>
                   <div className="text-2xl font-black text-gray-900 dark:text-white">
                     {toolStats.times_executed}
                   </div>
@@ -217,7 +217,7 @@ export const ToolUsageStats: React.FC = () => {
 
                 {/* Success Rate */}
                 <div className="glass-panel rounded-xl p-3 border-white/10">
-                  <div className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">Success</div>
+                  <div className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">Success</div>
                   <div className="flex items-center gap-1.5">
                     {successPercent >= 80 ? (
                       <CheckCircle className="w-4 h-4 text-emerald-500" />
@@ -254,7 +254,7 @@ export const ToolUsageStats: React.FC = () => {
 
                 {/* Avg Time */}
                 <div className="glass-panel rounded-xl p-3 border-white/10">
-                  <div className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">Avg Time</div>
+                  <div className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">Avg Time</div>
                   <div className="text-2xl font-black text-gray-900 dark:text-white">
                     {toolStats.avg_time_ms.toFixed(0)}<span className="text-sm font-bold text-gray-400">ms</span>
                   </div>
@@ -268,7 +268,7 @@ export const ToolUsageStats: React.FC = () => {
 
                 {/* Cache Hit Rate */}
                 <div className="glass-panel rounded-xl p-3 border-white/10">
-                  <div className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">Cache</div>
+                  <div className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">Cache</div>
                   <div className="text-2xl font-black text-gray-900 dark:text-white">
                     {(toolStats.cache_hit_rate * 100).toFixed(0)}%
                   </div>
@@ -282,7 +282,7 @@ export const ToolUsageStats: React.FC = () => {
               </div>
 
               {/* Success/Failure Counts */}
-              <div className="mt-4 flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+              <div className="mt-4 flex items-center gap-4 text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1.5 glass-panel px-2 py-1 rounded-lg">
                   <CheckCircle className="w-3 h-3 text-emerald-500" />
                   {toolStats.successes} ok

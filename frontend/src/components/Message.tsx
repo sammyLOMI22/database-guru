@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { User } from 'lucide-react';
+import mascot from '../assets/boxer_mascot.png';
 import MultiDatabaseResults from './MultiDatabaseResults';
 import type { MultiDatabaseQueryResponse, QueryResponse } from '../types/api';
 
@@ -48,7 +49,11 @@ export default function Message({ type, content, queryResponse, multiQueryRespon
         {isUser ? (
           <User className="w-5 h-5 shadow-sm" />
         ) : (
-          <span className="text-xl drop-shadow-sm">🧙‍♂️</span>
+          <img
+            src={mascot}
+            alt="Assistant Mascot"
+            className="w-7 h-7 object-contain drop-shadow-sm transition-transform group-hover:scale-110"
+          />
         )}
       </div>
 

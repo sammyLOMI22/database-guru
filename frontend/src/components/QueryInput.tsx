@@ -241,7 +241,7 @@ export default function QueryInput({ onSubmit, isLoading, selectedModel, perTask
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Query the guru..."
+              placeholder="Fetch some data..."
               disabled={isLoading}
               rows={1}
               className="w-full px-0 py-2 border-none bg-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-0 resize-none font-medium text-lg transition-all"

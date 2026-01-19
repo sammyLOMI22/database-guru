@@ -86,7 +86,7 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
               <button
                 key={conn.id}
                 onClick={() => setSelectedConnId(conn.id)}
-                className={`flex-shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all border ${selectedConnId === conn.id
+                className={`flex-shrink-0 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all border ${selectedConnId === conn.id
                   ? 'bg-blue-600 border-blue-500 text-white shadow-[0_5px_15px_rgba(59,130,246,0.3)]'
                   : 'glass-panel bg-white/5 border-white/5 text-gray-500 hover:border-white/20 hover:text-gray-300'
                   }`}

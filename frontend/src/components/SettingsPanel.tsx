@@ -186,7 +186,7 @@ export function SettingsPanel() {
               </div>
               <div>
                 <h2 className="text-3xl font-black uppercase tracking-tight text-gray-900 dark:text-white">System Settings</h2>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
+                <p className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                   Engine Configuration & Intelligence
                 </p>
@@ -196,7 +196,7 @@ export function SettingsPanel() {
               <button
                 onClick={resetSettings}
                 disabled={saving}
-                className="flex items-center space-x-2 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 glass-panel rounded-xl disabled:opacity-50 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-black/5"
+                className="flex items-center space-x-2 px-6 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 glass-panel rounded-xl disabled:opacity-50 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-black/5"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Reset</span>
@@ -204,7 +204,7 @@ export function SettingsPanel() {
               <button
                 onClick={saveSettings}
                 disabled={saving}
-                className="flex items-center space-x-2 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl disabled:opacity-50 shadow-2xl shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all"
+                className="flex items-center space-x-2 px-8 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl disabled:opacity-50 shadow-2xl shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all"
               >
                 <Save className="w-4 h-4" />
                 <span>{saving ? 'Saving...' : 'Save Changes'}</span>
@@ -345,7 +345,7 @@ export function SettingsPanel() {
                     </div>
                     <div>
                       <h4 className="text-[11px] font-black uppercase tracking-[0.15em] text-gray-900 dark:text-white">{mod.label}</h4>
-                      <p className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mt-1 leading-relaxed">{mod.desc}</p>
+                      <p className="text-[11px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mt-1 leading-relaxed">{mod.desc}</p>
                     </div>
                   </div>
                   <button
@@ -407,7 +407,7 @@ export function SettingsPanel() {
             <div className="p-8 glass-panel bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 border-emerald-500/10 rounded-[1.5rem] flex items-center justify-between transition-all shadow-[0_10px_40px_rgba(16,185,129,0.05)]">
               <div className="flex-1">
                 <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">Active Intelligence Evolution</label>
-                <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mt-1.5 leading-relaxed">
+                <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mt-1.5 leading-relaxed">
                   Automatically integrate high-confidence feedback into core models for continuous self-optimization
                 </p>
               </div>
@@ -424,13 +424,13 @@ export function SettingsPanel() {
               {/* Confidence Threshold Slider */}
               <div className="p-8 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-[1.5rem] transition-all">
                 <div className="flex justify-between mb-5">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">
                     Confidence Floor
                   </label>
-                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">{(settings.confidence_threshold * 100).toFixed(0)}%</span>
+                  <span className="text-[11px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">{(settings.confidence_threshold * 100).toFixed(0)}%</span>
                 </div>
                 <div className="flex items-center space-x-4">
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">50%</span>
+                  <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">50%</span>
                   <input
                     type="range"
                     min="0.5"
@@ -441,19 +441,19 @@ export function SettingsPanel() {
                     className="flex-1 h-1.5 bg-gray-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-emerald-600 focus:outline-none transition-all hover:h-2"
                     disabled={!settings.auto_learning_enabled}
                   />
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">100%</span>
+                  <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">100%</span>
                 </div>
               </div>
               {/* Apply Mode */}
               <div className="p-8 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-[1.5rem] transition-all">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white block mb-5">Execution Strategy</label>
+                <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white block mb-5">Execution Strategy</label>
                 <div className="flex gap-4">
                   {['immediate', 'deferred'].map((mode) => (
                     <button
                       key={mode}
                       onClick={() => setSettings({ ...settings, apply_mode: mode as 'immediate' | 'deferred' })}
                       disabled={!settings.auto_learning_enabled}
-                      className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] border rounded-xl transition-all ${settings.apply_mode === mode
+                      className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-[0.2em] border rounded-xl transition-all ${settings.apply_mode === mode
                         ? 'bg-emerald-600/10 border-emerald-500/30 text-emerald-600 shadow-inner'
                         : 'border-white/5 text-gray-500 hover:bg-white/5'}`}
                     >
@@ -467,8 +467,8 @@ export function SettingsPanel() {
             {/* Test Before Learning Toggle */}
             <div className="p-8 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-[1.5rem] flex items-center justify-between group transition-all hover:bg-white/10 shadow-sm">
               <div className="flex-1">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">Verification Pipeline</label>
-                <p className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mt-1 leading-relaxed">
+                <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">Verification Pipeline</label>
+                <p className="text-[11px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mt-1 leading-relaxed">
                   Run automated test suite against proposed model updates before integration
                 </p>
               </div>
@@ -494,8 +494,8 @@ export function SettingsPanel() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-8 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-[1.5rem] flex items-center justify-between group transition-all hover:bg-white/10 shadow-sm">
                 <div>
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">Audit trail</label>
-                  <p className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mt-1">Log all engine reasoning</p>
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">Audit trail</label>
+                  <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mt-1">Log all engine reasoning</p>
                 </div>
                 <button
                   onClick={() => setSettings({ ...settings, enable_audit_log: !settings.enable_audit_log })}
@@ -509,8 +509,8 @@ export function SettingsPanel() {
 
               <div className="p-8 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-[1.5rem] transition-all hover:bg-white/10 shadow-sm">
                 <div className="flex justify-between mb-5">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">Retention Policy</label>
-                  <span className="text-[10px] font-black text-gray-500 bg-black/10 dark:bg-white/10 px-2 py-0.5 rounded-full">{settings.max_audit_log_days} Days</span>
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">Retention Policy</label>
+                  <span className="text-[11px] font-black text-gray-500 bg-black/10 dark:bg-white/10 px-2 py-0.5 rounded-full">{settings.max_audit_log_days} Days</span>
                 </div>
                 <input
                   type="range"
@@ -541,7 +541,7 @@ export function SettingsPanel() {
                 'Low confidence requires manual intervention.',
                 'Rollback any change from the core audit dashboard.'
               ].map((text, idx) => (
-                <div key={idx} className="flex gap-3 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest leading-relaxed">
+                <div key={idx} className="flex gap-3 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest leading-relaxed">
                   <div className="w-1 h-1 rounded-full bg-blue-500/50 mt-1.5 flex-shrink-0" />
                   {text}
                 </div>

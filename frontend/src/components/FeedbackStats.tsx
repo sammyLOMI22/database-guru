@@ -175,7 +175,7 @@ export const FeedbackStats: React.FC = () => {
             </div>
             <div>
               <h2 className="text-2xl font-black uppercase tracking-tight text-gray-900 dark:text-white">Feedback Dashboard</h2>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
                 User corrections and continuous learning
               </p>
@@ -201,42 +201,42 @@ export const FeedbackStats: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Total Feedback */}
         <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-500/5 hover:border-blue-500/30 transition-all duration-300 group">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Total Feedback</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Total Feedback</p>
           <div className="flex items-center justify-between mt-2">
             <p className="text-4xl font-black text-gray-900 dark:text-white">{stats.total_feedback}</p>
             <div className="w-12 h-12 rounded-xl glass-panel flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
               <TrendingUp className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
+          <p className="text-[11px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
             All submitted corrections
           </p>
         </div>
 
         {/* Applied to Learning */}
         <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-emerald-500/10 via-transparent to-emerald-500/5 hover:border-emerald-500/30 transition-all duration-300 group">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Applied to Learning</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Applied to Learning</p>
           <div className="flex items-center justify-between mt-2">
             <p className="text-4xl font-black text-gray-900 dark:text-white">{stats.applied_to_learning}</p>
             <div className="w-12 h-12 rounded-xl glass-panel flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
               <CheckCircle className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
+          <p className="text-[11px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
             Learned from feedback
           </p>
         </div>
 
         {/* Pending Review */}
         <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-amber-500/10 via-transparent to-amber-500/5 hover:border-amber-500/30 transition-all duration-300 group">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Pending Review</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Pending Review</p>
           <div className="flex items-center justify-between mt-2">
             <p className="text-4xl font-black text-gray-900 dark:text-white">{stats.pending}</p>
             <div className="w-12 h-12 rounded-xl glass-panel flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
               <Clock className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
+          <p className="text-[11px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
             Awaiting approval
           </p>
         </div>
@@ -250,32 +250,32 @@ export const FeedbackStats: React.FC = () => {
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="glass-card rounded-xl p-4 bg-gradient-to-br from-emerald-500/10 via-transparent to-green-500/5 border-emerald-500/20 hover:border-emerald-500/40 transition-all">
-            <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-2">🚀 Tier 1 (≥90%)</div>
+            <div className="text-[11px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-2">🚀 Tier 1 (≥90%)</div>
             <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
               {recentFeedback.filter(f => f.user_confidence >= 0.90).length}
             </div>
-            <div className="text-[9px] font-bold text-emerald-500/70 mt-2 uppercase tracking-widest">Auto-apply (STRICT)</div>
+            <div className="text-[11px] font-bold text-emerald-500/70 mt-2 uppercase tracking-widest">Auto-apply (STRICT)</div>
           </div>
           <div className="glass-card rounded-xl p-4 bg-gradient-to-br from-blue-500/10 via-transparent to-cyan-500/5 border-blue-500/20 hover:border-blue-500/40 transition-all">
-            <div className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-2">⚡ Tier 2 (≥80%)</div>
+            <div className="text-[11px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-2">⚡ Tier 2 (≥80%)</div>
             <div className="text-3xl font-black text-blue-600 dark:text-blue-400">
               {recentFeedback.filter(f => f.user_confidence >= 0.80 && f.user_confidence < 0.90).length}
             </div>
-            <div className="text-[9px] font-bold text-blue-500/70 mt-2 uppercase tracking-widest">Auto-apply (MODERATE)</div>
+            <div className="text-[11px] font-bold text-blue-500/70 mt-2 uppercase tracking-widest">Auto-apply (MODERATE)</div>
           </div>
           <div className="glass-card rounded-xl p-4 bg-gradient-to-br from-amber-500/10 via-transparent to-yellow-500/5 border-amber-500/20 hover:border-amber-500/40 transition-all">
-            <div className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">📋 Tier 3 (≥70%)</div>
+            <div className="text-[11px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">📋 Tier 3 (≥70%)</div>
             <div className="text-3xl font-black text-amber-600 dark:text-amber-400">
               {recentFeedback.filter(f => f.user_confidence >= 0.70 && f.user_confidence < 0.80).length}
             </div>
-            <div className="text-[9px] font-bold text-amber-500/70 mt-2 uppercase tracking-widest">Batch queue</div>
+            <div className="text-[11px] font-bold text-amber-500/70 mt-2 uppercase tracking-widest">Batch queue</div>
           </div>
           <div className="glass-card rounded-xl p-4 bg-gradient-to-br from-gray-500/10 via-transparent to-gray-500/5 border-gray-500/20 hover:border-gray-500/40 transition-all">
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-2">👁 Manual (&lt;70%)</div>
+            <div className="text-[11px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-2">👁 Manual (&lt;70%)</div>
             <div className="text-3xl font-black text-gray-600 dark:text-gray-300">
               {recentFeedback.filter(f => f.user_confidence < 0.70).length}
             </div>
-            <div className="text-[9px] font-bold text-gray-500/70 mt-2 uppercase tracking-widest">Manual review</div>
+            <div className="text-[11px] font-bold text-gray-500/70 mt-2 uppercase tracking-widest">Manual review</div>
           </div>
         </div>
       </div>
@@ -329,7 +329,7 @@ export const FeedbackStats: React.FC = () => {
                   <button
                     key={key}
                     onClick={() => { setFilterMode(key as typeof filterMode); setCurrentPage(0); }}
-                    className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-300 ${
+                    className={`px-4 py-2 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all duration-300 ${
                       filterMode === key
                         ? key === 'pending'
                           ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-lg shadow-amber-500/20'
@@ -343,7 +343,7 @@ export const FeedbackStats: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest glass-panel px-3 py-1.5 rounded-lg">
+              <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest glass-panel px-3 py-1.5 rounded-lg">
                 Page {currentPage + 1}
               </span>
             </div>
@@ -368,7 +368,7 @@ export const FeedbackStats: React.FC = () => {
                   <div className="flex-1 min-w-0 overflow-hidden" style={{ maxWidth: "calc(100% - 100px)" }}>
 
                     <div className="flex flex-wrap items-center gap-2 mb-3">
-                      <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r border ${
+                      <span className={`px-2.5 py-1 text-[11px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r border ${
                         feedback.feedback_type === 'sql_correction' ? 'from-blue-500/20 to-cyan-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30' :
                         feedback.feedback_type === 'column_name' ? 'from-emerald-500/20 to-green-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' :
                         feedback.feedback_type === 'table_name' ? 'from-amber-500/20 to-yellow-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30' :
@@ -379,22 +379,22 @@ export const FeedbackStats: React.FC = () => {
                       {(() => {
                         const tierInfo = getTierInfo(feedback.user_confidence);
                         return (
-                          <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r border ${tierInfo.color}`} title={tierInfo.description}>
+                          <span className={`px-2.5 py-1 text-[11px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r border ${tierInfo.color}`} title={tierInfo.description}>
                             {tierInfo.emoji} {tierInfo.label}
                           </span>
                         );
                       })()}
                       {feedback.applied_successfully && (
-                        <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        <span className="px-2.5 py-1 text-[11px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                           ✓ Applied
                         </span>
                       )}
                       {feedback.learned_correction_id && (
-                        <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30" title="Learned Correction ID">
+                        <span className="px-2.5 py-1 text-[11px] font-black uppercase tracking-widest rounded-lg bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30" title="Learned Correction ID">
                           🧠 LC-{feedback.learned_correction_id}
                         </span>
                       )}
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                      <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">
                         {Math.round(feedback.user_confidence * 100)}% conf
                       </span>
                     </div>
@@ -460,7 +460,7 @@ export const FeedbackStats: React.FC = () => {
                         {expandedSql.has(feedback.id) && (
                           <div className="mt-3 space-y-3 max-w-full animate-fadeIn">
                             <div className="glass-panel bg-gradient-to-r from-red-500/10 to-rose-500/10 border border-red-500/30 rounded-xl p-4 overflow-hidden">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-red-600 dark:text-red-400 mb-2">Original SQL:</p>
+                              <p className="text-[11px] font-black uppercase tracking-widest text-red-600 dark:text-red-400 mb-2">Original SQL:</p>
                               <div className="max-w-full overflow-hidden">
                                 <pre className="text-xs text-gray-800 dark:text-gray-300 whitespace-pre-wrap break-all font-mono max-h-48 overflow-y-auto w-full">
                                   {feedback.original_sql}
@@ -468,7 +468,7 @@ export const FeedbackStats: React.FC = () => {
                               </div>
                             </div>
                             <div className="glass-panel bg-gradient-to-r from-emerald-500/10 to-green-500/10 border border-emerald-500/30 rounded-xl p-4 overflow-hidden">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-2">Corrected SQL:</p>
+                              <p className="text-[11px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-2">Corrected SQL:</p>
                               <div className="max-w-full overflow-hidden">
                                 <pre className="text-xs text-gray-800 dark:text-gray-300 whitespace-pre-wrap break-all font-mono max-h-48 overflow-y-auto w-full">
                                   {feedback.corrected_sql}
@@ -480,7 +480,7 @@ export const FeedbackStats: React.FC = () => {
                       </div>
                     )}
 
-                    <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
+                    <p className="text-[11px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
                       {new Date(feedback.created_at).toLocaleString()}
                     </p>
                   </div>
@@ -491,18 +491,18 @@ export const FeedbackStats: React.FC = () => {
                         {feedback.corrected_sql ? (
                           <button
                             onClick={() => handleApplyFeedback(feedback.id)}
-                            className="flex-1 sm:flex-initial px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-500/20"
+                            className="flex-1 sm:flex-initial px-4 py-2 text-[11px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-500/20"
                           >
                             Apply
                           </button>
                         ) : (
-                          <div className="flex-1 sm:flex-initial px-4 py-2 text-[10px] font-black uppercase tracking-widest glass-panel text-gray-500 dark:text-gray-400 rounded-xl text-center">
+                          <div className="flex-1 sm:flex-initial px-4 py-2 text-[11px] font-black uppercase tracking-widest glass-panel text-gray-500 dark:text-gray-400 rounded-xl text-center">
                             Info Only
                           </div>
                         )}
                         <button
                           onClick={() => handleRejectFeedback(feedback.id)}
-                          className="flex-1 sm:flex-initial px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-red-500/20"
+                          className="flex-1 sm:flex-initial px-4 py-2 text-[11px] font-black uppercase tracking-widest bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-red-500/20"
                         >
                           {feedback.corrected_sql ? 'Reject' : 'Dismiss'}
                         </button>
@@ -510,7 +510,7 @@ export const FeedbackStats: React.FC = () => {
                     ) : (
                       <button
                         onClick={() => handleRejectFeedback(feedback.id)}
-                        className="flex-1 sm:flex-initial px-4 py-2 text-[10px] font-black uppercase tracking-widest glass-panel text-gray-600 dark:text-gray-400 rounded-xl hover:scale-105 active:scale-95 transition-all hover:bg-gray-500/10"
+                        className="flex-1 sm:flex-initial px-4 py-2 text-[11px] font-black uppercase tracking-widest glass-panel text-gray-600 dark:text-gray-400 rounded-xl hover:scale-105 active:scale-95 transition-all hover:bg-gray-500/10"
                         title="Delete this feedback record"
                       >
                         Delete
@@ -529,12 +529,12 @@ export const FeedbackStats: React.FC = () => {
             <button
               onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
               disabled={currentPage === 0}
-              className="px-5 py-2.5 text-[10px] font-black uppercase tracking-widest glass-card rounded-xl text-gray-700 dark:text-gray-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
+              className="px-5 py-2.5 text-[11px] font-black uppercase tracking-widest glass-card rounded-xl text-gray-700 dark:text-gray-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
             >
               Previous
             </button>
 
-            <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+            <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
               Showing {recentFeedback.length} items on page {currentPage + 1}
               {stats && (
                 <span className="ml-2 text-gray-400">
@@ -548,7 +548,7 @@ export const FeedbackStats: React.FC = () => {
             <button
               onClick={() => setCurrentPage(prev => prev + 1)}
               disabled={recentFeedback.length < pageSize}
-              className="px-5 py-2.5 text-[10px] font-black uppercase tracking-widest glass-card rounded-xl text-gray-700 dark:text-gray-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
+              className="px-5 py-2.5 text-[11px] font-black uppercase tracking-widest glass-card rounded-xl text-gray-700 dark:text-gray-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
             >
               Next
             </button>

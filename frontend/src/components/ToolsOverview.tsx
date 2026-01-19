@@ -147,7 +147,7 @@ export const ToolsOverview: React.FC = () => {
         <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-orange-500/10 via-transparent to-orange-500/5 border-orange-500/20 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-600 dark:text-orange-400">Total Tools</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-orange-600 dark:text-orange-400">Total Tools</p>
               <p className="text-4xl font-black text-gray-900 dark:text-white mt-2">
                 {stats?.total_tools || 0}
               </p>
@@ -162,7 +162,7 @@ export const ToolsOverview: React.FC = () => {
         <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-500/5 border-blue-500/20 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Executions</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Executions</p>
               <p className="text-4xl font-black text-gray-900 dark:text-white mt-2">
                 {stats?.total_executions || 0}
               </p>
@@ -177,7 +177,7 @@ export const ToolsOverview: React.FC = () => {
         <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-emerald-500/10 via-transparent to-emerald-500/5 border-emerald-500/20 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">Success Rate</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">Success Rate</p>
               <p className="text-4xl font-black text-gray-900 dark:text-white mt-2">
                 {stats ? `${(stats.overall_success_rate * 100).toFixed(0)}%` : '-'}
               </p>
@@ -192,7 +192,7 @@ export const ToolsOverview: React.FC = () => {
         <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-purple-500/10 via-transparent to-purple-500/5 border-purple-500/20 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-600 dark:text-purple-400">Categories</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-purple-600 dark:text-purple-400">Categories</p>
               <p className="text-4xl font-black text-gray-900 dark:text-white mt-2">
                 {Object.keys(toolsByCategory).length}
               </p>
@@ -223,7 +223,7 @@ export const ToolsOverview: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white capitalize">{category}</p>
-                  <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mt-0.5">{count} tools</p>
+                  <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mt-0.5">{count} tools</p>
                 </div>
               </div>
             );

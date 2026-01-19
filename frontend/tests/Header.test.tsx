@@ -11,55 +11,56 @@ import Header from '../src/components/Header';
 describe('Header', () => {
   describe('Branding', () => {
     it('displays the application title', () => {
-      render(<Header isHealthy={true} />);
+      render(<Header isHealthy={true} isDarkMode={false} toggleDarkMode={() => {}} activeTab="chat" onTabChange={() => {}} />);
 
       expect(screen.getByText('Database Guru')).toBeInTheDocument();
     });
 
     it('displays the subtitle', () => {
-      render(<Header isHealthy={true} />);
+      render(<Header isHealthy={true} isDarkMode={false} toggleDarkMode={() => {}} activeTab="chat" onTabChange={() => {}} />);
 
-      expect(screen.getByText('AI-Powered SQL Assistant')).toBeInTheDocument();
+      expect(screen.getByText('AI SQL Assistant')).toBeInTheDocument();
     });
 
-    it('displays the wizard emoji', () => {
-      render(<Header isHealthy={true} />);
+    it('displays the boxer mascot image', () => {
+      render(<Header isHealthy={true} isDarkMode={false} toggleDarkMode={() => {}} activeTab="chat" onTabChange={() => {}} />);
 
-      expect(screen.getByText('🧙‍♂️')).toBeInTheDocument();
+      expect(screen.getByAltText('Boxer Mascot')).toBeInTheDocument();
     });
   });
 
   describe('Health Status', () => {
     it('shows connected status when healthy', () => {
-      render(<Header isHealthy={true} />);
+      render(<Header isHealthy={true} isDarkMode={false} toggleDarkMode={() => {}} activeTab="chat" onTabChange={() => {}} />);
 
-      expect(screen.getByText('Connected')).toBeInTheDocument();
+      expect(screen.getByText('Online')).toBeInTheDocument();
     });
 
     it('shows disconnected status when unhealthy', () => {
-      render(<Header isHealthy={false} />);
+      render(<Header isHealthy={false} isDarkMode={false} toggleDarkMode={() => {}} activeTab="chat" onTabChange={() => {}} />);
 
-      expect(screen.getByText('Disconnected')).toBeInTheDocument();
+      expect(screen.getByText('Offline')).toBeInTheDocument();
     });
 
     it('displays green indicator when healthy', () => {
-      const { container } = render(<Header isHealthy={true} />);
+      const { container } = render(<Header isHealthy={true} isDarkMode={false} toggleDarkMode={() => {}} activeTab="chat" onTabChange={() => {}} />);
 
       const indicator = container.querySelector('.bg-green-500');
       expect(indicator).toBeInTheDocument();
     });
 
-    it('displays red indicator when unhealthy', () => {
-      const { container } = render(<Header isHealthy={false} />);
+    it('displays no green indicator when unhealthy', () => {
+      const { container } = render(<Header isHealthy={false} isDarkMode={false} toggleDarkMode={() => {}} activeTab="chat" onTabChange={() => {}} />);
 
-      const indicator = container.querySelector('.bg-red-500');
-      expect(indicator).toBeInTheDocument();
+      // When unhealthy, there's no green ping indicator
+      const indicator = container.querySelector('.bg-green-500.animate-ping');
+      expect(indicator).not.toBeInTheDocument();
     });
   });
 
   describe('GitHub Link', () => {
     it('renders GitHub link with correct attributes', () => {
-      render(<Header isHealthy={true} />);
+      render(<Header isHealthy={true} isDarkMode={false} toggleDarkMode={() => {}} activeTab="chat" onTabChange={() => {}} />);
 
       const link = screen.getByRole('link');
       expect(link).toBeInTheDocument();
@@ -69,13 +70,15 @@ describe('Header', () => {
     });
 
     it('renders GitHub icon SVG', () => {
-      const { container } = render(<Header isHealthy={true} />);
+      const { container } = render(<Header isHealthy={true} isDarkMode={false} toggleDarkMode={() => {}} activeTab="chat" onTabChange={() => {}} />);
 
-      const svg = container.querySelector('svg');
+      // There are multiple SVGs (lucide icons), find the GitHub one in the link
+      const link = container.querySelector('a[href*="github"]');
+      expect(link).toBeInTheDocument();
+      const svg = link?.querySelector('svg');
       expect(svg).toBeInTheDocument();
-      // Lucide icons use fill="none" with stroke-based rendering
-      expect(svg).toHaveAttribute('fill', 'none');
-      expect(svg).toHaveAttribute('viewBox', '0 0 24 24');
+      // GitHub icon uses fill="currentColor" with path-based rendering
+      expect(svg).toHaveAttribute('fill', 'currentColor');
     });
   });
 });

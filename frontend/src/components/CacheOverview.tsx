@@ -117,12 +117,12 @@ export const CacheOverview: React.FC = () => {
       {/* Service Status Banner */}
       <div className="glass-panel rounded-2xl p-5 border-white/10">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 flex items-center gap-2">
+          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 flex items-center gap-2">
             <Server className="w-4 h-4" />
             Service Status
           </h3>
           {refreshing && (
-            <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
               <RefreshCw className="w-3 h-3 animate-spin" />
               Refreshing
             </div>
@@ -139,12 +139,12 @@ export const CacheOverview: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Redis Cache</h3>
-                <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+                <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
                   {redisConnected ? 'Semantic caching active' : 'Disconnected'}
                 </p>
               </div>
             </div>
-            <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${
+            <span className={`text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${
               redisConnected ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/20 text-red-600 dark:text-red-400'
             }`}>
               {redisConnected ? 'Online' : 'Offline'}
@@ -161,12 +161,12 @@ export const CacheOverview: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Embeddings</h3>
-                <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+                <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
                   {embedding?.ollama_available ? 'nomic-embed-text' : 'TF-IDF fallback'}
                 </p>
               </div>
             </div>
-            <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${
+            <span className={`text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${
               embedding?.ollama_available ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
             }`}>
               {embedding?.ollama_available ? 'Ollama' : 'Fallback'}
@@ -180,7 +180,7 @@ export const CacheOverview: React.FC = () => {
         <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-500/5 border-blue-500/20 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Lookups</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Lookups</p>
               <p className="text-4xl font-black text-gray-900 dark:text-white mt-2">{semantic?.total_lookups || 0}</p>
             </div>
             <div className="w-12 h-12 rounded-2xl glass-panel flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
@@ -192,7 +192,7 @@ export const CacheOverview: React.FC = () => {
         <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-amber-500/10 via-transparent to-amber-500/5 border-amber-500/20 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">Hit Rate</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">Hit Rate</p>
               <p className={`text-4xl font-black mt-2 ${(semantic?.hit_rate_percent || 0) > 50 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {semantic ? `${semantic.hit_rate_percent.toFixed(0)}%` : '0%'}
               </p>
@@ -206,7 +206,7 @@ export const CacheOverview: React.FC = () => {
         <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-purple-500/10 via-transparent to-purple-500/5 border-purple-500/20 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-600 dark:text-purple-400">Semantic</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-purple-600 dark:text-purple-400">Semantic</p>
               <p className="text-4xl font-black text-gray-900 dark:text-white mt-2">{semantic?.semantic_hits || 0}</p>
             </div>
             <div className="w-12 h-12 rounded-2xl glass-panel flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
@@ -218,7 +218,7 @@ export const CacheOverview: React.FC = () => {
         <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-emerald-500/10 via-transparent to-emerald-500/5 border-emerald-500/20 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">Cached</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">Cached</p>
               <p className="text-4xl font-black text-gray-900 dark:text-white mt-2">{semantic?.memory_entries || 0}</p>
             </div>
             <div className="w-12 h-12 rounded-2xl glass-panel flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">

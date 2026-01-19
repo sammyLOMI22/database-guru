@@ -186,25 +186,25 @@ export const RecentCachedQueries: React.FC = () => {
                       <div className="flex flex-wrap items-center gap-3 mt-3">
                         {/* Database Type Badge */}
                         <span
-                          className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-gradient-to-r ${dbStyle.bg} ${dbStyle.text} border ${dbStyle.border}`}
+                          className={`px-3 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-gradient-to-r ${dbStyle.bg} ${dbStyle.text} border ${dbStyle.border}`}
                         >
                           {query.database_type}
                         </span>
 
                         {/* Connection ID */}
-                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1.5 glass-panel px-2.5 py-1 rounded-lg uppercase tracking-widest">
+                        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1.5 glass-panel px-2.5 py-1 rounded-lg uppercase tracking-widest">
                           <Database className="w-3 h-3" />
                           #{query.connection_id}
                         </span>
 
                         {/* Created */}
-                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1.5 glass-panel px-2.5 py-1 rounded-lg uppercase tracking-widest" title={formatDate(query.created_at)}>
+                        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1.5 glass-panel px-2.5 py-1 rounded-lg uppercase tracking-widest" title={formatDate(query.created_at)}>
                           <Clock className="w-3 h-3" />
                           {formatTimeAgo(query.created_at)}
                         </span>
 
                         {/* Hits */}
-                        <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 glass-panel px-2.5 py-1 rounded-lg uppercase tracking-widest bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/20">
+                        <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 glass-panel px-2.5 py-1 rounded-lg uppercase tracking-widest bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/20">
                           <Eye className="w-3 h-3" />
                           {query.hits} hit{query.hits !== 1 ? 's' : ''}
                         </span>
@@ -231,7 +231,7 @@ export const RecentCachedQueries: React.FC = () => {
                 {/* Expanded SQL */}
                 {isExpanded && (
                   <div className="border-t border-white/10 bg-black/5 dark:bg-white/5 p-5 animate-fadeIn">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2">
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2">
                       <div className="w-1 h-1 rounded-full bg-amber-500" />
                       Cached SQL
                     </p>
@@ -239,7 +239,7 @@ export const RecentCachedQueries: React.FC = () => {
                       {query.sql}
                     </pre>
                     {query.last_hit_at && (
-                      <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mt-3 uppercase tracking-widest">
+                      <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 mt-3 uppercase tracking-widest">
                         Last hit: {formatDate(query.last_hit_at)}
                       </p>
                     )}
@@ -253,7 +253,7 @@ export const RecentCachedQueries: React.FC = () => {
 
       {/* Load More Hint */}
       {queries.length > 0 && queries.length < (data?.total || 0) && (
-        <p className="text-center text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest glass-panel rounded-xl py-3">
+        <p className="text-center text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest glass-panel rounded-xl py-3">
           Showing {queries.length} of {data?.total} queries. Increase page size to see more.
         </p>
       )}

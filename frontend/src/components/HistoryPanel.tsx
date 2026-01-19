@@ -44,7 +44,7 @@ export default function HistoryPanel({ onSelectQuery }: HistoryPanelProps) {
 
           {/* SQL preview */}
           <div className="relative mb-3">
-            <p className="text-[10px] font-mono text-blue-500 dark:text-blue-400 line-clamp-1 bg-black/20 dark:bg-black/40 p-2 rounded-lg border border-white/5">
+            <p className="text-[11px] font-mono text-blue-500 dark:text-blue-400 line-clamp-1 bg-black/20 dark:bg-black/40 p-2 rounded-lg border border-white/5">
               {item.generated_sql}
             </p>
           </div>
@@ -69,14 +69,14 @@ export default function HistoryPanel({ onSelectQuery }: HistoryPanelProps) {
               </div>
             </div>
             {item.model_used && (
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">
+              <span className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">
                 {item.model_used.split(':')[0]}
               </span>
             )}
           </div>
 
           {/* Timestamp */}
-          <div className="mt-3 text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-600 border-t border-white/5 pt-2">
+          <div className="mt-3 text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-600 border-t border-white/5 pt-2">
             {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         </button>
