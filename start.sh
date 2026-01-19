@@ -5,7 +5,7 @@
 
 set -e  # Exit on error
 
-echo "🧙‍♂️  Starting Database Guru..."
+echo "🐶  Starting Database Guru..."
 echo ""
 
 # Check if Python virtual environment exists

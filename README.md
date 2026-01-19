@@ -1,4 +1,4 @@
-# 🧙‍♂️ Database Guru
+# <img src="docs/images/logo.png" width="48" height="48" valign="middle"> Database Guru
 
 ![Tests](https://github.com/sammyLOMI22/database-guru/workflows/Tests/badge.svg)
 ![Coverage](https://img.shields.io/badge/coverage-46%25-yellow)

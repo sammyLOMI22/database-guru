@@ -1,4 +1,4 @@
-# 🧙‍♂️ Database Guru - End-to-End Guide
+# 🐶 Database Guru - End-to-End Guide
 
 ## What's New - Full SQL Execution! 🎉
 

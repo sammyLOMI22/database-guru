@@ -1,4 +1,4 @@
-# 🧙‍♂️ Database Guru - Complete Project Summary
+# 🐶 Database Guru - Complete Project Summary
 
 ## What is Database Guru?
 
@@ -513,4 +513,4 @@ You have:
 2. Deploy to production
 3. Add advanced features
 
-**Database Guru: Making databases speak your language!** 🧙‍♂️
+**Database Guru: Making databases speak your language!** 🐶

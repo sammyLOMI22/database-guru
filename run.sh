@@ -2,7 +2,7 @@
 
 # Database Guru - Easy Start Script
 
-echo "🧙‍♂️ Database Guru - Starting..."
+echo "🐶 Database Guru - Starting..."
 echo ""
 
 # Check if Docker is running
