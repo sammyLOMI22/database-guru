@@ -112,32 +112,34 @@ describe('ToolsPanel', () => {
   it('renders the main panel with header', () => {
     render(<ToolsPanel />);
 
-    expect(screen.getByText('Tool-Using Agent')).toBeInTheDocument();
-    expect(screen.getByText(/10 specialized tools/)).toBeInTheDocument();
+    expect(screen.getByText('Tool Agent')).toBeInTheDocument();
+    expect(screen.getByText(/Schema Exploration & Query Validation/i)).toBeInTheDocument();
   });
 
   it('renders all three tabs', () => {
     render(<ToolsPanel />);
 
     expect(screen.getByText('Overview')).toBeInTheDocument();
-    expect(screen.getByText('Tool Directory')).toBeInTheDocument();
-    expect(screen.getByText('Usage Stats')).toBeInTheDocument();
+    expect(screen.getByText('Directory')).toBeInTheDocument();
+    expect(screen.getByText('Usage')).toBeInTheDocument();
   });
 
   it('starts with Overview tab active', () => {
     render(<ToolsPanel />);
 
     const overviewTab = screen.getByText('Overview');
-    expect(overviewTab.closest('button')).toHaveClass('border-orange-500');
+    // Active tab now uses glass-card class instead of border-orange-500
+    expect(overviewTab.closest('button')).toHaveClass('glass-card');
   });
 
   it('switches tabs when clicked', () => {
     render(<ToolsPanel />);
 
-    const directoryTab = screen.getByText('Tool Directory');
+    const directoryTab = screen.getByText('Directory');
     fireEvent.click(directoryTab);
 
-    expect(directoryTab.closest('button')).toHaveClass('border-orange-500');
+    // Active tab now uses glass-card class
+    expect(directoryTab.closest('button')).toHaveClass('glass-card');
   });
 
   it('shows tab description based on active tab', () => {
@@ -145,10 +147,10 @@ describe('ToolsPanel', () => {
 
     expect(screen.getByText(/Summary of tool execution/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('Tool Directory'));
+    fireEvent.click(screen.getByText('Directory'));
     expect(screen.getByText(/Browse all 10 specialized tools/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('Usage Stats'));
+    fireEvent.click(screen.getByText('Usage'));
     expect(screen.getByText(/Detailed per-tool execution metrics/)).toBeInTheDocument();
   });
 });
@@ -179,10 +181,10 @@ describe('ToolsOverview', () => {
       expect(screen.getByText('10')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Total Executions')).toBeInTheDocument();
+    expect(screen.getByText('Executions')).toBeInTheDocument();
     expect(screen.getByText('150')).toBeInTheDocument();
     expect(screen.getByText('Success Rate')).toBeInTheDocument();
-    expect(screen.getByText('95.0%')).toBeInTheDocument();
+    expect(screen.getByText('95%')).toBeInTheDocument();
   });
 
   it('displays tools by category breakdown', async () => {
@@ -201,11 +203,11 @@ describe('ToolsOverview', () => {
     render(<ToolsOverview />);
 
     await waitFor(() => {
-      expect(screen.getByText('How Tool-Using Agent Works')).toBeInTheDocument();
+      expect(screen.getByText('How Tool Agent Works')).toBeInTheDocument();
     });
 
     expect(screen.getByText('Analyze Question')).toBeInTheDocument();
-    expect(screen.getByText('Use Tools')).toBeInTheDocument();
+    expect(screen.getByText('Execute Tools')).toBeInTheDocument();
     expect(screen.getByText('Generate SQL')).toBeInTheDocument();
   });
 
@@ -213,7 +215,7 @@ describe('ToolsOverview', () => {
     render(<ToolsOverview />);
 
     await waitFor(() => {
-      expect(screen.getByText('Clear All Tool Cache')).toBeInTheDocument();
+      expect(screen.getByText('Clear Tool Cache')).toBeInTheDocument();
     });
   });
 
@@ -282,7 +284,7 @@ describe('ToolDirectory', () => {
     render(<ToolDirectory />);
 
     await waitFor(() => {
-      expect(screen.getByText('All Categories')).toBeInTheDocument();
+      expect(screen.getByText('All')).toBeInTheDocument();
     });
 
     expect(screen.getByText('Schema')).toBeInTheDocument();
@@ -345,7 +347,7 @@ describe('ToolDirectory', () => {
     fireEvent.click(toolHeader!);
 
     await waitFor(() => {
-      expect(screen.getByText(/Cache TTL: 600s/)).toBeInTheDocument();
+      expect(screen.getByText(/TTL: 600s/)).toBeInTheDocument();
     });
   });
 });
@@ -402,18 +404,18 @@ describe('ToolUsageStats', () => {
     render(<ToolUsageStats />);
 
     await waitFor(() => {
-      expect(screen.getByText('Sort by:')).toBeInTheDocument();
+      expect(screen.getByText('Sort')).toBeInTheDocument();
     });
 
     // Look for sort buttons specifically
     const sortButtons = screen.getAllByRole('button');
-    const executionsButton = sortButtons.find(btn => btn.textContent?.includes('Executions'));
-    const successRateButton = sortButtons.find(btn => btn.textContent?.includes('Success Rate'));
-    const avgTimeButton = sortButtons.find(btn => btn.textContent?.includes('Avg Time'));
+    const runsButton = sortButtons.find(btn => btn.textContent?.includes('Runs'));
+    const successButton = sortButtons.find(btn => btn.textContent?.includes('Success'));
+    const timeButton = sortButtons.find(btn => btn.textContent?.includes('Time'));
 
-    expect(executionsButton).toBeDefined();
-    expect(successRateButton).toBeDefined();
-    expect(avgTimeButton).toBeDefined();
+    expect(runsButton).toBeDefined();
+    expect(successButton).toBeDefined();
+    expect(timeButton).toBeDefined();
   });
 
   it('changes sort order when sort button clicked', async () => {
@@ -423,14 +425,14 @@ describe('ToolUsageStats', () => {
       expect(screen.getByText('search_schema')).toBeInTheDocument();
     });
 
-    // Click success rate sort button (the one in the sort controls, not column headers)
+    // Click success sort button (the one in the sort controls, not column headers)
     const sortButtons = screen.getAllByRole('button');
-    const successRateButton = sortButtons.find(btn =>
-      btn.textContent?.includes('Success Rate') &&
+    const successButton = sortButtons.find(btn =>
+      btn.textContent?.includes('Success') &&
       btn.className.includes('rounded-lg')
     );
-    expect(successRateButton).toBeDefined();
-    fireEvent.click(successRateButton!);
+    expect(successButton).toBeDefined();
+    fireEvent.click(successButton!);
 
     // validate_sql should be first (100% success rate)
     await waitFor(() => {
@@ -455,11 +457,11 @@ describe('ToolUsageStats', () => {
     render(<ToolUsageStats />);
 
     await waitFor(() => {
-      expect(screen.getByText('43 successes')).toBeInTheDocument();
+      expect(screen.getByText('43 ok')).toBeInTheDocument();
     });
 
-    // Multiple tools may have "2 failures", so use getAllByText
-    const failureTexts = screen.getAllByText('2 failures');
+    // Multiple tools may have "2 fail", so use getAllByText
+    const failureTexts = screen.getAllByText('2 fail');
     expect(failureTexts.length).toBeGreaterThan(0);
   });
 
@@ -474,7 +476,7 @@ describe('ToolUsageStats', () => {
     render(<ToolUsageStats />);
 
     await waitFor(() => {
-      expect(screen.getByText(/No tool usage statistics available/)).toBeInTheDocument();
+      expect(screen.getByText(/No stats yet/)).toBeInTheDocument();
     });
   });
 

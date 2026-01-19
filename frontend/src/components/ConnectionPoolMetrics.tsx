@@ -124,13 +124,13 @@ export const ConnectionPoolMetrics: React.FC = () => {
   if (loading) {
     return (
       <div className="animate-pulse space-y-6">
-        <div className="h-16 bg-gray-200 dark:bg-gray-800 rounded-lg"></div>
+        <div className="h-20 glass-panel rounded-2xl" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-28 bg-gray-200 dark:bg-gray-800 rounded-lg" />
+            <div key={i} className="h-32 glass-panel rounded-2xl" />
           ))}
         </div>
-        <div className="h-48 bg-gray-200 dark:bg-gray-800 rounded-lg" />
+        <div className="h-64 glass-panel rounded-2xl" />
       </div>
     );
   }
@@ -138,26 +138,30 @@ export const ConnectionPoolMetrics: React.FC = () => {
   if (error) {
     return (
       <div className="text-center py-12">
-        <div className="text-red-500 mb-4">Error: {error}</div>
-        <button
-          onClick={() => loadData(true)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-        >
-          Retry
-        </button>
+        <div className="glass-panel rounded-2xl p-8 max-w-md mx-auto">
+          <div className="text-red-500 mb-4 text-sm font-bold uppercase tracking-widest">Error: {error}</div>
+          <button
+            onClick={() => loadData(true)}
+            className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-cyan-500/20"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
   if (!stats?.pooling_enabled) {
     return (
-      <div className="text-center py-12">
-        <Server className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
+      <div className="text-center py-16 glass-panel rounded-2xl border-white/10">
+        <div className="w-20 h-20 rounded-2xl glass-card flex items-center justify-center mx-auto mb-5">
+          <Server className="w-10 h-10 text-gray-400" />
+        </div>
+        <h3 className="text-xl font-black uppercase tracking-widest text-gray-700 dark:text-gray-300 mb-3">
           Connection Pooling Disabled
         </h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-4">
-          Set ENABLE_CONNECTION_POOLING=True to enable connection pooling
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+          Set <code className="px-2 py-0.5 glass-panel rounded text-cyan-600 dark:text-cyan-400 text-xs font-mono">ENABLE_CONNECTION_POOLING=True</code> to enable connection pooling
         </p>
       </div>
     );
@@ -166,32 +170,33 @@ export const ConnectionPoolMetrics: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Status Banner */}
-      <div className={`p-4 rounded-lg flex items-center justify-between shadow-sm border ${isHealthy
-          ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-400'
-          : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400'
+      <div className={`glass-panel rounded-2xl p-5 flex items-center justify-between border ${isHealthy
+          ? 'bg-gradient-to-r from-emerald-500/10 via-transparent to-green-500/10 border-emerald-500/20'
+          : 'bg-gradient-to-r from-red-500/10 via-transparent to-rose-500/10 border-red-500/20'
         }`}>
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-full ${isHealthy ? 'bg-green-100 dark:bg-green-900/40' : 'bg-red-100 dark:bg-red-900/40'}`}>
-            <Activity className="w-5 h-5" />
+        <div className="flex items-center gap-4">
+          <div className={`w-12 h-12 rounded-xl glass-panel flex items-center justify-center ${isHealthy ? 'text-emerald-500' : 'text-red-500'}`}>
+            <Activity className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+            <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
+              <div className={`w-1.5 h-1.5 rounded-full ${isHealthy ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
               Connection Pool Health
             </h3>
-            <p className="text-sm opacity-90">
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">
               {isHealthy
                 ? 'All connection pools are within normal operating parameters'
                 : 'Some pools are experiencing high utilization or degradation'}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {refreshing && (
             <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />
           )}
-          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${isHealthy
-              ? 'bg-green-200 dark:bg-green-800/50 text-green-800 dark:text-green-300'
-              : 'bg-red-200 dark:bg-red-800/50 text-red-800 dark:text-red-300'
+          <span className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg ${isHealthy
+              ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+              : 'bg-gradient-to-r from-red-500/20 to-rose-500/20 text-red-600 dark:text-red-400 border border-red-500/30'
             }`}>
             {isHealthy ? 'HEALTHY' : 'DEGRADED'}
           </span>
@@ -201,139 +206,162 @@ export const ConnectionPoolMetrics: React.FC = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Total Pools Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Pools</p>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+        <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-500/5 hover:border-blue-500/30 transition-all duration-300 group">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Total Pools</p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-4xl font-black text-gray-900 dark:text-white">
               {stats?.total_pools || 0}
             </p>
-            <Database className="w-8 h-8 text-blue-500 opacity-50 dark:opacity-30" />
+            <div className="w-12 h-12 rounded-xl glass-panel flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+              <Database className="w-6 h-6" />
+            </div>
           </div>
-          <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
             Active connection pools
-          </div>
+          </p>
         </div>
 
         {/* Active Connections Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Connections</p>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+        <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-emerald-500/10 via-transparent to-emerald-500/5 hover:border-emerald-500/30 transition-all duration-300 group">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Active Connections</p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-4xl font-black text-gray-900 dark:text-white">
               {stats?.global_metrics.total_active_connections || 0}
             </p>
-            <Activity className="w-8 h-8 text-green-500 opacity-50 dark:opacity-30" />
+            <div className="w-12 h-12 rounded-xl glass-panel flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
+              <Activity className="w-6 h-6" />
+            </div>
           </div>
-          <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
             Currently processing queries
-          </div>
+          </p>
         </div>
 
         {/* Idle Connections Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Idle Connections</p>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+        <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-gray-500/10 via-transparent to-gray-500/5 hover:border-gray-500/30 transition-all duration-300 group">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Idle Connections</p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-4xl font-black text-gray-900 dark:text-white">
               {stats?.global_metrics.total_idle_connections || 0}
             </p>
-            <BarChart3 className="w-8 h-8 text-slate-500 opacity-50 dark:opacity-30" />
+            <div className="w-12 h-12 rounded-xl glass-panel flex items-center justify-center text-gray-500 group-hover:scale-110 transition-transform">
+              <BarChart3 className="w-6 h-6" />
+            </div>
           </div>
-          <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
             Available in pool
-          </div>
+          </p>
         </div>
 
         {/* Average Utilization Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Average Utilization</p>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+        <div className="glass-card rounded-2xl p-5 border-white/10 bg-gradient-to-br from-purple-500/10 via-transparent to-purple-500/5 hover:border-purple-500/30 transition-all duration-300 group">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Average Utilization</p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-4xl font-black text-gray-900 dark:text-white">
               {stats?.global_metrics.avg_utilization_percent.toFixed(0) || 0}%
             </p>
-            <Gauge className="w-8 h-8 text-purple-500 opacity-50 dark:opacity-30" />
+            <div className="w-12 h-12 rounded-xl glass-panel flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
+              <Gauge className="w-6 h-6" />
+            </div>
           </div>
-          <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+          <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest">
             Average across pools
-          </div>
+          </p>
         </div>
       </div>
 
       {/* Per-Pool Status Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
-        <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50">
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-green-500" />
+      <div className="glass-panel rounded-2xl overflow-hidden border-white/10">
+        <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between bg-black/5 dark:bg-white/5">
+          <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
             Active Pools
           </h3>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+          <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest glass-panel px-3 py-1.5 rounded-lg">
             {stats?.pools.length || 0} pools monitored
           </span>
         </div>
 
         {stats.pools.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-            No active pools. Pools will be created on first query.
+          <div className="p-12 text-center">
+            <div className="w-16 h-16 rounded-2xl glass-card flex items-center justify-center mx-auto mb-4">
+              <Database className="w-8 h-8 text-gray-400" />
+            </div>
+            <p className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">No active pools</p>
+            <p className="text-xs font-medium text-gray-400 mt-2">Pools will be created on first query</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <thead className="bg-black/5 dark:bg-white/5">
                 <tr>
-                  <th className="px-6 py-3 border-b border-gray-200 dark:border-gray-700">Connection</th>
-                  <th className="px-6 py-3 border-b border-gray-200 dark:border-gray-700">Active</th>
-                  <th className="px-6 py-3 border-b border-gray-200 dark:border-gray-700">Idle</th>
-                  <th className="px-6 py-3 border-b border-gray-200 dark:border-gray-700">Utilization</th>
-                  <th className="px-6 py-3 border-b border-gray-200 dark:border-gray-700">Status</th>
-                  <th className="px-6 py-3 border-b border-gray-200 dark:border-gray-700">Wait Time</th>
-                  <th className="px-6 py-3 border-b border-gray-200 dark:border-gray-700">Age</th>
-                  <th className="px-6 py-3 border-b border-gray-200 dark:border-gray-700">Actions</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Connection</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Active</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Idle</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Utilization</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Status</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Wait Time</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Age</th>
+                  <th className="px-6 py-4 border-b border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="divide-y divide-white/10">
                 {stats.pools.map((pool: PoolInfo) => (
-                  <tr key={`${pool.connection_id}-${pool.database_type}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                  <tr key={`${pool.connection_id}-${pool.database_type}`} className="hover:bg-white/5 dark:hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4">
                       <div>
-                        <div className="font-medium text-gray-900 dark:text-gray-100">#{pool.connection_id}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{pool.connection_name} ({pool.database_type})</div>
+                        <div className="font-bold text-gray-900 dark:text-white">#{pool.connection_id}</div>
+                        <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">{pool.connection_name} ({pool.database_type})</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{pool.metrics.active_connections}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{pool.metrics.idle_connections}</td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                      <span className="text-sm font-black text-gray-900 dark:text-white">{pool.metrics.active_connections}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-black text-gray-900 dark:text-white">{pool.metrics.idle_connections}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-20 bg-black/5 dark:bg-white/5 rounded-full h-2 overflow-hidden">
                           <div
-                            className={`h-1.5 rounded-full ${pool.metrics.utilization_percent > 80 ? 'bg-amber-500' : 'bg-green-500'
+                            className={`h-full rounded-full transition-all ${pool.metrics.utilization_percent > 80
+                              ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                              : 'bg-gradient-to-r from-emerald-500 to-green-500'
                               }`}
                             style={{ width: `${pool.metrics.utilization_percent}%` }}
-                          ></div>
+                          />
                         </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <span className="text-sm font-black text-gray-900 dark:text-white">
                           {pool.metrics.utilization_percent.toFixed(0)}%
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${pool.metrics.health_status === 'healthy'
-                          ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
-                          : 'bg-red-100 dark:bg-red-800/50 text-red-700 dark:text-red-400'
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${pool.metrics.health_status === 'healthy'
+                          ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                          : 'bg-gradient-to-r from-red-500/20 to-rose-500/20 text-red-600 dark:text-red-400 border border-red-500/30'
                         }`}>
                         {pool.metrics.health_status === 'healthy' ? (
                           <>
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                             Healthy
                           </>
                         ) : 'Degraded'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                      {pool.metrics.avg_wait_time_ms.toFixed(1)}ms
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-bold text-gray-900 dark:text-white">
+                        {pool.metrics.avg_wait_time_ms.toFixed(1)}ms
+                      </div>
+                      <div className="text-[10px] font-medium text-gray-400 mt-0.5">
                         max: {pool.metrics.max_wait_time_ms.toFixed(0)}ms
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                      {formatDuration(pool.age_seconds)}
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">
+                        {formatDuration(pool.age_seconds)}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <button
@@ -343,7 +371,7 @@ export const ConnectionPoolMetrics: React.FC = () => {
                           handleEvictPool(pool.connection_id, pool.database_type);
                         }}
                         disabled={evicting === pool.connection_id}
-                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
+                        className="p-2.5 rounded-xl glass-panel text-red-500 hover:bg-red-500/10 hover:border-red-500/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
                         title="Evict pool (will be recreated on next use)"
                       >
                         {evicting === pool.connection_id ? (
@@ -363,15 +391,17 @@ export const ConnectionPoolMetrics: React.FC = () => {
 
       {/* Warnings Section */}
       {health?.unhealthy_pools && health.unhealthy_pools.length > 0 && (
-        <div className="bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-800/50 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+        <div className="glass-panel rounded-2xl p-5 border-2 border-red-500/30 bg-gradient-to-r from-red-500/10 via-transparent to-rose-500/10">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl glass-panel flex items-center justify-center text-red-500 flex-shrink-0">
+              <XCircle className="w-5 h-5" />
+            </div>
             <div className="flex-1">
-              <h4 className="font-semibold text-red-900 dark:text-red-100 mb-2">Unhealthy Pools</h4>
-              <ul className="space-y-1 text-sm text-red-700 dark:text-red-300">
+              <h4 className="text-sm font-black uppercase tracking-widest text-red-600 dark:text-red-400 mb-3">Unhealthy Pools</h4>
+              <ul className="space-y-2">
                 {health.unhealthy_pools.map((pool) => (
-                  <li key={`${pool.connection_id}-${pool.database_type}`}>
-                    Connection #{pool.connection_id} ({pool.database_type}): {pool.failed_checkouts} failed checkouts
+                  <li key={`${pool.connection_id}-${pool.database_type}`} className="text-xs font-medium text-red-700 dark:text-red-300 glass-panel px-3 py-2 rounded-lg">
+                    Connection #{pool.connection_id} ({pool.database_type}): <span className="font-bold">{pool.failed_checkouts}</span> failed checkouts
                   </li>
                 ))}
               </ul>
@@ -381,15 +411,17 @@ export const ConnectionPoolMetrics: React.FC = () => {
       )}
 
       {health?.high_utilization_pools && health.high_utilization_pools.length > 0 && (
-        <div className="bg-yellow-50 dark:bg-yellow-950/20 border-2 border-yellow-200 dark:border-yellow-800/50 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+        <div className="glass-panel rounded-2xl p-5 border-2 border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-transparent to-yellow-500/10">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl glass-panel flex items-center justify-center text-amber-500 flex-shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
             <div className="flex-1">
-              <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">High Utilization Pools</h4>
-              <ul className="space-y-1 text-sm text-yellow-700 dark:text-yellow-300">
+              <h4 className="text-sm font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-3">High Utilization Pools</h4>
+              <ul className="space-y-2">
                 {health.high_utilization_pools.map((pool) => (
-                  <li key={`${pool.connection_id}-${pool.database_type}`}>
-                    Connection #{pool.connection_id} ({pool.database_type}): {(pool.utilization * 100).toFixed(0)}% utilization
+                  <li key={`${pool.connection_id}-${pool.database_type}`} className="text-xs font-medium text-amber-700 dark:text-amber-300 glass-panel px-3 py-2 rounded-lg">
+                    Connection #{pool.connection_id} ({pool.database_type}): <span className="font-bold">{(pool.utilization * 100).toFixed(0)}%</span> utilization
                   </li>
                 ))}
               </ul>

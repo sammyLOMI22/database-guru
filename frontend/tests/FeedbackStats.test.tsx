@@ -28,6 +28,7 @@ vi.mock('lucide-react', () => ({
   TrendingUp: () => <div data-testid="trending-up-icon" />,
   ChevronDown: () => <div data-testid="chevron-down-icon" />,
   ChevronUp: () => <div data-testid="chevron-up-icon" />,
+  MessageSquare: () => <div data-testid="message-square-icon" />,
 }));
 
 describe('FeedbackStats', () => {
@@ -117,7 +118,7 @@ describe('FeedbackStats', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Feedback Dashboard')).toBeInTheDocument();
-        expect(screen.getByText(/continuous learning insights/i)).toBeInTheDocument();
+        expect(screen.getByText(/user corrections and continuous learning/i)).toBeInTheDocument();
       });
     });
 
@@ -153,16 +154,16 @@ describe('FeedbackStats', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/SQL Corrections/i)).toBeInTheDocument();
-        expect(screen.getByText('12')).toBeInTheDocument(); // sql_correction count
+        expect(screen.getByText(/^12 \(\d+%\)$/)).toBeInTheDocument(); // sql_correction count with percentage
 
         expect(screen.getByText(/Column Names/i)).toBeInTheDocument();
-        expect(screen.getByText('8')).toBeInTheDocument(); // column_name count
+        expect(screen.getByText(/^8 \(\d+%\)$/)).toBeInTheDocument(); // column_name count with percentage
 
         expect(screen.getByText(/Table Names/i)).toBeInTheDocument();
-        expect(screen.getByText('3')).toBeInTheDocument(); // table_name count
+        expect(screen.getByText(/^3 \(\d+%\)$/)).toBeInTheDocument(); // table_name count with percentage
 
         expect(screen.getByText(/Result Issues/i)).toBeInTheDocument();
-        expect(screen.getByText('2')).toBeInTheDocument(); // result_issue count
+        expect(screen.getByText(/^2 \(\d+%\)$/)).toBeInTheDocument(); // result_issue count with percentage
       });
     });
 
