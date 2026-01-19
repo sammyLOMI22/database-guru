@@ -141,7 +141,7 @@ export const ToolDirectory: React.FC = () => {
       <div className="flex items-center gap-4 pb-5 border-b border-white/10">
         <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
           <Filter className="w-4 h-4" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Filter</span>
+          <span className="text-[11px] font-black uppercase tracking-[0.2em]">Filter</span>
         </div>
         <div className="flex p-1 glass-panel rounded-xl border-white/10 bg-black/5 dark:bg-white/5">
           {categories.map((cat) => (
@@ -191,7 +191,7 @@ export const ToolDirectory: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-3">
                         <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">{tool.name}</h3>
-                        <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg glass-panel ${style.icon}`}>
+                        <span className={`text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg glass-panel ${style.icon}`}>
                           {tool.category}
                         </span>
                       </div>
@@ -208,7 +208,7 @@ export const ToolDirectory: React.FC = () => {
                   <div className="p-5 border-t border-white/10 bg-black/5 dark:bg-white/5 animate-fadeIn">
                     {/* Parameters */}
                     <div className="mb-5">
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2">
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2">
                         <div className="w-1 h-1 rounded-full bg-orange-500" />
                         Parameters
                       </h4>
@@ -226,14 +226,14 @@ export const ToolDirectory: React.FC = () => {
                               </code>
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">({param.type})</span>
+                                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">({param.type})</span>
                                   {tool.required_params.includes(name) && (
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-red-500 bg-red-500/10 px-2 py-0.5 rounded">required</span>
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-red-500 bg-red-500/10 px-2 py-0.5 rounded">required</span>
                                   )}
                                 </div>
                                 <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mt-1">{param.description}</p>
                                 {param.default !== undefined && (
-                                  <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">
+                                  <p className="text-[11px] font-bold text-gray-400 mt-1 uppercase tracking-widest">
                                     Default: <span className="text-gray-500">{JSON.stringify(param.default)}</span>
                                   </p>
                                 )}

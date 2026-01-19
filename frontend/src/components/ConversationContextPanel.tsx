@@ -116,7 +116,7 @@ export default function ConversationContextPanel({
         </div>
         <button
           onClick={loadContext}
-          className="px-4 py-2 glass-panel rounded-lg text-[10px] font-black uppercase tracking-widest text-red-600 dark:text-red-400 hover:scale-105 active:scale-95 transition-all"
+          className="px-4 py-2 glass-panel rounded-lg text-[11px] font-black uppercase tracking-widest text-red-600 dark:text-red-400 hover:scale-105 active:scale-95 transition-all"
         >
           Retry
         </button>
@@ -135,7 +135,7 @@ export default function ConversationContextPanel({
             <h3 className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">
               No conversation history
             </h3>
-            <p className="mt-1 text-[10px] font-medium text-blue-700/70 dark:text-blue-300/70">
+            <p className="mt-1 text-[11px] font-medium text-blue-700/70 dark:text-blue-300/70">
               Start asking questions! I'll remember your queries to help with follow-ups like "filter that" or "sort by price".
             </p>
           </div>
@@ -158,7 +158,7 @@ export default function ConversationContextPanel({
           <div className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-500">
             <MessageSquare className="w-3 h-3" />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-300">
+          <span className="text-[11px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-300">
             Context ({context.window_size})
           </span>
         </button>
@@ -198,18 +198,18 @@ export default function ConversationContextPanel({
                     <span className="text-blue-500 font-bold mr-1">{index + 1}.</span>
                     {msg.question}
                   </div>
-                  <div className="text-[10px] font-mono text-gray-500 dark:text-gray-400 glass-panel rounded-lg px-2 py-1.5 overflow-x-auto border-white/10">
+                  <div className="text-[11px] font-mono text-gray-500 dark:text-gray-400 glass-panel rounded-lg px-2 py-1.5 overflow-x-auto border-white/10">
                     {msg.sql}
                   </div>
                 </div>
                 <div className="flex-shrink-0">
                   {msg.success ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                       <CheckCircle className="w-3 h-3" />
                       OK
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest bg-red-500/20 text-red-600 dark:text-red-400">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-red-500/20 text-red-600 dark:text-red-400">
                       <XCircle className="w-3 h-3" />
                       Err
                     </span>
@@ -220,7 +220,7 @@ export default function ConversationContextPanel({
           ))}
 
           <div className="pt-3 border-t border-white/10">
-            <p className="text-[10px] font-medium text-gray-400 flex items-center gap-2">
+            <p className="text-[11px] font-medium text-gray-400 flex items-center gap-2">
               <Info className="w-3 h-3" />
               I'll use this context for follow-up questions like "filter that" or "sort by price"
             </p>

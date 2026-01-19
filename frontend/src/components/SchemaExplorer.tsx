@@ -294,7 +294,7 @@ const TableRow: React.FC<TableRowProps> = ({
               {table.name}
             </span>
             {table.row_count !== null && (
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] opacity-60">
+              <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.15em] opacity-60">
                 {table.row_count.toLocaleString()} ROWS
               </span>
             )}
@@ -358,7 +358,7 @@ const ColumnRow: React.FC<ColumnRowProps> = ({ column, searchTerm, compact }) =>
         {/* Column name & type */}
         <div className={`flex ${compact ? 'flex-col items-start gap-0.5' : 'items-center gap-2.5'} flex-1 min-w-0`}>
           <span className="text-[11px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-widest truncate">{highlightMatch(column.name)}</span>
-          <span className={`${compact ? 'text-[9px]' : 'text-[10px]'} font-black text-gray-400 dark:text-gray-500 uppercase tracking-tight`}>{column.type}</span>
+          <span className={`${compact ? 'text-[11px]' : 'text-[11px]'} font-black text-gray-400 dark:text-gray-500 uppercase tracking-tight`}>{column.type}</span>
         </div>
 
         {/* Nullable indicator */}
@@ -369,7 +369,7 @@ const ColumnRow: React.FC<ColumnRowProps> = ({ column, searchTerm, compact }) =>
         {/* Semantic type badge */}
         {column.semantic_type && (
           <span
-            className={`${compact ? 'text-[8px] px-1.5' : 'text-[9px] px-2'} font-black uppercase tracking-[0.2em] py-0.5 rounded-full shadow-sm ${column.semantic_type === 'location'
+            className={`${compact ? 'text-[8px] px-1.5' : 'text-[11px] px-2'} font-black uppercase tracking-[0.2em] py-0.5 rounded-full shadow-sm ${column.semantic_type === 'location'
               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10'
               : column.semantic_type === 'categorical'
                 ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/10'

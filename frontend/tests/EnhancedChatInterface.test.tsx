@@ -184,7 +184,7 @@ describe('EnhancedChatInterface', () => {
       renderWithClient(<EnhancedChatInterface />);
 
       // Find the input field and submit a query
-      const input = screen.getByPlaceholderText(/query the guru/i);
+      const input = screen.getByPlaceholderText(/Fetch some data/i);
       const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
@@ -209,7 +209,7 @@ describe('EnhancedChatInterface', () => {
       fireEvent.click(checkbox);
 
       // Submit a query
-      const input = screen.getByPlaceholderText(/query the guru/i);
+      const input = screen.getByPlaceholderText(/Fetch some data/i);
       const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
@@ -235,7 +235,7 @@ describe('EnhancedChatInterface', () => {
       expect(checkbox.checked).toBe(true);
 
       // Submit a query
-      const input = screen.getByPlaceholderText(/query the guru/i);
+      const input = screen.getByPlaceholderText(/Fetch some data/i);
       const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
@@ -255,7 +255,7 @@ describe('EnhancedChatInterface', () => {
       fireEvent.click(checkbox);
 
       // Submit a query
-      const input = screen.getByPlaceholderText(/query the guru/i);
+      const input = screen.getByPlaceholderText(/Fetch some data/i);
       const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
@@ -295,7 +295,7 @@ describe('EnhancedChatInterface', () => {
       expect(checkbox.checked).toBe(true);
 
       // Submit a query
-      const input = screen.getByPlaceholderText(/query the guru/i);
+      const input = screen.getByPlaceholderText(/Fetch some data/i);
       const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
@@ -323,7 +323,7 @@ describe('EnhancedChatInterface', () => {
     it('renders welcome message', () => {
       renderWithClient(<EnhancedChatInterface />);
 
-      expect(screen.getByText(/Hello! I'm Database Guru/i)).toBeInTheDocument();
+      expect(screen.getByText(/Hello! I'm your Database Guru/i)).toBeInTheDocument();
     });
 
     it('renders model selector with default model', () => {
@@ -384,7 +384,7 @@ describe('EnhancedChatInterface', () => {
     it('adds user message to chat when query is submitted', async () => {
       renderWithClient(<EnhancedChatInterface />);
 
-      const input = screen.getByPlaceholderText(/query the guru/i);
+      const input = screen.getByPlaceholderText(/Fetch some data/i);
       const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
@@ -398,7 +398,7 @@ describe('EnhancedChatInterface', () => {
     it('adds assistant response after successful query', async () => {
       renderWithClient(<EnhancedChatInterface />);
 
-      const input = screen.getByPlaceholderText(/query the guru/i);
+      const input = screen.getByPlaceholderText(/Fetch some data/i);
       const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });
@@ -424,7 +424,7 @@ describe('EnhancedChatInterface', () => {
 
       renderWithClient(<EnhancedChatInterface />);
 
-      const input = screen.getByPlaceholderText(/query the guru/i);
+      const input = screen.getByPlaceholderText(/Fetch some data/i);
       const sendButton = screen.getByRole('button', { name: /SEND/i });
 
       fireEvent.change(input, { target: { value: 'Show me all users' } });

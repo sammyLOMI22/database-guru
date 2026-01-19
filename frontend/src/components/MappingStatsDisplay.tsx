@@ -69,9 +69,9 @@ export const MappingStatsDisplay: React.FC<MappingStatsDisplayProps> = ({ connec
         <div className="glass-card rounded-2xl p-5 bg-gradient-to-br from-blue-500/10 via-transparent to-cyan-500/5 border-blue-500/20 hover:scale-[1.02] transition-all">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Column Mappings</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Column Mappings</p>
               <p className="text-3xl font-black text-gray-900 dark:text-white mt-1">{columnStats.total_mappings}</p>
-              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-blue-600 dark:text-blue-400 mt-1">
+              <p className="text-[11px] font-black uppercase tracking-[0.15em] text-blue-600 dark:text-blue-400 mt-1">
                 {columnStats.total_applications} applications
               </p>
             </div>
@@ -85,9 +85,9 @@ export const MappingStatsDisplay: React.FC<MappingStatsDisplayProps> = ({ connec
         <div className="glass-card rounded-2xl p-5 bg-gradient-to-br from-emerald-500/10 via-transparent to-green-500/5 border-emerald-500/20 hover:scale-[1.02] transition-all">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Table Mappings</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Table Mappings</p>
               <p className="text-3xl font-black text-gray-900 dark:text-white mt-1">{tableStats.total_mappings}</p>
-              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emerald-600 dark:text-emerald-400 mt-1">
+              <p className="text-[11px] font-black uppercase tracking-[0.15em] text-emerald-600 dark:text-emerald-400 mt-1">
                 {tableStats.total_applications} applications
               </p>
             </div>
@@ -101,9 +101,9 @@ export const MappingStatsDisplay: React.FC<MappingStatsDisplayProps> = ({ connec
         <div className="glass-card rounded-2xl p-5 bg-gradient-to-br from-purple-500/10 via-transparent to-indigo-500/5 border-purple-500/20 hover:scale-[1.02] transition-all">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Validation Patterns</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Validation Patterns</p>
               <p className="text-3xl font-black text-gray-900 dark:text-white mt-1">{patternStats.total_patterns}</p>
-              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-purple-600 dark:text-purple-400 mt-1">
+              <p className="text-[11px] font-black uppercase tracking-[0.15em] text-purple-600 dark:text-purple-400 mt-1">
                 {patternStats.total_triggers} triggers
               </p>
             </div>
@@ -121,7 +121,7 @@ export const MappingStatsDisplay: React.FC<MappingStatsDisplayProps> = ({ connec
             <div className="w-7 h-7 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-500">
               <CheckCircle className="w-4 h-4" />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-gray-400">Column Success</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-gray-400">Column Success</p>
           </div>
           <p className="text-2xl font-black text-blue-600 dark:text-blue-400">
             {(columnStats.average_success_rate * 100).toFixed(1)}%
@@ -133,7 +133,7 @@ export const MappingStatsDisplay: React.FC<MappingStatsDisplayProps> = ({ connec
             <div className="w-7 h-7 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500">
               <CheckCircle className="w-4 h-4" />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-gray-400">Table Success</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-gray-400">Table Success</p>
           </div>
           <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
             {(tableStats.average_success_rate * 100).toFixed(1)}%
@@ -145,12 +145,12 @@ export const MappingStatsDisplay: React.FC<MappingStatsDisplayProps> = ({ connec
             <div className="w-7 h-7 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-500">
               <Award className="w-4 h-4" />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-gray-400">Helpfulness</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-gray-400">Helpfulness</p>
           </div>
           <p className="text-2xl font-black text-purple-600 dark:text-purple-400">
             {patternStats.helpfulness_rate.toFixed(1)}%
           </p>
-          <p className="text-[9px] font-black uppercase tracking-[0.1em] text-gray-400 mt-1">
+          <p className="text-[11px] font-black uppercase tracking-[0.1em] text-gray-400 mt-1">
             {patternStats.total_helpful} / {patternStats.total_triggers}
           </p>
         </div>
@@ -171,19 +171,19 @@ export const MappingStatsDisplay: React.FC<MappingStatsDisplayProps> = ({ connec
             {columnStats.most_used.map((mapping, index) => (
               <div key={index} className="flex items-center justify-between glass-card rounded-xl p-3 border-white/5 hover:scale-[1.005] transition-all">
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-black text-gray-400 w-4">#{index + 1}</span>
-                  <span className="font-mono text-[10px] text-red-500 line-through bg-red-500/10 px-1.5 py-0.5 rounded-lg">
+                  <span className="text-[11px] font-black text-gray-400 w-4">#{index + 1}</span>
+                  <span className="font-mono text-[11px] text-red-500 line-through bg-red-500/10 px-1.5 py-0.5 rounded-lg">
                     {mapping.source}
                   </span>
                   <ArrowRight className="w-3 h-3 text-gray-400" />
-                  <span className="font-mono text-[10px] text-emerald-500 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-lg">
+                  <span className="font-mono text-[11px] text-emerald-500 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-lg">
                     {mapping.target}
                   </span>
                   {mapping.table && (
-                    <span className="text-[9px] font-medium text-gray-400">in {mapping.table}</span>
+                    <span className="text-[11px] font-medium text-gray-400">in {mapping.table}</span>
                   )}
                 </div>
-                <span className="text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <span className="text-[11px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
                   {mapping.times_applied}x
                 </span>
               </div>
@@ -207,21 +207,21 @@ export const MappingStatsDisplay: React.FC<MappingStatsDisplayProps> = ({ connec
             {tableStats.most_used.map((mapping, index) => (
               <div key={index} className="flex items-center justify-between glass-card rounded-xl p-3 border-white/5 hover:scale-[1.005] transition-all">
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-black text-gray-400 w-4">#{index + 1}</span>
-                  <span className="font-mono text-[10px] text-red-500 line-through bg-red-500/10 px-1.5 py-0.5 rounded-lg">
+                  <span className="text-[11px] font-black text-gray-400 w-4">#{index + 1}</span>
+                  <span className="font-mono text-[11px] text-red-500 line-through bg-red-500/10 px-1.5 py-0.5 rounded-lg">
                     {mapping.source}
                   </span>
                   <ArrowRight className="w-3 h-3 text-gray-400" />
-                  <span className="font-mono text-[10px] text-emerald-500 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-lg">
+                  <span className="font-mono text-[11px] text-emerald-500 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-lg">
                     {mapping.target}
                   </span>
                   {mapping.type && (
-                    <span className="text-[9px] font-black uppercase tracking-[0.15em] px-1.5 py-0.5 rounded-lg bg-gray-500/10 text-gray-500">
+                    <span className="text-[11px] font-black uppercase tracking-[0.15em] px-1.5 py-0.5 rounded-lg bg-gray-500/10 text-gray-500">
                       {mapping.type}
                     </span>
                   )}
                 </div>
-                <span className="text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <span className="text-[11px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                   {mapping.times_applied}x
                 </span>
               </div>
@@ -242,8 +242,8 @@ export const MappingStatsDisplay: React.FC<MappingStatsDisplayProps> = ({ connec
               {Object.entries(columnStats.by_database_type).map(([dbType, count]) => (
                 <div key={dbType}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-gray-400">{dbType}</span>
-                    <span className="text-[10px] font-black text-blue-600 dark:text-blue-400">{count}</span>
+                    <span className="text-[11px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-gray-400">{dbType}</span>
+                    <span className="text-[11px] font-black text-blue-600 dark:text-blue-400">{count}</span>
                   </div>
                   <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-2.5 overflow-hidden">
                     <div
@@ -269,10 +269,10 @@ export const MappingStatsDisplay: React.FC<MappingStatsDisplayProps> = ({ connec
               {Object.entries(patternStats.by_type).map(([type, count]) => (
                 <div key={type}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-gray-400">
+                    <span className="text-[11px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-gray-400">
                       {type.replace('_', ' ')}
                     </span>
-                    <span className="text-[10px] font-black text-purple-600 dark:text-purple-400">{count}</span>
+                    <span className="text-[11px] font-black text-purple-600 dark:text-purple-400">{count}</span>
                   </div>
                   <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-2.5 overflow-hidden">
                     <div

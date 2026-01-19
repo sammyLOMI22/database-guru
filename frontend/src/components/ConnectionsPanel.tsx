@@ -164,11 +164,11 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
                       </div>
                       <div className="pl-1 space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-black/10 dark:bg-white/10 text-gray-600 dark:text-gray-400 transition-colors">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-black uppercase tracking-widest bg-black/10 dark:bg-white/10 text-gray-600 dark:text-gray-400 transition-colors">
                             {conn.database_type.toUpperCase()}
                           </span>
                           {conn.host && (
-                            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">
+                            <span className="text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">
                               {conn.host}
                             </span>
                           )}

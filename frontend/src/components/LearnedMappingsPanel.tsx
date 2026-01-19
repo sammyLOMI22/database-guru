@@ -57,13 +57,13 @@ export const LearnedMappingsPanel: React.FC<LearnedMappingsPanelProps> = ({
           </div>
           <div>
             <h2 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">Learned Patterns</h2>
-            <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
               Mappings and patterns learned from your feedback
             </p>
           </div>
         </div>
         {connectionName && (
-          <span className="text-[10px] font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-xl glass-card text-blue-600 dark:text-blue-400 border-blue-500/20">
+          <span className="text-[11px] font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-xl glass-card text-blue-600 dark:text-blue-400 border-blue-500/20">
             {connectionName}
           </span>
         )}
@@ -79,7 +79,7 @@ export const LearnedMappingsPanel: React.FC<LearnedMappingsPanelProps> = ({
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={`
-                  flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-[10px] font-black uppercase tracking-[0.15em]
+                  flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-[11px] font-black uppercase tracking-[0.15em]
                   transition-all hover:scale-[1.02] active:scale-[0.98]
                   ${
                     activeTab === tab.key
@@ -98,7 +98,7 @@ export const LearnedMappingsPanel: React.FC<LearnedMappingsPanelProps> = ({
 
         {/* Tab Description */}
         <div className="px-6 py-3 border-b border-white/5 bg-gradient-to-r from-indigo-500/5 via-transparent to-transparent">
-          <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
             {tabs.find((t) => t.key === activeTab)?.description}
           </p>
         </div>

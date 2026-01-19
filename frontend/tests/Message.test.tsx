@@ -99,11 +99,11 @@ describe('Message', () => {
       expect(avatar).toBeInTheDocument();
     });
 
-    it('renders wizard emoji for assistant messages', () => {
+    it('renders boxer mascot image for assistant messages', () => {
       render(<Message type="assistant" content="Test" />);
 
-      // The assistant uses a wizard emoji
-      expect(screen.getByText('🧙‍♂️')).toBeInTheDocument();
+      // The assistant uses a boxer mascot image
+      expect(screen.getByAltText('Assistant Mascot')).toBeInTheDocument();
     });
   });
 

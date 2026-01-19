@@ -221,7 +221,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8 bg-transparent flex flex-col">
           {/* Connection Name */}
           <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
               Connection Identifier *
             </label>
             <input
@@ -237,7 +237,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
 
           {/* Database Type */}
           <div className="space-y-4">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
               Select Protocol *
             </label>
             <div className="flex flex-wrap gap-2.5">
@@ -246,7 +246,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                   key={type}
                   type="button"
                   onClick={() => handleDatabaseTypeChange(type)}
-                  className={`px-4 py-2.5 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${formData.database_type === type
+                  className={`px-4 py-2.5 rounded-xl border-2 text-[11px] font-black uppercase tracking-widest transition-all duration-300 ${formData.database_type === type
                     ? 'border-blue-500/50 bg-blue-500/20 text-blue-500 shadow-[0_5px_15px_rgba(59,130,246,0.2)] scale-105'
                     : 'border-white/5 glass-panel bg-black/5 dark:bg-white/5 text-gray-500 hover:border-white/10 hover:text-gray-300'
                     }`}
@@ -260,7 +260,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
           {/* Dynamic Fields */}
           {(formData.database_type === 'sqlite' || formData.database_type === 'duckdb') ? (
             <div className="space-y-3">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+              <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
                 Database Target Path *
               </label>
               <input
@@ -273,7 +273,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                 className="w-full px-4 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
               />
               {formData.database_type === 'duckdb' && (
-                <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-xl text-[10px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-xl text-[11px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                   Tip: Use :memory: for an ephemeral in-memory database
                 </div>
@@ -284,7 +284,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
               {/* Host and Port */}
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="flex-1 space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Host Address *</label>
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Host Address *</label>
                   <input
                     type="text"
                     name="host"
@@ -296,7 +296,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                   />
                 </div>
                 <div className="w-full md:w-32 space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Port *</label>
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Port *</label>
                   <input
                     type="number"
                     name="port"
@@ -310,7 +310,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
 
               {/* Database Name */}
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
                   Database Schema Name *
                 </label>
                 <input
@@ -327,7 +327,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
               {/* Username and Password */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
                     Authority Username *
                   </label>
                   <input
@@ -341,7 +341,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                   />
                 </div>
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
                     Authority Secret *
                   </label>
                   <input
@@ -361,13 +361,13 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
           {/* Connection String Preview */}
           <div className="border-t border-white/5 pt-8">
             <div className="flex items-center justify-between mb-4">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+              <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
                 Connection String Protocol
               </label>
               <button
                 type="button"
                 onClick={() => setShowConnectionString(!showConnectionString)}
-                className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors"
+                className="text-[11px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors"
               >
                 {showConnectionString ? 'Hide Protocol' : 'Inspect Protocol'}
               </button>
@@ -377,7 +377,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                 <code className="text-[11px] text-blue-400/90 break-all font-mono leading-relaxed block">
                   {getConnectionString()}
                 </code>
-                <p className="mt-4 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                <p className="mt-4 text-[11px] font-black uppercase tracking-widest text-gray-500">
                   Synchronized protocol string for engine registration. Password tokens are protected.
                 </p>
               </div>
@@ -402,7 +402,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
               type="button"
               onClick={handleTestConnection}
               disabled={testing}
-              className="px-6 py-4 glass-panel border-white/10 text-[10px] font-black uppercase tracking-widest text-gray-900 dark:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:cursor-not-allowed group flex items-center gap-2"
+              className="px-6 py-4 glass-panel border-white/10 text-[11px] font-black uppercase tracking-widest text-gray-900 dark:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:cursor-not-allowed group flex items-center gap-2"
             >
               {testing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {testing ? 'Verifying...' : 'Verify Engine'}
@@ -411,13 +411,13 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-all"
+              className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-8 py-4 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-blue-500 transition-all shadow-xl shadow-blue-500/20 active:scale-95"
+              className="px-8 py-4 bg-blue-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-blue-500 transition-all shadow-xl shadow-blue-500/20 active:scale-95"
             >
               Synchronize connection
             </button>

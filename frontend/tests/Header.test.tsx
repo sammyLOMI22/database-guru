@@ -22,10 +22,10 @@ describe('Header', () => {
       expect(screen.getByText('AI SQL Assistant')).toBeInTheDocument();
     });
 
-    it('displays the wizard emoji', () => {
+    it('displays the boxer mascot image', () => {
       render(<Header isHealthy={true} isDarkMode={false} toggleDarkMode={() => {}} activeTab="chat" onTabChange={() => {}} />);
 
-      expect(screen.getByText('🧙‍♂️')).toBeInTheDocument();
+      expect(screen.getByAltText('Boxer Mascot')).toBeInTheDocument();
     });
   });
 

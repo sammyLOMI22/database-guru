@@ -67,7 +67,7 @@ export const ToolsPanel: React.FC = () => {
                 <h2 className="text-3xl font-black uppercase tracking-tight text-gray-900 dark:text-white">
                   Tool Agent
                 </h2>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
+                <p className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
                   Schema Exploration & Query Validation
                 </p>

@@ -154,13 +154,13 @@ export default function QueryResults({
                   {cacheType === 'exact' ? 'Exact Cache Hit' : 'Semantic Cache Hit'}
                 </span>
                 {semanticSimilarity && cacheType === 'semantic' && (
-                  <span className="ml-2 text-[10px] font-bold text-amber-500 uppercase tracking-widest">
+                  <span className="ml-2 text-[11px] font-bold text-amber-500 uppercase tracking-widest">
                     ({(semanticSimilarity * 100).toFixed(0)}% match)
                   </span>
                 )}
               </div>
             </div>
-            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg glass-panel ${cacheType === 'exact'
+            <span className={`text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg glass-panel ${cacheType === 'exact'
               ? 'text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
               : 'text-amber-600 dark:text-amber-400 border-amber-500/20'
               }`}>
@@ -187,7 +187,7 @@ export default function QueryResults({
       {/* SQL Display */}
       <div className="glass-panel rounded-2xl overflow-hidden border-white/10">
         <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 bg-black/20">
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 flex items-center gap-2">
+          <span className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             Generated SQL
           </span>
@@ -195,7 +195,7 @@ export default function QueryResults({
             {queryId && (
               <button
                 onClick={() => setShowFeedbackModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white hover:bg-white/10 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest text-gray-400 hover:text-white hover:bg-white/10 transition-all"
                 title="Provide Feedback"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
@@ -204,7 +204,7 @@ export default function QueryResults({
             )}
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-emerald-400 hover:bg-white/10 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest text-gray-400 hover:text-emerald-400 hover:bg-white/10 transition-all"
               title="Copy SQL"
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -279,12 +279,12 @@ export default function QueryResults({
           <div className="px-5 py-4 border-b border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 glass-panel px-3 py-1.5 rounded-lg">
-                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Rows</span>
+                <span className="text-[11px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Rows</span>
                 <span className="text-sm font-black text-gray-900 dark:text-white">{rowCount}</span>
               </div>
               {executionTime !== null && (
                 <div className="flex items-center gap-2 glass-panel px-3 py-1.5 rounded-lg">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Time</span>
+                  <span className="text-[11px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Time</span>
                   <span className="text-sm font-black text-gray-900 dark:text-white">{executionTime.toFixed(2)}ms</span>
                 </div>
               )}
@@ -331,7 +331,7 @@ export default function QueryResults({
                           {Object.keys(results[0]).map((column) => (
                             <th
                               key={column}
-                              className="px-5 py-3 text-left text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-[0.15em]"
+                              className="px-5 py-3 text-left text-[11px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-[0.15em]"
                             >
                               {column}
                             </th>
@@ -367,7 +367,7 @@ export default function QueryResults({
                     {totalRows > 10 && (
                       <div className="flex items-center justify-between px-5 py-4 border-t border-white/5 bg-black/5 dark:bg-white/5">
                         <div className="flex items-center gap-3">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Per page</span>
+                          <span className="text-[11px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Per page</span>
                           <div className="relative">
                             <select
                               value={pageSize}
@@ -387,7 +387,7 @@ export default function QueryResults({
                         </div>
 
                         <div className="flex items-center gap-4">
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                          <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                             {startIdx + 1}-{endIdx} of {totalRows}
                           </span>
                           <div className="flex items-center gap-1">

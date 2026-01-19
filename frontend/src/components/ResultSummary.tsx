@@ -32,7 +32,7 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
           </div>
           <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Data Insights</h3>
         </div>
-        <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border bg-gradient-to-r ${getConfidenceBadgeStyle(analysis.confidence)}`}>
+        <span className={`text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border bg-gradient-to-r ${getConfidenceBadgeStyle(analysis.confidence)}`}>
           {getConfidenceLabel(analysis.confidence)} ({(analysis.confidence * 100).toFixed(0)}%)
         </span>
       </div>
@@ -40,7 +40,7 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
       {/* Direct Answer (if available) */}
       {analysis.direct_answer && (
         <div className="glass-panel rounded-xl p-4 border-l-4 border-blue-500 bg-gradient-to-r from-blue-500/10 via-transparent to-transparent">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 mb-1">Answer</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 mb-1">Answer</p>
           <p className="text-xl font-black text-gray-900 dark:text-white">{analysis.direct_answer}</p>
         </div>
       )}
@@ -55,7 +55,7 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
         <div className="glass-panel rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="w-4 h-4 text-blue-500" />
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400">Key Insights</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400">Key Insights</p>
           </div>
           <ul className="space-y-2">
             {analysis.key_insights.map((insight, index) => (
@@ -142,7 +142,7 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
               .filter(([key]) => !['anomalies', 'trends', 'correlations'].includes(key))
               .map(([key, value]) => (
                 <div key={key} className="flex justify-between text-sm">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 capitalize">{key.replace(/_/g, ' ')}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 capitalize">{key.replace(/_/g, ' ')}</span>
                   <span className="font-mono text-xs font-bold text-gray-900 dark:text-gray-100">
                     {typeof value === 'object'
                       ? JSON.stringify(value)
@@ -153,11 +153,11 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
             {rowCount !== undefined && executionTime !== undefined && (
               <>
                 <div className="flex justify-between text-sm pt-2 border-t border-white/5">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Row count</span>
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Row count</span>
                   <span className="font-mono text-xs font-bold text-gray-900 dark:text-gray-100">{rowCount}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Execution time</span>
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Execution time</span>
                   <span className="font-mono text-xs font-bold text-gray-900 dark:text-gray-100">{executionTime.toFixed(2)} ms</span>
                 </div>
               </>
@@ -168,7 +168,7 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
 
       {/* Generated timestamp */}
       <div className="flex justify-end pt-2">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
           Generated {new Date(analysis.generated_at).toLocaleTimeString()}
         </p>
       </div>

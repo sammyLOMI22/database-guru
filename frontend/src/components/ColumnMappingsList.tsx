@@ -100,7 +100,7 @@ export const ColumnMappingsList: React.FC<ColumnMappingsListProps> = ({ connecti
             <Database className="w-7 h-7" />
           </div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">No column mappings</p>
-          <p className="text-[10px] font-medium text-gray-400 mt-2">
+          <p className="text-[11px] font-medium text-gray-400 mt-2">
             Submit column name corrections via feedback to start learning
           </p>
         </div>
@@ -125,25 +125,25 @@ export const ColumnMappingsList: React.FC<ColumnMappingsListProps> = ({ connecti
 
                   <div className="flex flex-wrap gap-2">
                     {mapping.table_name && (
-                      <span className="text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <span className="text-[11px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
                         {mapping.table_name}
                       </span>
                     )}
                     {mapping.connection_name && (
-                      <span className="text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                      <span className="text-[11px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
                         {mapping.connection_name}
                       </span>
                     )}
-                    <span className="text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-gray-500/10 text-gray-600 dark:text-gray-400">
+                    <span className="text-[11px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-gray-500/10 text-gray-600 dark:text-gray-400">
                       {mapping.database_type}
                     </span>
                     {mapping.times_applied > 0 && (
-                      <span className="text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <span className="text-[11px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                         <CheckCircle className="w-3 h-3" />
                         {mapping.times_applied}x
                       </span>
                     )}
-                    <span className={`text-[9px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg ${
+                    <span className={`text-[11px] font-black uppercase tracking-[0.15em] px-2 py-1 rounded-lg ${
                       mapping.confidence_score >= 0.8 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
                       mapping.confidence_score >= 0.5 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
                       'bg-red-500/10 text-red-600 dark:text-red-400'
@@ -153,13 +153,13 @@ export const ColumnMappingsList: React.FC<ColumnMappingsListProps> = ({ connecti
                   </div>
 
                   {mapping.description && (
-                    <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-2">{mapping.description}</p>
+                    <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-2">{mapping.description}</p>
                   )}
                 </div>
 
                 <button
                   onClick={() => handleDelete(mapping.id)}
-                  className="flex-shrink-0 ml-4 w-9 h-9 rounded-xl glass-panel flex items-center justify-center text-gray-400 hover:text-red-500 hover:scale-105 active:scale-95 transition-all"
+                  className="flex-shrink-0 ml-4 w-9 h-9 rounded-xl glass-panel flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-500/10 hover:scale-105 active:scale-95 transition-all"
                   title="Delete mapping"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -172,7 +172,7 @@ export const ColumnMappingsList: React.FC<ColumnMappingsListProps> = ({ connecti
 
       {/* Summary */}
       {mappings.length > 0 && (
-        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center pt-4 border-t border-white/5">
+        <div className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 text-center pt-4 border-t border-white/5">
           {mappings.length} mapping{mappings.length !== 1 ? 's' : ''}
         </div>
       )}

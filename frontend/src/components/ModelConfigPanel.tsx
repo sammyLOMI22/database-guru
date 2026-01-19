@@ -184,7 +184,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
             <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">
               Model Configuration
             </h3>
-            <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
               Assign different models for optimal performance
             </p>
           </div>
@@ -192,7 +192,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
         <button
           onClick={fetchAvailableModels}
           disabled={loadingModels || disabled}
-          className="flex items-center gap-2 px-3 py-2 glass-card rounded-lg text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-2 glass-card rounded-lg text-[11px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loadingModels ? 'animate-spin' : ''}`} />
           Refresh
@@ -231,11 +231,11 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
               </div>
 
               {/* Description */}
-              <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mb-4">{task.description}</p>
+              <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-4">{task.description}</p>
 
               {/* Model Selection */}
               <div className="mb-4">
-                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
+                <label className="block text-[11px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
                   Model
                 </label>
                 <select
@@ -244,19 +244,19 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
                   disabled={disabled || loadingModels}
                   className="w-full glass-panel rounded-lg px-3 py-2 text-xs font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 border-white/10 bg-transparent appearance-none cursor-pointer disabled:opacity-50"
                 >
-                  <option value="" className="bg-gray-800 text-white">Default (system model)</option>
+                  <option value="">Default (system model)</option>
                   {availableModels.map((model) => (
-                    <option key={model.name} value={model.name} className="bg-gray-800 text-white">
+                    <option key={model.name} value={model.name}>
                       {model.name}
                     </option>
                   ))}
                 </select>
-                <p className="text-[9px] font-medium text-gray-400 mt-1">{task.hint}</p>
+                <p className="text-[11px] font-medium text-gray-400 mt-1">{task.hint}</p>
               </div>
 
               {/* Timeout Configuration */}
               <div className="glass-panel rounded-lg p-3 border-white/10">
-                <label className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-2">
+                <label className="flex items-center gap-1 text-[11px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-2">
                   <Clock className="w-3 h-3" />
                   Timeout: {currentTimeout}s
                 </label>
@@ -270,7 +270,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
                   disabled={disabled}
                   className="w-full h-1.5 rounded-full appearance-none bg-gradient-to-r from-gray-300 to-blue-500 cursor-pointer"
                 />
-                <div className="flex justify-between text-[9px] font-bold text-gray-400 mt-1">
+                <div className="flex justify-between text-[11px] font-bold text-gray-400 mt-1">
                   <span>5s</span>
                   <span className="text-blue-500">Default: {task.defaultTimeout}s</span>
                   <span>120s</span>
@@ -291,7 +291,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
             <h4 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">
               Optimization Features
             </h4>
-            <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
               Improve response time and accuracy for smaller models
             </p>
           </div>
@@ -303,7 +303,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <label className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300">Query Templates</label>
-                <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-1">
                   Bypass LLM for simple patterns like "show all customers"
                 </p>
               </div>
@@ -326,7 +326,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <label className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300">Location Preprocessing</label>
-                <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-1">
                   Normalize locations (California → CA) based on database format
                 </p>
               </div>
@@ -353,11 +353,11 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
                 <label className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300">
                   Prompt Optimization
                 </label>
-                <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold uppercase tracking-widest">
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold uppercase tracking-widest">
                   Phase 2.2
                 </span>
               </div>
-              <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-1">
                 Compress prompts for faster responses (~40% token reduction)
               </p>
             </div>
@@ -379,7 +379,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
             <div className="mt-4 pt-4 border-t border-purple-500/20 space-y-4">
               {/* Model Size Selection */}
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
+                <label className="block text-[11px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
                   Model Size Detection
                 </label>
                 <select
@@ -388,12 +388,12 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
                   disabled={disabled}
                   className="w-full glass-panel rounded-lg px-3 py-2 text-xs font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 border-white/10 bg-transparent appearance-none cursor-pointer disabled:opacity-50"
                 >
-                  <option value="auto" className="bg-gray-800 text-white">Auto-detect from model name</option>
-                  <option value="small" className="bg-gray-800 text-white">Small (&lt;7B params, 2K context)</option>
-                  <option value="medium" className="bg-gray-800 text-white">Medium (7-13B params, 4K context)</option>
-                  <option value="large" className="bg-gray-800 text-white">Large (13B+ params, 8K+ context)</option>
+                  <option value="auto">Auto-detect from model name</option>
+                  <option value="small">Small (&lt;7B params, 2K context)</option>
+                  <option value="medium">Medium (7-13B params, 4K context)</option>
+                  <option value="large">Large (13B+ params, 8K+ context)</option>
                 </select>
-                <p className="text-[9px] font-medium text-gray-400 mt-1">
+                <p className="text-[11px] font-medium text-gray-400 mt-1">
                   Controls token budget allocation for prompts
                 </p>
               </div>
@@ -401,8 +401,8 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
               {/* Schema Compression Toggle */}
               <div className="flex items-center justify-between glass-panel rounded-lg p-3 border-white/10">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300">Schema Compression</label>
-                  <p className="text-[9px] font-medium text-gray-400 mt-0.5">
+                  <label className="text-[11px] font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300">Schema Compression</label>
+                  <p className="text-[11px] font-medium text-gray-400 mt-0.5">
                     Include only relevant tables in prompts
                   </p>
                 </div>
@@ -422,7 +422,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
               {/* Max Schema Tables */}
               {config.enable_schema_compression && (
                 <div className="ml-4 glass-panel rounded-lg p-3 border-white/10">
-                  <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">
                     Max Tables: <span className="text-purple-500">{config.max_schema_tables || 10}</span>
                   </label>
                   <input
@@ -441,8 +441,8 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
               {/* Example Selection Toggle */}
               <div className="flex items-center justify-between glass-panel rounded-lg p-3 border-white/10">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300">Smart Example Selection</label>
-                  <p className="text-[9px] font-medium text-gray-400 mt-0.5">
+                  <label className="text-[11px] font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300">Smart Example Selection</label>
+                  <p className="text-[11px] font-medium text-gray-400 mt-0.5">
                     Choose relevant few-shot examples based on query
                   </p>
                 </div>
@@ -462,7 +462,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
               {/* Max Few-Shot Examples */}
               {config.enable_example_selection && (
                 <div className="ml-4 glass-panel rounded-lg p-3 border-white/10">
-                  <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">
                     Max Examples: <span className="text-purple-500">{config.max_few_shot_examples || 3}</span>
                   </label>
                   <input
@@ -475,7 +475,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
                     disabled={disabled}
                     className="w-full h-1.5 rounded-full appearance-none bg-gradient-to-r from-gray-300 to-purple-500 cursor-pointer"
                   />
-                  <p className="text-[9px] font-medium text-gray-400 mt-1">
+                  <p className="text-[11px] font-medium text-gray-400 mt-1">
                     0 = zero-shot (best for small models)
                   </p>
                 </div>
@@ -491,7 +491,7 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
           <div className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-500 flex-shrink-0 mt-0.5">
             <Info className="w-3.5 h-3.5" />
           </div>
-          <p className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
+          <p className="text-[11px] font-medium text-gray-600 dark:text-gray-400">
             <span className="font-bold text-blue-600 dark:text-blue-400">Tip:</span> Use specialized models (like duckdb-nsql) for SQL generation and
             general-purpose models (like llama3.2) for narratives. Leave fields empty to use the default system model.
           </p>

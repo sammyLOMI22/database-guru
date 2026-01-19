@@ -142,7 +142,7 @@ export default function SchemaPanel() {
                     </div>
                     <div className="min-w-0 flex-1 overflow-hidden">
                       <p className="text-xs font-black uppercase tracking-wider truncate block w-full">{conn.name}</p>
-                      <p className="text-[9px] opacity-60 font-bold uppercase tracking-widest truncate block w-full">{conn.database_type}</p>
+                      <p className="text-[11px] opacity-60 font-bold uppercase tracking-widest truncate block w-full">{conn.database_type}</p>
                     </div>
                   </button>
                 ))}

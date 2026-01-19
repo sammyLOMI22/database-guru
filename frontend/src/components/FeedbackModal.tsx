@@ -104,7 +104,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
           {/* Feedback Type */}
           <div className="mb-6">
-            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
+            <label className="block text-[11px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
               Feedback Type
             </label>
             <select
@@ -112,12 +112,12 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               onChange={(e) => setFeedbackType(e.target.value)}
               className="w-full glass-panel rounded-xl px-4 py-3 text-sm font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 border-white/10 bg-transparent appearance-none cursor-pointer"
             >
-              <option value="sql_correction" className="bg-gray-800 text-white">SQL Correction</option>
-              <option value="column_name" className="bg-gray-800 text-white">Column Name Issue</option>
-              <option value="table_name" className="bg-gray-800 text-white">Table Name Issue</option>
-              <option value="result_issue" className="bg-gray-800 text-white">Result Issue</option>
+              <option value="sql_correction">SQL Correction</option>
+              <option value="column_name">Column Name Issue</option>
+              <option value="table_name">Table Name Issue</option>
+              <option value="result_issue">Result Issue</option>
             </select>
-            <p className="text-[10px] font-medium text-gray-400 mt-2 flex items-center gap-1">
+            <p className="text-[11px] font-medium text-gray-400 mt-2 flex items-center gap-1">
               <ChevronRight className="w-3 h-3" />
               {feedbackType === 'sql_correction' && 'Provide a corrected version of the SQL query'}
               {feedbackType === 'column_name' && 'Report an incorrect column name'}
@@ -148,7 +148,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
           {/* Description */}
           <div className="mb-6">
-            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
+            <label className="block text-[11px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
               What's Wrong? <span className="text-red-500">*</span>
             </label>
             <textarea
@@ -166,7 +166,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               required
             />
             {!description.trim() && (
-              <p className="text-[10px] font-bold text-red-500 mt-2 flex items-center gap-1">
+              <p className="text-[11px] font-bold text-red-500 mt-2 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" />
                 Required field
               </p>
@@ -175,7 +175,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
           {/* Additional Notes */}
           <div className="mb-6">
-            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
+            <label className="block text-[11px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
               Additional Notes
               <span className="text-gray-400 font-medium normal-case tracking-normal ml-2">(optional)</span>
             </label>
@@ -189,7 +189,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
           {/* Confidence Slider */}
           <div className="mb-6">
-            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-3">
+            <label className="block text-[11px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-3">
               Confidence Level
             </label>
             <div className="glass-panel rounded-xl p-4 border-white/10">
@@ -211,7 +211,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   {Math.round(confidence * 100)}%
                 </span>
               </div>
-              <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest text-gray-400 mt-2">
+              <div className="flex justify-between text-[11px] font-bold uppercase tracking-widest text-gray-400 mt-2">
                 <span>Not sure</span>
                 <span>Very confident</span>
               </div>
