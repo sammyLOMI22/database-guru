@@ -1,4 +1,4 @@
-# 🧙‍♂️ Database Guru - Implementation Status
+# 🐶 Database Guru - Implementation Status
 
 ## Overview
 Database Guru is an AI-powered database expert that converts natural language queries into SQL. This document tracks the current implementation status.
