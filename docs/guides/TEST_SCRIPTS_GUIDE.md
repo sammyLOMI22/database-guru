@@ -101,7 +101,7 @@ Created a comprehensive suite of bash scripts to streamline testing workflows fo
 ```
 ╔══════════════════════════════════════════════════════╗
 ║                                                      ║
-║        🧙‍♂️  DATABASE GURU TEST SUITE 🧙‍♂️             ║
+║        🐶  DATABASE GURU TEST SUITE 🐶             ║
 ║                                                      ║
 ╚══════════════════════════════════════════════════════╝
 

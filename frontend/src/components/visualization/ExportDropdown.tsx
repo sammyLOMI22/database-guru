@@ -77,12 +77,11 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled || !hasData}
         className={`
-          inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg
-          border transition-all duration-150
-          ${
-            disabled || !hasData
-              ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-              : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+          inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-bold rounded-xl
+          transition-all duration-300
+          ${disabled || !hasData
+            ? 'bg-gray-500/10 text-gray-400 cursor-not-allowed border-gray-500/5'
+            : 'glass-card bg-white/40 dark:bg-white/10 text-gray-700 dark:text-gray-200 border-white/30 hover:bg-white/60 dark:hover:bg-white/20 hover:scale-105 select-none active:scale-95'
           }
         `}
         title={hasData ? 'Export data' : 'No data to export'}
@@ -93,51 +92,63 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
 
       {/* Dropdown Menu */}
       {isOpen && hasData && (
-        <div className="absolute right-0 mt-1 w-48 rounded-lg bg-white border border-gray-200 shadow-lg z-50">
-          <div className="py-1">
+        <div className="absolute right-0 mt-2 w-56 glass-card bg-white/95 dark:bg-gray-900/95 border-gray-500/20 rounded-2xl shadow-2xl z-50 overflow-hidden animate-scaleUp">
+          <div className="py-2">
+            <div className="px-4 py-2 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em] bg-gray-500/5">
+              Available Formats
+            </div>
             {/* CSV Export */}
             <button
               onClick={handleExportCSV}
-              className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="flex items-center gap-3 w-full px-5 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-500/10 transition-colors"
             >
-              <FileSpreadsheet className="w-4 h-4 text-green-600" />
-              <span>Export as CSV</span>
+              <div className="p-1.5 bg-green-500/10 rounded-lg">
+                <FileSpreadsheet className="w-4 h-4 text-green-600" />
+              </div>
+              <span className="font-medium">Export as CSV</span>
             </button>
 
             {/* JSON Export */}
             <button
               onClick={handleExportJSON}
-              className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="flex items-center gap-3 w-full px-5 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-500/10 transition-colors"
             >
-              <FileJson className="w-4 h-4 text-blue-600" />
-              <span>Export as JSON</span>
+              <div className="p-1.5 bg-blue-500/10 rounded-lg">
+                <FileJson className="w-4 h-4 text-blue-600" />
+              </div>
+              <span className="font-medium">Export as JSON</span>
             </button>
 
-            <div className="border-t border-gray-100 my-1" />
+            <div className="border-t border-gray-500/10 my-1.5 mx-2" />
 
             {/* Copy to Clipboard */}
             <button
               onClick={handleCopyToClipboard}
-              className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="flex items-center gap-3 w-full px-5 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-500/10 transition-colors"
             >
               {copied ? (
-                <>
-                  <Check className="w-4 h-4 text-green-600" />
-                  <span className="text-green-600">Copied!</span>
-                </>
+                <div className="flex items-center gap-3 w-full text-green-600">
+                  <div className="p-1.5 bg-green-500/10 rounded-lg">
+                    <Check className="w-4 h-4" />
+                  </div>
+                  <span className="font-bold">Copied Successfully!</span>
+                </div>
               ) : (
                 <>
-                  <Copy className="w-4 h-4 text-gray-500" />
-                  <span>Copy to Clipboard</span>
+                  <div className="p-1.5 bg-gray-500/10 rounded-lg">
+                    <Copy className="w-4 h-4 text-gray-500" />
+                  </div>
+                  <span className="font-medium">Copy Raw Results</span>
                 </>
               )}
             </button>
           </div>
 
           {/* Row count info */}
-          <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 rounded-b-lg">
-            <p className="text-xs text-gray-500">
-              {data.length.toLocaleString()} row{data.length !== 1 ? 's' : ''}
+          <div className="px-5 py-2.5 bg-gray-500/5 border-t border-gray-500/10 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider flex items-center justify-between">
+              <span>Total Data Size</span>
+              <span>{data.length.toLocaleString()} row{data.length !== 1 ? 's' : ''}</span>
             </p>
           </div>
         </div>

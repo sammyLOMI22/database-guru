@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Trash2, AlertCircle, ThumbsUp, TrendingUp } from 'lucide-react';
+import { Trash2, AlertCircle, ThumbsUp, TrendingUp, Filter } from 'lucide-react';
 import { mappingsAPI } from '../services/mappingsApi';
 import type { ResultPattern } from '../types/api';
 
@@ -53,78 +53,90 @@ export const ResultPatternsList: React.FC = () => {
     }
   };
 
-  const getPatternTypeColor = (type: string) => {
+  const getPatternTypeStyle = (type: string) => {
     switch (type) {
       case 'empty_result':
-        return 'bg-red-100 text-red-700';
+        return 'bg-red-500/10 text-red-600 dark:text-red-400';
       case 'missing_data':
-        return 'bg-yellow-100 text-yellow-700';
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
       case 'suspicious_values':
-        return 'bg-orange-100 text-orange-700';
+        return 'bg-orange-500/10 text-orange-600 dark:text-orange-400';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-gray-500/10 text-gray-600 dark:text-gray-400';
     }
   };
 
-  const getActionColor = (action: string) => {
+  const getActionStyle = (action: string) => {
     switch (action) {
       case 'warn_user':
-        return 'bg-yellow-100 text-yellow-700';
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
       case 'suggest_fix':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
       case 'block':
-        return 'bg-red-100 text-red-700';
+        return 'bg-red-500/10 text-red-600 dark:text-red-400';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-gray-500/10 text-gray-600 dark:text-gray-400';
     }
   };
 
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-6 bg-gray-200 rounded w-1/3"></div>
-        <div className="h-20 bg-gray-200 rounded"></div>
-        <div className="h-20 bg-gray-200 rounded"></div>
+        <div className="h-10 glass-panel rounded-2xl"></div>
+        <div className="h-32 glass-panel rounded-2xl"></div>
+        <div className="h-32 glass-panel rounded-2xl"></div>
       </div>
     );
   }
 
   if (error) {
-    return <div className="text-red-600">Error: {error}</div>;
+    return (
+      <div className="glass-card rounded-2xl p-4 bg-gradient-to-r from-red-500/10 via-transparent to-rose-500/5 border-red-500/20">
+        <p className="text-xs font-black uppercase tracking-[0.15em] text-red-600 dark:text-red-400">Error: {error}</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex gap-4">
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">All pattern types</option>
-          <option value="empty_result">Empty Result</option>
-          <option value="missing_data">Missing Data</option>
-          <option value="suspicious_values">Suspicious Values</option>
-        </select>
-        <select
-          value={filterAction}
-          onChange={(e) => setFilterAction(e.target.value)}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">All actions</option>
-          <option value="warn_user">Warn User</option>
-          <option value="suggest_fix">Suggest Fix</option>
-          <option value="block">Block</option>
-        </select>
+      <div className="flex gap-3">
+        <div className="flex-1 relative">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="w-full glass-panel rounded-xl pl-10 pr-4 py-2.5 text-xs font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 border-white/5 bg-transparent appearance-none cursor-pointer transition-all"
+          >
+            <option value="">All pattern types</option>
+            <option value="empty_result">Empty Result</option>
+            <option value="missing_data">Missing Data</option>
+            <option value="suspicious_values">Suspicious Values</option>
+          </select>
+        </div>
+        <div className="flex-1 relative">
+          <AlertCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <select
+            value={filterAction}
+            onChange={(e) => setFilterAction(e.target.value)}
+            className="w-full glass-panel rounded-xl pl-10 pr-4 py-2.5 text-xs font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 border-white/5 bg-transparent appearance-none cursor-pointer transition-all"
+          >
+            <option value="">All actions</option>
+            <option value="warn_user">Warn User</option>
+            <option value="suggest_fix">Suggest Fix</option>
+            <option value="block">Block</option>
+          </select>
+        </div>
       </div>
 
       {/* Patterns List */}
       {patterns.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p>No validation patterns learned yet</p>
-          <p className="text-sm mt-1">
+        <div className="text-center py-12 glass-card rounded-2xl border-white/10">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl glass-panel flex items-center justify-center text-gray-400">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">No validation patterns</p>
+          <p className="text-[11px] font-medium text-gray-400 mt-2">
             Submit result issue feedback to start learning validation patterns
           </p>
         </div>
@@ -139,48 +151,52 @@ export const ResultPatternsList: React.FC = () => {
             return (
               <div
                 key={pattern.id}
-                className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+                className="glass-card rounded-2xl p-4 hover:scale-[1.005] transition-all border-white/10 hover:border-purple-500/20"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <span className={`px-2 py-1 text-xs rounded font-medium ${getPatternTypeColor(pattern.pattern_type)}`}>
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <span className={`px-2 py-1 text-[11px] font-black uppercase tracking-[0.15em] rounded-lg ${getPatternTypeStyle(pattern.pattern_type)}`}>
                         {pattern.pattern_type.replace('_', ' ')}
                       </span>
-                      <span className={`px-2 py-1 text-xs rounded font-medium ${getActionColor(pattern.action)}`}>
-                        Action: {pattern.action.replace('_', ' ')}
+                      <span className={`px-2 py-1 text-[11px] font-black uppercase tracking-[0.15em] rounded-lg ${getActionStyle(pattern.action)}`}>
+                        {pattern.action.replace('_', ' ')}
                       </span>
                       {pattern.times_triggered > 0 && (
-                        <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded flex items-center gap-1">
+                        <span className="px-2 py-1 text-[11px] font-black uppercase tracking-[0.15em] rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center gap-1">
                           <TrendingUp className="w-3 h-3" />
-                          Triggered {pattern.times_triggered}x
+                          {pattern.times_triggered}x
                         </span>
                       )}
                       {pattern.times_helpful > 0 && (
-                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded flex items-center gap-1">
+                        <span className="px-2 py-1 text-[11px] font-black uppercase tracking-[0.15em] rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                           <ThumbsUp className="w-3 h-3" />
-                          Helpful {pattern.times_helpful}x ({Math.round(helpfulnessRate)}%)
+                          {pattern.times_helpful}x ({Math.round(helpfulnessRate)}%)
                         </span>
                       )}
-                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded">
-                        {Math.round(pattern.confidence_score * 100)}% confidence
+                      <span className={`px-2 py-1 text-[11px] font-black uppercase tracking-[0.15em] rounded-lg ${
+                        pattern.confidence_score >= 0.8 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                        pattern.confidence_score >= 0.5 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                        'bg-red-500/10 text-red-600 dark:text-red-400'
+                      }`}>
+                        {Math.round(pattern.confidence_score * 100)}%
                       </span>
                     </div>
 
-                    <p className="text-sm text-gray-900 mb-2">{pattern.pattern_description}</p>
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-3">{pattern.pattern_description}</p>
 
                     {/* Matching Criteria */}
-                    <div className="bg-white border border-gray-200 rounded p-3 mb-2">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">Matching Criteria:</p>
-                      <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono">
+                    <div className="glass-panel rounded-xl p-3 mb-3 border-white/5">
+                      <p className="text-[11px] font-black uppercase tracking-[0.15em] text-gray-500 dark:text-gray-400 mb-2">Matching Criteria</p>
+                      <pre className="text-[11px] font-mono text-gray-600 dark:text-gray-400 whitespace-pre-wrap overflow-x-auto">
                         {JSON.stringify(pattern.matching_criteria, null, 2)}
                       </pre>
                     </div>
 
                     {pattern.suggestion && (
-                      <div className="bg-blue-50 border border-blue-200 rounded p-2">
-                        <p className="text-xs font-semibold text-blue-700 mb-1">Suggestion:</p>
-                        <p className="text-xs text-blue-900">{pattern.suggestion}</p>
+                      <div className="glass-card rounded-xl p-3 bg-gradient-to-r from-blue-500/10 via-transparent to-cyan-500/5 border-blue-500/20">
+                        <p className="text-[11px] font-black uppercase tracking-[0.15em] text-blue-600 dark:text-blue-400 mb-1">Suggestion</p>
+                        <p className="text-[11px] font-medium text-blue-700 dark:text-blue-300">{pattern.suggestion}</p>
                       </div>
                     )}
                   </div>
@@ -188,14 +204,14 @@ export const ResultPatternsList: React.FC = () => {
                   <div className="flex-shrink-0 flex flex-col gap-2">
                     <button
                       onClick={() => handleMarkHelpful(pattern.id)}
-                      className="p-2 text-green-600 hover:bg-green-50 rounded transition-colors"
+                      className="w-9 h-9 rounded-xl glass-panel flex items-center justify-center text-gray-400 hover:text-emerald-500 hover:scale-105 active:scale-95 transition-all"
                       title="Mark as helpful"
                     >
                       <ThumbsUp className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(pattern.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                      className="w-9 h-9 rounded-xl glass-panel flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-500/10 hover:scale-105 active:scale-95 transition-all"
                       title="Delete pattern"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -210,8 +226,8 @@ export const ResultPatternsList: React.FC = () => {
 
       {/* Summary */}
       {patterns.length > 0 && (
-        <div className="text-sm text-gray-600 text-center pt-4 border-t border-gray-200">
-          Showing {patterns.length} validation pattern{patterns.length !== 1 ? 's' : ''}
+        <div className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 text-center pt-4 border-t border-white/5">
+          {patterns.length} pattern{patterns.length !== 1 ? 's' : ''}
         </div>
       )}
     </div>

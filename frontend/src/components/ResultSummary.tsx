@@ -1,4 +1,4 @@
-import { Sparkles, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
+import { Sparkles, TrendingUp, AlertCircle, CheckCircle, ChevronDown } from 'lucide-react';
 import { ResultAnalysis } from '../types/api';
 
 interface ResultSummaryProps {
@@ -8,57 +8,59 @@ interface ResultSummaryProps {
 }
 
 export function ResultSummary({ analysis, rowCount, executionTime }: ResultSummaryProps) {
-  // Determine confidence badge color
-  const getConfidenceBadgeColor = (confidence: number) => {
-    if (confidence >= 0.85) return 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-300 dark:border-green-800/50';
-    if (confidence >= 0.7) return 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800/50';
-    return 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-300 dark:border-red-800/50';
+  // Determine confidence badge styling
+  const getConfidenceBadgeStyle = (confidence: number) => {
+    if (confidence >= 0.85) return 'from-emerald-500/20 to-green-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+    if (confidence >= 0.7) return 'from-amber-500/20 to-yellow-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30';
+    return 'from-red-500/20 to-rose-500/20 text-red-600 dark:text-red-400 border-red-500/30';
   };
 
   const getConfidenceLabel = (confidence: number) => {
-    if (confidence >= 0.85) return 'High Confidence';
-    if (confidence >= 0.7) return 'Good Confidence';
-    if (confidence >= 0.5) return 'Moderate Confidence';
-    return 'Low Confidence';
+    if (confidence >= 0.85) return 'High';
+    if (confidence >= 0.7) return 'Good';
+    if (confidence >= 0.5) return 'Moderate';
+    return 'Low';
   };
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800/50 rounded-lg p-5 space-y-4">
+    <div className="glass-card rounded-2xl p-6 border-white/10 bg-gradient-to-br from-blue-500/5 via-transparent to-indigo-500/5 space-y-4">
       {/* Header with confidence badge */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          <h3 className="font-semibold text-blue-900 dark:text-blue-100">Data Insights</h3>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl glass-panel flex items-center justify-center text-blue-500">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Data Insights</h3>
         </div>
-        <span className={`text-xs font-medium px-3 py-1 rounded-full border ${getConfidenceBadgeColor(analysis.confidence)}`}>
+        <span className={`text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border bg-gradient-to-r ${getConfidenceBadgeStyle(analysis.confidence)}`}>
           {getConfidenceLabel(analysis.confidence)} ({(analysis.confidence * 100).toFixed(0)}%)
         </span>
       </div>
 
       {/* Direct Answer (if available) */}
       {analysis.direct_answer && (
-        <div className="bg-white dark:bg-gray-800 border-l-4 border-blue-500 px-4 py-3 rounded shadow-sm">
-          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Answer</p>
-          <p className="text-lg font-semibold text-blue-900 dark:text-blue-300 mt-1">{analysis.direct_answer}</p>
+        <div className="glass-panel rounded-xl p-4 border-l-4 border-blue-500 bg-gradient-to-r from-blue-500/10 via-transparent to-transparent">
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 mb-1">Answer</p>
+          <p className="text-xl font-black text-gray-900 dark:text-white">{analysis.direct_answer}</p>
         </div>
       )}
 
       {/* Summary */}
-      <div className="bg-white dark:bg-gray-800 px-4 py-3 rounded shadow-sm">
-        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{analysis.summary}</p>
+      <div className="glass-panel rounded-xl p-4">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 leading-relaxed">{analysis.summary}</p>
       </div>
 
       {/* Key Insights */}
       {analysis.key_insights && analysis.key_insights.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 px-4 py-3 rounded shadow-sm">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Key Insights</p>
+        <div className="glass-panel rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-4 h-4 text-blue-500" />
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400">Key Insights</p>
           </div>
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             {analysis.key_insights.map((insight, index) => (
-              <li key={index} className="flex gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+              <li key={index} className="flex gap-3 text-sm text-gray-700 dark:text-gray-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0" />
                 <span>{insight}</span>
               </li>
             ))}
@@ -71,15 +73,16 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
         <>
           {/* Anomalies Alert */}
           {analysis.statistics.anomalies?.found && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded px-4 py-3">
-              <p className="text-sm font-semibold text-red-900 dark:text-red-300 flex items-center gap-2">
+            <div className="glass-card rounded-xl p-4 bg-gradient-to-r from-red-500/10 via-transparent to-rose-500/5 border-red-500/20">
+              <p className="text-xs font-black uppercase tracking-widest text-red-600 dark:text-red-400 flex items-center gap-2 mb-3">
                 <AlertCircle className="w-4 h-4" />
-                Statistical Anomalies Detected
+                Anomalies Detected
               </p>
-              <ul className="mt-2 space-y-1">
+              <ul className="space-y-1.5">
                 {analysis.statistics.anomalies?.patterns?.map((pattern: string, idx: number) => (
-                  <li key={idx} className="text-xs text-red-800 dark:text-red-400 ml-6">
-                    • {pattern}
+                  <li key={idx} className="text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
+                    <span className="w-1 h-1 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
+                    {pattern}
                   </li>
                 ))}
               </ul>
@@ -88,15 +91,16 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
 
           {/* Trends Alert */}
           {analysis.statistics.trends?.found && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded px-4 py-3">
-              <p className="text-sm font-semibold text-blue-900 dark:text-blue-300 flex items-center gap-2">
+            <div className="glass-card rounded-xl p-4 bg-gradient-to-r from-blue-500/10 via-transparent to-cyan-500/5 border-blue-500/20">
+              <p className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 flex items-center gap-2 mb-3">
                 <TrendingUp className="w-4 h-4" />
-                Temporal Trends Detected
+                Trends Detected
               </p>
-              <ul className="mt-2 space-y-1">
+              <ul className="space-y-1.5">
                 {analysis.statistics.trends?.detected_trends?.map((trend: any, idx: number) => (
-                  <li key={idx} className="text-xs text-blue-800 dark:text-blue-400 ml-6">
-                    • {trend.insight}
+                  <li key={idx} className="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                    <span className="w-1 h-1 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                    {trend.insight}
                   </li>
                 ))}
               </ul>
@@ -105,15 +109,16 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
 
           {/* Correlations Alert */}
           {analysis.statistics.correlations?.found && (
-            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/50 rounded px-4 py-3">
-              <p className="text-sm font-semibold text-purple-900 dark:text-purple-300 flex items-center gap-2">
+            <div className="glass-card rounded-xl p-4 bg-gradient-to-r from-purple-500/10 via-transparent to-indigo-500/5 border-purple-500/20">
+              <p className="text-xs font-black uppercase tracking-widest text-purple-600 dark:text-purple-400 flex items-center gap-2 mb-3">
                 <CheckCircle className="w-4 h-4" />
-                Column Correlations Found
+                Correlations Found
               </p>
-              <ul className="mt-2 space-y-1">
+              <ul className="space-y-1.5">
                 {analysis.statistics.correlations?.significant_correlations?.map((corr: any, idx: number) => (
-                  <li key={idx} className="text-xs text-purple-800 dark:text-purple-400 ml-6">
-                    • {corr.insight}
+                  <li key={idx} className="text-xs text-purple-700 dark:text-purple-300 flex items-start gap-2">
+                    <span className="w-1 h-1 rounded-full bg-purple-500 mt-1.5 flex-shrink-0" />
+                    {corr.insight}
                   </li>
                 ))}
               </ul>
@@ -124,19 +129,21 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
 
       {/* Statistics (Expandable) */}
       {analysis.statistics && Object.keys(analysis.statistics).length > 0 && (
-        <details className="bg-white dark:bg-gray-800 px-4 py-3 rounded cursor-pointer group shadow-sm">
-          <summary className="flex items-center gap-2 font-medium text-gray-700 dark:text-gray-300 text-sm select-none">
-            <CheckCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            Detailed Statistics
-            <span className="ml-auto text-gray-400 dark:text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+        <details className="glass-panel rounded-xl overflow-hidden group">
+          <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none hover:bg-white/5 transition-colors">
+            <CheckCircle className="w-4 h-4 text-blue-500" />
+            <span className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300">
+              Detailed Statistics
+            </span>
+            <ChevronDown className="ml-auto w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
           </summary>
-          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 space-y-2">
+          <div className="px-4 pb-4 pt-2 border-t border-white/5 space-y-2">
             {Object.entries(analysis.statistics)
               .filter(([key]) => !['anomalies', 'trends', 'correlations'].includes(key))
               .map(([key, value]) => (
                 <div key={key} className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400 capitalize">{key.replace(/_/g, ' ')}:</span>
-                  <span className="font-mono text-gray-900 dark:text-gray-100">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 capitalize">{key.replace(/_/g, ' ')}</span>
+                  <span className="font-mono text-xs font-bold text-gray-900 dark:text-gray-100">
                     {typeof value === 'object'
                       ? JSON.stringify(value)
                       : String(value)}
@@ -145,13 +152,13 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
               ))}
             {rowCount !== undefined && executionTime !== undefined && (
               <>
-                <div className="flex justify-between text-sm pt-2 border-t border-gray-100 dark:border-gray-700">
-                  <span className="text-gray-600 dark:text-gray-400">Row count:</span>
-                  <span className="font-mono text-gray-900 dark:text-gray-100">{rowCount}</span>
+                <div className="flex justify-between text-sm pt-2 border-t border-white/5">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Row count</span>
+                  <span className="font-mono text-xs font-bold text-gray-900 dark:text-gray-100">{rowCount}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Execution time:</span>
-                  <span className="font-mono text-gray-900 dark:text-gray-100">{executionTime.toFixed(2)} ms</span>
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Execution time</span>
+                  <span className="font-mono text-xs font-bold text-gray-900 dark:text-gray-100">{executionTime.toFixed(2)} ms</span>
                 </div>
               </>
             )}
@@ -160,9 +167,9 @@ export function ResultSummary({ analysis, rowCount, executionTime }: ResultSumma
       )}
 
       {/* Generated timestamp */}
-      <div className="flex justify-end">
-        <p className="text-xs text-gray-500 dark:text-gray-500">
-          Generated at {new Date(analysis.generated_at).toLocaleTimeString()}
+      <div className="flex justify-end pt-2">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+          Generated {new Date(analysis.generated_at).toLocaleTimeString()}
         </p>
       </div>
     </div>

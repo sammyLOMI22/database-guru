@@ -26,15 +26,6 @@ const getErrorMessage = (err: unknown, fallback: string): string => {
 
 /**
  * Overview dashboard for Semantic Cache.
- *
- * Shows:
- * - Total lookups and hit rate
- * - Semantic vs exact hits
- * - LLM cache stats
- * - Embedding service status
- * - Quick actions (clear cache)
- *
- * Part of Phase 3.3: Semantic Caching UI Components
  */
 export const CacheOverview: React.FC = () => {
   const [stats, setStats] = useState<CacheStatsResponse | null>(null);
@@ -45,21 +36,13 @@ export const CacheOverview: React.FC = () => {
 
   useEffect(() => {
     loadData(true);
-
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      loadData(false);
-    }, 30000);
-
+    const interval = setInterval(() => loadData(false), 30000);
     return () => clearInterval(interval);
   }, []);
 
   const loadData = async (isInitial = false) => {
-    if (isInitial) {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
+    if (isInitial) setLoading(true);
+    else setRefreshing(true);
     setError(null);
     try {
       const data = await cacheAPI.getStats();
@@ -78,20 +61,13 @@ export const CacheOverview: React.FC = () => {
       llm: 'Clear LLM cache? Cached SQL generation responses will be removed.',
       all: 'Clear all caches? This will remove all cached data.',
     };
-
-    if (!window.confirm(messages[cacheType])) {
-      return;
-    }
+    if (!window.confirm(messages[cacheType])) return;
 
     setClearing(cacheType);
     try {
-      if (cacheType === 'semantic') {
-        await cacheAPI.clearSemanticCache();
-      } else if (cacheType === 'llm') {
-        await cacheAPI.clearLLMCache();
-      } else {
-        await cacheAPI.clearAllCaches();
-      }
+      if (cacheType === 'semantic') await cacheAPI.clearSemanticCache();
+      else if (cacheType === 'llm') await cacheAPI.clearLLMCache();
+      else await cacheAPI.clearAllCaches();
       await loadData();
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to clear cache'));
@@ -103,29 +79,28 @@ export const CacheOverview: React.FC = () => {
   if (loading) {
     return (
       <div className="animate-pulse space-y-6">
-        <div className="h-16 bg-gray-200 dark:bg-gray-800 rounded-lg"></div>
+        <div className="h-20 glass-panel rounded-2xl" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-28 bg-gray-200 dark:bg-gray-800 rounded-lg" />
+            <div key={i} className="h-28 glass-panel rounded-2xl" />
           ))}
         </div>
-        <div className="h-64 bg-gray-200 dark:bg-gray-800 rounded-lg" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="p-6 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/50 rounded-xl text-center max-w-md shadow-sm">
-          <AlertCircle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-red-900 dark:text-red-100 mb-2">Service Error</h3>
-          <p className="text-red-700 dark:text-red-300 mb-6">{error}</p>
+      <div className="text-center py-12">
+        <div className="glass-panel rounded-2xl p-8 max-w-md mx-auto">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <div className="text-red-500 mb-4 text-sm font-bold uppercase tracking-widest">Service Error</div>
+          <p className="text-xs text-gray-500 mb-6">{error}</p>
           <button
             onClick={() => loadData(true)}
-            className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
+            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-amber-500/20"
           >
-            Retry Connection
+            Retry
           </button>
         </div>
       </div>
@@ -140,336 +115,225 @@ export const CacheOverview: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Service Status Banner */}
-      <div className="bg-gradient-to-r from-gray-50 via-white to-gray-50 rounded-lg border-2 border-gray-200 p-4 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 dark:text-gray-300">
+      <div className="glass-panel rounded-2xl p-5 border-white/10">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 flex items-center gap-2">
             <Server className="w-4 h-4" />
             Service Status
           </h3>
           {refreshing && (
-            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
               <RefreshCw className="w-3 h-3 animate-spin" />
-              Refreshing...
+              Refreshing
             </div>
           )}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-          {/* Status Banner */}
-          <div className={`p-4 rounded-lg flex items-center justify-between shadow-sm border ${redisConnected
-            ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-400'
-            : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400'
-            }`}>
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-full ${redisConnected ? 'bg-green-100 dark:bg-green-900/40' : 'bg-red-100 dark:bg-red-900/40'}`}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Redis Status */}
+          <div className={`glass-card rounded-xl p-4 flex items-center justify-between ${
+            redisConnected ? 'border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5' : 'border-red-500/30 bg-gradient-to-br from-red-500/10 to-red-500/5'
+          }`}>
+            <div className="flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-xl glass-panel flex items-center justify-center ${redisConnected ? 'text-emerald-500' : 'text-red-500'}`}>
                 <Database className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                  Redis Semantic Cache
-                </h3>
-                <p className="text-sm opacity-90">
-                  {redisConnected
-                    ? 'Semantic caching is active and and optimizing queries'
-                    : `Disconnected from Redis: ${error || 'Unknown error'}`}
+                <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Redis Cache</h3>
+                <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+                  {redisConnected ? 'Semantic caching active' : 'Disconnected'}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${redisConnected
-                ? 'bg-green-200 dark:bg-green-800/50 text-green-800 dark:text-green-300'
-                : 'bg-red-200 dark:bg-red-800/50 text-red-800 dark:text-red-300'
-                }`}>
-                {redisConnected ? 'CONNECTED' : 'OFFLINE'}
-              </span>
-            </div>
+            <span className={`text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${
+              redisConnected ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/20 text-red-600 dark:text-red-400'
+            }`}>
+              {redisConnected ? 'Online' : 'Offline'}
+            </span>
           </div>
 
-          {/* Ollama Embeddings Status */}
-          <div className={`flex items-center gap-3 p-3 rounded-lg border-2 ${embedding?.ollama_available
-            ? 'bg-green-50 border-green-300 dark:bg-green-950/20 dark:border-green-800/50'
-            : 'bg-yellow-50 border-yellow-300 dark:bg-yellow-950/20 dark:border-yellow-800/50'
-            }`}>
-            <div className={`p-2 rounded-full ${embedding?.ollama_available ? 'bg-green-200 dark:bg-green-900/40' : 'bg-yellow-200 dark:bg-yellow-900/40'
-              }`}>
-              {embedding?.ollama_available ? (
-                <CheckCircle className="w-5 h-5 text-green-700 dark:text-green-400" />
-              ) : (
-                <AlertCircle className="w-5 h-5 text-yellow-700 dark:text-yellow-400" />
-              )}
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-gray-900 dark:text-gray-100">Ollama Embeddings</span>
-                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${embedding?.ollama_available
-                  ? 'bg-green-200 text-green-800 dark:bg-green-800/50 dark:text-green-300'
-                  : 'bg-yellow-200 text-yellow-800 dark:bg-yellow-800/50 dark:text-yellow-300'
-                  }`}>
-                  {embedding?.ollama_available ? 'Online' : 'Offline'}
-                </span>
+          {/* Ollama Status */}
+          <div className={`glass-card rounded-xl p-4 flex items-center justify-between ${
+            embedding?.ollama_available ? 'border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5' : 'border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-500/5'
+          }`}>
+            <div className="flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-xl glass-panel flex items-center justify-center ${embedding?.ollama_available ? 'text-emerald-500' : 'text-amber-500'}`}>
+                {embedding?.ollama_available ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
               </div>
-              <p className="text-xs text-gray-600 mt-0.5 dark:text-gray-400">
-                {embedding?.ollama_available
-                  ? `Model: nomic-embed-text`
-                  : 'Using TF-IDF fallback (lower accuracy)'}
-              </p>
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">Embeddings</h3>
+                <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+                  {embedding?.ollama_available ? 'nomic-embed-text' : 'TF-IDF fallback'}
+                </p>
+              </div>
             </div>
+            <span className={`text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${
+              embedding?.ollama_available ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+            }`}>
+              {embedding?.ollama_available ? 'Ollama' : 'Fallback'}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Lookup Rate Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Lookups</p>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">
-              {semantic?.total_lookups || 0}
-            </p>
-            <Activity className="w-8 h-8 text-blue-500 opacity-50 dark:opacity-30" />
-          </div>
-          <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-            Across all chat sessions
-          </div>
-        </div>
-
-        {/* Hit Rate Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Global Hit Rate</p>
-          <div className="flex items-center justify-between mt-1">
-            <p className={`text-3xl font-bold ${(semantic?.hit_rate_percent || 0) > 50 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'
-              }`}>
-              {semantic ? `${semantic.hit_rate_percent.toFixed(1)}%` : '0%'}
-            </p>
-            <Zap className="w-8 h-8 text-amber-500 opacity-50 dark:opacity-30" />
-          </div>
-          <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-            Semantic matches found
-          </div>
-        </div>
-
-        {/* Semantic Hits */}
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-5 border border-blue-200 dark:from-blue-950/20 dark:to-blue-900/20 dark:border-blue-800/50">
+        <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-500/5 border-blue-500/20 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-blue-700 dark:text-blue-400">Semantic Hits</p>
-              <p className="text-3xl font-bold text-blue-900 mt-1 dark:text-blue-100">
-                {semantic?.semantic_hits || 0}
-              </p>
-              <p className="text-xs text-blue-600 mt-1 dark:text-blue-300">
-                {semantic?.semantic_hit_rate_percent?.toFixed(1) || 0}% of lookups
-              </p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Lookups</p>
+              <p className="text-4xl font-black text-gray-900 dark:text-white mt-2">{semantic?.total_lookups || 0}</p>
             </div>
-            <div className="p-3 bg-blue-200 rounded-full dark:bg-blue-900/40">
-              <Zap className="w-6 h-6 text-blue-700 dark:text-blue-400" />
+            <div className="w-12 h-12 rounded-2xl glass-panel flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+              <Activity className="w-6 h-6" />
             </div>
           </div>
         </div>
 
-        {/* Keys Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Cache Size</p>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">
-              {semantic?.memory_entries || 0}
-            </p>
-            <Clock className="w-8 h-8 text-purple-500 opacity-50 dark:opacity-30" />
+        <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-amber-500/10 via-transparent to-amber-500/5 border-amber-500/20 group">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">Hit Rate</p>
+              <p className={`text-4xl font-black mt-2 ${(semantic?.hit_rate_percent || 0) > 50 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {semantic ? `${semantic.hit_rate_percent.toFixed(0)}%` : '0%'}
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl glass-panel flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
+              <Zap className="w-6 h-6" />
+            </div>
           </div>
-          <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-            Cached plan/results
+        </div>
+
+        <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-purple-500/10 via-transparent to-purple-500/5 border-purple-500/20 group">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-purple-600 dark:text-purple-400">Semantic</p>
+              <p className="text-4xl font-black text-gray-900 dark:text-white mt-2">{semantic?.semantic_hits || 0}</p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl glass-panel flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
+              <Zap className="w-6 h-6" />
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-card rounded-2xl p-6 bg-gradient-to-br from-emerald-500/10 via-transparent to-emerald-500/5 border-emerald-500/20 group">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">Cached</p>
+              <p className="text-4xl font-black text-gray-900 dark:text-white mt-2">{semantic?.memory_entries || 0}</p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl glass-panel flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
+              <Clock className="w-6 h-6" />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Cache Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Semantic Cache Details */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <Database className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+        <div className="glass-panel rounded-2xl p-6 border-white/10">
+          <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white mb-5 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             Semantic Cache
           </h3>
           <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-300">Total Hits</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{semantic?.total_hits || 0}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-300">Exact Hits</span>
-              <span className="font-semibold text-green-600 dark:text-green-400">{semantic?.exact_hits || 0}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-300">Semantic Hits</span>
-              <span className="font-semibold text-blue-600 dark:text-blue-400">{semantic?.semantic_hits || 0}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-300">Misses</span>
-              <span className="font-semibold text-gray-500 dark:text-gray-400">{semantic?.misses || 0}</span>
-            </div>
-            <hr className="my-2 border-gray-200 dark:border-gray-700" />
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500 dark:text-gray-400">Similarity Threshold</span>
-              <span className="text-gray-900 dark:text-white">{semantic?.similarity_threshold || 0.85}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500 dark:text-gray-400">TTL</span>
-              <span className="text-gray-900 dark:text-white">{Math.round((semantic?.ttl_seconds || 86400) / 3600)}h</span>
-            </div>
+            {[
+              { label: 'Total Hits', value: semantic?.total_hits || 0, color: 'text-gray-900 dark:text-white' },
+              { label: 'Exact Hits', value: semantic?.exact_hits || 0, color: 'text-emerald-600 dark:text-emerald-400' },
+              { label: 'Semantic Hits', value: semantic?.semantic_hits || 0, color: 'text-blue-600 dark:text-blue-400' },
+              { label: 'Misses', value: semantic?.misses || 0, color: 'text-gray-400' },
+            ].map((item) => (
+              <div key={item.label} className="flex justify-between items-center glass-panel rounded-xl px-4 py-3 border-white/10">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{item.label}</span>
+                <span className={`text-sm font-black ${item.color}`}>{item.value}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* LLM Cache Details */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            LLM Response Cache
+        <div className="glass-panel rounded-2xl p-6 border-white/10">
+          <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white mb-5 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+            LLM Cache
           </h3>
           <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-300">Total Lookups</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{llm?.total_lookups || 0}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-300">Hits</span>
-              <span className="font-semibold text-green-600 dark:text-green-400">{llm?.hits || 0}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-300">Hit Rate</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{llm?.hit_rate_percent?.toFixed(1) || 0}%</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-300">Misses</span>
-              <span className="font-semibold text-gray-500 dark:text-gray-400">{llm?.misses || 0}</span>
-            </div>
-            <hr className="my-2 border-gray-200 dark:border-gray-700" />
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500 dark:text-gray-400">Similarity Threshold</span>
-              <span className="text-gray-900 dark:text-white">{llm?.similarity_threshold || 0.88}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500 dark:text-gray-400">TTL</span>
-              <span className="text-gray-900 dark:text-white">{Math.round((llm?.ttl_seconds || 43200) / 3600)}h</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Embedding Service Status */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <Activity className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          Embedding Service
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="text-center p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{embedding?.total_requests || 0}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Requests</p>
-          </div>
-          <div className="text-center p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{embedding?.cache_hits || 0}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Cache Hits</p>
-          </div>
-          <div className="text-center p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {embedding?.cache_hit_rate_percent?.toFixed(0) || 0}%
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Hit Rate</p>
-          </div>
-          <div className="text-center p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{embedding?.ollama_calls || 0}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Ollama Calls</p>
-          </div>
-          <div className="text-center p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-center gap-2">
-              {embedding?.ollama_available ? (
-                <>
-                  <CheckCircle className="w-5 h-5 text-green-500 dark:text-green-400" />
-                  <span className="text-green-600 font-medium dark:text-green-400">Online</span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="w-5 h-5 text-yellow-500 dark:text-yellow-400" />
-                  <span className="text-yellow-600 font-medium dark:text-yellow-400">TF-IDF</span>
-                </>
-              )}
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
+            {[
+              { label: 'Lookups', value: llm?.total_lookups || 0, color: 'text-gray-900 dark:text-white' },
+              { label: 'Hits', value: llm?.hits || 0, color: 'text-emerald-600 dark:text-emerald-400' },
+              { label: 'Hit Rate', value: `${llm?.hit_rate_percent?.toFixed(0) || 0}%`, color: 'text-blue-600 dark:text-blue-400' },
+              { label: 'Misses', value: llm?.misses || 0, color: 'text-gray-400' },
+            ].map((item) => (
+              <div key={item.label} className="flex justify-between items-center glass-panel rounded-xl px-4 py-3 border-white/10">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{item.label}</span>
+                <span className={`text-sm font-black ${item.color}`}>{item.value}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
       {/* How It Works */}
-      <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-6">
-        <h3 className="text-lg font-bold text-amber-900 dark:text-amber-100 flex items-center gap-2 mb-4">
-          <Zap className="w-5 h-5" />
-          How Semantic Caching Works
+      <div className="glass-panel rounded-2xl p-6 border-white/10 bg-gradient-to-br from-amber-500/5 via-transparent to-yellow-500/5">
+        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white mb-5 flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          How It Works
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-2">
-            <div className="font-semibold text-amber-800 dark:text-amber-400 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-400 flex items-center justify-center text-xs">1</span>
-              Vector Embedding
+          {[
+            { step: 1, title: 'Vector Embed', desc: 'Queries converted to vectors using Ollama embeddings' },
+            { step: 2, title: 'Similarity Search', desc: 'Cosine similarity finds queries with same intent' },
+            { step: 3, title: 'Instant Response', desc: 'Matches return cached SQL in milliseconds' },
+          ].map((item) => (
+            <div key={item.step} className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-amber-500 to-yellow-500 text-white rounded-xl flex items-center justify-center font-black text-sm shadow-lg shadow-amber-500/20">
+                {item.step}
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">{item.title}</p>
+                <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">{item.desc}</p>
+              </div>
             </div>
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              Incoming natural language queries are converted into mathematical vectors using locally hosted Ollama embedding models.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <div className="font-semibold text-amber-800 dark:text-amber-400 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-400 flex items-center justify-center text-xs">2</span>
-              Similarity Search
-            </div>
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              The cache performs a cosine similarity search in Redis to find previous queries with the same intent, not just same keywords.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <div className="font-semibold text-amber-800 dark:text-amber-400 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-400 flex items-center justify-center text-xs">3</span>
-              Instant Response
-            </div>
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              Matches above the threshold (.90) return the cached SQL immediately, reducing LLM costs and database latency to milliseconds.
-            </p>
-          </div>
+          ))}
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
+      <div className="glass-panel rounded-2xl p-6 border-white/10">
+        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white mb-5 flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          Quick Actions
+        </h3>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => handleClearCache('semantic')}
             disabled={!!clearing}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 disabled:opacity-50 transition-colors dark:bg-amber-950/40 dark:text-amber-400 dark:hover:bg-amber-900/60 dark:border dark:border-amber-800/50"
+            className="flex items-center gap-2 px-5 py-2.5 glass-card rounded-xl text-amber-600 dark:text-amber-400 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all text-xs font-black uppercase tracking-widest border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-yellow-500/10"
           >
             <Trash2 className={`w-4 h-4 ${clearing === 'semantic' ? 'animate-pulse' : ''}`} />
-            {clearing === 'semantic' ? 'Clearing...' : 'Clear Semantic Cache'}
+            {clearing === 'semantic' ? 'Clearing...' : 'Clear Semantic'}
           </button>
           <button
             onClick={() => handleClearCache('llm')}
             disabled={!!clearing}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 disabled:opacity-50 transition-colors dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border dark:border-blue-800/50"
+            className="flex items-center gap-2 px-5 py-2.5 glass-card rounded-xl text-blue-600 dark:text-blue-400 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all text-xs font-black uppercase tracking-widest border-blue-500/20 bg-gradient-to-r from-blue-500/10 to-cyan-500/10"
           >
             <Trash2 className={`w-4 h-4 ${clearing === 'llm' ? 'animate-pulse' : ''}`} />
-            {clearing === 'llm' ? 'Clearing...' : 'Clear LLM Cache'}
+            {clearing === 'llm' ? 'Clearing...' : 'Clear LLM'}
           </button>
           <button
             onClick={() => handleClearCache('all')}
             disabled={!!clearing}
-            className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 transition-colors dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-900/60 dark:border dark:border-red-800/50"
+            className="flex items-center gap-2 px-5 py-2.5 glass-card rounded-xl text-red-600 dark:text-red-400 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all text-xs font-black uppercase tracking-widest border-red-500/20 bg-gradient-to-r from-red-500/10 to-rose-500/10"
           >
             <Trash2 className={`w-4 h-4 ${clearing === 'all' ? 'animate-pulse' : ''}`} />
-            {clearing === 'all' ? 'Clearing...' : 'Clear All Caches'}
+            {clearing === 'all' ? 'Clearing...' : 'Clear All'}
           </button>
           <button
             onClick={() => loadData(false)}
             disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 glass-card rounded-xl text-gray-600 dark:text-gray-400 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all text-xs font-black uppercase tracking-widest"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Refreshing...' : 'Refresh Stats'}
+            Refresh
           </button>
         </div>
       </div>

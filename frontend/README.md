@@ -1,4 +1,4 @@
-# 🧙‍♂️ Database Guru - React Frontend
+# <img src="../docs/images/logo.png" width="48" height="48" valign="middle"> Database Guru - React Frontend
 
 Modern, responsive React + TypeScript frontend for Database Guru.
 

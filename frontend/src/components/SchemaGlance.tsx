@@ -285,24 +285,24 @@ const TableSummary: React.FC<TableSummaryProps> = ({ table, isExpanded, onToggle
         )}
         <Table className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
         <span className="font-semibold text-gray-800 dark:text-gray-200">{table.name}</span>
-        <span className="text-gray-400 dark:text-gray-500 text-[10px] ml-1">
+        <span className="text-gray-400 dark:text-gray-500 text-xs ml-1">
           ({table.columns.length} cols)
         </span>
         {table.row_count !== null && (
-          <span className="text-gray-400 dark:text-gray-500 ml-auto text-[10px]">
+          <span className="text-gray-400 dark:text-gray-500 ml-auto text-xs">
             {table.row_count.toLocaleString()} rows
           </span>
         )}
         {/* Badges */}
         <div className="flex items-center gap-1 ml-2">
           {pkCount > 0 && (
-            <span className="inline-flex items-center px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded text-[9px] transition-colors">
+            <span className="inline-flex items-center px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded text-xs transition-colors">
               <Key className="w-2.5 h-2.5 mr-0.5" />
               {pkCount}
             </span>
           )}
           {locationCols.length > 0 && (
-            <span className="inline-flex items-center px-1.5 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-[9px] transition-colors">
+            <span className="inline-flex items-center px-1.5 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs transition-colors">
               <MapPin className="w-2.5 h-2.5 mr-0.5" />
               {locationCols.length}
             </span>
@@ -313,7 +313,7 @@ const TableSummary: React.FC<TableSummaryProps> = ({ table, isExpanded, onToggle
       {/* Columns Table */}
       {isExpanded && (
         <div className="border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
-          <table className="w-full text-[11px]">
+          <table className="w-full text-xs">
             <thead>
               <tr className="text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
                 <th className="text-left py-1.5 px-3 font-medium">Column</th>
@@ -345,7 +345,7 @@ const TableSummary: React.FC<TableSummaryProps> = ({ table, isExpanded, onToggle
                     </div>
                   </td>
                   <td className="py-1.5 px-2">
-                    <code className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded font-mono text-[10px] transition-colors">
+                    <code className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded font-mono text-xs transition-colors">
                       {col.type}
                     </code>
                   </td>
@@ -364,9 +364,9 @@ const TableSummary: React.FC<TableSummaryProps> = ({ table, isExpanded, onToggle
           {/* Foreign Keys Section */}
           {table.foreign_keys.length > 0 && (
             <div className="border-t border-gray-100 dark:border-gray-700 px-3 py-2 bg-purple-50/50 dark:bg-purple-900/10 transition-colors">
-              <div className="text-[10px] font-medium text-purple-700 dark:text-purple-400 mb-1">Foreign Keys:</div>
+              <div className="text-xs font-medium text-purple-700 dark:text-purple-400 mb-1">Foreign Keys:</div>
               {table.foreign_keys.map((fk, idx) => (
-                <div key={idx} className="text-[10px] text-purple-600 dark:text-purple-500 font-mono">
+                <div key={idx} className="text-xs text-purple-600 dark:text-purple-500 font-mono">
                   {fk.column} → {fk.referred_table}.{fk.referred_column}
                 </div>
               ))}

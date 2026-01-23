@@ -65,97 +65,98 @@ export default function SchemaPanel() {
   }
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col h-full w-full bg-transparent overflow-hidden">
       {/* Header with View Mode Toggle */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 transition-colors">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Schema Explorer</h2>
+      <div className="px-6 py-6 border-b border-white/5 relative z-20">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl glass-panel flex items-center justify-center text-blue-500 shadow-lg shadow-blue-500/10">
+              <Database className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black uppercase tracking-tight text-gray-900 dark:text-white">Schema Explorer</h2>
+              <p className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">Visualize and compare structures</p>
+            </div>
+          </div>
           <button
             onClick={loadConnections}
-            className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="p-2.5 glass-panel rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:scale-110 active:scale-95 transition-all"
             title="Refresh connections"
           >
-            <RefreshCw className="w-5 h-5" />
+            <RefreshCw className="w-4 h-4" />
           </button>
         </div>
 
-        {/* View Mode Tabs */}
-        <div className="mt-4 flex gap-2">
-          <button
-            onClick={() => setViewMode('explore')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'explore'
-                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-transparent'
-              }`}
-          >
-            <List className="w-4 h-4" />
-            Explore Single Database
-          </button>
-          <button
-            onClick={() => setViewMode('compare')}
-            disabled={connections.length < 2}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'compare'
-                ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-transparent'
-              } ${connections.length < 2 ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <GitCompare className="w-4 h-4" />
-            Compare Databases
-            {connections.length < 2 && (
-              <span className="text-xs ml-1">(need 2+)</span>
-            )}
-          </button>
-          <button
-            onClick={() => setViewMode('diagram')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'diagram'
-                ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-transparent'
-              }`}
-          >
-            <Share2 className="w-4 h-4" />
-            ER Diagram
-          </button>
+        {/* View Mode Tabs - Premium Segmented Control */}
+        <div className="flex p-1 glass-panel rounded-2xl border-white/10 bg-black/5 dark:bg-white/5 max-w-2xl">
+          {[
+            { id: 'explore', label: 'Explore', icon: List, color: 'blue' },
+            { id: 'compare', label: 'Compare', icon: GitCompare, color: 'purple', disabled: connections.length < 2 },
+            { id: 'diagram', label: 'ER Diagram', icon: Share2, color: 'emerald' },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = viewMode === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setViewMode(tab.id as ViewMode)}
+                disabled={tab.disabled}
+                className={`
+                  flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300
+                  ${isActive
+                    ? `bg-white dark:bg-gray-800 text-${tab.color}-600 dark:text-${tab.color}-400 shadow-xl`
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                  }
+                  ${tab.disabled ? 'opacity-30 cursor-not-allowed' : ''}
+                `}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isActive ? `text-${tab.color}-500` : 'text-gray-400'}`} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-hidden flex min-h-0">
+      <div className="flex-1 overflow-hidden flex min-h-0 relative z-10">
         {viewMode === 'diagram' ? (
           <>
             {/* Connection Selector Sidebar for Diagram */}
-            <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
-              <div className="p-4">
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Select Database
-                </h3>
-                <div className="space-y-2">
-                  {connections.map((conn) => (
-                    <button
-                      key={conn.id}
-                      onClick={() => setSelectedConnectionId(conn.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${selectedConnectionId === conn.id
-                          ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                          : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                        }`}
-                    >
-                      <Database className="w-4 h-4 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{conn.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{conn.database_type}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+            <div className="w-72 flex-shrink-0 border-r border-white/5 glass-panel overflow-y-auto transition-all animate-slideInLeft p-4 space-y-4">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 ml-1">
+                Select Database
+              </h3>
+              <div className="space-y-2">
+                {connections.map((conn) => (
+                  <button
+                    key={conn.id}
+                    onClick={() => setSelectedConnectionId(conn.id)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-300 border ${selectedConnectionId === conn.id
+                      ? 'glass-card border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 font-bold shadow-lg shadow-emerald-500/5'
+                      : 'border-transparent text-gray-700 dark:text-gray-300 hover:bg-white/5 hover:border-white/10'
+                      }`}
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedConnectionId === conn.id ? 'bg-emerald-500/10' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                      <Database className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <p className="text-xs font-black uppercase tracking-wider truncate block w-full">{conn.name}</p>
+                      <p className="text-[11px] opacity-60 font-bold uppercase tracking-widest truncate block w-full">{conn.database_type}</p>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* ER Diagram */}
-            <div className="flex-1 h-full min-h-0">
+            <div className="flex-1 h-full min-h-0 bg-gray-50/30 dark:bg-black/20">
               {selectedConnectionId ? (
                 <ERDiagram connectionId={selectedConnectionId} />
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
-                  Select a database to view its ER diagram
+                <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400 animate-fadeIn">
+                  <Share2 className="w-12 h-12 mb-4 opacity-20" />
+                  <p className="text-sm font-black uppercase tracking-widest">Select structure to visualize</p>
                 </div>
               )}
             </div>
@@ -163,44 +164,47 @@ export default function SchemaPanel() {
         ) : viewMode === 'explore' ? (
           <>
             {/* Connection Selector Sidebar */}
-            <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
-              <div className="p-4">
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Select Database
-                </h3>
-                <div className="space-y-2">
-                  {connections.map((conn) => (
-                    <button
-                      key={conn.id}
-                      onClick={() => setSelectedConnectionId(conn.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${selectedConnectionId === conn.id
-                          ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                          : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                        }`}
-                    >
-                      <Database className="w-4 h-4 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{conn.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{conn.database_type}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+            <div className="w-72 flex-shrink-0 border-r border-white/5 glass-panel overflow-y-auto transition-all animate-slideInLeft p-4 space-y-4">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 ml-1">
+                Select Database
+              </h3>
+              <div className="space-y-2">
+                {connections.map((conn) => (
+                  <button
+                    key={conn.id}
+                    onClick={() => setSelectedConnectionId(conn.id)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-300 border ${selectedConnectionId === conn.id
+                      ? 'glass-card border-blue-500/30 bg-blue-500/5 text-blue-600 dark:text-blue-400 font-bold shadow-lg shadow-blue-500/5'
+                      : 'border-transparent text-gray-700 dark:text-gray-300 hover:bg-white/5 hover:border-white/10'
+                      }`}
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedConnectionId === conn.id ? 'bg-blue-500/10' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                      <Database className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-wider truncate">{conn.name}</p>
+                      <p className="text-xs opacity-60 font-bold uppercase">{conn.database_type}</p>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Schema Explorer */}
-            <div className="flex-1 h-full min-h-0 overflow-y-auto p-6">
+            <div className="flex-1 h-full min-h-0 overflow-y-auto p-6 bg-gray-50/30 dark:bg-black/20 custom-scrollbar">
               {selectedConnectionId ? (
-                <SchemaExplorer
-                  connectionId={selectedConnectionId}
-                  connectionName={
-                    connections.find((c) => c.id === selectedConnectionId)?.name
-                  }
-                />
+                <div className="max-w-[1600px] mx-auto animate-fadeIn">
+                  <SchemaExplorer
+                    connectionId={selectedConnectionId}
+                    connectionName={
+                      connections.find((c) => c.id === selectedConnectionId)?.name
+                    }
+                  />
+                </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  Select a database to explore its schema
+                <div className="flex flex-col items-center justify-center h-full text-gray-500 animate-fadeIn">
+                  <List className="w-12 h-12 mb-4 opacity-20" />
+                  <p className="text-sm font-black uppercase tracking-widest">Select database to explore</p>
                 </div>
               )}
             </div>
@@ -208,76 +212,79 @@ export default function SchemaPanel() {
         ) : (
           <>
             {/* Comparison Connection Selector */}
-            <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto transition-colors">
-              <div className="p-4">
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Select Databases to Compare
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                  {compareConnectionIds.length} selected
-                </p>
-                <div className="space-y-2">
-                  {connections.map((conn) => {
-                    const isSelected = compareConnectionIds.includes(conn.id);
-                    return (
-                      <label
-                        key={conn.id}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isSelected
-                            ? 'bg-purple-100 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-800'
-                            : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                          }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleCompareConnection(conn.id)}
-                          className="rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-gray-900"
-                        />
-                        <Database className="w-4 h-4 flex-shrink-0 text-gray-400 dark:text-gray-500" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{conn.name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{conn.database_type}</p>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
+            <div className="w-72 flex-shrink-0 border-r border-white/5 glass-panel overflow-y-auto transition-all animate-slideInLeft p-4 flex flex-col">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 ml-1 mb-1">
+                Compare Structures
+              </h3>
+              <p className="text-xs font-bold text-purple-500 uppercase tracking-widest mb-4 ml-1">
+                {compareConnectionIds.length} SELECTED
+              </p>
 
-                {/* Quick actions */}
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => setCompareConnectionIds(connections.map((c) => c.id))}
-                    className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition-colors"
-                  >
-                    Select All
-                  </button>
-                  <span className="text-gray-300 dark:text-gray-600">|</span>
-                  <button
-                    onClick={() => setCompareConnectionIds([])}
-                    className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition-colors"
-                  >
-                    Clear
-                  </button>
-                </div>
+              <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar pr-1">
+                {connections.map((conn) => {
+                  const isSelected = compareConnectionIds.includes(conn.id);
+                  return (
+                    <label
+                      key={conn.id}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-300 border ${isSelected
+                        ? 'glass-card border-purple-500/30 bg-purple-500/5 text-purple-600 dark:text-purple-400 font-bold shadow-lg shadow-purple-500/5'
+                        : 'border-transparent text-gray-700 dark:text-gray-300 hover:bg-white/5 hover:border-white/10'
+                        }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleCompareConnection(conn.id)}
+                        className="hidden"
+                      />
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isSelected ? 'bg-purple-600 border-purple-600' : 'border-white/20'}`}>
+                        {isSelected && (
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black uppercase tracking-wider truncate">{conn.name}</p>
+                        <p className="text-xs opacity-60 font-bold uppercase">{conn.database_type}</p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {/* Quick actions */}
+              <div className="mt-4 pt-4 border-t border-white/5 flex gap-4 ml-1">
+                <button
+                  onClick={() => setCompareConnectionIds(connections.map((c) => c.id))}
+                  className="text-xs font-black uppercase tracking-widest text-purple-500 hover:text-purple-600 transition-colors"
+                >
+                  Select All
+                </button>
+                <button
+                  onClick={() => setCompareConnectionIds([])}
+                  className="text-xs font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Clear
+                </button>
               </div>
             </div>
 
             {/* Schema Comparison */}
-            <div className="flex-1 h-full min-h-0 overflow-y-auto p-6">
+            <div className="flex-1 h-full min-h-0 overflow-y-auto p-6 bg-gray-50/30 dark:bg-black/20 custom-scrollbar">
               {compareConnectionIds.length >= 2 ? (
-                <SchemaComparison
-                  connectionIds={compareConnectionIds}
-                  connectionNames={Object.fromEntries(
-                    connections.map((c) => [c.id, c.name])
-                  )}
-                />
+                <div className="max-w-[1600px] mx-auto animate-fadeIn">
+                  <SchemaComparison
+                    connectionIds={compareConnectionIds}
+                    connectionNames={Object.fromEntries(
+                      connections.map((c) => [c.id, c.name])
+                    )}
+                  />
+                </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                  <GitCompare className="w-12 h-12 mb-4 opacity-50" />
-                  <p className="text-lg font-medium">Select at least 2 databases</p>
-                  <p className="text-sm mt-2">
-                    Choose databases from the sidebar to compare their schemas
-                  </p>
+                <div className="flex flex-col items-center justify-center h-full text-gray-500 animate-fadeIn">
+                  <GitCompare className="w-12 h-12 mb-4 opacity-20" />
+                  <p className="text-sm font-black uppercase tracking-widest">Select at least 2 databases</p>
                 </div>
               )}
             </div>

@@ -1,4 +1,4 @@
-# 🧙‍♂️ Database Guru - Quick Start Guide
+# 🐶 Database Guru - Quick Start Guide
 
 ## Prerequisites
 
@@ -106,7 +106,7 @@ You should see:
 ✅ Database ready
 💾 Initializing Redis cache...
 ✅ Cache ready
-🧙‍♂️ Database Guru is ready!
+🐶 Database Guru is ready!
 ```
 
 ## Step 7: Test the API

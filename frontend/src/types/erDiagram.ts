@@ -146,9 +146,9 @@ export interface LayoutOptions {
  */
 export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   direction: 'TB',
-  nodeSpacingX: 120, // Increased for premium look
-  nodeSpacingY: 100, // Increased for premium look
-  nodePadding: 40,   // Increased for premium look
+  nodeSpacingX: 200, // Horizontal spacing between nodes in same rank
+  nodeSpacingY: 180, // Vertical spacing between ranks (levels)
+  nodePadding: 60,   // Margin around the entire graph
 };
 
 // =============================================================================

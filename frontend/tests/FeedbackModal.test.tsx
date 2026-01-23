@@ -67,13 +67,14 @@ describe('FeedbackModal', () => {
 
     it('shows description field with required marker', () => {
       render(<FeedbackModal {...defaultProps} />);
-      expect(screen.getByText(/What's wrong/i)).toBeInTheDocument();
-      expect(screen.getByText('*REQUIRED*')).toBeInTheDocument();
+      expect(screen.getByText(/What's Wrong/i)).toBeInTheDocument();
+      // Required field now uses just an asterisk (*)
+      expect(screen.getByText('*')).toBeInTheDocument();
     });
 
     it('shows confidence slider defaulting to 100%', () => {
       render(<FeedbackModal {...defaultProps} />);
-      expect(screen.getByText(/How confident are you/i)).toBeInTheDocument();
+      expect(screen.getByText(/Confidence Level/i)).toBeInTheDocument();
       expect(screen.getByText('100%')).toBeInTheDocument();
     });
 

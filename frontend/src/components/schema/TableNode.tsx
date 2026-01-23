@@ -10,8 +10,6 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import {
   Key,
   Link,
-  ChevronDown,
-  ChevronRight,
   Database,
   MapPin,
   Tag,
@@ -49,10 +47,10 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
   return (
     <div
       className={`
-        rounded-xl shadow-2xl border transition-all duration-300 node-enter
-        ${selected ? 'ring-2 ring-blue-500 ring-offset-4' : ''}
-        ${isHighlighted ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
-        ${isDarkMode ? 'glass-node' : 'bg-white'}
+        rounded-2xl shadow-2xl border transition-all duration-500 node-enter
+        ${selected ? 'ring-2 ring-blue-500 ring-offset-8 scale-[1.02]' : ''}
+        ${isHighlighted ? 'ring-2 ring-yellow-400 ring-offset-4 scale-[1.02] glow-accent' : ''}
+        ${isDarkMode ? 'glass-node' : 'bg-white/90 backdrop-blur-md border-gray-200/50'}
       `}
       style={{
         opacity,
@@ -60,7 +58,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
         borderColor: isHighlighted
           ? '#FBBF24'
           : isDarkMode
-            ? 'rgba(75, 85, 99, 0.4)'
+            ? 'rgba(255, 255, 255, 0.1)'
             : '#E5E7EB',
       }}
     >
@@ -68,42 +66,47 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
       <Handle
         type="target"
         position={Position.Top}
-        className={`w-3 h-3 ${isDarkMode ? 'bg-gray-600' : 'bg-gray-400'}`}
+        className={`w-3.5 h-3.5 border-2 ${isDarkMode ? 'bg-gray-800 border-blue-500' : 'bg-white border-blue-400'}`}
       />
       <Handle
         type="source"
         position={Position.Bottom}
-        className={`w-3 h-3 ${isDarkMode ? 'bg-gray-600' : 'bg-gray-400'}`}
+        className={`w-3.5 h-3.5 border-2 ${isDarkMode ? 'bg-gray-800 border-blue-500' : 'bg-white border-blue-400'}`}
       />
 
       {/* Table Header */}
       <div
         className={`
-          px-4 py-3 flex items-center justify-between cursor-pointer
+          px-5 py-4 flex items-center justify-between cursor-pointer rounded-t-2xl
           ${isDarkMode
-            ? 'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/30 hover:to-indigo-600/30'
-            : 'bg-gray-50 hover:bg-gray-100'}
-          border-b ${isDarkMode ? 'border-gray-700/50' : 'border-gray-200'}
-          transition-colors duration-200
+            ? 'bg-gradient-to-br from-blue-600/30 via-indigo-600/20 to-transparent hover:from-blue-600/40 hover:via-indigo-600/30'
+            : 'bg-gradient-to-br from-blue-50 via-indigo-50/50 to-transparent hover:from-blue-100 hover:via-indigo-100/50'}
+          border-b ${isDarkMode ? 'border-white/5' : 'border-gray-200/50'}
+          transition-all duration-300 group
         `}
       >
-        <div className="flex items-center gap-2">
-          {isExpanded ? (
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-          )}
-          <Database className={`w-4 h-4 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
-          <span
-            className={`font-bold text-sm tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'
-              }`}
-          >
-            {tableName}
-          </span>
+        <div className="flex items-center gap-3">
+          <div className={`
+            p-1.5 rounded-lg transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3
+            ${isDarkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'}
+          `}>
+            <Database className="w-4 h-4" />
+          </div>
+          <div className="flex flex-col">
+            <span
+              className={`font-extrabold text-sm tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}
+            >
+              {tableName}
+            </span>
+            <span className={`text-xs font-bold uppercase tracking-widest opacity-60 ${isDarkMode ? 'text-blue-300' : 'text-blue-600'}`}>
+              {databaseType}
+            </span>
+          </div>
         </div>
         {rowCount !== null && (
           <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isDarkMode ? 'bg-blue-900/40 text-blue-300' : 'bg-blue-50 text-blue-600'
+            className={`text-xs px-2.5 py-1 rounded-full font-bold shadow-sm ${isDarkMode ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-100'
               }`}
           >
             {rowCount.toLocaleString()}
@@ -123,7 +126,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
               <div
                 key={column.name}
                 className={`
-                  px-4 py-2 flex items-center justify-between text-[11px]
+                  px-4 py-2 flex items-center justify-between text-xs
                   border-b last:border-b-0
                   ${isDarkMode ? 'border-gray-800/50' : 'border-gray-100'}
                   ${isDarkMode ? 'hover:bg-gray-800/40' : 'hover:bg-gray-50'}
@@ -157,7 +160,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
                 <div className="flex items-center gap-2">
                   <span
                     className={`
-                      px-1.5 py-0.5 rounded text-[9px] font-mono leading-none
+                      px-1.5 py-0.5 rounded text-xs font-mono leading-none
                       ${isDarkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-100 text-gray-400'}
                     `}
                   >
@@ -185,7 +188,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
       {/* Collapsed summary */}
       {!isExpanded && (
         <div
-          className={`px-4 py-2 text-[10px] italic ${isDarkMode ? 'text-gray-500' : 'text-gray-400'
+          className={`px-4 py-2 text-xs italic ${isDarkMode ? 'text-gray-500' : 'text-gray-400'
             }`}
         >
           {columns.length} columns
@@ -197,7 +200,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
       {/* Database badge */}
       <div
         className={`
-          px-4 py-1.5 text-[10px] flex items-center gap-1.5 font-medium
+          px-4 py-1.5 text-xs flex items-center gap-1.5 font-medium
           ${isDarkMode ? 'bg-blue-900/10 text-gray-500' : 'bg-gray-50 text-gray-400'}
         `}
       >
@@ -234,6 +237,9 @@ function formatColumnType(type: string): string {
     'point': 'point',
     'text': 'text',
     'clob': 'text',
+    'blob': 'blob',
+    'jsonb': 'jsonb',
+    'uuid': 'uuid',
   };
 
   // Check exact matches first
@@ -241,37 +247,23 @@ function formatColumnType(type: string): string {
     return exactTypes[lower];
   }
 
-  // Check prefix matches for compound types
-  for (const [long, short] of Object.entries(exactTypes)) {
-    if (lower.startsWith(long)) {
-      return type.toLowerCase().replace(long, short);
-    }
-  }
+  // Handle common prefix matches for compound types
+  if (lower.startsWith('varchar')) return 'varchar';
+  if (lower.startsWith('nvarchar')) return 'nvarchar';
+  if (lower.startsWith('char')) return 'char';
+  if (lower.startsWith('timestamp')) return 'timestamp';
+  if (lower.startsWith('datetime')) return 'datetime';
+  if (lower.startsWith('date')) return 'date';
+  if (lower.startsWith('decimal') || lower.startsWith('numeric')) return 'num';
 
   // Handle integer types explicitly (int, int4, int8, etc.)
-  // Exclude 'interval' and 'point' which contain 'int' substring
   if (/^int\d*$/i.test(lower)) {
     return 'int';
   }
 
-  // Match text/char types (varchar, char, nvarchar, nchar)
-  if (/^n?(var)?char/i.test(lower)) return 'text';
-
-  // Match date/time types
-  if (/^timestamp/i.test(lower)) return 'date';
-  if (/^date$/i.test(lower)) return 'date';
-  if (/^time$/i.test(lower)) return 'time';
-  if (/^datetime/i.test(lower)) return 'date';
-
-  // Match boolean types
-  if (/^bool(ean)?$/i.test(lower)) return 'bool';
-
-  // Match numeric types
-  if (/^(float|double|decimal|numeric|real|money)/i.test(lower)) return 'num';
-
-  // Truncate very long types
-  if (type.length > 10) {
-    return type.substring(0, 8) + '..';
+  // Truncate very long types if no better match was found
+  if (type.length > 12) {
+    return type.substring(0, 10).trim() + '..';
   }
 
   return type.toLowerCase();

@@ -36,14 +36,14 @@ export const SemanticCachePanel: React.FC = () => {
     },
     {
       key: 'statistics',
-      label: 'Statistics',
+      label: 'Stats',
       icon: <BarChart3 className="w-4 h-4" />,
       description:
         'Cache hit distribution, embedding metrics, and performance breakdown',
     },
     {
       key: 'recent',
-      label: 'Recent Queries',
+      label: 'Recent',
       icon: <Clock className="w-4 h-4" />,
       description:
         'Browse recently cached queries with hit counts and metadata',
@@ -53,51 +53,59 @@ export const SemanticCachePanel: React.FC = () => {
   const currentTab = tabs.find((t) => t.key === activeTab);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-            <Database className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+    <div className="max-w-[1600px] mx-auto animate-fadeIn">
+      {/* Main Glass Container */}
+      <div className="glass-panel rounded-[2rem] shadow-2xl border-white/10 overflow-hidden">
+        {/* Header */}
+        <div className="border-b border-white/5 px-8 py-8 bg-white/5 dark:bg-black/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-5">
+              <div className="w-14 h-14 rounded-2xl glass-panel flex items-center justify-center text-amber-500 shadow-xl shadow-amber-500/10">
+                <Database className="w-7 h-7" />
+              </div>
+              <div>
+                <h2 className="text-3xl font-black uppercase tracking-tight text-gray-900 dark:text-white">
+                  Semantic Cache
+                </h2>
+                <p className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  Intelligent Similarity Matching
+                </p>
+              </div>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Semantic Cache</h2>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Intelligent caching with similarity matching - 30-50% higher hit rates
-            </p>
-          </div>
-        </div>
-      </div>
 
-      {/* Main Content Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-100 dark:border-gray-700">
-        {/* Tab Navigation */}
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="flex overflow-x-auto" aria-label="Cache tabs">
+          {/* Tab Navigation - Segmented Control */}
+          <div className="mt-6 flex p-1.5 glass-panel rounded-2xl border-white/10 bg-black/5 dark:bg-white/5 shadow-inner max-w-md">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.key
-                    ? 'border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                  }`}
+                className={`
+                  flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300
+                  ${activeTab === tab.key
+                    ? 'glass-card bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow-[0_10px_20px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_20px_rgba(0,0,0,0.3)] scale-105 z-10'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/5'
+                  }
+                `}
                 aria-current={activeTab === tab.key ? 'page' : undefined}
               >
                 {tab.icon}
-                {tab.label}
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
-          </nav>
+          </div>
         </div>
 
         {/* Tab Description */}
-        <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-600 dark:text-gray-400">{currentTab?.description}</p>
+        <div className="px-8 py-4 border-b border-white/5 bg-black/5 dark:bg-white/5">
+          <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+            {currentTab?.description}
+          </p>
         </div>
 
         {/* Tab Content */}
-        <div className="p-6">
+        <div className="p-8">
           {activeTab === 'overview' && <CacheOverview />}
           {activeTab === 'statistics' && <CacheStatistics />}
           {activeTab === 'recent' && <RecentCachedQueries />}

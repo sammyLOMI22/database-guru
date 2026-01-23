@@ -175,24 +175,26 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
   }, [isDarkMode, setNodes, setEdges]);
 
   // Apply search filter when query changes (live filtering as user types)
-  // Note: Schema effect also applies filter to handle diagram switches
   useEffect(() => {
     if (nodes.length === 0) return;
 
+    // Apply the filter (handles empty query by resetting)
     const { nodes: filteredNodes, edges: filteredEdges } = applySearchFilter(
       nodes as ERTableNode[],
       edges as ERRelationshipEdge[],
       debouncedSearchQuery
     );
 
-    // Only update if highlighting actually changed to prevent unnecessary re-renders
-    const hasHighlightChanges = filteredNodes.some(
-      (n, i) =>
-        n.data?.isHighlighted !== (nodes[i] as ERTableNode)?.data?.isHighlighted ||
-        n.data?.isDimmed !== (nodes[i] as ERTableNode)?.data?.isDimmed
-    );
+    // Check if any node's highlight/dimmed state changed
+    const highlightStateChanged = filteredNodes.some((n) => {
+      const existingNode = nodes.find((node) => node.id === n.id);
+      return (
+        n.data?.isHighlighted !== existingNode?.data?.isHighlighted ||
+        n.data?.isDimmed !== existingNode?.data?.isDimmed
+      );
+    });
 
-    if (hasHighlightChanges) {
+    if (highlightStateChanged || (!debouncedSearchQuery && nodes.some(n => n.data?.isHighlighted || n.data?.isDimmed))) {
       setNodes(filteredNodes as unknown as typeof nodes);
       setEdges(filteredEdges as unknown as typeof edges);
 
@@ -208,8 +210,7 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchQuery, fitView]);
+  }, [debouncedSearchQuery, fitView, setNodes, setEdges]);
 
   // Handle node click to toggle expansion
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -281,13 +282,13 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
   }
 
   return (
-    <div className="h-full w-full flex flex-col">
-      {/* Toolbar */}
+    <div className="h-full w-full relative group flex flex-col">
+      {/* Floating Toolbar */}
       <div
         className={`
-          flex items-center justify-between px-4 py-2 border-b
-          ${isDarkMode ? 'glass-panel border-gray-700/50' : 'bg-gray-50 border-gray-200'}
-          backdrop-blur-md z-10 relative
+          absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-6 px-6 py-3 
+          glass-panel rounded-2xl shadow-2xl z-40 transition-all duration-500
+          hover:scale-[1.02]
         `}
       >
         <ERDiagramSearch
@@ -306,8 +307,8 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
         />
       </div>
 
-      {/* Diagram - React Flow requires explicit dimensions */}
-      <div className="flex-1 w-full relative">
+      {/* Diagram Area */}
+      <div className="flex-1 w-full relative min-h-0 overflow-hidden">
         <div className="absolute inset-0">
           <ErrorBoundary>
             <ReactFlow
@@ -350,37 +351,37 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
             </ReactFlow>
           </ErrorBoundary>
         </div>
+      </div>
 
-        {/* Legend */}
-        <div
-          className={`
-          flex items-center gap-4 px-4 py-2 text-[10px] border-t font-medium
+      {/* Legend Footer */}
+      <div
+        className={`
+          flex items-center gap-4 px-4 py-2 text-xs border-t font-medium z-10
           ${isDarkMode ? 'glass-panel border-gray-700/50 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}
           backdrop-blur-sm
         `}
-        >
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-0.5 bg-gray-400" />
-            <span>Explicit FK</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div
-              className="w-4 h-0.5 bg-gray-400"
-              style={{ borderTop: '2px dashed' }}
-            />
-            <span>Inferred</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-yellow-500">●</span>
-            <span>PK</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-purple-500">●</span>
-            <span>FK</span>
-          </div>
-          <div className="ml-auto">
-            {nodes.length} tables · {edges.length} relationships
-          </div>
+      >
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-0.5 bg-gray-400" />
+          <span>Explicit FK</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div
+            className="w-4 h-0.5 bg-gray-400"
+            style={{ borderTop: '2px dashed' }}
+          />
+          <span>Inferred</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-yellow-500">●</span>
+          <span>PK</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-purple-500">●</span>
+          <span>FK</span>
+        </div>
+        <div className="ml-auto">
+          {nodes.length} tables · {edges.length} relationships
         </div>
       </div>
     </div>

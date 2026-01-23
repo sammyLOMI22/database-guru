@@ -36,7 +36,7 @@ describe('ResultSummary Component', () => {
     render(<ResultSummary analysis={mockAnalysis} />);
     const directAnswerText = screen.getByText('42 customers');
     expect(directAnswerText).toBeInTheDocument();
-    expect(directAnswerText).toHaveClass('text-lg', 'font-semibold');
+    expect(directAnswerText).toHaveClass('text-xl', 'font-black');
   });
 
   it('should render all key insights', () => {
@@ -46,11 +46,11 @@ describe('ResultSummary Component', () => {
     });
   });
 
-  it('should display confidence badge with high confidence color (green)', () => {
+  it('should display confidence badge with high confidence color (emerald)', () => {
     render(<ResultSummary analysis={mockAnalysis} />);
-    const confidenceBadge = screen.getByText('High Confidence (92%)');
+    const confidenceBadge = screen.getByText('High (92%)');
     expect(confidenceBadge).toBeInTheDocument();
-    expect(confidenceBadge).toHaveClass('bg-green-100', 'text-green-800');
+    expect(confidenceBadge).toHaveClass('text-emerald-600');
   });
 
   it('should display confidence badge with good confidence color (amber)', () => {
@@ -59,9 +59,9 @@ describe('ResultSummary Component', () => {
       confidence: 0.75,
     };
     render(<ResultSummary analysis={analysis} />);
-    const confidenceBadge = screen.getByText('Good Confidence (75%)');
+    const confidenceBadge = screen.getByText('Good (75%)');
     expect(confidenceBadge).toBeInTheDocument();
-    expect(confidenceBadge).toHaveClass('bg-amber-100', 'text-amber-800');
+    expect(confidenceBadge).toHaveClass('text-amber-600');
   });
 
   it('should display confidence badge with low confidence color (red)', () => {
@@ -70,9 +70,9 @@ describe('ResultSummary Component', () => {
       confidence: 0.45,
     };
     render(<ResultSummary analysis={analysis} />);
-    const confidenceBadge = screen.getByText('Low Confidence (45%)');
+    const confidenceBadge = screen.getByText('Low (45%)');
     expect(confidenceBadge).toBeInTheDocument();
-    expect(confidenceBadge).toHaveClass('bg-red-100', 'text-red-800');
+    expect(confidenceBadge).toHaveClass('text-red-600');
   });
 
   it('should not render direct answer section when not provided', () => {
@@ -92,9 +92,11 @@ describe('ResultSummary Component', () => {
 
   it('should include row count and execution time in statistics', () => {
     render(<ResultSummary analysis={mockAnalysis} rowCount={42} executionTime={123.45} />);
-    expect(screen.getByText(/Row count:/)).toBeInTheDocument();
+    // Multiple "row count" elements may exist (from statistics object and from props)
+    const rowCountLabels = screen.getAllByText(/Row count/i);
+    expect(rowCountLabels.length).toBeGreaterThan(0);
     expect(screen.getByText('42')).toBeInTheDocument();
-    expect(screen.getByText(/Execution time:/)).toBeInTheDocument();
+    expect(screen.getByText(/Execution time/i)).toBeInTheDocument();
     expect(screen.getByText('123.45 ms')).toBeInTheDocument();
   });
 
@@ -121,19 +123,19 @@ describe('ResultSummary Component', () => {
 
   it('should display generated_at timestamp', () => {
     render(<ResultSummary analysis={mockAnalysis} />);
-    expect(screen.getByText(/Generated at/)).toBeInTheDocument();
+    expect(screen.getByText(/Generated/)).toBeInTheDocument();
   });
 
   it('should handle confidence scores at boundaries correctly', () => {
     const testCases = [
-      { confidence: 1.0, expectedLabel: 'High Confidence' },
-      { confidence: 0.85, expectedLabel: 'High Confidence' },
-      { confidence: 0.84, expectedLabel: 'Good Confidence' },
-      { confidence: 0.7, expectedLabel: 'Good Confidence' },
-      { confidence: 0.69, expectedLabel: 'Moderate Confidence' },
-      { confidence: 0.5, expectedLabel: 'Moderate Confidence' },
-      { confidence: 0.49, expectedLabel: 'Low Confidence' },
-      { confidence: 0.0, expectedLabel: 'Low Confidence' },
+      { confidence: 1.0, expectedLabel: 'High' },
+      { confidence: 0.85, expectedLabel: 'High' },
+      { confidence: 0.84, expectedLabel: 'Good' },
+      { confidence: 0.7, expectedLabel: 'Good' },
+      { confidence: 0.69, expectedLabel: 'Moderate' },
+      { confidence: 0.5, expectedLabel: 'Moderate' },
+      { confidence: 0.49, expectedLabel: 'Low' },
+      { confidence: 0.0, expectedLabel: 'Low' },
     ];
 
     testCases.forEach(({ confidence, expectedLabel }) => {
@@ -156,6 +158,6 @@ describe('ResultSummary Component', () => {
     };
     render(<ResultSummary analysis={minimalAnalysis} />);
     expect(screen.getByText('Query completed successfully.')).toBeInTheDocument();
-    expect(screen.getByText(/Moderate Confidence/)).toBeInTheDocument();
+    expect(screen.getByText(/Moderate/)).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { MessageSquare, ChevronRight, RefreshCw, Trash2, Info, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { chatAPI } from '../services/api';
 import type { ConversationContext } from '../types/api';
 
@@ -80,18 +81,25 @@ export default function ConversationContextPanel({
 
   if (!sessionId) {
     return (
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 text-sm text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-gray-800">
-        💬 Select or create a chat session to enable conversational memory
+      <div className="glass-panel rounded-xl p-4 border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg glass-card flex items-center justify-center text-gray-400">
+            <MessageSquare className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+            Select or create a chat session to enable conversational memory
+          </p>
+        </div>
       </div>
     );
   }
 
   if (loading && !context) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-        <div className="flex items-center text-gray-500">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-          Loading conversation context...
+      <div className="glass-panel rounded-xl p-4 border-white/10">
+        <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+          <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
+          <span className="text-xs font-medium">Loading conversation context...</span>
         </div>
       </div>
     );
@@ -99,13 +107,16 @@ export default function ConversationContextPanel({
 
   if (error) {
     return (
-      <div className="bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-900/50 p-4">
-        <div className="text-red-700 dark:text-red-400 text-sm">
-          ⚠️ {error}
+      <div className="glass-card rounded-xl p-4 bg-gradient-to-r from-red-500/10 via-transparent to-rose-500/5 border-red-500/20">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-500">
+            <AlertCircle className="w-4 h-4" />
+          </div>
+          <span className="text-xs font-bold text-red-600 dark:text-red-400">{error}</span>
         </div>
         <button
           onClick={loadContext}
-          className="mt-2 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm underline"
+          className="px-4 py-2 glass-panel rounded-lg text-[11px] font-black uppercase tracking-widest text-red-600 dark:text-red-400 hover:scale-105 active:scale-95 transition-all"
         >
           Retry
         </button>
@@ -115,18 +126,16 @@ export default function ConversationContextPanel({
 
   if (!context || !context.has_context) {
     return (
-      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-900/50 p-4">
-        <div className="flex items-start">
-          <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
+      <div className="glass-card rounded-xl p-4 bg-gradient-to-r from-blue-500/10 via-transparent to-cyan-500/5 border-blue-500/20">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-500 flex-shrink-0">
+            <Info className="w-4 h-4" />
           </div>
-          <div className="ml-3 flex-1">
-            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
-              No conversation history yet
+          <div className="flex-1">
+            <h3 className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">
+              No conversation history
             </h3>
-            <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
+            <p className="mt-1 text-[11px] font-medium text-blue-700/70 dark:text-blue-300/70">
               Start asking questions! I'll remember your queries to help with follow-ups like "filter that" or "sort by price".
             </p>
           </div>
@@ -136,75 +145,73 @@ export default function ConversationContextPanel({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+    <div className="glass-panel rounded-xl border-white/10 overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center flex-1 text-left"
+          className="flex items-center flex-1 text-left gap-2"
         >
-          <svg
-            className={`h-4 w-4 text-gray-500 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`}
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
-            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-          </svg>
-          <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-            💬 Conversation Context ({context.window_size})
+          <ChevronRight
+            className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+          />
+          <div className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-500">
+            <MessageSquare className="w-3 h-3" />
+          </div>
+          <span className="text-[11px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-300">
+            Context ({context.window_size})
           </span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
             onClick={loadContext}
             disabled={loading}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded disabled:opacity-50"
+            className="w-7 h-7 rounded-lg glass-card flex items-center justify-center text-gray-400 hover:text-blue-500 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
             title="Refresh context"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
           <button
             onClick={handleClearContext}
             disabled={loading}
-            className="p-1 text-gray-400 hover:text-red-600 rounded disabled:opacity-50"
-            title="Clear context (fresh start)"
+            className="w-7 h-7 rounded-lg glass-card flex items-center justify-center text-gray-400 hover:text-red-500 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+            title="Clear context"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Context Messages */}
       {isExpanded && (
-        <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
+        <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
           {context.messages.map((msg, index) => (
             <div
               key={index}
-              className="text-sm border-l-2 border-blue-300 dark:border-blue-700 pl-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-r"
+              className="glass-card rounded-lg p-3 border-l-2 border-blue-500/50"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="text-gray-700 dark:text-gray-300 font-medium mb-1">
-                    {index + 1}. {msg.question}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <span className="text-blue-500 font-bold mr-1">{index + 1}.</span>
+                    {msg.question}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded mb-1 overflow-x-auto border border-gray-200 dark:border-gray-800">
+                  <div className="text-[11px] font-mono text-gray-500 dark:text-gray-400 glass-panel rounded-lg px-2 py-1.5 overflow-x-auto border-white/10">
                     {msg.sql}
                   </div>
                 </div>
-                <div className="ml-2">
+                <div className="flex-shrink-0">
                   {msg.success ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                      ✓ Success
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle className="w-3 h-3" />
+                      OK
                     </span>
                   ) : (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                      ✗ Error
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-red-500/20 text-red-600 dark:text-red-400">
+                      <XCircle className="w-3 h-3" />
+                      Err
                     </span>
                   )}
                 </div>
@@ -212,9 +219,10 @@ export default function ConversationContextPanel({
             </div>
           ))}
 
-          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-              💡 I'll use this context when you ask follow-up questions like "filter that" or "sort by price"
+          <div className="pt-3 border-t border-white/10">
+            <p className="text-[11px] font-medium text-gray-400 flex items-center gap-2">
+              <Info className="w-3 h-3" />
+              I'll use this context for follow-up questions like "filter that" or "sort by price"
             </p>
           </div>
         </div>
