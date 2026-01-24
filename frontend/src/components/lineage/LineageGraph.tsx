@@ -51,6 +51,13 @@ function LineageGraphInner({ initialSql, graphData, onParseComplete }: LineageGr
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
 
+  // Auto-fill and parse when initialSql prop changes
+  useEffect(() => {
+    if (initialSql && initialSql !== sql) {
+      setSql(initialSql);
+    }
+  }, [initialSql]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Apply layout when graphData changes
   useEffect(() => {
     if (graphData && graphData.nodes.length > 0) {

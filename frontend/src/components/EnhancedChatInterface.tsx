@@ -29,7 +29,12 @@ interface PerTaskModelSettings {
   enable_prompt_optimization: boolean;
 }
 
-export default function EnhancedChatInterface() {
+interface EnhancedChatInterfaceProps {
+  onViewLineage?: (sql: string) => void;
+  onLastSqlChange?: (sql: string) => void;
+}
+
+export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }: EnhancedChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -155,6 +160,12 @@ export default function EnhancedChatInterface() {
       console.log('DEBUG: Combined analysis:', response.combined_analysis);
       console.log('DEBUG: DB results[0].result_analysis:', response.database_results[0]?.result_analysis);
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // Track last executed SQL for ER diagram query path overlay
+      const firstSuccessful = response.database_results.find((r) => r.success && r.sql);
+      if (firstSuccessful?.sql) {
+        onLastSqlChange?.(firstSuccessful.sql);
+      }
     } catch (error: any) {
       // Add error message
       const errorMessage: ChatMessage = {
@@ -372,6 +383,7 @@ export default function EnhancedChatInterface() {
                 type={message.type}
                 content={message.content}
                 multiQueryResponse={message.multiQueryResponse}
+                onViewLineage={onViewLineage}
               />
             </div>
           ))}

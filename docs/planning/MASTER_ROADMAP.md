@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: January 23, 2026
+**Last Updated**: January 24, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -57,10 +57,12 @@
                     │          API, 62 tests)                      │
                     │  ✅ 11.2 Frontend Core (LineageGraph,       │
                     │          LineagePanel, React Flow viz)       │
-                    │  ► 11.3 Column Lineage & Impact Panel      │
-                    │  ○ 11.4 ER Extensions (QueryPathOverlay,   │
-                    │          TableStatsNode)                     │
-                    │  ○ 11.5 Query Pattern Analytics (Heatmap)  │
+                    │  ✅ 11.3 Column Lineage & Impact Panel     │
+                    │          (ColumnLineage, ImpactAnalysisPanel,│
+                    │          View Lineage, Analyze Impact btns)  │
+                    │  ✅ 11.4 ER Extensions (QueryPathOverlay,  │
+                    │          ERContextMenu, cross-nav)           │
+                    │  ► 11.5 Query Pattern Analytics (Heatmap)  │
                     │  ○ 11.6 Polish & Testing                    │
                     │                                             │
                     │  Branch: data-lineage | Priority: HIGH      │
@@ -71,12 +73,12 @@
     │                                    READY TO IMPLEMENT                                    │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
-    ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
-    │   Query Path Overlay │  │   Table Statistics   │  │   Schema Health      │
-    │   (Highlight tables) │  │   (Row counts, size) │  │   (Missing PKs, etc) │
-    │   Est: ~150 lines    │  │   Est: ~280 lines    │  │   Est: ~270 lines    │
-    │   Blocked by: 11.3   │  │   Blocked by: 11.3   │  │   Standalone         │
-    └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
+    ┌──────────────────────┐  ┌──────────────────────┐
+    │   Table Statistics   │  │   Schema Health      │
+    │   (Row counts, size) │  │   (Missing PKs, etc) │
+    │   Est: ~280 lines    │  │   Est: ~270 lines    │
+    │   Standalone         │  │   Standalone         │
+    └──────────────────────┘  └──────────────────────┘
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
@@ -167,20 +169,20 @@
             │    ┌─────────────────────┘
             │    │
             ▼    ▼
-    ┌───────────────────┐
-    │  Phase 11.3       │  ◀── NEXT
-    │  Column Lineage   │
-    │  & Impact Panel   │
-    └───────────────────┘
+    ┌───────────────────┐     ┌───────────────────┐
+    │  Phase 11.3 ✅    │     │  Phase 11.4 ✅    │
+    │  Column Lineage   │     │  ER Extensions    │
+    │  & Impact Panel   │     │  (Overlay + Menu) │
+    └───────────────────┘     └───────────────────┘
             │
-            ├──────────────────┬──────────────────┐
-            ▼                  ▼                  ▼
-    ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
-    │ Phase 11.4    │  │ Phase 11.5    │  │ Phase 11.6    │
-    │ ER Extensions │  │ Query Pattern │  │ Polish &      │
-    │ (Overlay +    │  │ Analytics     │  │ Testing       │
-    │  TableStats)  │  │ (Heatmap)     │  │               │
-    └───────────────┘  └───────────────┘  └───────────────┘
+            ├──────────────────┐
+            ▼                  ▼
+    ┌───────────────┐  ┌───────────────┐
+    │ Phase 11.5    │  │ Phase 11.6    │
+    │ Query Pattern │  │ Polish &      │  ◀── NEXT
+    │ Analytics     │  │ Testing       │
+    │ (Heatmap)     │  │               │
+    └───────────────┘  └───────────────┘
 
 
     INDEPENDENT FEATURES (Can Start Anytime):
@@ -201,18 +203,19 @@
 
 ## Recommended Next Steps
 
-### Priority 1: Data Lineage Phase 11.3 (Column Lineage & Impact Panel)
-**Why**: Continues active branch work, builds on completed 11.1-11.2
-- `ColumnLineage.tsx` - Detailed column-level tracing view
-- `ImpactAnalysisPanel.tsx` - Standalone impact analysis component
-- Integration with QueryResults ("View Lineage" button)
-- Integration with Schema tab ("Analyze Impact" button)
+### Priority 1: Data Lineage Phase 11.5 (Query Pattern Analytics)
+**Why**: Continues active branch, completes the lineage feature set
+- `QueryPatternAnalyzer` backend - Analyze query history for table/column usage
+- `QueryPatternHeatmap.tsx` - Usage frequency visualization
+- Time range filtering, per-connection/cross-connection scope
+- Table frequency badges on ER diagram nodes
 
-### Priority 2: Data Lineage Phase 11.4 (ER Extensions)
-**Why**: Ties ER Diagrams (Phase 7) and Lineage together
-- `QueryPathOverlay.tsx` - Highlight tables used by current query on ER diagram
-- `TableStatsNode.tsx` - Show row counts/size on table nodes
-- Right-click context menu on ER tables for impact analysis
+### Priority 2: Data Lineage Phase 11.6 (Polish & Testing)
+**Why**: Finalizes Phase 11 for merge to main
+- E2E tests for cross-component navigation flows
+- Unit tests for ColumnLineage, ImpactAnalysisPanel, QueryPathOverlay
+- Performance optimization for large lineage graphs
+- Edge case handling and error states
 
 ### Priority 3: Table Sorting (Quick Win)
 **Why**: Immediate UX improvement, independent of lineage work
@@ -220,11 +223,11 @@
 - Asc/Desc toggle indicator
 - Multi-column sort support
 
-### Priority 4: Data Lineage Phase 11.5 (Query Analytics)
-**Why**: Completes the lineage feature set
-- `QueryPatternAnalyzer` backend
-- `QueryPatternHeatmap.tsx` - Usage visualization
-- Time range filtering, per-connection/cross-connection scope
+### Priority 4: Schema Health Analysis
+**Why**: Standalone feature, complements ER Diagrams
+- Missing primary key detection
+- Orphaned foreign key detection
+- Schema quality scoring
 
 ---
 
@@ -232,7 +235,7 @@
 
 | Category | Features | Status | Total Effort |
 |----------|----------|--------|--------------|
-| **Visualization** | ER Diagrams, Data Lineage | Phase 7 done, Phase 11 in progress | ~2,400 lines remaining |
+| **Visualization** | ER Diagrams, Data Lineage | Phase 7 done, Phase 11.1-11.4 done | ~800 lines remaining (11.5-11.6) |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Table UX** | Sorting, Resizing, Export | Not started | ~600 lines |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
@@ -259,6 +262,7 @@
 | Multi-DB Validator | Pre-flight validation | 27 tests |
 | ER Diagrams (Phase 7) | Schema visualization | React Flow + Dagre |
 | Data Lineage 11.1-11.2 | Lineage graph + Impact analysis | 62 tests |
+| Data Lineage 11.3-11.4 | Column lineage, Impact panel, ER overlay, cross-nav | ~1,200 lines |
 
 **Total Tests**: 660+ passing
 
@@ -273,4 +277,4 @@
 
 ---
 
-**Updated**: January 23, 2026
+**Updated**: January 24, 2026

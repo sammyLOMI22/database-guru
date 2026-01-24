@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import EnhancedChatInterface from './components/EnhancedChatInterface';
 import Header from './components/Header';
 import { ObservabilityDemo } from './components/ObservabilityDemo';
@@ -27,6 +27,20 @@ function App() {
   const [isHealthy, setIsHealthy] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'settings'>('chat');
+
+  // Cross-component lineage navigation state
+  const [lineageNav, setLineageNav] = useState<{ sql?: string; tab?: 'explore' | 'history' | 'impact'; impactTable?: string } | null>(null);
+  const [lastExecutedSql, setLastExecutedSql] = useState<string | null>(null);
+
+  const handleViewLineage = useCallback((sql: string) => {
+    setLineageNav({ sql, tab: 'explore' });
+    setActiveTab('lineage');
+  }, []);
+
+  const handleAnalyzeImpact = useCallback((tableName: string) => {
+    setLineageNav({ impactTable: tableName, tab: 'impact' });
+    setActiveTab('lineage');
+  }, []);
 
   useEffect(() => {
     // Check health on mount
@@ -66,12 +80,12 @@ function App() {
           <main className="flex-1 flex h-full">
             {/* Chat - always mounted to preserve history */}
             <div className={`flex-1 flex ${activeTab === 'chat' ? '' : 'hidden'}`}>
-              <EnhancedChatInterface />
+              <EnhancedChatInterface onViewLineage={handleViewLineage} onLastSqlChange={setLastExecutedSql} />
             </div>
 
             {/* Schema */}
             <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'schema' ? '' : 'hidden'}`}>
-              <SchemaPanel />
+              <SchemaPanel onAnalyzeImpact={handleAnalyzeImpact} lastSql={lastExecutedSql} />
             </div>
 
             {/* Feedback */}
@@ -97,7 +111,11 @@ function App() {
             {/* Lineage */}
             <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'lineage' ? '' : 'hidden'}`}>
               <div className="flex-1 flex flex-col h-full min-h-0">
-                <LineagePanel />
+                <LineagePanel
+                  initialSql={lineageNav?.sql}
+                  initialTab={lineageNav?.tab}
+                  initialImpactTable={lineageNav?.impactTable}
+                />
               </div>
             </div>
 

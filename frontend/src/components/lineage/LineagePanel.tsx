@@ -2,15 +2,18 @@
  * LineagePanel - Top-level panel for the Lineage tab.
  *
  * Sub-views:
- * - Explore: SQL textarea → parse → LineageGraph
+ * - Explore: SQL textarea → parse → LineageGraph + ColumnLineage table
  * - History: Dropdown of recent queries → LineageGraph
- * - Impact: Table/column input → list of affected queries with risk badges
+ * - Impact: Table/column input → ImpactAnalysisPanel
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import LineageGraph from './LineageGraph';
+import { ColumnLineage } from './ColumnLineage';
+import { ImpactAnalysisPanel } from './ImpactAnalysisPanel';
 import { lineageAPI } from '../../services/lineageApi';
-import type { LineageGraphResponse, ImpactAnalysisResponse, ImpactedQuery } from '../../types/lineage';
+import type { LineageGraphResponse } from '../../types/lineage';
 
 type TabId = 'explore' | 'history' | 'impact';
 
@@ -20,15 +23,16 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'impact', label: 'Impact', icon: '💥' },
 ];
 
-const RISK_COLORS: Record<string, string> = {
-  low: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  high: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-};
+interface LineagePanelProps {
+  initialSql?: string;
+  initialTab?: TabId;
+  initialImpactTable?: string;
+}
 
-export function LineagePanel() {
-  const [activeTab, setActiveTab] = useState<TabId>('explore');
+export function LineagePanel({ initialSql, initialTab, initialImpactTable }: LineagePanelProps) {
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab || 'explore');
   const [lineageResult, setLineageResult] = useState<LineageGraphResponse | null>(null);
+  const [showColumnLineage, setShowColumnLineage] = useState(true);
 
   // History tab state
   const [queryId, setQueryId] = useState('');
@@ -37,11 +41,27 @@ export function LineagePanel() {
   const [historyGraph, setHistoryGraph] = useState<LineageGraphResponse | null>(null);
 
   // Impact tab state
-  const [impactTable, setImpactTable] = useState('');
+  const [impactTable, setImpactTable] = useState(initialImpactTable || '');
   const [impactColumn, setImpactColumn] = useState('');
-  const [impactLoading, setImpactLoading] = useState(false);
-  const [impactError, setImpactError] = useState<string | null>(null);
-  const [impactResult, setImpactResult] = useState<ImpactAnalysisResponse | null>(null);
+  const [impactKey, setImpactKey] = useState(0);
+  const [submittedImpact, setSubmittedImpact] = useState<{ table: string; column?: string } | null>(
+    initialImpactTable ? { table: initialImpactTable } : null
+  );
+
+  // React to prop changes for cross-component navigation
+  const prevPropsRef = useRef({ initialTab, initialImpactTable, initialSql });
+  useEffect(() => {
+    const prev = prevPropsRef.current;
+    if (initialTab && initialTab !== prev.initialTab) {
+      setActiveTab(initialTab);
+    }
+    if (initialImpactTable && initialImpactTable !== prev.initialImpactTable) {
+      setImpactTable(initialImpactTable);
+      setSubmittedImpact({ table: initialImpactTable });
+      setImpactKey((k) => k + 1);
+    }
+    prevPropsRef.current = { initialTab, initialImpactTable, initialSql };
+  }, [initialTab, initialImpactTable, initialSql]);
 
   const handleHistoryLoad = useCallback(async () => {
     const id = parseInt(queryId);
@@ -60,23 +80,10 @@ export function LineagePanel() {
     }
   }, [queryId]);
 
-  const handleImpactAnalyze = useCallback(async () => {
+  const handleImpactAnalyze = useCallback(() => {
     if (!impactTable.trim()) return;
-
-    setImpactLoading(true);
-    setImpactError(null);
-    try {
-      const result = await lineageAPI.analyzeImpact(
-        impactTable.trim(),
-        impactColumn.trim() || undefined
-      );
-      setImpactResult(result);
-    } catch (err: any) {
-      setImpactError(err.response?.data?.detail || err.message || 'Impact analysis failed');
-      setImpactResult(null);
-    } finally {
-      setImpactLoading(false);
-    }
+    setSubmittedImpact({ table: impactTable.trim(), column: impactColumn.trim() || undefined });
+    setImpactKey((k) => k + 1);
   }, [impactTable, impactColumn]);
 
   return (
@@ -104,7 +111,27 @@ export function LineagePanel() {
       {/* Tab Content */}
       <div className="flex-1 min-h-0">
         {activeTab === 'explore' && (
-          <LineageGraph onParseComplete={setLineageResult} />
+          <div className="flex flex-col h-full">
+            <div className={`min-h-0 ${lineageResult && showColumnLineage ? 'h-[60%]' : 'flex-1'}`}>
+              <LineageGraph onParseComplete={setLineageResult} initialSql={initialSql} />
+            </div>
+            {lineageResult && (
+              <>
+                <button
+                  onClick={() => setShowColumnLineage(!showColumnLineage)}
+                  className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 transition-colors"
+                >
+                  Column Lineage
+                  {showColumnLineage ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                </button>
+                {showColumnLineage && (
+                  <div className="h-[40%] min-h-0 border-t border-gray-200 dark:border-gray-700 overflow-auto">
+                    <ColumnLineage graphData={lineageResult} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         )}
 
         {activeTab === 'history' && (
@@ -175,88 +202,27 @@ export function LineagePanel() {
                 </div>
                 <button
                   onClick={handleImpactAnalyze}
-                  disabled={impactLoading || !impactTable.trim()}
+                  disabled={!impactTable.trim()}
                   className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white text-sm font-bold transition-all shadow-lg"
                   data-testid="impact-analyze-button"
                 >
-                  {impactLoading ? 'Analyzing...' : 'Analyze'}
+                  Analyze
                 </button>
               </div>
-              {impactError && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{impactError}</p>
-              )}
             </div>
 
-            {/* Impact Results */}
-            {impactResult && (
-              <div className="space-y-4">
-                {/* Summary */}
-                <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                      Impact: {impactResult.changed_object}
-                    </h3>
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${RISK_COLORS[impactResult.risk_level]}`}>
-                      {impactResult.risk_level.toUpperCase()}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{impactResult.summary}</p>
-                  <div className="flex gap-4 mt-3 text-xs">
-                    <span className="text-green-600 dark:text-green-400">Low: {impactResult.risk_counts.low}</span>
-                    <span className="text-yellow-600 dark:text-yellow-400">Medium: {impactResult.risk_counts.medium}</span>
-                    <span className="text-red-600 dark:text-red-400">High: {impactResult.risk_counts.high}</span>
-                  </div>
-                </div>
-
-                {/* Affected Queries */}
-                {impactResult.impacted_queries.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                      Affected Queries ({impactResult.total_affected})
-                    </h4>
-                    {impactResult.impacted_queries.map((q) => (
-                      <ImpactedQueryCard key={q.query_id} query={q} />
-                    ))}
-                  </div>
-                )}
-              </div>
+            {/* Impact Results (delegated to ImpactAnalysisPanel) */}
+            {submittedImpact && (
+              <ImpactAnalysisPanel
+                key={impactKey}
+                tableName={submittedImpact.table}
+                columnName={submittedImpact.column}
+                autoAnalyze
+              />
             )}
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function ImpactedQueryCard({ query }: { query: ImpactedQuery }) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${RISK_COLORS[query.risk_level]}`}>
-            {query.risk_level}
-          </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400 uppercase">
-            {query.impact_type}
-          </span>
-          <span className="text-sm text-gray-900 dark:text-white truncate">
-            {query.natural_language_query}
-          </span>
-        </div>
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex-shrink-0 ml-2"
-        >
-          {expanded ? 'Hide SQL' : 'Show SQL'}
-        </button>
-      </div>
-      {expanded && (
-        <pre className="mt-2 p-2 text-xs font-mono bg-gray-50 dark:bg-gray-900 rounded-lg overflow-x-auto text-gray-700 dark:text-gray-300">
-          {query.generated_sql}
-        </pre>
-      )}
     </div>
   );
 }

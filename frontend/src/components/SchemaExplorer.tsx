@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Copy,
   Check,
+  Zap,
 } from 'lucide-react';
 import { schemaAPI } from '../services/api';
 import type { SchemaExploreResponse, SchemaTableInfo, SchemaColumnInfo } from '../types/api';
@@ -17,6 +18,7 @@ interface SchemaExplorerProps {
   connectionId: number;
   connectionName?: string;
   onTableSelect?: (tableName: string) => void;
+  onAnalyzeImpact?: (tableName: string) => void;
   compact?: boolean;
 }
 
@@ -24,6 +26,7 @@ export const SchemaExplorer: React.FC<SchemaExplorerProps> = ({
   connectionId,
   connectionName,
   onTableSelect,
+  onAnalyzeImpact,
   compact = false,
 }) => {
   const [schema, setSchema] = useState<SchemaExploreResponse | null>(null);
@@ -229,6 +232,7 @@ export const SchemaExplorer: React.FC<SchemaExplorerProps> = ({
               expanded={expandedTables.has(table.name)}
               onToggle={() => toggleTable(table.name)}
               onSelect={() => onTableSelect?.(table.name)}
+              onAnalyzeImpact={onAnalyzeImpact ? () => onAnalyzeImpact(table.name) : undefined}
               searchTerm={searchTerm}
               compact={compact}
             />
@@ -251,6 +255,7 @@ interface TableRowProps {
   expanded: boolean;
   onToggle: () => void;
   onSelect?: () => void;
+  onAnalyzeImpact?: () => void;
   searchTerm: string;
   compact: boolean;
 }
@@ -260,6 +265,7 @@ const TableRow: React.FC<TableRowProps> = ({
   expanded,
   onToggle,
   onSelect,
+  onAnalyzeImpact,
   searchTerm,
   compact,
 }) => {
@@ -300,6 +306,15 @@ const TableRow: React.FC<TableRowProps> = ({
             )}
           </div>
         </div>
+        {onAnalyzeImpact && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAnalyzeImpact(); }}
+            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all"
+            title="Analyze Impact"
+          >
+            <Zap className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Columns */}

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { MessageSquare, Copy, Check, Zap, Database, ChevronLeft, ChevronRight, AlertCircle, XCircle } from 'lucide-react';
+import { MessageSquare, Copy, Check, Zap, Database, ChevronLeft, ChevronRight, AlertCircle, XCircle, GitBranch } from 'lucide-react';
 import type { DatabaseQueryResult, CacheInfo } from '../types/api';
 import { AgentTrace } from './AgentTrace';
 import { CorrectionHistory } from './CorrectionHistory';
@@ -24,6 +24,7 @@ interface MultiDatabaseResultsProps {
   question: string;
   cacheInfo?: CacheInfo | null;
   combinedAnalysis?: any; // ResultAnalysis from multi-db response
+  onViewLineage?: (sql: string) => void;
 }
 
 export default function MultiDatabaseResults({
@@ -33,6 +34,7 @@ export default function MultiDatabaseResults({
   question,
   cacheInfo,
   combinedAnalysis,
+  onViewLineage,
 }: MultiDatabaseResultsProps) {
   console.log('DEBUG: MultiDatabaseResults props:', { combinedAnalysis, resultAnalysis0: results[0]?.result_analysis });
 
@@ -341,6 +343,15 @@ export default function MultiDatabaseResults({
                             <Copy className="w-3 h-3" />
                           )}
                         </button>
+                        {onViewLineage && result.sql && (
+                          <button
+                            onClick={() => onViewLineage(result.sql)}
+                            className="text-gray-400 hover:text-indigo-500 transition-colors p-1"
+                            title="View Lineage"
+                          >
+                            <GitBranch className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     <pre className="bg-gray-900 border border-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto font-mono">

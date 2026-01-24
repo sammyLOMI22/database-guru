@@ -13,6 +13,7 @@ import {
   Focus,
   Link2,
   Link2Off,
+  Route,
 } from 'lucide-react';
 import type { LayoutDirection } from '../../types/erDiagram';
 import { useDarkMode } from '../../hooks/useDarkMode';
@@ -26,6 +27,12 @@ interface ERDiagramControlsProps {
   showInferred: boolean;
   /** Callback when show inferred changes */
   onShowInferredChange: (show: boolean) => void;
+  /** Whether to show query path overlay */
+  showQueryPath?: boolean;
+  /** Callback when query path toggle changes */
+  onShowQueryPathChange?: (show: boolean) => void;
+  /** Whether there is a last query to highlight */
+  hasLastQuery?: boolean;
   /** Expand all nodes */
   onExpandAll: () => void;
   /** Collapse all nodes */
@@ -39,6 +46,9 @@ const ERDiagramControls: React.FC<ERDiagramControlsProps> = ({
   onLayoutChange,
   showInferred,
   onShowInferredChange,
+  showQueryPath,
+  onShowQueryPathChange,
+  hasLastQuery,
   onExpandAll,
   onCollapseAll,
   onFitView,
@@ -105,6 +115,18 @@ const ERDiagramControls: React.FC<ERDiagramControlsProps> = ({
           <Link2Off className="w-4 h-4" />
         )}
       </button>
+
+      {/* Query path overlay toggle */}
+      {onShowQueryPathChange && (
+        <button
+          onClick={() => onShowQueryPathChange(!showQueryPath)}
+          className={`${buttonBaseClass} ${showQueryPath ? buttonActiveClass : ''} ${!hasLastQuery ? 'opacity-40 cursor-not-allowed' : ''}`}
+          title={hasLastQuery ? (showQueryPath ? 'Hide query path' : 'Highlight tables from last query') : 'No query to highlight'}
+          disabled={!hasLastQuery}
+        >
+          <Route className="w-4 h-4" />
+        </button>
+      )}
 
       {/* Separator */}
       <div
