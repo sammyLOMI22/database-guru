@@ -173,21 +173,34 @@ class SQLLineageParser:
                     item, tables, aliases, table_nodes, graph
                 )
 
-            # Add filter edges from subquery tables to output nodes
-            if subquery_tables and graph.output_columns:
-                for sq_table in subquery_tables:
-                    if sq_table in table_nodes:
-                        # Find the first output node to connect the filter to
-                        output_nodes = [
-                            n for n in graph.nodes
-                            if n.node_type == LineageNodeType.OUTPUT_COLUMN
-                        ]
-                        if output_nodes:
+            # Connect orphaned tables (used in JOINs/WHERE but not in SELECT)
+            output_nodes = [
+                n for n in graph.nodes
+                if n.node_type == LineageNodeType.OUTPUT_COLUMN
+            ]
+            if output_nodes:
+                # Find tables that have no edges yet
+                connected_table_ids = set()
+                for edge in graph.edges:
+                    connected_table_ids.add(edge.source_id)
+
+                for table_name, table_node in table_nodes.items():
+                    if table_node.id not in connected_table_ids:
+                        if table_name in subquery_tables:
+                            # Subquery table → filter edge
                             graph.edges.append(LineageEdge(
-                                source_id=table_nodes[sq_table].id,
+                                source_id=table_node.id,
                                 target_id=output_nodes[0].id,
                                 edge_type="filter",
                                 label="filters via subquery",
+                            ))
+                        elif table_name in tables:
+                            # Primary table with no output columns → join/filter edge
+                            graph.edges.append(LineageEdge(
+                                source_id=table_node.id,
+                                target_id=output_nodes[0].id,
+                                edge_type="join",
+                                label="joins",
                             ))
 
         except Exception as e:

@@ -559,6 +559,35 @@ class TestWhereSubqueries:
         customers_node = next(n for n in graph.nodes if n.table_name == "customers")
         assert filter_edges[0].source_id == customers_node.id
 
+    def test_join_tables_not_in_select_get_edges(self, parser):
+        """Tables used only in JOINs/WHERE should get join edges, not be orphaned."""
+        sql = """
+        SELECT p.name FROM products p
+        JOIN orders o ON p.id = o.product_id
+        JOIN customers c ON o.customer_id = c.id
+        WHERE c.state ILIKE 'TX' AND o.status ILIKE 'shipped' LIMIT 100
+        """
+        graph = parser.parse(sql)
+
+        assert "products" in graph.tables_used
+        assert "orders" in graph.tables_used
+        assert "customers" in graph.tables_used
+
+        # All tables should have edges (no orphans)
+        source_ids_in_edges = {e.source_id for e in graph.edges}
+        for table_name in ["products", "orders", "customers"]:
+            table_node = next(n for n in graph.nodes if n.table_name == table_name)
+            assert table_node.id in source_ids_in_edges, f"{table_name} is orphaned"
+
+        # orders and customers should have "join" edges
+        join_edges = [e for e in graph.edges if e.edge_type == "join"]
+        assert len(join_edges) == 2
+        join_source_ids = {e.source_id for e in join_edges}
+        orders_node = next(n for n in graph.nodes if n.table_name == "orders")
+        customers_node = next(n for n in graph.nodes if n.table_name == "customers")
+        assert orders_node.id in join_source_ids
+        assert customers_node.id in join_source_ids
+
     def test_subquery_shared_table_not_duplicated(self, parser):
         """When subquery references same table as FROM, don't add it as subquery table."""
         sql = """

@@ -23,6 +23,8 @@ const EDGE_COLORS: Record<string, string> = {
   contains: '#3b82f6',  // blue
   feeds: '#a855f7',     // purple
   produces: '#22c55e',  // green
+  join: '#f59e0b',      // amber
+  filter: '#ef4444',    // red
   data_flow: '#6b7280', // gray
 };
 
