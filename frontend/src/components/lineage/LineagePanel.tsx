@@ -12,15 +12,17 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import LineageGraph from './LineageGraph';
 import { ColumnLineage } from './ColumnLineage';
 import { ImpactAnalysisPanel } from './ImpactAnalysisPanel';
+import { QueryPatternHeatmap } from './QueryPatternHeatmap';
 import { lineageAPI } from '../../services/lineageApi';
 import type { LineageGraphResponse } from '../../types/lineage';
 
-type TabId = 'explore' | 'history' | 'impact';
+type TabId = 'explore' | 'history' | 'impact' | 'patterns';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'explore', label: 'Explore', icon: '🔍' },
   { id: 'history', label: 'History', icon: '📜' },
   { id: 'impact', label: 'Impact', icon: '💥' },
+  { id: 'patterns', label: 'Patterns', icon: '🔥' },
 ];
 
 interface LineagePanelProps {
@@ -220,6 +222,12 @@ export function LineagePanel({ initialSql, initialTab, initialImpactTable }: Lin
                 autoAnalyze
               />
             )}
+          </div>
+        )}
+
+        {activeTab === 'patterns' && (
+          <div className="flex-1 min-h-0 overflow-auto p-4">
+            <QueryPatternHeatmap />
           </div>
         )}
       </div>

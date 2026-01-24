@@ -735,6 +735,7 @@ async def process_multi_database_query(
                     error_message=exec_result.get("error"),
                     database_type=connection.database_type,
                     model_used=model_used,
+                    connection_id=connection.id,
                 )
                 db.add(individual_query_record)
                 await db.flush()  # Flush to get the ID without committing
@@ -1285,6 +1286,7 @@ async def stream_multi_database_query(
                             executed=False,
                             database_type=connection.database_type,
                             model_used=request.model or settings.OLLAMA_MODEL,
+                            connection_id=connection.id,
                         )
                         db.add(query_record)
                         await db.flush()

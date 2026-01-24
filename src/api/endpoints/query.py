@@ -349,6 +349,7 @@ async def process_query(
             error_message=error_msg,
             database_type=database_type,  # Use detected database type from active connection
             model_used=model_used,  # Use actual model that was used
+            connection_id=active_connection.id,
         )
         db.add(query_record)
         await db.commit()
@@ -660,6 +661,7 @@ async def stream_query_results(
                     executed=False,
                     database_type=database_type,
                     model_used=request.model or settings.OLLAMA_MODEL,
+                    connection_id=active_connection.id,
                 )
                 db.add(query_record)
                 await db.commit()

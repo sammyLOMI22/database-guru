@@ -66,3 +66,40 @@ export interface TableQueriesResponse {
   queries: ImpactedQuery[];
   total: number;
 }
+
+// ============================================================================
+// Query Pattern Analytics Types (Phase 11.5)
+// ============================================================================
+
+export interface TableUsageEntry {
+  table_name: string;
+  query_count: number;
+  join_count: number;
+  avg_execution_time_ms?: number | null;
+  last_used_at?: string | null;
+}
+
+export interface JoinPattern {
+  table_a: string;
+  table_b: string;
+  join_count: number;
+  sample_sql: string;
+  avg_execution_time_ms?: number | null;
+}
+
+export interface PerformanceBottleneck {
+  table_name: string;
+  query_count: number;
+  avg_execution_time_ms: number;
+  max_execution_time_ms: number;
+  bottleneck_score: number;
+}
+
+export interface HeatmapDataResponse {
+  table_usage: TableUsageEntry[];
+  join_patterns: JoinPattern[];
+  bottlenecks: PerformanceBottleneck[];
+  time_range_days?: number | null;
+  total_queries_analyzed: number;
+  connection_id?: number | null;
+}

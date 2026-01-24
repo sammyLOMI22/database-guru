@@ -13,7 +13,9 @@ Endpoints:
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +23,7 @@ from src.api.dependencies.common import get_db
 from src.database.models import QueryHistory
 from src.lineage.sql_lineage_parser import SQLLineageParser
 from src.lineage.impact_analyzer import ImpactAnalyzer
+from src.lineage.query_pattern_analyzer import QueryPatternAnalyzer
 from src.models.schemas import (
     LineageParseRequest,
     LineageGraphResponse,
@@ -30,6 +33,10 @@ from src.models.schemas import (
     ImpactAnalysisResponse,
     ImpactedQuerySchema,
     LineageStatsResponse,
+    HeatmapDataResponse,
+    TableUsageEntrySchema,
+    JoinPatternSchema,
+    PerformanceBottleneckSchema,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,6 +46,7 @@ router = APIRouter(prefix="/lineage", tags=["lineage"])
 # Shared instances
 _parser = SQLLineageParser()
 _analyzer = ImpactAnalyzer()
+_pattern_analyzer = QueryPatternAnalyzer()
 
 
 @router.post("/parse", response_model=LineageGraphResponse)
@@ -159,3 +167,60 @@ async def get_lineage_stats(
     """
     stats = await _analyzer.get_lineage_stats(db)
     return LineageStatsResponse(**stats)
+
+
+@router.get("/patterns/{connection_id}", response_model=HeatmapDataResponse)
+async def get_query_patterns(
+    connection_id: int,
+    time_range: Optional[int] = Query(
+        default=None,
+        description="Time range in days (7, 30, 90, or None for all)",
+        ge=1,
+        le=365,
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get query pattern analytics for a connection.
+
+    Returns table usage frequencies, common join patterns, and bottlenecks.
+    Pass connection_id=0 for all connections.
+    """
+    conn_id = connection_id if connection_id > 0 else None
+    heatmap = await _pattern_analyzer.get_heatmap_data(db, conn_id, time_range)
+
+    return HeatmapDataResponse(
+        table_usage=[
+            TableUsageEntrySchema(
+                table_name=t.table_name,
+                query_count=t.query_count,
+                join_count=t.join_count,
+                avg_execution_time_ms=t.avg_execution_time_ms,
+                last_used_at=t.last_used_at,
+            )
+            for t in heatmap.table_usage
+        ],
+        join_patterns=[
+            JoinPatternSchema(
+                table_a=j.table_a,
+                table_b=j.table_b,
+                join_count=j.join_count,
+                sample_sql=j.sample_sql,
+                avg_execution_time_ms=j.avg_execution_time_ms,
+            )
+            for j in heatmap.join_patterns
+        ],
+        bottlenecks=[
+            PerformanceBottleneckSchema(
+                table_name=b.table_name,
+                query_count=b.query_count,
+                avg_execution_time_ms=b.avg_execution_time_ms,
+                max_execution_time_ms=b.max_execution_time_ms,
+                bottleneck_score=b.bottleneck_score,
+            )
+            for b in heatmap.bottlenecks
+        ],
+        time_range_days=heatmap.time_range_days,
+        total_queries_analyzed=heatmap.total_queries_analyzed,
+        connection_id=heatmap.connection_id,
+    )

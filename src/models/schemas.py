@@ -632,3 +632,44 @@ class LineageStatsResponse(BaseModel):
     total_queries: int = 0
     unique_tables_referenced: int = 0
     tables: List[str] = Field(default_factory=list)
+
+
+# ============================================================================
+# Query Pattern Analytics Schemas (Phase 11.5)
+# ============================================================================
+
+class TableUsageEntrySchema(BaseModel):
+    """Usage details for a single table."""
+    table_name: str
+    query_count: int
+    join_count: int = 0
+    avg_execution_time_ms: Optional[float] = None
+    last_used_at: Optional[datetime] = None
+
+
+class JoinPatternSchema(BaseModel):
+    """A frequently observed JOIN pattern."""
+    table_a: str
+    table_b: str
+    join_count: int
+    sample_sql: str = ""
+    avg_execution_time_ms: Optional[float] = None
+
+
+class PerformanceBottleneckSchema(BaseModel):
+    """A performance bottleneck table."""
+    table_name: str
+    query_count: int
+    avg_execution_time_ms: float
+    max_execution_time_ms: float
+    bottleneck_score: float
+
+
+class HeatmapDataResponse(BaseModel):
+    """Complete heatmap response for query pattern visualization."""
+    table_usage: List[TableUsageEntrySchema] = Field(default_factory=list)
+    join_patterns: List[JoinPatternSchema] = Field(default_factory=list)
+    bottlenecks: List[PerformanceBottleneckSchema] = Field(default_factory=list)
+    time_range_days: Optional[int] = None
+    total_queries_analyzed: int = 0
+    connection_id: Optional[int] = None

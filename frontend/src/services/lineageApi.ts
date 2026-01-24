@@ -10,6 +10,7 @@ import type {
   ImpactAnalysisResponse,
   LineageStatsResponse,
   TableQueriesResponse,
+  HeatmapDataResponse,
 } from '../types/lineage';
 
 const api = axios.create({
@@ -69,6 +70,22 @@ export const lineageAPI = {
    */
   async getStats(): Promise<LineageStatsResponse> {
     const { data } = await api.get<LineageStatsResponse>('/api/lineage/stats');
+    return data;
+  },
+
+  /**
+   * Get query pattern heatmap data for a connection.
+   * Pass connectionId=0 for all connections.
+   */
+  async getHeatmapData(connectionId: number, timeRange?: number): Promise<HeatmapDataResponse> {
+    const params: Record<string, number> = {};
+    if (timeRange != null) {
+      params.time_range = timeRange;
+    }
+    const { data } = await api.get<HeatmapDataResponse>(
+      `/api/lineage/patterns/${connectionId}`,
+      { params }
+    );
     return data;
   },
 };
