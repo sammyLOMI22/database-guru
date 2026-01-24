@@ -8,6 +8,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { ToolsPanel } from './components/ToolsPanel';
 import { SemanticCachePanel } from './components/SemanticCachePanel';
 import { ConnectionPoolMetrics } from './components/ConnectionPoolMetrics';
+import { LineagePanel } from './components/lineage/LineagePanel';
 import SchemaPanel from './components/SchemaPanel';
 import { healthAPI } from './services/api';
 import { useDarkMode } from './hooks/useDarkMode';
@@ -25,7 +26,7 @@ function App() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [isHealthy, setIsHealthy] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'settings'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'settings'>('chat');
 
   useEffect(() => {
     // Check health on mount
@@ -91,6 +92,13 @@ function App() {
             {/* Pools */}
             <div className={`flex-1 overflow-auto p-6 pb-32 ${activeTab === 'pools' ? '' : 'hidden'}`}>
               <ConnectionPoolMetrics />
+            </div>
+
+            {/* Lineage */}
+            <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'lineage' ? '' : 'hidden'}`}>
+              <div className="flex-1 flex flex-col h-full min-h-0">
+                <LineagePanel />
+              </div>
             </div>
 
             {/* Settings */}

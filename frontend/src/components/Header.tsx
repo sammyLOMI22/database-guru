@@ -16,6 +16,7 @@ const TABS = [
   { id: 'tools', label: 'Tools', icon: '🔧' },
   { id: 'cache', label: 'Cache', icon: '💾' },
   { id: 'pools', label: 'Pools', icon: '🔗' },
+  { id: 'lineage', label: 'Lineage', icon: '🔀' },
   { id: 'settings', label: 'Config', icon: '⚙️' },
 ];
 
