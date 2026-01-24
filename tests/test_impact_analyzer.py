@@ -72,6 +72,18 @@ async def db_session():
                 generated_sql="SELECT * FROM customers",
                 executed=False,
             ),
+            # Substring trap: "customer_orders" contains "orders" as substring
+            QueryHistory(
+                natural_language_query="Customer order join table",
+                generated_sql="SELECT * FROM customer_orders WHERE created_at > '2024-01-01'",
+                executed=True,
+            ),
+            # Substring trap: "orders_archive" contains "orders" as substring
+            QueryHistory(
+                natural_language_query="Archived orders",
+                generated_sql="SELECT * FROM orders_archive LIMIT 100",
+                executed=True,
+            ),
         ]
 
         for q in queries:
@@ -205,6 +217,66 @@ class TestRiskLevels:
         assert analyzer._assess_risk(5) == RiskLevel.MEDIUM.value
         assert analyzer._assess_risk(20) == RiskLevel.MEDIUM.value
         assert analyzer._assess_risk(21) == RiskLevel.HIGH.value
+
+
+# =============================================================================
+# False Positive Prevention Tests
+# =============================================================================
+
+class TestFalsePositivePrevention:
+    @pytest.mark.asyncio
+    async def test_no_substring_match_prefix(self, analyzer, db_session):
+        """'orders' should NOT match 'customer_orders' (prefix substring)."""
+        analysis = await analyzer.analyze_table_impact(db_session, "orders")
+
+        matched_sqls = [q.generated_sql for q in analysis.impacted_queries]
+        for sql in matched_sqls:
+            assert "customer_orders" not in sql
+
+    @pytest.mark.asyncio
+    async def test_no_substring_match_suffix(self, analyzer, db_session):
+        """'orders' should NOT match 'orders_archive' (suffix substring)."""
+        analysis = await analyzer.analyze_table_impact(db_session, "orders")
+
+        matched_sqls = [q.generated_sql for q in analysis.impacted_queries]
+        for sql in matched_sqls:
+            assert "orders_archive" not in sql
+
+    @pytest.mark.asyncio
+    async def test_exact_table_still_matches(self, analyzer, db_session):
+        """'orders' should still match queries that actually use 'orders' table."""
+        analysis = await analyzer.analyze_table_impact(db_session, "orders")
+
+        # Should match: "FROM orders o JOIN", "FROM orders GROUP BY", "FROM orders WHERE"
+        assert analysis.total_affected >= 3
+
+    @pytest.mark.asyncio
+    async def test_qualified_name_matches(self, analyzer, db_session):
+        """Table name after a dot (schema.table) should still match."""
+        analysis = await analyzer.analyze_table_impact(db_session, "customer_id")
+
+        # customer_id appears as o.customer_id and c.id in JOIN queries
+        assert analysis.total_affected >= 1
+
+    def test_identifier_match_word_boundary(self, analyzer):
+        """Direct test of _is_identifier_match for various patterns."""
+        # Should match: standalone identifier
+        assert analyzer._is_identifier_match("SELECT * FROM orders", "orders")
+        # Should match: with alias
+        assert analyzer._is_identifier_match("FROM orders o", "orders")
+        # Should match: after dot (qualified)
+        assert analyzer._is_identifier_match("o.customer_id = c.id", "customer_id")
+        # Should NOT match: substring of longer identifier
+        assert not analyzer._is_identifier_match("FROM customer_orders", "orders")
+        assert not analyzer._is_identifier_match("FROM orders_archive", "orders")
+        # Should NOT match: embedded in word
+        assert not analyzer._is_identifier_match("FROM reorders", "orders")
+
+    def test_column_identifier_match(self, analyzer):
+        """Column names should match as standalone identifiers."""
+        assert analyzer._is_identifier_match("SELECT name FROM t", "name")
+        assert not analyzer._is_identifier_match("SELECT username FROM t", "name")
+        assert not analyzer._is_identifier_match("SELECT name_full FROM t", "name")
 
 
 # =============================================================================

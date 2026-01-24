@@ -8,11 +8,12 @@ Provides risk assessment based on how many historical queries would be affected.
 """
 
 import logging
+import re
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from sqlalchemy import select, or_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import QueryHistory
@@ -213,6 +214,16 @@ class ImpactAnalyzer:
             "tables": sorted(tables_referenced)[:50],
         }
 
+    def _is_identifier_match(self, sql: str, identifier: str) -> bool:
+        """
+        Check if identifier appears as a standalone SQL identifier in the SQL text.
+
+        Uses word-boundary matching to avoid false positives where the identifier
+        is a substring of another name (e.g., "orders" matching "customer_orders").
+        """
+        pattern = r'\b' + re.escape(identifier) + r'\b'
+        return bool(re.search(pattern, sql, re.IGNORECASE))
+
     async def _scan_query_history(
         self,
         db: AsyncSession,
@@ -223,41 +234,37 @@ class ImpactAnalyzer:
         """
         Scan query history for references to a table/column.
 
-        Uses SQL LIKE queries against generated_sql field.
+        Uses ILIKE as a pre-filter at the database level, then verifies matches
+        using word-boundary regex to eliminate false positives from substring matches.
         """
-        conditions = []
-
-        # Table reference patterns
-        table_patterns = [
-            f"%{table_name}%",
-        ]
-
-        for pattern in table_patterns:
-            conditions.append(QueryHistory.generated_sql.ilike(pattern))
-
+        # Use ILIKE as a broad pre-filter (fast at DB level)
         stmt = (
             select(QueryHistory)
             .where(
                 QueryHistory.executed == True,
-                or_(*conditions),
+                QueryHistory.generated_sql.ilike(f"%{table_name}%"),
             )
             .order_by(QueryHistory.id.desc())
-            .limit(limit)
+            .limit(limit * 2)  # Over-fetch since post-filter may reduce results
         )
 
         result = await db.execute(stmt)
         rows = result.scalars().all()
 
-        # If column specified, further filter in Python for accuracy
-        if column_name:
-            filtered = []
-            for row in rows:
-                sql_lower = row.generated_sql.lower()
-                if column_name.lower() in sql_lower:
-                    filtered.append(row)
-            return filtered
+        # Post-filter: verify table name is an actual identifier, not a substring
+        verified = [
+            row for row in rows
+            if self._is_identifier_match(row.generated_sql, table_name)
+        ]
 
-        return rows
+        # If column specified, further filter for exact column identifier match
+        if column_name:
+            verified = [
+                row for row in verified
+                if self._is_identifier_match(row.generated_sql, column_name)
+            ]
+
+        return verified[:limit]
 
     def _detect_impact_type(
         self, sql: str, table_name: str, column_name: Optional[str]
