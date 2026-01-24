@@ -149,12 +149,13 @@ class SQLLineageParser:
                 return graph
 
             # Extract tables and aliases
-            tables, aliases = self._extract_tables(stmt)
-            graph.tables_used = sorted(tables)
+            tables, aliases, subquery_tables = self._extract_tables(stmt)
+            all_tables = tables | subquery_tables
+            graph.tables_used = sorted(all_tables)
 
             # Create source table nodes
             table_nodes: Dict[str, LineageNode] = {}
-            for table in tables:
+            for table in all_tables:
                 node = LineageNode(
                     id=self._generate_id("table"),
                     node_type=LineageNodeType.SOURCE_TABLE,
@@ -172,6 +173,23 @@ class SQLLineageParser:
                     item, tables, aliases, table_nodes, graph
                 )
 
+            # Add filter edges from subquery tables to output nodes
+            if subquery_tables and graph.output_columns:
+                for sq_table in subquery_tables:
+                    if sq_table in table_nodes:
+                        # Find the first output node to connect the filter to
+                        output_nodes = [
+                            n for n in graph.nodes
+                            if n.node_type == LineageNodeType.OUTPUT_COLUMN
+                        ]
+                        if output_nodes:
+                            graph.edges.append(LineageEdge(
+                                source_id=table_nodes[sq_table].id,
+                                target_id=output_nodes[0].id,
+                                edge_type="filter",
+                                label="filters via subquery",
+                            ))
+
         except Exception as e:
             logger.warning(f"Lineage parsing error: {e}")
 
@@ -179,15 +197,17 @@ class SQLLineageParser:
 
     def _extract_tables(
         self, stmt: sqlparse.sql.Statement
-    ) -> Tuple[Set[str], Dict[str, str]]:
+    ) -> Tuple[Set[str], Dict[str, str], Set[str]]:
         """
-        Extract table names and aliases from a SQL statement.
+        Extract table names and aliases from a SQL statement,
+        including tables referenced in WHERE/HAVING subqueries.
 
         Returns:
-            Tuple of (table names set, alias -> real_name mapping)
+            Tuple of (primary table names, alias -> real_name mapping, subquery table names)
         """
         tables: Set[str] = set()
         aliases: Dict[str, str] = {}
+        subquery_tables: Set[str] = set()
 
         from_seen = False
         join_seen = False
@@ -241,7 +261,61 @@ class SQLLineageParser:
                     join_seen = True
                     from_seen = False
 
-        return tables, aliases
+            # Extract tables from WHERE/HAVING clause subqueries
+            if isinstance(token, Where):
+                clause_tables = self._extract_tables_from_clause(token)
+                # Only add tables not already in FROM/JOIN as subquery tables
+                for t in clause_tables:
+                    if t not in tables:
+                        subquery_tables.add(t)
+
+        return tables, aliases, subquery_tables
+
+    def _extract_tables_from_clause(self, token) -> Set[str]:
+        """
+        Recursively extract table names from subqueries within a clause
+        (WHERE, HAVING, or any parenthesized expression).
+        """
+        tables: Set[str] = set()
+
+        for sub in token.tokens:
+            if isinstance(sub, Parenthesis):
+                inner = sub.value.strip('()')
+                stripped = inner.strip()
+                if stripped.upper().startswith('SELECT'):
+                    # This is a subquery - parse it for tables
+                    subquery_tables = self._extract_tables_from_subquery(stripped)
+                    tables.update(subquery_tables)
+                else:
+                    # Could be nested parentheses, recurse
+                    tables.update(self._extract_tables_from_clause(sub))
+            elif isinstance(sub, (IdentifierList, Identifier)):
+                # Recurse into identifiers that may contain subqueries
+                tables.update(self._extract_tables_from_clause(sub))
+
+        return tables
+
+    def _extract_tables_from_subquery(self, sql: str) -> Set[str]:
+        """
+        Parse a subquery SQL string and extract all table names,
+        including from nested subqueries.
+        """
+        tables: Set[str] = set()
+
+        try:
+            parsed = sqlparse.parse(sql.strip())
+            if not parsed:
+                return tables
+
+            stmt = parsed[0]
+            # Recursively extract tables from the subquery
+            primary, _, nested_subquery = self._extract_tables(stmt)
+            tables.update(primary)
+            tables.update(nested_subquery)
+        except Exception as e:
+            logger.debug(f"Error parsing subquery for tables: {e}")
+
+        return tables
 
     def _is_subquery(self, token: Identifier) -> bool:
         """Check if an identifier contains a subquery."""

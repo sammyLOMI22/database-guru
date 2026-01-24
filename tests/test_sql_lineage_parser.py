@@ -438,3 +438,143 @@ class TestEdgeCases:
 
         # Should at least recognize the subquery alias as a table
         assert len(graph.tables_used) >= 1
+
+
+class TestWhereSubqueries:
+    """Tests for subquery extraction in WHERE clauses."""
+
+    @pytest.fixture
+    def parser(self):
+        return SQLLineageParser()
+
+    def test_where_in_subquery(self, parser):
+        sql = """
+        SELECT * FROM orders
+        WHERE customer_id IN (SELECT customer_id FROM customers WHERE state = 'TX')
+        """
+        graph = parser.parse(sql)
+
+        assert "orders" in graph.tables_used
+        assert "customers" in graph.tables_used
+        assert len(graph.tables_used) == 2
+
+    def test_where_in_subquery_with_schema_prefix(self, parser):
+        sql = """
+        SELECT * FROM orders
+        WHERE customer_id IN (
+            SELECT customers.customer_id FROM customers WHERE state = 'TX'
+        ) AND status = 'shipped' LIMIT 100
+        """
+        graph = parser.parse(sql)
+
+        assert "orders" in graph.tables_used
+        assert "customers" in graph.tables_used
+
+    def test_where_exists_subquery(self, parser):
+        sql = """
+        SELECT o.id, o.total FROM orders o
+        WHERE EXISTS (
+            SELECT 1 FROM payments p WHERE p.order_id = o.id
+        )
+        """
+        graph = parser.parse(sql)
+
+        assert "orders" in graph.tables_used
+        assert "payments" in graph.tables_used
+
+    def test_where_scalar_subquery(self, parser):
+        sql = """
+        SELECT name, salary FROM employees
+        WHERE salary > (SELECT AVG(salary) FROM employees)
+        """
+        graph = parser.parse(sql)
+
+        assert "employees" in graph.tables_used
+
+    def test_where_not_in_subquery(self, parser):
+        sql = """
+        SELECT * FROM products
+        WHERE category_id NOT IN (
+            SELECT id FROM categories WHERE deprecated = true
+        )
+        """
+        graph = parser.parse(sql)
+
+        assert "products" in graph.tables_used
+        assert "categories" in graph.tables_used
+
+    def test_nested_subqueries_in_where(self, parser):
+        sql = """
+        SELECT * FROM orders
+        WHERE customer_id IN (
+            SELECT id FROM customers
+            WHERE region_id IN (
+                SELECT id FROM regions WHERE country = 'US'
+            )
+        )
+        """
+        graph = parser.parse(sql)
+
+        assert "orders" in graph.tables_used
+        assert "customers" in graph.tables_used
+        assert "regions" in graph.tables_used
+
+    def test_multiple_subqueries_in_where(self, parser):
+        sql = """
+        SELECT * FROM orders
+        WHERE customer_id IN (SELECT id FROM customers)
+        AND product_id IN (SELECT id FROM products WHERE active = true)
+        """
+        graph = parser.parse(sql)
+
+        assert "orders" in graph.tables_used
+        assert "customers" in graph.tables_used
+        assert "products" in graph.tables_used
+
+    def test_subquery_table_not_expanded_in_star(self, parser):
+        sql = """
+        SELECT * FROM orders
+        WHERE customer_id IN (SELECT id FROM customers)
+        """
+        graph = parser.parse(sql)
+
+        # SELECT * should only expand the primary table (orders), not customers
+        output_labels = [n.label for n in graph.nodes if n.node_type.value == "output_column"]
+        assert "orders.*" in output_labels
+        assert "customers.*" not in output_labels
+
+    def test_subquery_creates_filter_edge(self, parser):
+        sql = """
+        SELECT * FROM orders
+        WHERE customer_id IN (SELECT id FROM customers)
+        """
+        graph = parser.parse(sql)
+
+        # Should have a filter edge from customers table to output
+        filter_edges = [e for e in graph.edges if e.edge_type == "filter"]
+        assert len(filter_edges) == 1
+        assert filter_edges[0].label == "filters via subquery"
+
+        # The filter edge source should be the customers table node
+        customers_node = next(n for n in graph.nodes if n.table_name == "customers")
+        assert filter_edges[0].source_id == customers_node.id
+
+    def test_subquery_shared_table_not_duplicated(self, parser):
+        """When subquery references same table as FROM, don't add it as subquery table."""
+        sql = """
+        SELECT * FROM employees
+        WHERE salary > (SELECT AVG(salary) FROM employees)
+        """
+        graph = parser.parse(sql)
+
+        # employees should appear only once in tables_used
+        assert graph.tables_used.count("employees") == 1
+        # Only one SOURCE_TABLE node for employees
+        source_nodes = [
+            n for n in graph.nodes
+            if n.table_name == "employees" and n.node_type.value == "source_table"
+        ]
+        assert len(source_nodes) == 1
+        # No filter edge since it's the same table
+        filter_edges = [e for e in graph.edges if e.edge_type == "filter"]
+        assert len(filter_edges) == 0
