@@ -88,6 +88,17 @@ function App() {
               <SchemaPanel onAnalyzeImpact={handleAnalyzeImpact} lastSql={lastExecutedSql} />
             </div>
 
+            {/* Lineage */}
+            <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'lineage' ? '' : 'hidden'}`}>
+              <div className="flex-1 flex flex-col h-full min-h-0">
+                <LineagePanel
+                  initialSql={lineageNav?.sql}
+                  initialTab={lineageNav?.tab}
+                  initialImpactTable={lineageNav?.impactTable}
+                />
+              </div>
+            </div>
+
             {/* Feedback */}
             <div className={`flex-1 overflow-auto p-6 pb-32 ${activeTab === 'feedback' ? '' : 'hidden'}`}>
               <FeedbackStats />
@@ -106,17 +117,6 @@ function App() {
             {/* Pools */}
             <div className={`flex-1 overflow-auto p-6 pb-32 ${activeTab === 'pools' ? '' : 'hidden'}`}>
               <ConnectionPoolMetrics />
-            </div>
-
-            {/* Lineage */}
-            <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'lineage' ? '' : 'hidden'}`}>
-              <div className="flex-1 flex flex-col h-full min-h-0">
-                <LineagePanel
-                  initialSql={lineageNav?.sql}
-                  initialTab={lineageNav?.tab}
-                  initialImpactTable={lineageNav?.impactTable}
-                />
-              </div>
             </div>
 
             {/* Settings */}

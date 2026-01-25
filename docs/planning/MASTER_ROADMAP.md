@@ -74,11 +74,31 @@
     │                                    READY TO IMPLEMENT                                    │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │                      LINEAGE INTELLIGENCE (Phase 12) - LLM-Powered                        │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐ │
+    │  │ 12.1 Lineage│   │ 12.2 Impact │   │ 12.3 Schema │   │ 12.4 Pattern│   │ 12.5 Lineage│ │
+    │  │ Narrator    │──▶│ Advisor     │──▶│ Health      │──▶│ Intelligence│──▶│ Chat        │ │
+    │  │             │   │             │   │ Analyzer    │   │             │   │             │ │
+    │  │ • Data flow │   │ • Migration │   │             │   │ • Bottleneck│   │ • NL queries│ │
+    │  │   explain   │   │   guides    │   │ • Index     │   │   root cause│   │ • Multi-turn│ │
+    │  │ • Column    │   │ • Risk      │   │   suggest   │   │ • Anti-     │   │ • Schema Q&A│ │
+    │  │   semantics │   │   explain   │   │ • Normal-   │   │   patterns  │   │             │ │
+    │  │ • Business  │   │ • SQL patch │   │   ization   │   │ • Trend     │   │ ~1000 lines │ │
+    │  │   context   │   │   generate  │   │ • Type      │   │   analysis  │   │             │ │
+    │  │             │   │             │   │   suggest   │   │             │   │             │ │
+    │  │ ~800 lines  │   │ ~900 lines  │   │ ~1000 lines │   │ ~800 lines  │   │             │ │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘ │
+    │                                                                                           │
+    │  Prereq: Phase 11 (Data Lineage) | Priority: HIGH | Est: 8-10 days | ~4,500 lines        │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
     ┌──────────────────────┐  ┌──────────────────────┐
     │   Table Statistics   │  │   Schema Health      │
     │   (Row counts, size) │  │   (Missing PKs, etc) │
     │   Est: ~280 lines    │  │   Est: ~270 lines    │
-    │   Standalone         │  │   Standalone         │
+    │   Standalone         │  │   (Part of 12.3)     │
     └──────────────────────┘  └──────────────────────┘
 
 
@@ -176,21 +196,32 @@
     │  & Impact Panel   │     │  (Overlay + Menu) │
     └───────────────────┘     └───────────────────┘
             │
-            │
             ▼
     ┌───────────────┐
     │ Phase 11.5 ✅ │
     │ Query Pattern │
     │ Analytics     │
-    │ (33 tests)    │
     └───────────────┘
             │
             ▼
     ┌───────────────┐
-    │ Phase 11.6    │  ◀── NEXT
+    │ Phase 11.6    │  ◀── CURRENT
     │ Polish &      │
     │ Testing       │
     └───────────────┘
+            │
+            ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                LINEAGE INTELLIGENCE (Phase 12)                   │
+    │                     LLM-Powered Features                         │
+    │                                                                  │
+    │  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
+    │  │ 12.1    │──▶│ 12.2    │──▶│ 12.3    │──▶│ 12.4    │──▶│ 12.5    │
+    │  │ Lineage │   │ Impact  │   │ Schema  │   │ Pattern │   │ Lineage │
+    │  │ Narrator│   │ Advisor │   │ Health  │   │ Intel.  │   │ Chat    │
+    │  └─────────┘   └─────────┘   └─────────┘   └─────────┘   └─────────┘
+    │                                                                  │
+    └─────────────────────────────────────────────────────────────────┘
 
 
     INDEPENDENT FEATURES (Can Start Anytime):
@@ -218,17 +249,20 @@
 - Performance optimization for large lineage graphs
 - Edge case handling and error states
 
-### Priority 2: Table Sorting (Quick Win)
+### Priority 2: Lineage Intelligence Phase 12 (LLM-Powered)
+**Why**: Transforms Database Guru from query tool to intelligence platform
+- **12.1 Lineage Narrator**: Explain data flows in business terms
+- **12.2 Impact Advisor**: Migration guides, risk explanations, SQL patches
+- **12.3 Schema Health Analyzer**: Index suggestions, normalization, type improvements
+- **12.4 Pattern Intelligence**: Bottleneck root cause, anti-pattern detection
+- **12.5 Conversational Lineage**: Natural language queries about schema and lineage
+- See: [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) for full details
+
+### Priority 3: Table Sorting (Quick Win)
 **Why**: Immediate UX improvement, independent of lineage work
 - Click column header to sort
 - Asc/Desc toggle indicator
 - Multi-column sort support
-
-### Priority 3: Schema Health Analysis
-**Why**: Standalone feature, complements ER Diagrams
-- Missing primary key detection
-- Orphaned foreign key detection
-- Schema quality scoring
 
 ---
 
@@ -237,6 +271,7 @@
 | Category | Features | Status | Total Effort |
 |----------|----------|--------|--------------|
 | **Visualization** | ER Diagrams, Data Lineage | Phase 7 done, Phase 11.1-11.5 done | ~300 lines remaining (11.6) |
+| **LLM Intelligence** | Lineage Narrator, Impact Advisor, Schema Health, Pattern Intel, Lineage Chat | **PLANNED (Phase 12)** | ~4,500 lines |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Table UX** | Sorting, Resizing, Export | Not started | ~600 lines |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
@@ -275,8 +310,9 @@
 - [FUTURE_PLANS.md](FUTURE_PLANS.md) - Core roadmap
 - [ADVANCED_VISUALIZATION_PHASE2_PLAN.md](ADVANCED_VISUALIZATION_PHASE2_PLAN.md) - Visualization features
 - [SMALL_MODEL_OPTIMIZATION_PHASE2.md](SMALL_MODEL_OPTIMIZATION_PHASE2.md) - LLM optimization features
-- [DATA_LINGEAGE_PLAN.md](DATA_LINGEAGE_PLAN.md) - Data Lineage & Impact Analysis plan
+- [DATA_LINGEAGE_PLAN.md](DATA_LINGEAGE_PLAN.md) - Data Lineage & Impact Analysis plan (Phase 11)
+- [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) - **LLM-Powered Lineage Intelligence (Phase 12)** ← NEW
 
 ---
 
-**Updated**: January 24, 2026 (Phase 11.5 complete)
+**Updated**: January 24, 2026 (Phase 12 Lineage Intelligence planned)
