@@ -62,8 +62,9 @@
                     │          View Lineage, Analyze Impact btns)  │
                     │  ✅ 11.4 ER Extensions (QueryPathOverlay,  │
                     │          ERContextMenu, cross-nav)           │
-                    │  ► 11.5 Query Pattern Analytics (Heatmap)  │
-                    │  ○ 11.6 Polish & Testing                    │
+                    │  ✅ 11.5 Query Pattern Analytics (Heatmap,  │
+                    │          QueryPatternAnalyzer, 33 tests)     │
+                    │  ► 11.6 Polish & Testing                    │
                     │                                             │
                     │  Branch: data-lineage | Priority: HIGH      │
                     └─────────────────────────────────────────────┘
@@ -175,14 +176,21 @@
     │  & Impact Panel   │     │  (Overlay + Menu) │
     └───────────────────┘     └───────────────────┘
             │
-            ├──────────────────┐
-            ▼                  ▼
-    ┌───────────────┐  ┌───────────────┐
-    │ Phase 11.5    │  │ Phase 11.6    │
-    │ Query Pattern │  │ Polish &      │  ◀── NEXT
-    │ Analytics     │  │ Testing       │
-    │ (Heatmap)     │  │               │
-    └───────────────┘  └───────────────┘
+            │
+            ▼
+    ┌───────────────┐
+    │ Phase 11.5 ✅ │
+    │ Query Pattern │
+    │ Analytics     │
+    │ (33 tests)    │
+    └───────────────┘
+            │
+            ▼
+    ┌───────────────┐
+    │ Phase 11.6    │  ◀── NEXT
+    │ Polish &      │
+    │ Testing       │
+    └───────────────┘
 
 
     INDEPENDENT FEATURES (Can Start Anytime):
@@ -203,27 +211,20 @@
 
 ## Recommended Next Steps
 
-### Priority 1: Data Lineage Phase 11.5 (Query Pattern Analytics)
-**Why**: Continues active branch, completes the lineage feature set
-- `QueryPatternAnalyzer` backend - Analyze query history for table/column usage
-- `QueryPatternHeatmap.tsx` - Usage frequency visualization
-- Time range filtering, per-connection/cross-connection scope
-- Table frequency badges on ER diagram nodes
-
-### Priority 2: Data Lineage Phase 11.6 (Polish & Testing)
+### Priority 1: Data Lineage Phase 11.6 (Polish & Testing)
 **Why**: Finalizes Phase 11 for merge to main
 - E2E tests for cross-component navigation flows
 - Unit tests for ColumnLineage, ImpactAnalysisPanel, QueryPathOverlay
 - Performance optimization for large lineage graphs
 - Edge case handling and error states
 
-### Priority 3: Table Sorting (Quick Win)
+### Priority 2: Table Sorting (Quick Win)
 **Why**: Immediate UX improvement, independent of lineage work
 - Click column header to sort
 - Asc/Desc toggle indicator
 - Multi-column sort support
 
-### Priority 4: Schema Health Analysis
+### Priority 3: Schema Health Analysis
 **Why**: Standalone feature, complements ER Diagrams
 - Missing primary key detection
 - Orphaned foreign key detection
@@ -235,7 +236,7 @@
 
 | Category | Features | Status | Total Effort |
 |----------|----------|--------|--------------|
-| **Visualization** | ER Diagrams, Data Lineage | Phase 7 done, Phase 11.1-11.4 done | ~800 lines remaining (11.5-11.6) |
+| **Visualization** | ER Diagrams, Data Lineage | Phase 7 done, Phase 11.1-11.5 done | ~300 lines remaining (11.6) |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Table UX** | Sorting, Resizing, Export | Not started | ~600 lines |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
@@ -263,8 +264,9 @@
 | ER Diagrams (Phase 7) | Schema visualization | React Flow + Dagre |
 | Data Lineage 11.1-11.2 | Lineage graph + Impact analysis | 62 tests |
 | Data Lineage 11.3-11.4 | Column lineage, Impact panel, ER overlay, cross-nav | ~1,200 lines |
+| Data Lineage 11.5 | QueryPatternAnalyzer, QueryPatternHeatmap, connection_id FK | 33 tests |
 
-**Total Tests**: 660+ passing
+**Total Tests**: 693+ passing
 
 ---
 
@@ -277,4 +279,4 @@
 
 ---
 
-**Updated**: January 24, 2026
+**Updated**: January 24, 2026 (Phase 11.5 complete)
