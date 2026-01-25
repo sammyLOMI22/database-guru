@@ -472,7 +472,7 @@ class SQLLineageParser:
         # Detect expression (CASE, arithmetic, etc.)
         expr_str = result["expression"].upper()
         if not result["is_function"] and not result["is_star"]:
-            if any(op in expr_str for op in ['CASE', '+', '-', '*/', '||', 'CONCAT']):
+            if any(op in expr_str for op in ['CASE', '+', '-', '*', '/', '||', 'CONCAT']):
                 result["is_function"] = True
                 if 'CASE' in expr_str:
                     result["function_name"] = "CASE"

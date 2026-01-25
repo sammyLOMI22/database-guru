@@ -350,3 +350,17 @@ class TestSummary:
         analysis = await analyzer.analyze_table_impact(db_session, "customers")
         assert "queries reference" in analysis.summary
         assert "customers" in analysis.summary
+
+
+class TestRiskLevelThresholds:
+    """Test risk level boundary conditions."""
+
+    def test_risk_level_boundaries(self, analyzer):
+        """Verify risk level thresholds are correct."""
+        # Test the assess_risk method directly
+        assert analyzer._assess_risk(21) == RiskLevel.HIGH.value
+        assert analyzer._assess_risk(20) == RiskLevel.MEDIUM.value
+        assert analyzer._assess_risk(5) == RiskLevel.MEDIUM.value
+        assert analyzer._assess_risk(4) == RiskLevel.LOW.value
+        assert analyzer._assess_risk(0) == RiskLevel.LOW.value
+

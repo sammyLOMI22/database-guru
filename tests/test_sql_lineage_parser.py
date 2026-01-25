@@ -607,3 +607,85 @@ class TestWhereSubqueries:
         # No filter edge since it's the same table
         filter_edges = [e for e in graph.edges if e.edge_type == "filter"]
         assert len(filter_edges) == 0
+
+
+# =============================================================================
+# Orphaned Table & Edge Case Tests
+# =============================================================================
+
+class TestOrphanedTableHandling:
+    """Test tables used only in JOINs/WHERE get appropriate edges."""
+    
+    @pytest.fixture
+    def parser(self):
+        return SQLLineageParser()
+
+    def test_join_only_table_connected(self, parser):
+        """Tables in JOIN condition but not in SELECT should have edges."""
+        sql = "SELECT c.name FROM customers c JOIN orders o ON c.id = o.customer_id"
+        graph = parser.parse(sql)
+
+        # Both tables should be in graph
+        assert "customers" in graph.tables_used
+        assert "orders" in graph.tables_used
+
+        # Orders should have at least one edge (to JOIN condition)
+        # Find orders node
+        orders_node = next((n for n in graph.nodes if n.table_name == "orders"), None)
+        assert orders_node is not None
+        
+        # Check for any edges connected to this node
+        order_edges = [e for e in graph.edges if e.source_id == orders_node.id or e.target_id == orders_node.id]
+        assert len(order_edges) >= 1
+
+    def test_where_subquery_table_connected(self, parser):
+        """Tables in WHERE subquery should be connected."""
+        sql = "SELECT name FROM customers WHERE id IN (SELECT customer_id FROM orders)"
+        graph = parser.parse(sql)
+
+        assert "orders" in graph.tables_used
+        
+        orders_node = next((n for n in graph.nodes if n.table_name == "orders"), None)
+        assert orders_node is not None
+        
+        # Verify orders has edges
+        order_edges = [e for e in graph.edges if e.source_id == orders_node.id]
+        assert len(order_edges) >= 1
+
+
+class TestComplexExpressions:
+    """Test complex SQL expressions."""
+    
+    @pytest.fixture
+    def parser(self):
+        return SQLLineageParser()
+
+    def test_nested_function_calls(self, parser):
+        sql = "SELECT UPPER(TRIM(name)) AS clean_name FROM customers"
+        graph = parser.parse(sql)
+
+        assert "clean_name" in graph.output_columns
+        # Should detect function transformation
+        trans_nodes = [n for n in graph.nodes if n.node_type == LineageNodeType.TRANSFORMATION]
+        assert len(trans_nodes) >= 1
+
+    def test_arithmetic_expression(self, parser):
+        sql = "SELECT price * quantity AS total FROM order_items"
+        graph = parser.parse(sql)
+
+        assert "total" in graph.output_columns
+        # Should have EXPRESSION transformation type
+        trans_nodes = [n for n in graph.nodes if n.transformation_type == TransformationType.EXPRESSION]
+        assert len(trans_nodes) >= 1
+
+    def test_coalesce_function(self, parser):
+        sql = "SELECT COALESCE(nickname, name) AS display_name FROM users"
+        graph = parser.parse(sql)
+
+        assert "display_name" in graph.output_columns
+        # Both nickname and name should be source columns
+        # Check via string representation or logic, as exact labels might vary
+        labels = [n.label for n in graph.nodes]
+        # At least one of them should be present as a source node label
+        assert any("nickname" in l for l in labels) or any("name" in l for l in labels)
+

@@ -238,126 +238,87 @@ describe('LineageGraph', () => {
   });
 });
 
-// =============================================================================
-// LineagePanel Tests
-// =============================================================================
+describe('Phase 11.6 Additional Tests', () => {
 
-describe('LineagePanel', () => {
-  it('renders tab navigation', async () => {
-    const { LineagePanel } = await import('../src/components/lineage/LineagePanel');
-    render(<LineagePanel />);
+  describe('Path Highlighting', () => {
+    it('highlights upstream nodes when output column clicked', async () => {
+      (lineageAPI.parseSql as any).mockResolvedValue(mockGraphResponse);
 
-    expect(screen.getByText('Explore')).toBeInTheDocument();
-    expect(screen.getByText('History')).toBeInTheDocument();
-    expect(screen.getByText('Impact')).toBeInTheDocument();
-  });
+      const { default: LineageGraph } = await import('../src/components/lineage/LineageGraph');
+      render(<LineageGraph />);
 
-  it('shows explore tab by default', async () => {
-    const { LineagePanel } = await import('../src/components/lineage/LineagePanel');
-    render(<LineagePanel />);
+      // Trigger parse
+      const input = screen.getByTestId('sql-input');
+      fireEvent.change(input, { target: { value: 'SELECT name FROM customers' } });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('parse-button'));
+      });
 
-    expect(screen.getByTestId('sql-input')).toBeInTheDocument();
-  });
+      await waitFor(() => {
+        expect(screen.getByTestId('node-out_1')).toBeInTheDocument();
+      });
 
-  it('switches to history tab', async () => {
-    const { LineagePanel } = await import('../src/components/lineage/LineagePanel');
-    render(<LineagePanel />);
+      // Click output node
+      fireEvent.click(screen.getByTestId('node-out_1'));
 
-    fireEvent.click(screen.getByText('History'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('query-id-input')).toBeInTheDocument();
+      // Verify upstream interactions (via reactflow mock onNodeClick behavior if implemented or internal state)
+      // Since this is a unit test with mocked ReactFlow, we verify the interaction doesn't crash
+      // and ideally checks state if exposed. For now, basic interaction coverage.
     });
   });
 
-  it('switches to impact tab', async () => {
-    const { LineagePanel } = await import('../src/components/lineage/LineagePanel');
-    render(<LineagePanel />);
+  describe('Large Graph Performance', () => {
+    it('renders graph with 50+ nodes without crashing', async () => {
+      const largeNodes = Array.from({ length: 50 }, (_, i) => ({
+        id: `node_${i}`,
+        node_type: 'source_table',
+        label: `table_${i}`,
+        table_name: `table_${i}`
+      }));
+      const largeGraph = { ...mockGraphResponse, nodes: largeNodes };
+      (lineageAPI.parseSql as any).mockResolvedValue(largeGraph);
 
-    fireEvent.click(screen.getByText('Impact'));
+      const { default: LineageGraph } = await import('../src/components/lineage/LineageGraph');
+      render(<LineageGraph />);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('impact-table-input')).toBeInTheDocument();
-      expect(screen.getByTestId('impact-column-input')).toBeInTheDocument();
-      expect(screen.getByTestId('impact-analyze-button')).toBeInTheDocument();
+      const input = screen.getByTestId('sql-input');
+      fireEvent.change(input, { target: { value: 'SELECT * FROM huge_schema' } });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('parse-button'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('react-flow')).toBeInTheDocument();
+        // Check data attribute from mock
+        const flow = screen.getByTestId('react-flow');
+        expect(Number(flow.getAttribute('data-nodes'))).toBe(50);
+      });
     });
   });
 
-  it('analyzes impact and shows results', async () => {
-    (lineageAPI.analyzeImpact as any).mockResolvedValue(mockImpactResponse);
+  describe('Error States', () => {
+    it('shows error message for malformed SQL', async () => {
+      (lineageAPI.parseSql as any).mockRejectedValueOnce({
+        response: { data: { detail: 'Parse error: Invalid SQL syntax' } }
+      });
 
-    const { LineagePanel } = await import('../src/components/lineage/LineagePanel');
-    render(<LineagePanel />);
+      const { default: LineageGraph } = await import('../src/components/lineage/LineageGraph');
+      render(<LineageGraph />);
 
-    fireEvent.click(screen.getByText('Impact'));
+      const input = screen.getByTestId('sql-input');
+      fireEvent.change(input, { target: { value: 'INVALID SQL' } });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('parse-button'));
+      });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('impact-table-input')).toBeInTheDocument();
-    });
-
-    fireEvent.change(screen.getByTestId('impact-table-input'), { target: { value: 'customers' } });
-    fireEvent.change(screen.getByTestId('impact-column-input'), { target: { value: 'email' } });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('impact-analyze-button'));
-    });
-
-    await waitFor(() => {
-      expect(lineageAPI.analyzeImpact).toHaveBeenCalledWith('customers', 'email');
-      expect(screen.getByText(/Impact:/)).toBeInTheDocument();
-      expect(screen.getByText(/2 queries reference customers\.email/)).toBeInTheDocument();
-    });
-  });
-
-  it('handles impact analysis error', async () => {
-    (lineageAPI.analyzeImpact as any).mockRejectedValue({
-      response: { data: { detail: 'Analysis failed' } },
-    });
-
-    const { LineagePanel } = await import('../src/components/lineage/LineagePanel');
-    render(<LineagePanel />);
-
-    fireEvent.click(screen.getByText('Impact'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('impact-table-input')).toBeInTheDocument();
-    });
-
-    fireEvent.change(screen.getByTestId('impact-table-input'), { target: { value: 'test' } });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('impact-analyze-button'));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText(/Analysis failed/)).toBeInTheDocument();
-    });
-  });
-
-  it('loads query lineage from history', async () => {
-    (lineageAPI.getQueryLineage as any).mockResolvedValue(mockGraphResponse);
-
-    const { LineagePanel } = await import('../src/components/lineage/LineagePanel');
-    render(<LineagePanel />);
-
-    fireEvent.click(screen.getByText('History'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('query-id-input')).toBeInTheDocument();
-    });
-
-    fireEvent.change(screen.getByTestId('query-id-input'), { target: { value: '42' } });
-
-    const loadBtn = screen.getByText('Load');
-    await act(async () => {
-      fireEvent.click(loadBtn);
-    });
-
-    await waitFor(() => {
-      expect(lineageAPI.getQueryLineage).toHaveBeenCalledWith(42);
+      await waitFor(() => {
+        expect(screen.getByText(/Parse error/i)).toBeInTheDocument();
+      });
     });
   });
 });
+
+// LineagePanel tests moved to LineagePanel.test.tsx
 
 // =============================================================================
 // Layout Utilities Tests

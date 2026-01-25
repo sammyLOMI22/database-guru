@@ -227,3 +227,51 @@ class TestHeatmapData:
         assert result.join_patterns == []
         assert result.bottlenecks == []
         assert result.total_queries_analyzed == 0
+
+
+class TestHeatmapDataIntegration:
+    """Test the combined get_heatmap_data() method."""
+
+    @pytest.mark.asyncio
+    async def test_heatmap_data_structure(self, analyzer, db_session):
+        """Verify heatmap data has all required fields."""
+        data = await analyzer.get_heatmap_data(
+            db_session,
+            connection_id=1,
+            time_range_days=30
+        )
+
+        # Verify structure
+        assert hasattr(data, 'table_usage')
+        assert hasattr(data, 'join_patterns')
+        assert hasattr(data, 'bottlenecks')
+
+        # Verify types
+        assert all(isinstance(t, TableUsageEntry) for t in data.table_usage)
+        assert all(isinstance(j, JoinPattern) for j in data.join_patterns)
+        assert all(isinstance(b, PerformanceBottleneck) for b in data.bottlenecks)
+
+    @pytest.mark.asyncio
+    async def test_bottleneck_score_range(self, analyzer, db_session):
+        """Verify bottleneck scores are in 0-1 range."""
+        data = await analyzer.get_heatmap_data(db_session, connection_id=1)
+
+        for bottleneck in data.bottlenecks:
+            assert 0.0 <= bottleneck.bottleneck_score <= 1.0
+
+
+class TestTimeRangeFiltering:
+    """Test time range filtering accuracy."""
+
+    @pytest.mark.asyncio
+    async def test_7_day_filter(self, analyzer, db_session):
+        """Verify 7-day filter excludes older queries."""
+        # Get data for 7 days
+        data_7 = await analyzer.get_heatmap_data(db_session, time_range_days=7)
+
+        # Get data for 30 days
+        data_30 = await analyzer.get_heatmap_data(db_session, time_range_days=30)
+
+        # 30-day should have >= 7-day counts
+        assert sum(t.query_count for t in data_30.table_usage) >= sum(t.query_count for t in data_7.table_usage)
+

@@ -92,16 +92,17 @@ export function LineagePanel({ initialSql, initialTab, initialImpactTable }: Lin
     <div className="flex flex-col h-full">
       {/* Tab Navigation */}
       <div className="flex-shrink-0 px-4 pt-4 pb-2">
-        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl" role="tablist">
           {TABS.map((tab) => (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all duration-300 ${
-                activeTab === tab.id
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all duration-300 ${activeTab === tab.id
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
                   : 'text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-700/50'
-              }`}
+                }`}
             >
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
