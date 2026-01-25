@@ -9,7 +9,7 @@ import logging
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import select
@@ -327,7 +327,7 @@ class QueryPatternAnalyzer:
             stmt = stmt.where(QueryHistory.connection_id == connection_id)
 
         if time_range_days is not None:
-            cutoff = datetime.utcnow() - timedelta(days=time_range_days)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=time_range_days)
             stmt = stmt.where(QueryHistory.created_at >= cutoff)
 
         stmt = stmt.order_by(QueryHistory.created_at.desc()).limit(MAX_QUERIES)

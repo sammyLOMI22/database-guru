@@ -43,49 +43,37 @@ describe('ImpactAnalysisPanel', () => {
         vi.clearAllMocks();
     });
 
-    describe('Input Form', () => {
-        it('renders table and column input fields', () => {
-            render(<ImpactAnalysisPanel tableName="test_table" />);
+    describe('Loading State', () => {
+        it('shows loading indicator when analyzing', async () => {
+            // Make the mock hang to show loading state
+            vi.mocked(lineageAPI.analyzeImpact).mockImplementation(
+                () => new Promise(() => {}) // Never resolves
+            );
 
-            expect(screen.getByLabelText(/table name/i)).toBeInTheDocument();
-            expect(screen.getByLabelText(/column name/i)).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: /analyze/i })).toBeInTheDocument();
+            render(<ImpactAnalysisPanel tableName="customers" autoAnalyze={true} />);
+
+            expect(screen.getByText(/analyzing impact/i)).toBeInTheDocument();
         });
 
-        it('requires table name before analyzing', async () => {
-            // If tableName is empty prop, verify behavior. Assuming component uses prop for initial but validation might be on internal state?
-            // Actually ImpactAnalysisPanel component implementation uses props `tableName` to initialize but also has local state?
-            // Line 46: const [impactTable, setImpactTable] ... NO, ImpactAnalysisPanel takes props and runs analysis.
-            // Wait, ImpactAnalysisPanel logic (line 18): receives tableName.
-            // line 23: analyze() checks `if (!tableName.trim()) return;`.
-            // It does NOT render input fields itself?
-            // Line 72: returns div space-y-4 containing results. 
-            // Where are inputs?
-            // Ah, LineagePanel renders inputs! ImpactAnalysisPanel ONLY renders RESULTS.
-            // LineagePanel.tsx lines 177-214 render inputs.
-            // LineagePanel.tsx line 218 renders ImpactAnalysisPanel ONLY if submittedImpact is true.
+        it('renders nothing without autoAnalyze', () => {
+            render(<ImpactAnalysisPanel tableName="customers" />);
 
-            // So ImpactAnalysisPanel tests should only test RESULT DISPLAY, not inputs (unless ImpactAnalysisPanel has inputs too?)
-            // Checked ImpactAnalysisPanel.tsx content: It shows status (loading/error) and results. It does NOT have inputs.
-
-            // Therefore, "Input Form" tests in ImpactAnalysisPanel.test.tsx are WRONG because the component doesn't have inputs.
-            // I should remove "Input Form" tests from ImpactAnalysisPanel.test.tsx.
-            // And "Impact Results" tests should assume props are passed.
+            // Without autoAnalyze, no API call, no result, renders null
+            expect(screen.queryByText(/analyzing/i)).not.toBeInTheDocument();
+            expect(screen.queryByText(/impact/i)).not.toBeInTheDocument();
         });
     });
 
     describe('Impact Results', () => {
-        it('displays impacted queries after analysis', async () => {
+        it('displays impact summary after analysis', async () => {
             vi.mocked(lineageAPI.analyzeImpact).mockResolvedValueOnce(mockImpactResponse);
 
-            // Render with autoAnalyze=true to trigger effect
             render(<ImpactAnalysisPanel tableName="customers" columnName="name" autoAnalyze={true} />);
 
             await waitFor(() => {
-                expect(screen.getByText(/2 queries.*affected/i)).toBeInTheDocument();
+                // Check for summary text
+                expect(screen.getByText(/2 queries impacted/i)).toBeInTheDocument();
             });
-
-            expect(screen.getByText(/medium/i)).toBeInTheDocument(); // Risk level
         });
 
         it('shows risk level badge', async () => {
@@ -94,20 +82,41 @@ describe('ImpactAnalysisPanel', () => {
             render(<ImpactAnalysisPanel tableName="customers" autoAnalyze={true} />);
 
             await waitFor(() => {
-                const badge = screen.getByText(/medium/i);
-                expect(badge).toBeInTheDocument();
+                // Risk level badge shows "MEDIUM" (uppercase)
+                expect(screen.getByText('MEDIUM')).toBeInTheDocument();
+            });
+        });
+
+        it('displays affected queries when present', async () => {
+            vi.mocked(lineageAPI.analyzeImpact).mockResolvedValueOnce(mockImpactResponse);
+
+            render(<ImpactAnalysisPanel tableName="customers" autoAnalyze={true} />);
+
+            await waitFor(() => {
+                // Shows affected queries header
+                expect(screen.getByText(/Affected Queries \(2\)/i)).toBeInTheDocument();
+            });
+        });
+
+        it('shows changed object in header', async () => {
+            vi.mocked(lineageAPI.analyzeImpact).mockResolvedValueOnce(mockImpactResponse);
+
+            render(<ImpactAnalysisPanel tableName="customers" columnName="name" autoAnalyze={true} />);
+
+            await waitFor(() => {
+                expect(screen.getByText(/Impact: customers\.name/i)).toBeInTheDocument();
             });
         });
     });
 
     describe('Empty Results', () => {
-        it('shows no impact message when no queries affected', async () => {
+        it('shows summary but no affected queries section when zero impact', async () => {
             vi.mocked(lineageAPI.analyzeImpact).mockResolvedValueOnce({
                 impacted_queries: [],
                 total_affected: 0,
                 risk_level: 'low',
                 risk_counts: { low: 0, medium: 0, high: 0 },
-                summary: 'No impact',
+                summary: 'No queries would be affected',
                 changed_object: 'unused_table',
                 object_type: 'table'
             });
@@ -115,11 +124,25 @@ describe('ImpactAnalysisPanel', () => {
             render(<ImpactAnalysisPanel tableName="unused_table" autoAnalyze={true} />);
 
             await waitFor(() => {
-                // Since ImpactAnalysisPanel renders `result.summary`
-                expect(screen.getByText(/No impact/i)).toBeInTheDocument();
-                expect(screen.getByText(/Affected Queries \(0\)/i)).toBeInTheDocument(); // Wait, line 95: condition result.impacted_queries.length > 0.
-                // So header "Affected Queries" won't show.
-                // But summary will show.
+                // Summary should show
+                expect(screen.getByText(/No queries would be affected/i)).toBeInTheDocument();
+                // LOW risk badge
+                expect(screen.getByText('LOW')).toBeInTheDocument();
+            });
+
+            // Affected Queries section should NOT be rendered (impacted_queries.length === 0)
+            expect(screen.queryByText(/Affected Queries/i)).not.toBeInTheDocument();
+        });
+    });
+
+    describe('Error Handling', () => {
+        it('displays error message on API failure', async () => {
+            vi.mocked(lineageAPI.analyzeImpact).mockRejectedValueOnce(new Error('Network error'));
+
+            render(<ImpactAnalysisPanel tableName="customers" autoAnalyze={true} />);
+
+            await waitFor(() => {
+                expect(screen.getByText(/Network error/i)).toBeInTheDocument();
             });
         });
     });

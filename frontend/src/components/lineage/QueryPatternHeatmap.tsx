@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { lineageAPI } from '../../services/lineageApi';
 import { connectionsAPI } from '../../services/api';
+import { useDarkMode } from '../../hooks/useDarkMode';
 import type { HeatmapDataResponse, TableUsageEntry, JoinPattern } from '../../types/lineage';
 import type { DatabaseConnection } from '../../types/api';
 
@@ -75,7 +76,7 @@ export function QueryPatternHeatmap() {
   const [error, setError] = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
 
-  const isDark = document.documentElement.classList.contains('dark');
+  const { isDarkMode: isDark } = useDarkMode();
 
   // Fetch connections
   useEffect(() => {
