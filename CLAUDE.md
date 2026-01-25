@@ -272,6 +272,40 @@ The system uses a multi-agent architecture with specialized agents that work tog
     - Key classes: `PromptBudget`, `ModelPromptTemplate`, `OptimizedPrompt`, `ModelSize`, `ModelFamily`
     - Test coverage: 52 tests in `tests/test_prompt_optimizer.py`
 
+### Data Lineage System (`src/lineage/`) **NEW - January 2026**
+
+The lineage system provides column-level data lineage tracking, schema change impact analysis, and query pattern analytics:
+
+1. **SQL Lineage Parser** (`src/lineage/sql_lineage_parser.py`) - 835 lines
+   - Parses SQL queries to extract column-level lineage
+   - **Node Types**: SOURCE_TABLE, SOURCE_COLUMN, TRANSFORMATION, OUTPUT_COLUMN
+   - **Transformation Types**: DIRECT, AGGREGATION, EXPRESSION, FUNCTION
+   - Handles JOINs, subqueries, aggregations, CASE expressions
+   - Table alias resolution and schema-qualified names
+   - SELECT * expansion with column tracking
+   - Aggregation functions: COUNT, SUM, AVG, MIN, MAX, GROUP_CONCAT, STRING_AGG
+   - Key classes: `LineageNode`, `LineageEdge`, `LineageGraph`, `SQLLineageParser`
+   - Key methods: `parse()`, `_extract_tables()`, `_extract_select_columns()`, `_process_select_item()`
+
+2. **Impact Analyzer** (`src/lineage/impact_analyzer.py`) - 341 lines
+   - Assesses impact of schema changes on existing queries
+   - **Risk Levels**: LOW (<5 queries), MEDIUM (5-20), HIGH (>20)
+   - **Impact Types**: SELECT, FILTER, JOIN, GROUP, ORDER
+   - Word-boundary regex matching to avoid false positives
+   - ILIKE pre-filter + regex post-filter for accuracy
+   - Key classes: `RiskLevel`, `ImpactType`, `ImpactedQuery`, `ImpactAnalysis`, `ImpactAnalyzer`
+   - Key methods: `analyze_table_impact()`, `analyze_column_impact()`, `get_queries_for_table()`
+
+3. **Query Pattern Analyzer** (`src/lineage/query_pattern_analyzer.py`) - 399 lines
+   - Analyzes query patterns for heatmap visualization
+   - **Table Usage Frequency**: Count table appearances across queries
+   - **Join Patterns**: Common join table pairs with sample SQL
+   - **Performance Bottlenecks**: High-frequency, high-latency tables (bottleneck_score 0-1)
+   - Time range filtering: 7, 30, 90 days or all history
+   - Per-connection scoping for multi-database setups
+   - Key classes: `TableUsageEntry`, `JoinPattern`, `PerformanceBottleneck`, `HeatmapData`
+   - Key methods: `get_table_usage_frequency()`, `get_common_join_patterns()`, `identify_bottlenecks()`, `get_heatmap_data()`
+
 ### Tool System (`src/tools/`)
 
 The tool system provides 10 specialized tools across 4 categories for schema exploration and query validation:
@@ -455,6 +489,13 @@ Endpoints organized by domain (`src/api/endpoints/`):
   - `DELETE /api/cache/llm` - Clear LLM response cache
   - `DELETE /api/cache/all` - Clear all caches
   - `DELETE /api/cache/semantic/connection/{id}` - Clear cache for specific connection
+- `lineage.py` - **Lineage API (NEW - January 2026)** - SQL lineage and impact analysis
+  - `POST /api/lineage/parse` - Parse SQL and return lineage graph
+  - `GET /api/lineage/query/{query_id}` - Get lineage for historical query
+  - `POST /api/lineage/impact` - Analyze schema change impact
+  - `GET /api/lineage/table/{table_name}/queries` - Get queries referencing a table
+  - `GET /api/lineage/stats` - Get lineage statistics
+  - `GET /api/lineage/patterns/{connection_id}` - Get query pattern heatmap data
 
 ## Important Implementation Details
 
@@ -542,6 +583,21 @@ Located in `frontend/src/`:
   - Color-coded task cards (blue, green, purple, orange)
 - `SettingsPanel.tsx` - Updated to include ModelConfigPanel integration
 - `QueryInput.tsx` - Row limit integration with per-task settings
+
+**Data Lineage UI Components (NEW - January 2026)**:
+- `frontend/src/components/lineage/LineagePanel.tsx` (238 lines) - Main 4-tab container (Explore, History, Impact, Patterns)
+- `frontend/src/components/lineage/LineageGraph.tsx` (214 lines) - React Flow visualization with custom nodes/edges
+- `frontend/src/components/lineage/LineageNode.tsx` (102 lines) - Custom node component with 4 types and color coding
+- `frontend/src/components/lineage/LineageEdge.tsx` (85 lines) - Custom animated edge with 7 edge types
+- `frontend/src/components/lineage/ColumnLineage.tsx` (224 lines) - Table view of column-to-column transformations
+- `frontend/src/components/lineage/ImpactAnalysisPanel.tsx` (105 lines) - Schema change impact with risk badges
+- `frontend/src/components/lineage/ImpactedQueryCard.tsx` (42 lines) - Individual impacted query display
+- `frontend/src/components/lineage/QueryPatternHeatmap.tsx` (~100 lines) - 3-view heatmap (Frequency, Joins, Performance)
+- `frontend/src/types/lineage.ts` - TypeScript interfaces for lineage data structures
+- `frontend/src/services/lineageApi.ts` (~100 lines) - API client with 6 methods
+- `frontend/src/utils/lineageLayoutUtils.ts` - Dagre layout engine for visualization
+- Total: **~1,200 lines** of new UI code for data lineage
+- Tests: `frontend/tests/LineageGraph.test.tsx` (15+ tests), `frontend/tests/QueryPatternHeatmap.test.tsx`
 
 ### LLM Prompts
 
@@ -724,6 +780,27 @@ Settings managed via Pydantic in `src/config/settings.py`:
   - `tests/test_query_templates.py` - 510 lines of template engine tests (updated with dialect tests)
   - `tests/test_dialect_registry.py` - 72 lines of dialect registry tests **NEW - Jan 10, 2026**
   - `tests/test_prompt_optimizer.py` - 600 lines of prompt optimizer tests (52 tests) **NEW - Jan 11, 2026**
+- **Data Lineage System (NEW - January 2026)**:
+  - `src/lineage/sql_lineage_parser.py` - SQL parsing for column-level lineage (835 lines)
+  - `src/lineage/sql_lineage_parser.py:parse()` - Main entry point for SQL lineage extraction
+  - `src/lineage/sql_lineage_parser.py:_extract_tables()` - Table extraction from FROM/JOIN/WHERE
+  - `src/lineage/sql_lineage_parser.py:_process_select_item()` - Build lineage edges for output columns
+  - `src/lineage/impact_analyzer.py` - Schema change impact assessment (341 lines)
+  - `src/lineage/impact_analyzer.py:analyze_column_impact()` - Column modification impact
+  - `src/lineage/impact_analyzer.py:analyze_table_impact()` - Table modification impact
+  - `src/lineage/query_pattern_analyzer.py` - Query pattern analytics for heatmap (399 lines)
+  - `src/lineage/query_pattern_analyzer.py:get_heatmap_data()` - Combined analytics endpoint
+  - `src/lineage/query_pattern_analyzer.py:identify_bottlenecks()` - High-frequency, high-latency detection
+  - `src/api/endpoints/lineage.py` - REST API for lineage (6 endpoints, 227 lines)
+  - `frontend/src/components/lineage/LineagePanel.tsx` - Main UI container with 4 tabs
+  - `frontend/src/components/lineage/LineageGraph.tsx` - React Flow visualization
+  - `frontend/src/components/lineage/QueryPatternHeatmap.tsx` - Heatmap visualization
+  - `frontend/src/services/lineageApi.ts` - API client (6 methods)
+  - `frontend/src/utils/lineageLayoutUtils.ts` - Dagre layout engine
+  - `tests/test_sql_lineage_parser.py` - Parser tests (100+ tests)
+  - `tests/test_impact_analyzer.py` - Impact analysis tests (20+ tests)
+  - `tests/test_query_pattern_analyzer.py` - Pattern analyzer tests (20+ tests)
+  - `frontend/tests/LineageGraph.test.tsx` - Frontend lineage tests (15+ tests)
 
 ## Documentation
 
@@ -736,6 +813,7 @@ Key docs in `docs/`:
 - `guides/TEST_DATABASE_SETUP.md` - **Test Database Setup Guide (Dec 6, 2025)** - Docker Compose test infrastructure setup and usage
 - `guides/DATA_NARRATIVES_GUIDE.md` - **Intelligent Data Narratives & Human Insights (NEW - Dec 13, 2025)** - Complete feature guide
 - `guides/MULTI_DB_VALIDATION_GUIDE.md` - **Multi-Database Validation Guide (NEW - Jan 7, 2026)** - Pre-flight validation architecture and API reference
+- `guides/DATA_LINEAGE_GUIDE.md` - **Data Lineage Guide (NEW - Jan 2026)** - Column-level lineage, impact analysis, query patterns
 - `guides/testing/TESTING.md` - Testing guide
 
 **Technical** (`docs/technical/`):
