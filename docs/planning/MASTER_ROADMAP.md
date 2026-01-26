@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: January 24, 2026
+**Last Updated**: January 25, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -45,29 +45,12 @@
     │   ✅ COMPLETE        │  │   ✅ COMPLETE        │  │   ✅ COMPLETE        │
     └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
 
-
-    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                                      IN PROGRESS                                        │
-    └─────────────────────────────────────────────────────────────────────────────────────────┘
-
-                    ┌─────────────────────────────────────────────┐
-                    │    DATA LINEAGE & IMPACT (Phase 11)          │
-                    │  =========================================  │
-                    │  ✅ 11.1 Backend Core (parser, analyzer,    │
-                    │          API, 62 tests)                      │
-                    │  ✅ 11.2 Frontend Core (LineageGraph,       │
-                    │          LineagePanel, React Flow viz)       │
-                    │  ✅ 11.3 Column Lineage & Impact Panel     │
-                    │          (ColumnLineage, ImpactAnalysisPanel,│
-                    │          View Lineage, Analyze Impact btns)  │
-                    │  ✅ 11.4 ER Extensions (QueryPathOverlay,  │
-                    │          ERContextMenu, cross-nav)           │
-                    │  ✅ 11.5 Query Pattern Analytics (Heatmap,  │
-                    │          QueryPatternAnalyzer, 33 tests)     │
-                    │  ► 11.6 Polish & Testing                    │
-                    │                                             │
-                    │  Branch: data-lineage | Priority: HIGH      │
-                    └─────────────────────────────────────────────┘
+    ┌──────────────────────┐
+    │   Data Lineage       │
+    │   (Phase 11)         │
+    │   185 tests passing  │
+    │   ✅ COMPLETE        │
+    └──────────────────────┘
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
@@ -182,37 +165,19 @@
                                     FEATURE DEPENDENCIES
                                     ====================
 
-    ┌───────────────────┐     ┌───────────────────┐
-    │  ER Diagrams      │     │  Data Lineage     │
-    │  (Phase 7) ✅     │     │  11.1-11.2 ✅     │
-    └───────────────────┘     └───────────────────┘
-            │                          │
-            │    ┌─────────────────────┘
-            │    │
-            ▼    ▼
-    ┌───────────────────┐     ┌───────────────────┐
-    │  Phase 11.3 ✅    │     │  Phase 11.4 ✅    │
-    │  Column Lineage   │     │  ER Extensions    │
-    │  & Impact Panel   │     │  (Overlay + Menu) │
-    └───────────────────┘     └───────────────────┘
-            │
-            ▼
-    ┌───────────────┐
-    │ Phase 11.5 ✅ │
-    │ Query Pattern │
-    │ Analytics     │
-    └───────────────┘
-            │
-            ▼
-    ┌───────────────┐
-    │ Phase 11.6    │  ◀── CURRENT
-    │ Polish &      │
-    │ Testing       │
-    └───────────────┘
+    ┌───────────────────────────────────────────────────────────────┐
+    │           DATA LINEAGE (Phase 11) - COMPLETE ✅               │
+    │                                                               │
+    │  11.1 Backend Core ✅    11.2 Frontend Core ✅                │
+    │  11.3 Column Lineage ✅  11.4 ER Extensions ✅                │
+    │  11.5 Query Patterns ✅  11.6 Polish & Testing ✅             │
+    │                                                               │
+    │  185 tests (116 backend + 69 frontend)                        │
+    └───────────────────────────────────────────────────────────────┘
             │
             ▼
     ┌─────────────────────────────────────────────────────────────────┐
-    │                LINEAGE INTELLIGENCE (Phase 12)                   │
+    │                LINEAGE INTELLIGENCE (Phase 12)                   │  ◀── NEXT
     │                     LLM-Powered Features                         │
     │                                                                  │
     │  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
@@ -242,12 +207,12 @@
 
 ## Recommended Next Steps
 
-### Priority 1: Data Lineage Phase 11.6 (Polish & Testing)
-**Why**: Finalizes Phase 11 for merge to main
-- E2E tests for cross-component navigation flows
-- Unit tests for ColumnLineage, ImpactAnalysisPanel, QueryPathOverlay
-- Performance optimization for large lineage graphs
-- Edge case handling and error states
+### Priority 1: Merge Data Lineage Branch
+**Status**: Phase 11 COMPLETE ✅ (185 tests passing)
+- All 6 sub-phases complete (11.1-11.6)
+- Backend: 116 tests passing
+- Frontend: 69 tests passing
+- Ready to merge `data-lineage` → `main`
 
 ### Priority 2: Lineage Intelligence Phase 12 (LLM-Powered)
 **Why**: Transforms Database Guru from query tool to intelligence platform
@@ -270,8 +235,8 @@
 
 | Category | Features | Status | Total Effort |
 |----------|----------|--------|--------------|
-| **Visualization** | ER Diagrams, Data Lineage | Phase 7 done, Phase 11.1-11.5 done | ~300 lines remaining (11.6) |
-| **LLM Intelligence** | Lineage Narrator, Impact Advisor, Schema Health, Pattern Intel, Lineage Chat | **PLANNED (Phase 12)** | ~4,500 lines |
+| **Visualization** | ER Diagrams, Data Lineage | Phase 7 ✅, Phase 11 ✅ | COMPLETE |
+| **LLM Intelligence** | Lineage Narrator, Impact Advisor, Schema Health, Pattern Intel, Lineage Chat | **NEXT (Phase 12)** | ~4,500 lines |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Table UX** | Sorting, Resizing, Export | Not started | ~600 lines |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
@@ -297,11 +262,9 @@
 | Dialect Registry | DB-specific SQL | 72 lines tests |
 | Multi-DB Validator | Pre-flight validation | 27 tests |
 | ER Diagrams (Phase 7) | Schema visualization | React Flow + Dagre |
-| Data Lineage 11.1-11.2 | Lineage graph + Impact analysis | 62 tests |
-| Data Lineage 11.3-11.4 | Column lineage, Impact panel, ER overlay, cross-nav | ~1,200 lines |
-| Data Lineage 11.5 | QueryPatternAnalyzer, QueryPatternHeatmap, connection_id FK | 33 tests |
+| Data Lineage (Phase 11) | Column-level lineage, impact analysis, query patterns | 185 tests (116 BE + 69 FE) |
 
-**Total Tests**: 693+ passing
+**Total Tests**: 780+ passing
 
 ---
 
@@ -315,4 +278,4 @@
 
 ---
 
-**Updated**: January 24, 2026 (Phase 12 Lineage Intelligence planned)
+**Updated**: January 25, 2026 (Phase 11 Data Lineage complete, ready for merge)
