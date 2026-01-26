@@ -8,7 +8,12 @@ import ERDiagram from './schema/ERDiagram';
 
 type ViewMode = 'explore' | 'compare' | 'diagram';
 
-export default function SchemaPanel() {
+interface SchemaPanelProps {
+  onAnalyzeImpact?: (tableName: string) => void;
+  lastSql?: string | null;
+}
+
+export default function SchemaPanel({ onAnalyzeImpact, lastSql }: SchemaPanelProps) {
   const [connections, setConnections] = useState<DatabaseConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('explore');
@@ -152,7 +157,11 @@ export default function SchemaPanel() {
             {/* ER Diagram */}
             <div className="flex-1 h-full min-h-0 bg-gray-50/30 dark:bg-black/20">
               {selectedConnectionId ? (
-                <ERDiagram connectionId={selectedConnectionId} />
+                <ERDiagram
+                  connectionId={selectedConnectionId}
+                  lastSql={lastSql}
+                  onAnalyzeImpact={onAnalyzeImpact}
+                />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400 animate-fadeIn">
                   <Share2 className="w-12 h-12 mb-4 opacity-20" />
@@ -199,6 +208,7 @@ export default function SchemaPanel() {
                     connectionName={
                       connections.find((c) => c.id === selectedConnectionId)?.name
                     }
+                    onAnalyzeImpact={onAnalyzeImpact}
                   />
                 </div>
               ) : (

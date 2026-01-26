@@ -29,6 +29,7 @@ class QueryHistory(Base):
     # Metadata
     database_type = Column(String(50))  # postgres, mysql, sqlite, etc.
     model_used = Column(String(100))  # llama3, gpt-4, etc.
+    connection_id = Column(Integer, ForeignKey("database_connections.id"), nullable=True, index=True)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
@@ -40,6 +41,7 @@ class QueryHistory(Base):
     __table_args__ = (
         Index('idx_user_created', 'user_id', 'created_at'),
         Index('idx_created', 'created_at'),
+        Index('idx_connection_created', 'connection_id', 'created_at'),
     )
 
 

@@ -9,9 +9,10 @@ interface MessageProps {
   content: string;
   queryResponse?: QueryResponse;  // Legacy single-database response
   multiQueryResponse?: MultiDatabaseQueryResponse;  // Multi-database response
+  onViewLineage?: (sql: string) => void;
 }
 
-export default function Message({ type, content, queryResponse, multiQueryResponse }: MessageProps) {
+export default function Message({ type, content, queryResponse, multiQueryResponse, onViewLineage }: MessageProps) {
   // Convert legacy single-database response to multi-database format for unified rendering
   const effectiveMultiResponse = useMemo(() => {
     if (multiQueryResponse) return multiQueryResponse;
@@ -80,6 +81,7 @@ export default function Message({ type, content, queryResponse, multiQueryRespon
                 question={effectiveMultiResponse.question}
                 cacheInfo={effectiveMultiResponse.cache_info}
                 combinedAnalysis={effectiveMultiResponse.combined_analysis}
+                onViewLineage={onViewLineage}
               />
             </div>
           )}

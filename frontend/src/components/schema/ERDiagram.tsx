@@ -40,6 +40,8 @@ import TableNode from './TableNode';
 import RelationshipEdge from './RelationshipEdge';
 import ERDiagramControls from './ERDiagramControls';
 import ERDiagramSearch from './ERDiagramSearch';
+import ERContextMenu from './ERContextMenu';
+import { applyQueryPathOverlay } from './QueryPathOverlay';
 
 // Custom node and edge types
 const nodeTypes = {
@@ -55,11 +57,17 @@ interface ERDiagramProps {
   connectionId: number;
   /** Optional connection IDs for multi-database view */
   connectionIds?: number[];
+  /** Last executed SQL for query path overlay */
+  lastSql?: string | null;
+  /** Callback for context menu "Analyze Impact" action */
+  onAnalyzeImpact?: (tableName: string) => void;
 }
 
 const ERDiagramInner: React.FC<ERDiagramProps> = ({
   connectionId,
   connectionIds,
+  lastSql,
+  onAnalyzeImpact,
 }) => {
   const { isDarkMode } = useDarkMode();
 
@@ -79,6 +87,8 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('TB');
   const [showInferred, setShowInferred] = useState(true);
+  const [showQueryPath, setShowQueryPath] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; tableName: string } | null>(null);
 
   // Get all connection IDs to load
   const allConnectionIds = useMemo(() => {
@@ -239,6 +249,40 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
     fitView({ padding: 0.2 });
   }, [fitView]);
 
+  // Apply query path overlay when toggled or lastSql changes
+  useEffect(() => {
+    if (nodes.length === 0) return;
+    // Only apply when not searching (search takes priority)
+    if (debouncedSearchQuery) return;
+
+    const overlayedNodes = applyQueryPathOverlay(
+      nodes as ERTableNode[],
+      lastSql,
+      showQueryPath
+    );
+
+    const changed = overlayedNodes.some((n, i) => {
+      const orig = nodes[i];
+      return n.data?.isHighlighted !== orig?.data?.isHighlighted || n.data?.isDimmed !== orig?.data?.isDimmed;
+    });
+
+    if (changed) {
+      setNodes(overlayedNodes as unknown as typeof nodes);
+    }
+  }, [showQueryPath, lastSql, debouncedSearchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle right-click on node for context menu
+  const handleNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: any) => {
+      event.preventDefault();
+      const tableName = node.data?.tableName;
+      if (tableName && onAnalyzeImpact) {
+        setContextMenu({ x: event.clientX, y: event.clientY, tableName });
+      }
+    },
+    [onAnalyzeImpact]
+  );
+
   // Loading state
   if (isLoading) {
     return (
@@ -301,6 +345,9 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
           onLayoutChange={handleLayoutChange}
           showInferred={showInferred}
           onShowInferredChange={setShowInferred}
+          showQueryPath={showQueryPath}
+          onShowQueryPathChange={setShowQueryPath}
+          hasLastQuery={!!lastSql}
           onExpandAll={handleExpandAll}
           onCollapseAll={handleCollapseAll}
           onFitView={handleFitView}
@@ -317,6 +364,8 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onNodeClick={onNodeClick}
+              onNodeContextMenu={onAnalyzeImpact ? handleNodeContextMenu : undefined}
+              onPaneClick={() => setContextMenu(null)}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               fitView
@@ -350,6 +399,16 @@ const ERDiagramInner: React.FC<ERDiagramProps> = ({
               />
             </ReactFlow>
           </ErrorBoundary>
+
+          {/* Context Menu */}
+          {contextMenu && onAnalyzeImpact && (
+            <ERContextMenu
+              position={contextMenu}
+              tableName={contextMenu.tableName}
+              onClose={() => setContextMenu(null)}
+              onAnalyzeImpact={onAnalyzeImpact}
+            />
+          )}
         </div>
       </div>
 

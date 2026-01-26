@@ -543,3 +543,133 @@ class SystemSettingsUpdateRequest(BaseModel):
     # Multi-Database Query Intelligence (Phase 2.4)
     enable_multi_db_validation: Optional[bool] = None  # Pre-flight schema validation
     multi_db_validation_threshold: Optional[float] = Field(None, ge=0.0, le=1.0)  # Fuzzy match threshold
+
+
+# ============================================================================
+# Data Lineage Schemas (Phase 11)
+# ============================================================================
+
+class LineageNodeSchema(BaseModel):
+    """A node in the lineage graph."""
+    id: str
+    node_type: str  # source_table, source_column, transformation, output_column
+    label: str
+    table_name: Optional[str] = None
+    column_name: Optional[str] = None
+    expression: Optional[str] = None
+    transformation_type: Optional[str] = None  # direct, aggregation, expression, function
+
+
+class LineageEdgeSchema(BaseModel):
+    """An edge in the lineage graph."""
+    source_id: str
+    target_id: str
+    edge_type: str = "data_flow"
+    label: Optional[str] = None
+
+
+class LineageParseRequest(BaseModel):
+    """Request to parse SQL for lineage."""
+    sql: str = Field(
+        ...,
+        description="SQL query to parse for lineage",
+        min_length=1,
+        max_length=10000,
+    )
+    connection_id: Optional[int] = Field(
+        default=None,
+        description="Optional connection ID for context",
+    )
+
+
+class LineageGraphResponse(BaseModel):
+    """Response with the parsed lineage graph."""
+    nodes: List[LineageNodeSchema] = Field(default_factory=list)
+    edges: List[LineageEdgeSchema] = Field(default_factory=list)
+    sql: str = ""
+    tables_used: List[str] = Field(default_factory=list)
+    columns_used: List[str] = Field(default_factory=list)
+    output_columns: List[str] = Field(default_factory=list)
+
+
+class ImpactedQuerySchema(BaseModel):
+    """A query affected by a schema change."""
+    query_id: int
+    natural_language_query: str
+    generated_sql: str
+    impact_type: str
+    risk_level: str
+
+
+class ImpactAnalysisRequest(BaseModel):
+    """Request to analyze impact of a schema change."""
+    table_name: str = Field(
+        ...,
+        description="Table being changed",
+        min_length=1,
+        max_length=255,
+    )
+    column_name: Optional[str] = Field(
+        default=None,
+        description="Column being changed (optional - if omitted, analyzes table-level impact)",
+        max_length=255,
+    )
+
+
+class ImpactAnalysisResponse(BaseModel):
+    """Response with impact analysis results."""
+    changed_object: str
+    object_type: str  # "table" or "column"
+    impacted_queries: List[ImpactedQuerySchema] = Field(default_factory=list)
+    total_affected: int = 0
+    risk_level: str = "low"
+    risk_counts: Dict[str, int] = Field(default_factory=lambda: {"low": 0, "medium": 0, "high": 0})
+    summary: str = ""
+
+
+class LineageStatsResponse(BaseModel):
+    """Basic lineage statistics."""
+    total_queries: int = 0
+    unique_tables_referenced: int = 0
+    tables: List[str] = Field(default_factory=list)
+
+
+# ============================================================================
+# Query Pattern Analytics Schemas (Phase 11.5)
+# ============================================================================
+
+class TableUsageEntrySchema(BaseModel):
+    """Usage details for a single table."""
+    table_name: str
+    query_count: int
+    join_count: int = 0
+    avg_execution_time_ms: Optional[float] = None
+    last_used_at: Optional[datetime] = None
+
+
+class JoinPatternSchema(BaseModel):
+    """A frequently observed JOIN pattern."""
+    table_a: str
+    table_b: str
+    join_count: int
+    sample_sql: str = ""
+    avg_execution_time_ms: Optional[float] = None
+
+
+class PerformanceBottleneckSchema(BaseModel):
+    """A performance bottleneck table."""
+    table_name: str
+    query_count: int
+    avg_execution_time_ms: float
+    max_execution_time_ms: float
+    bottleneck_score: float
+
+
+class HeatmapDataResponse(BaseModel):
+    """Complete heatmap response for query pattern visualization."""
+    table_usage: List[TableUsageEntrySchema] = Field(default_factory=list)
+    join_patterns: List[JoinPatternSchema] = Field(default_factory=list)
+    bottlenecks: List[PerformanceBottleneckSchema] = Field(default_factory=list)
+    time_range_days: Optional[int] = None
+    total_queries_analyzed: int = 0
+    connection_id: Optional[int] = None

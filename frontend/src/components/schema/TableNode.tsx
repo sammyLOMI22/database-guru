@@ -32,6 +32,7 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
     isHighlighted,
     isDimmed,
     isDarkMode = false,
+    queryFrequency,
   } = data;
 
   // Create a set of FK column names for quick lookup
@@ -104,14 +105,24 @@ const TableNode: React.FC<TableNodeProps> = ({ data, selected }) => {
             </span>
           </div>
         </div>
-        {rowCount !== null && (
-          <span
-            className={`text-xs px-2.5 py-1 rounded-full font-bold shadow-sm ${isDarkMode ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-100'
-              }`}
-          >
-            {rowCount.toLocaleString()}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {queryFrequency != null && queryFrequency > 0 && (
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-bold ${isDarkMode ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30' : 'bg-orange-50 text-orange-700 border border-orange-100'}`}
+              title={`${queryFrequency} queries reference this table`}
+            >
+              {queryFrequency}q
+            </span>
+          )}
+          {rowCount !== null && (
+            <span
+              className={`text-xs px-2.5 py-1 rounded-full font-bold shadow-sm ${isDarkMode ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-100'
+                }`}
+            >
+              {rowCount.toLocaleString()}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Columns (when expanded) */}

@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: January 17, 2026
+**Last Updated**: January 25, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -39,37 +39,50 @@
     │   ✅ COMPLETE        │  │   ✅ COMPLETE        │  │   ✅ COMPLETE        │
     └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
 
-    ┌──────────────────────┐  ┌──────────────────────┐
-    │   Dialect Registry   │  │  Multi-DB Validator  │
-    │   (DB-specific SQL)  │  │   (Pre-flight check) │
-    │   ✅ COMPLETE        │  │   ✅ COMPLETE        │
-    └──────────────────────┘  └──────────────────────┘
+    ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
+    │   Dialect Registry   │  │  Multi-DB Validator  │  │   ER Diagrams        │
+    │   (DB-specific SQL)  │  │   (Pre-flight check) │  │   (Phase 7)          │
+    │   ✅ COMPLETE        │  │   ✅ COMPLETE        │  │   ✅ COMPLETE        │
+    └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
+
+    ┌──────────────────────┐
+    │   Data Lineage       │
+    │   (Phase 11)         │
+    │   185 tests passing  │
+    │   ✅ COMPLETE        │
+    └──────────────────────┘
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                                    READY TO IMPLEMENT                                    │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
-                    ┌─────────────────────────────────────────────┐
-                    │         ER DIAGRAM GENERATOR (Phase 7)      │
-                    │  =========================================  │
-                    │  • Interactive schema visualization         │
-                    │  • React Flow + Dagre auto-layout          │
-                    │  • FK relationship inference               │
-                    │  • Multi-database color coding             │
-                    │  • Export PNG/SVG                          │
-                    │                                             │
-                    │  Est: ~1,600 lines | Priority: HIGH        │
-                    │  Dependencies: None                         │
-                    └─────────────────────────────────────────────┘
-                                         │
-                    ┌────────────────────┼────────────────────┐
-                    ▼                    ▼                    ▼
-    ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
-    │   Query Path Overlay │  │   Table Statistics   │  │   Schema Health      │
-    │   (Highlight tables) │  │   (Row counts, size) │  │   (Missing PKs, etc) │
-    │   Est: ~150 lines    │  │   Est: ~280 lines    │  │   Est: ~270 lines    │
-    └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │                      LINEAGE INTELLIGENCE (Phase 12) - LLM-Powered                        │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐ │
+    │  │ 12.1 Lineage│   │ 12.2 Impact │   │ 12.3 Schema │   │ 12.4 Pattern│   │ 12.5 Lineage│ │
+    │  │ Narrator    │──▶│ Advisor     │──▶│ Health      │──▶│ Intelligence│──▶│ Chat        │ │
+    │  │             │   │             │   │ Analyzer    │   │             │   │             │ │
+    │  │ • Data flow │   │ • Migration │   │             │   │ • Bottleneck│   │ • NL queries│ │
+    │  │   explain   │   │   guides    │   │ • Index     │   │   root cause│   │ • Multi-turn│ │
+    │  │ • Column    │   │ • Risk      │   │   suggest   │   │ • Anti-     │   │ • Schema Q&A│ │
+    │  │   semantics │   │   explain   │   │ • Normal-   │   │   patterns  │   │             │ │
+    │  │ • Business  │   │ • SQL patch │   │   ization   │   │ • Trend     │   │ ~1000 lines │ │
+    │  │   context   │   │   generate  │   │ • Type      │   │   analysis  │   │             │ │
+    │  │             │   │             │   │   suggest   │   │             │   │             │ │
+    │  │ ~800 lines  │   │ ~900 lines  │   │ ~1000 lines │   │ ~800 lines  │   │             │ │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘ │
+    │                                                                                           │
+    │  Prereq: Phase 11 (Data Lineage) | Priority: HIGH | Est: 8-10 days | ~4,500 lines        │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────┐  ┌──────────────────────┐
+    │   Table Statistics   │  │   Schema Health      │
+    │   (Row counts, size) │  │   (Missing PKs, etc) │
+    │   Est: ~280 lines    │  │   Est: ~270 lines    │
+    │   Standalone         │  │   (Part of 12.3)     │
+    └──────────────────────┘  └──────────────────────┘
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
@@ -84,7 +97,6 @@
     │  • Boolean handling  │       │  • Auto-templates    │       │  • Auto model select │
     │  • Status values     │       │  • Pattern matching  │       │  • Performance stats │
     │                      │       │                      │       │                      │
-    │  Est: 2-3 days       │       │  Est: 4-5 days       │       │  (Included in 2.6)   │
     │  NOT STARTED         │       │  NOT STARTED         │       │  NOT STARTED         │
     └──────────────────────┘       └──────────────────────┘       └──────────────────────┘
 
@@ -101,7 +113,6 @@
     │  • Multi-column sort │       │  • Persist widths    │       │  • Filtered export   │
     │  • Asc/Desc toggle   │       │  • Auto-fit option   │       │  • Streaming export  │
     │                      │       │                      │       │                      │
-    │  Est: 1-2 days       │       │  Est: 1-2 days       │       │  Est: 2-3 days       │
     │  NOT STARTED         │       │  NOT STARTED         │       │  NOT STARTED         │
     └──────────────────────┘       └──────────────────────┘       └──────────────────────┘
 
@@ -109,18 +120,6 @@
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                                      FUTURE PHASES                                       │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
-
-                    ┌─────────────────────────────────────────────┐
-                    │      DATA LINEAGE & IMPACT (Phase 11)       │
-                    │  =========================================  │
-                    │  • Query lineage graph                      │
-                    │  • Column-level tracking                    │
-                    │  • "What breaks if..." analysis            │
-                    │  • Query pattern analytics                  │
-                    │                                             │
-                    │  Est: ~2,400 lines | Priority: MEDIUM      │
-                    │  Depends on: Phase 7 ER Diagrams           │
-                    └─────────────────────────────────────────────┘
 
     ┌──────────────────────┐       ┌──────────────────────┐       ┌──────────────────────┐
     │   Streaming Results  │       │   Query Suggestions  │       │   Collaborative      │
@@ -130,7 +129,6 @@
     │  • Progressive render│       │  • History-based     │       │  • Team queries      │
     │  • Large dataset UX  │       │  • Autocomplete      │       │  • Templates library │
     │                      │       │                      │       │                      │
-    │  Est: 1-2 weeks      │       │  Est: 2 weeks        │       │  Est: 3-4 weeks      │
     │  Priority: MEDIUM    │       │  Priority: LOW       │       │  Priority: LOW       │
     └──────────────────────┘       └──────────────────────┘       └──────────────────────┘
 
@@ -167,47 +165,28 @@
                                     FEATURE DEPENDENCIES
                                     ====================
 
-    Query Compilation (Current PR)
-            │
-            ├───────────────────────────────────────────────────────────────┐
-            ▼                                                               │
-    ┌───────────────────┐                                                   │
-    │  ER Diagrams      │◀───────────────────────────────────────────┐      │
-    │  (Phase 7)        │                                            │      │
-    └───────────────────┘                                            │      │
-            │                                                        │      │
-            ├──────────────────┬──────────────────┐                  │      │
-            ▼                  ▼                  ▼                  │      │
-    ┌───────────────┐  ┌───────────────┐  ┌───────────────┐         │      │
-    │ Query Path    │  │ Table Stats   │  │ Schema Health │         │      │
-    │ Overlay       │  │ Overlay       │  │ Indicators    │         │      │
-    └───────────────┘  └───────────────┘  └───────────────┘         │      │
-            │                  │                  │                  │      │
-            └──────────────────┴──────────────────┘                  │      │
-                               │                                     │      │
-                               ▼                                     │      │
-                    ┌───────────────────┐                            │      │
-                    │  Data Lineage     │◀───────────────────────────┘      │
-                    │  (Phase 11)       │                                   │
-                    └───────────────────┘                                   │
-                                                                            │
-    ┌───────────────────┐                                                   │
-    │  Advanced         │◀──────────────────────────────────────────────────┘
-    │  Preprocessing    │
-    │  (Phase 2.3)      │
-    └───────────────────┘
+    ┌───────────────────────────────────────────────────────────────┐
+    │           DATA LINEAGE (Phase 11) - COMPLETE ✅               │
+    │                                                               │
+    │  11.1 Backend Core ✅    11.2 Frontend Core ✅                │
+    │  11.3 Column Lineage ✅  11.4 ER Extensions ✅                │
+    │  11.5 Query Patterns ✅  11.6 Polish & Testing ✅             │
+    │                                                               │
+    │  185 tests (116 backend + 69 frontend)                        │
+    └───────────────────────────────────────────────────────────────┘
             │
             ▼
-    ┌───────────────────┐
-    │  Pattern Learning │
-    │  (Phase 2.6)      │
-    └───────────────────┘
-            │
-            ▼
-    ┌───────────────────┐
-    │  Model Performance│
-    │  Tracker          │
-    └───────────────────┘
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                LINEAGE INTELLIGENCE (Phase 12)                   │  ◀── NEXT
+    │                     LLM-Powered Features                         │
+    │                                                                  │
+    │  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
+    │  │ 12.1    │──▶│ 12.2    │──▶│ 12.3    │──▶│ 12.4    │──▶│ 12.5    │
+    │  │ Lineage │   │ Impact  │   │ Schema  │   │ Pattern │   │ Lineage │
+    │  │ Narrator│   │ Advisor │   │ Health  │   │ Intel.  │   │ Chat    │
+    │  └─────────┘   └─────────┘   └─────────┘   └─────────┘   └─────────┘
+    │                                                                  │
+    └─────────────────────────────────────────────────────────────────┘
 
 
     INDEPENDENT FEATURES (Can Start Anytime):
@@ -217,51 +196,38 @@
     │  Table Sorting    │  │  Column Resizing  │  │  Export Options   │
     └───────────────────┘  └───────────────────┘  └───────────────────┘
 
-    ┌───────────────────┐  ┌───────────────────┐
-    │  Streaming Results│  │  Error Boundaries │
-    └───────────────────┘  └───────────────────┘
+    ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐
+    │  Streaming Results│  │  Advanced         │  │  Pattern Learning │
+    └───────────────────┘  │  Preprocessing    │  │  (Phase 2.6)      │
+                           │  (Phase 2.3)      │  └───────────────────┘
+                           └───────────────────┘
 ```
 
 ---
 
 ## Recommended Next Steps
 
-Based on your interests (no auth, ER diagrams, data visualization, insight quality, table sorting):
+### Priority 1: Merge Data Lineage Branch
+**Status**: Phase 11 COMPLETE ✅ (185 tests passing)
+- All 6 sub-phases complete (11.1-11.6)
+- Backend: 116 tests passing
+- Frontend: 69 tests passing
+- Ready to merge `data-lineage` → `main`
 
-### Priority 1: ER Diagram Generator (Phase 7)
-**Why**: Foundation for schema understanding and Data Lineage (Phase 11)
-- Interactive schema visualization with React Flow
-- Auto-layout with Dagre algorithm
-- FK relationship inference from naming conventions
-- Multi-database color coding
-- Export PNG/SVG
+### Priority 2: Lineage Intelligence Phase 12 (LLM-Powered)
+**Why**: Transforms Database Guru from query tool to intelligence platform
+- **12.1 Lineage Narrator**: Explain data flows in business terms
+- **12.2 Impact Advisor**: Migration guides, risk explanations, SQL patches
+- **12.3 Schema Health Analyzer**: Index suggestions, normalization, type improvements
+- **12.4 Pattern Intelligence**: Bottleneck root cause, anti-pattern detection
+- **12.5 Conversational Lineage**: Natural language queries about schema and lineage
+- See: [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) for full details
 
-**Effort**: ~1,600 lines | 3-5 days
-
-### Priority 2: Table Sorting (Quick Win)
-**Why**: User explicitly mentioned, immediate UX improvement
+### Priority 3: Table Sorting (Quick Win)
+**Why**: Immediate UX improvement, independent of lineage work
 - Click column header to sort
 - Asc/Desc toggle indicator
 - Multi-column sort support
-- Persist sort preferences
-
-**Effort**: ~200 lines | 1-2 days
-
-### Priority 3: Advanced Preprocessing (Phase 2.3)
-**Why**: Improves insight quality for all queries
-- Date normalization ("last 7 days" → SQL)
-- Boolean handling ("active" → `status = 'active'`)
-- Status value normalization (detect actual DB values)
-
-**Effort**: ~400 lines | 2-3 days
-
-### Priority 4: Pattern Learning (Phase 2.6)
-**Why**: Continuous improvement of SQL generation
-- Learn successful patterns from queries
-- Auto-generate templates from usage
-- Track model performance per task
-
-**Effort**: ~800 lines | 4-5 days
 
 ---
 
@@ -269,9 +235,10 @@ Based on your interests (no auth, ER diagrams, data visualization, insight quali
 
 | Category | Features | Status | Total Effort |
 |----------|----------|--------|--------------|
-| **Visualization** | ER Diagrams, Data Lineage | Ready + Future | ~4,000 lines |
-| **Insight Quality** | Preprocessing, Pattern Learning | Ready | ~1,200 lines |
-| **Table UX** | Sorting, Resizing, Export | Ready | ~600 lines |
+| **Visualization** | ER Diagrams, Data Lineage | Phase 7 ✅, Phase 11 ✅ | COMPLETE |
+| **LLM Intelligence** | Lineage Narrator, Impact Advisor, Schema Health, Pattern Intel, Lineage Chat | **NEXT (Phase 12)** | ~4,500 lines |
+| **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
+| **Table UX** | Sorting, Resizing, Export | Not started | ~600 lines |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
 | **Security** | Auth, Rate Limiting | Deferred | ~2,000 lines |
 
@@ -294,8 +261,10 @@ Based on your interests (no auth, ER diagrams, data visualization, insight quali
 | Prompt Optimizer | 40% token reduction | 52 tests |
 | Dialect Registry | DB-specific SQL | 72 lines tests |
 | Multi-DB Validator | Pre-flight validation | 27 tests |
+| ER Diagrams (Phase 7) | Schema visualization | React Flow + Dagre |
+| Data Lineage (Phase 11) | Column-level lineage, impact analysis, query patterns | 185 tests (116 BE + 69 FE) |
 
-**Total Tests**: 600+ passing
+**Total Tests**: 780+ passing
 
 ---
 
@@ -304,7 +273,9 @@ Based on your interests (no auth, ER diagrams, data visualization, insight quali
 - [FUTURE_PLANS.md](FUTURE_PLANS.md) - Core roadmap
 - [ADVANCED_VISUALIZATION_PHASE2_PLAN.md](ADVANCED_VISUALIZATION_PHASE2_PLAN.md) - Visualization features
 - [SMALL_MODEL_OPTIMIZATION_PHASE2.md](SMALL_MODEL_OPTIMIZATION_PHASE2.md) - LLM optimization features
+- [DATA_LINGEAGE_PLAN.md](DATA_LINGEAGE_PLAN.md) - Data Lineage & Impact Analysis plan (Phase 11)
+- [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) - **LLM-Powered Lineage Intelligence (Phase 12)** ← NEW
 
 ---
 
-**Created**: January 17, 2026
+**Updated**: January 25, 2026 (Phase 11 Data Lineage complete, ready for merge)

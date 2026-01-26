@@ -12,6 +12,7 @@ interface HeaderProps {
 const TABS = [
   { id: 'chat', label: 'Chat', icon: '💬' },
   { id: 'schema', label: 'Schema', icon: '🗂️' },
+  { id: 'lineage', label: 'Lineage', icon: '🔀' },
   { id: 'feedback', label: 'Stats', icon: '📊' },
   { id: 'tools', label: 'Tools', icon: '🔧' },
   { id: 'cache', label: 'Cache', icon: '💾' },

@@ -62,6 +62,8 @@ export interface TableNodeData {
   isDimmed: boolean;
   /** Current theme mode */
   isDarkMode: boolean;
+  /** Query frequency count from pattern analytics (optional) */
+  queryFrequency?: number | null;
 }
 
 /**
