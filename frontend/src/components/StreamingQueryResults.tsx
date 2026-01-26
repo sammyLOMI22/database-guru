@@ -54,6 +54,7 @@ export default function StreamingQueryResults({ request, onComplete, onError }: 
     // Reset sort when a new request starts
     resetSort();
     startStreaming();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resetSort is stable, intentionally omitted to avoid re-triggering on its changes
   }, [request]);
 
   const startStreaming = async () => {

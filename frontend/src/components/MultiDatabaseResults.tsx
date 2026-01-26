@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { MessageSquare, Copy, Check, Zap, Database, ChevronLeft, ChevronRight, AlertCircle, XCircle, GitBranch } from 'lucide-react';
-import type { SortConfig } from '../hooks/useTableSort';
+import { sortData, type SortConfig } from '../hooks/useTableSort';
 import { SortableTableHeader } from './SortableTableHeader';
 import type { DatabaseQueryResult, CacheInfo } from '../types/api';
 import { AgentTrace } from './AgentTrace';
@@ -174,32 +174,8 @@ export default function MultiDatabaseResults({
 
   // Helper to get sorted results for a specific database
   const getSortedResults = useCallback((connectionId: number, data: Record<string, unknown>[]) => {
-    const config = sortConfigs[connectionId] || { column: null, direction: 'asc' };
-    if (!config.column || data.length === 0) return data;
-
-    return [...data].sort((a, b) => {
-      const aVal = a[config.column!];
-      const bVal = b[config.column!];
-
-      // Nulls always sort to end
-      const aIsNull = aVal === null || aVal === undefined;
-      const bIsNull = bVal === null || bVal === undefined;
-      if (aIsNull && bIsNull) return 0;
-      if (aIsNull) return 1;
-      if (bIsNull) return -1;
-
-      const multiplier = config.direction === 'asc' ? 1 : -1;
-
-      // Number comparison
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return (aVal - bVal) * multiplier;
-      }
-
-      // String comparison (case-insensitive)
-      const strA = String(aVal).toLowerCase();
-      const strB = String(bVal).toLowerCase();
-      return strA.localeCompare(strB) * multiplier;
-    });
+    const config = sortConfigs[connectionId] || { column: null, direction: 'asc' as const };
+    return sortData(data, config);
   }, [sortConfigs]);
 
   const successfulQueries = results.filter((r) => r.success).length;

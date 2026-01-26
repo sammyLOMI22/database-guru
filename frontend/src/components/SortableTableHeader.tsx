@@ -70,6 +70,18 @@ export function SortableTableHeader({
       ? ArrowDown
       : ArrowUpDown;
 
+  const thClassName = [
+    className,
+    disabled ? 'cursor-default' : 'cursor-pointer select-none',
+    'group',
+  ].filter(Boolean).join(' ');
+
+  const iconClassName = [
+    'w-3 h-3 flex-shrink-0 transition-opacity',
+    isActive ? 'opacity-100 text-indigo-400' : 'opacity-0 group-hover:opacity-50 text-gray-400',
+    disabled ? 'hidden' : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <th
       role="columnheader"
@@ -77,24 +89,11 @@ export function SortableTableHeader({
       tabIndex={disabled ? -1 : 0}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      className={`
-        ${className}
-        ${disabled ? 'cursor-default' : 'cursor-pointer select-none'}
-        group
-      `}
+      className={thClassName}
     >
       <div className="flex items-center gap-1">
         <span>{label ?? column}</span>
-        <SortIcon
-          className={`
-            w-3 h-3 flex-shrink-0 transition-opacity
-            ${isActive
-              ? 'opacity-100 text-indigo-400'
-              : 'opacity-0 group-hover:opacity-50 text-gray-400'
-            }
-            ${disabled ? 'hidden' : ''}
-          `}
-        />
+        <SortIcon className={iconClassName} />
       </div>
     </th>
   );

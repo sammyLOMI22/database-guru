@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useTableSort } from '../../src/hooks/useTableSort';
+import { useTableSort, sortData } from '../../src/hooks/useTableSort';
 
 describe('useTableSort', () => {
   describe('string sorting', () => {
@@ -400,5 +400,82 @@ describe('useTableSort', () => {
         { name: 'Alice' },
       ]);
     });
+  });
+});
+
+describe('sortData utility', () => {
+  it('returns original data when column is null', () => {
+    const data = [{ name: 'Charlie' }, { name: 'Alice' }];
+    const result = sortData(data, { column: null, direction: 'asc' });
+    expect(result).toEqual(data);
+  });
+
+  it('returns original data when data is empty', () => {
+    const result = sortData([], { column: 'name', direction: 'asc' });
+    expect(result).toEqual([]);
+  });
+
+  it('sorts strings ascending', () => {
+    const data = [{ name: 'Charlie' }, { name: 'Alice' }, { name: 'Bob' }];
+    const result = sortData(data, { column: 'name', direction: 'asc' });
+    expect(result).toEqual([
+      { name: 'Alice' },
+      { name: 'Bob' },
+      { name: 'Charlie' },
+    ]);
+  });
+
+  it('sorts strings descending', () => {
+    const data = [{ name: 'Charlie' }, { name: 'Alice' }, { name: 'Bob' }];
+    const result = sortData(data, { column: 'name', direction: 'desc' });
+    expect(result).toEqual([
+      { name: 'Charlie' },
+      { name: 'Bob' },
+      { name: 'Alice' },
+    ]);
+  });
+
+  it('sorts numbers numerically', () => {
+    const data = [{ value: 100 }, { value: 20 }, { value: 3 }];
+    const result = sortData(data, { column: 'value', direction: 'asc' });
+    expect(result).toEqual([{ value: 3 }, { value: 20 }, { value: 100 }]);
+  });
+
+  it('sorts numeric strings numerically', () => {
+    const data = [{ value: '100' }, { value: '20' }, { value: '3' }];
+    const result = sortData(data, { column: 'value', direction: 'asc' });
+    expect(result).toEqual([{ value: '3' }, { value: '20' }, { value: '100' }]);
+  });
+
+  it('sorts date strings chronologically', () => {
+    const data = [
+      { date: '2024-03-15' },
+      { date: '2024-01-01' },
+      { date: '2024-02-20' },
+    ];
+    const result = sortData(data, { column: 'date', direction: 'asc' });
+    expect(result).toEqual([
+      { date: '2024-01-01' },
+      { date: '2024-02-20' },
+      { date: '2024-03-15' },
+    ]);
+  });
+
+  it('sorts nulls to end regardless of direction', () => {
+    const data = [{ name: null }, { name: 'Alice' }, { name: 'Bob' }];
+    const ascResult = sortData(data, { column: 'name', direction: 'asc' });
+    const descResult = sortData(data, { column: 'name', direction: 'desc' });
+
+    expect(ascResult[2].name).toBeNull();
+    expect(descResult[2].name).toBeNull();
+  });
+
+  it('does not mutate original array', () => {
+    const data = [{ name: 'Charlie' }, { name: 'Alice' }];
+    const originalData = [...data];
+    const result = sortData(data, { column: 'name', direction: 'asc' });
+
+    expect(data).toEqual(originalData);
+    expect(result).not.toBe(data);
   });
 });

@@ -39,18 +39,18 @@ export interface UseTableSortOptions {
 }
 
 /**
- * Check if a value is a numeric string
+ * Check if a value is a numeric string (type predicate)
  */
-function isNumericString(value: unknown): boolean {
+function isNumericString(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   if (value.trim() === '') return false;
   return !isNaN(parseFloat(value)) && isFinite(Number(value));
 }
 
 /**
- * Check if a value is a date string (ISO format with dashes)
+ * Check if a value is a date string (ISO format with dashes) (type predicate)
  */
-function isDateString(value: unknown): boolean {
+function isDateString(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   // Must contain dashes and parse to valid date
   if (!value.includes('-')) return false;
@@ -79,18 +79,47 @@ function compareValues(a: unknown, b: unknown, direction: 'asc' | 'desc'): numbe
 
   // Numeric string detection - sort numerically
   if (isNumericString(a) && isNumericString(b)) {
-    return (parseFloat(a as string) - parseFloat(b as string)) * multiplier;
+    return (parseFloat(a) - parseFloat(b)) * multiplier;
   }
 
   // Date string detection - sort chronologically
   if (isDateString(a) && isDateString(b)) {
-    return (new Date(a as string).getTime() - new Date(b as string).getTime()) * multiplier;
+    return (new Date(a).getTime() - new Date(b).getTime()) * multiplier;
   }
 
   // String comparison (case-insensitive)
   const strA = String(a).toLowerCase();
   const strB = String(b).toLowerCase();
   return strA.localeCompare(strB) * multiplier;
+}
+
+/**
+ * Sort an array of objects by a column with smart type detection
+ *
+ * @param data - Array of objects to sort
+ * @param config - Sort configuration (column and direction)
+ * @returns Sorted array (new array, does not mutate original)
+ *
+ * @example
+ * ```tsx
+ * const sorted = sortData(results, { column: 'name', direction: 'asc' });
+ * ```
+ */
+export function sortData<T extends Record<string, unknown>>(
+  data: T[],
+  config: SortConfig
+): T[] {
+  if (!config.column || data.length === 0) {
+    return data;
+  }
+
+  return [...data].sort((a, b) =>
+    compareValues(
+      a[config.column!],
+      b[config.column!],
+      config.direction
+    )
+  );
 }
 
 /**
@@ -150,20 +179,7 @@ export function useTableSort<T extends Record<string, unknown>>(
     onSortChange?.(initialConfig);
   }, [defaultColumn, defaultDirection, onSortChange]);
 
-  const sortedData = useMemo(() => {
-    if (!sortConfig.column || data.length === 0) {
-      return data;
-    }
-
-    // Create a copy to avoid mutating the original array
-    return [...data].sort((a, b) =>
-      compareValues(
-        a[sortConfig.column!],
-        b[sortConfig.column!],
-        sortConfig.direction
-      )
-    );
-  }, [data, sortConfig.column, sortConfig.direction]);
+  const sortedData = useMemo(() => sortData(data, sortConfig), [data, sortConfig.column, sortConfig.direction]);
 
   return {
     sortedData,
