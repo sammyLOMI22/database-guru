@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { queryAPI } from '../services/api';
 import type { QueryRequest } from '../types/api';
+import { useTableSort } from '../hooks/useTableSort';
+import { SortableTableHeader } from './SortableTableHeader';
 
 interface StreamingQueryResultsProps {
   request: QueryRequest;
@@ -39,9 +41,20 @@ export default function StreamingQueryResults({ request, onComplete, onError }: 
     error: null,
   });
 
+  // Sorting - only enabled after streaming completes
+  const { sortedData, sortConfig, handleSort, resetSort } = useTableSort(
+    state.rows,
+    {} // No onSortChange needed since there's no pagination
+  );
+
+  // Sorting is only enabled when streaming is complete
+  const sortingEnabled = state.status === 'complete';
+
   useEffect(() => {
+    // Reset sort when a new request starts
+    resetSort();
     startStreaming();
-  }, []);
+  }, [request]);
 
   const startStreaming = async () => {
     try {
@@ -242,17 +255,19 @@ export default function StreamingQueryResults({ request, onComplete, onError }: 
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
                   {state.columns.map((column, idx) => (
-                    <th
+                    <SortableTableHeader
                       key={idx}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      {column}
-                    </th>
+                      column={column}
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                      disabled={!sortingEnabled}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
+                    />
                   ))}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {state.rows.map((row, rowIdx) => (
+                {sortedData.map((row, rowIdx) => (
                   <tr
                     key={rowIdx}
                     className={`${

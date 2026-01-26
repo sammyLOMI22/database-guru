@@ -1,4 +1,6 @@
 import { Copy, Check, MessageSquare, Zap, Database, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTableSort } from '../hooks/useTableSort';
+import { SortableTableHeader } from './SortableTableHeader';
 import { useState, useMemo, useEffect } from 'react';
 import {
   AgentTrace as AgentTraceType,
@@ -83,11 +85,20 @@ export default function QueryResults({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Reset pagination and selection when results change
+  // Sorting state
+  const { sortedData, sortConfig, handleSort, resetSort } = useTableSort(
+    results ?? [],
+    {
+      onSortChange: () => setCurrentPage(1), // Reset to page 1 on sort change
+    }
+  );
+
+  // Reset pagination, sorting, and selection when results change
   useEffect(() => {
     setCurrentPage(1);
     setSelectedChartType(null);
-  }, [results]);
+    resetSort();
+  }, [results, resetSort]);
 
   // Auto-select chart type and view mode when preferred chart type is provided
   useEffect(() => {
@@ -317,11 +328,12 @@ export default function QueryResults({
           ) : (
             <div className="overflow-x-auto">
               {(() => {
-                const totalRows = results.length;
+                // Sort the full dataset first, then paginate
+                const totalRows = sortedData.length;
                 const totalPages = Math.ceil(totalRows / pageSize);
                 const startIdx = (currentPage - 1) * pageSize;
                 const endIdx = Math.min(startIdx + pageSize, totalRows);
-                const paginatedResults = results.slice(startIdx, endIdx);
+                const paginatedResults = sortedData.slice(startIdx, endIdx);
 
                 return (
                   <>
@@ -329,12 +341,13 @@ export default function QueryResults({
                       <thead className="border-b border-white/10 bg-black/5 dark:bg-white/5">
                         <tr>
                           {Object.keys(results[0]).map((column) => (
-                            <th
+                            <SortableTableHeader
                               key={column}
-                              className="px-5 py-3 text-left text-[11px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-[0.15em]"
-                            >
-                              {column}
-                            </th>
+                              column={column}
+                              sortConfig={sortConfig}
+                              onSort={handleSort}
+                              className="px-5 py-3 text-left text-[11px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-[0.15em] hover:bg-white/10 transition-colors"
+                            />
                           ))}
                         </tr>
                       </thead>

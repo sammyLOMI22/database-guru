@@ -1,5 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { MessageSquare, Copy, Check, Zap, Database, ChevronLeft, ChevronRight, AlertCircle, XCircle, GitBranch } from 'lucide-react';
+import type { SortConfig } from '../hooks/useTableSort';
+import { SortableTableHeader } from './SortableTableHeader';
 import type { DatabaseQueryResult, CacheInfo } from '../types/api';
 import { AgentTrace } from './AgentTrace';
 import { CorrectionHistory } from './CorrectionHistory';
@@ -62,11 +64,17 @@ export default function MultiDatabaseResults({
     Object.fromEntries(results.map((r) => [r.connection_id, 10]))
   );
 
+  // Sorting state per database
+  const [sortConfigs, setSortConfigs] = useState<Record<number, SortConfig>>(() =>
+    Object.fromEntries(results.map((r) => [r.connection_id, { column: null, direction: 'asc' as const }]))
+  );
+
   // Reset states when results prop changes
   useEffect(() => {
     setViewModes(Object.fromEntries(results.map((r) => [r.connection_id, 'table'])));
     setSelectedChartTypes(Object.fromEntries(results.map((r) => [r.connection_id, null])));
     setCurrentPages(Object.fromEntries(results.map((r) => [r.connection_id, 1])));
+    setSortConfigs(Object.fromEntries(results.map((r) => [r.connection_id, { column: null, direction: 'asc' as const }])));
     setExpandedDatabases(new Set(results.map((r) => r.connection_id)));
   }, [results]);
 
@@ -147,6 +155,52 @@ export default function MultiDatabaseResults({
     if (isCannotAnswer(result)) return 'cannot_answer';
     return 'error';
   };
+
+  // Helper to handle sorting for a specific database
+  const handleSortForDb = useCallback((connectionId: number, column: string) => {
+    setSortConfigs((prev) => {
+      const current = prev[connectionId] || { column: null, direction: 'asc' as const };
+      return {
+        ...prev,
+        [connectionId]: {
+          column,
+          direction: current.column === column && current.direction === 'asc' ? 'desc' : 'asc',
+        },
+      };
+    });
+    // Reset page to 1 when sort changes
+    setCurrentPages((prev) => ({ ...prev, [connectionId]: 1 }));
+  }, []);
+
+  // Helper to get sorted results for a specific database
+  const getSortedResults = useCallback((connectionId: number, data: Record<string, unknown>[]) => {
+    const config = sortConfigs[connectionId] || { column: null, direction: 'asc' };
+    if (!config.column || data.length === 0) return data;
+
+    return [...data].sort((a, b) => {
+      const aVal = a[config.column!];
+      const bVal = b[config.column!];
+
+      // Nulls always sort to end
+      const aIsNull = aVal === null || aVal === undefined;
+      const bIsNull = bVal === null || bVal === undefined;
+      if (aIsNull && bIsNull) return 0;
+      if (aIsNull) return 1;
+      if (bIsNull) return -1;
+
+      const multiplier = config.direction === 'asc' ? 1 : -1;
+
+      // Number comparison
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return (aVal - bVal) * multiplier;
+      }
+
+      // String comparison (case-insensitive)
+      const strA = String(aVal).toLowerCase();
+      const strB = String(bVal).toLowerCase();
+      return strA.localeCompare(strB) * multiplier;
+    });
+  }, [sortConfigs]);
 
   const successfulQueries = results.filter((r) => r.success).length;
   const cannotAnswerQueries = results.filter((r) => !r.success && isCannotAnswer(r)).length;
@@ -441,11 +495,13 @@ export default function MultiDatabaseResults({
                             {(() => {
                               const pageSize = pageSizes[result.connection_id] || 10;
                               const currentPage = currentPages[result.connection_id] || 1;
-                              const totalRows = result.results.length;
+                              // Sort the full dataset first, then paginate
+                              const sortedResults = getSortedResults(result.connection_id, result.results);
+                              const totalRows = sortedResults.length;
                               const totalPages = Math.ceil(totalRows / pageSize);
                               const startIdx = (currentPage - 1) * pageSize;
                               const endIdx = Math.min(startIdx + pageSize, totalRows);
-                              const paginatedResults = result.results.slice(startIdx, endIdx);
+                              const paginatedResults = sortedResults.slice(startIdx, endIdx);
 
                               return (
                                 <>
@@ -453,12 +509,13 @@ export default function MultiDatabaseResults({
                                     <thead className="bg-gray-50 dark:bg-gray-800/50">
                                       <tr>
                                         {Object.keys(result.results[0]).map((key) => (
-                                          <th
+                                          <SortableTableHeader
                                             key={key}
-                                            className="px-3 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider"
-                                          >
-                                            {key}
-                                          </th>
+                                            column={key}
+                                            sortConfig={sortConfigs[result.connection_id] || { column: null, direction: 'asc' }}
+                                            onSort={(col) => handleSortForDb(result.connection_id, col)}
+                                            className="px-3 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                                          />
                                         ))}
                                       </tr>
                                     </thead>
