@@ -51,6 +51,24 @@ frontend/src/
 
 **Tests**: `QueryResults.test.tsx` (10 tests), `MultiDatabaseResults.test.tsx` (16 tests)
 
+### Table Sorting Components (January 28, 2026)
+| Component | Lines | Purpose |
+|-----------|-------|---------|
+| `hooks/useTableSort.ts` | 192 | Reusable hook for client-side table sorting |
+| `SortableTableHeader.tsx` | 101 | Accessible sortable column header with visual indicators |
+
+**Features**:
+- Smart type detection: numbers, dates (ISO), strings sorted appropriately
+- Nulls always sort to end regardless of direction
+- Keyboard accessible (Enter/Space to sort)
+- Visual indicators using Lucide icons (ArrowUp, ArrowDown, ArrowUpDown)
+- `onSortChange` callback for pagination reset
+- ARIA attributes for screen readers (`aria-sort`, `role="columnheader"`)
+
+**Integrated Into**: `QueryResults.tsx`, `MultiDatabaseResults.tsx`, `StreamingQueryResults.tsx`
+
+**Tests**: `useTableSort.test.ts` (14 tests), `SortableTableHeader.test.tsx` (10 tests)
+
 ### Semantic Cache UI Components (November 22, 2025)
 | Component | Lines | Purpose |
 |-----------|-------|---------|
