@@ -111,6 +111,7 @@ The demo showcases:
 - 🗄️ **Dialect-Aware SQL (NEW!)** - Database-specific SQL generation for PostgreSQL, MySQL, SQLite, DuckDB
 - 🔍 **Multi-Database Query Validation (NEW!)** - Pre-flight validation with schema assessment
 - 🔗 **Data Lineage (NEW!)** - Column-level lineage visualization, impact analysis, query pattern heatmaps
+- 🔀 **Table Sorting (NEW!)** - Click any column header to sort results (numbers, dates, strings auto-detected)
 
 All with mock data - no database connection needed!
 
@@ -216,7 +217,8 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Advanced Visualization (NEW!)** - 10 chart types (Bar, Line, Pie, Scatter, Area, Histogram, Box Plot, Treemap, Sunburst, Bubble) with intelligent auto-detection, manual override, export to CSV/JSON/ZIP
 - ✅ **Cross-Database Comparison Charts** - Visual comparison across databases with auto-detection
 - ✅ **Configurable Row Limits (NEW!)** - Select from 10 to 10,000 rows per query via dropdown
-- ✅ **Result Table Pagination (NEW!)** - Navigate through large result sets with 10/25/50/100 rows per page
+- ✅ **Result Table Pagination** - Navigate through large result sets with 10/25/50/100 rows per page
+- ✅ **Table Sorting (NEW!)** - Click column headers to sort results, with smart type detection for numbers, dates, and strings
 - ✅ **Small Model Optimization (NEW!)** - Per-task model routing, query templates, location preprocessing, and dialect-aware SQL generation for faster responses with smaller models
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
@@ -1678,6 +1680,44 @@ Table shows: 1-50 of 487
 
 ---
 
+## 🔀 Table Sorting (NEW!)
+
+Database Guru now supports **client-side table sorting** with smart type detection. Click any column header to sort your query results.
+
+### Features:
+
+- **Click to Sort**: Click any column header to sort ascending, click again for descending
+- **Smart Type Detection**: Automatically detects and sorts appropriately:
+  - **Numbers**: Numeric sorting (1, 2, 10, not 1, 10, 2)
+  - **Dates**: Chronological sorting for ISO date strings
+  - **Strings**: Case-insensitive alphabetical sorting
+- **Null Handling**: Null values always sort to the end regardless of direction
+- **Visual Indicators**: Arrow icons show current sort column and direction
+- **Keyboard Accessible**: Use Enter or Space to sort columns
+- **Pagination Integration**: Sorting resets to page 1 when sort changes
+
+### Example:
+```
+Click "Price" column header:
+  → Data sorts by price ascending (lowest first)
+  → Arrow up icon appears
+
+Click "Price" again:
+  → Data sorts by price descending (highest first)
+  → Arrow down icon appears
+
+Click "Name" column:
+  → Data sorts by name A-Z
+  → Price column shows neutral icon
+```
+
+### Works In:
+- Single database query results
+- Multi-database query results (independent per database)
+- Streaming query results (sorting disabled during streaming)
+
+---
+
 ## 📊 Advanced Visualization (NEW!)
 
 Database Guru now includes **intelligent chart visualization** with automatic chart type detection and manual override capabilities!
@@ -1748,9 +1788,9 @@ Scatter plots require **minimum 10 data points** to avoid spurious correlations 
 Database Guru has comprehensive test coverage with automated testing for all major components.
 
 ### Quick Test Status
-![Tests](https://img.shields.io/badge/tests-230%2B%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-250%2B%20passing-brightgreen)
 ![Backend Tests](https://img.shields.io/badge/backend-107%20tests-brightgreen)
-![Frontend Tests](https://img.shields.io/badge/frontend-120%20tests-brightgreen)
+![Frontend Tests](https://img.shields.io/badge/frontend-144%20tests-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-55%25-yellow)
 ![Components](https://img.shields.io/badge/components-fully%20tested-brightgreen)
 
@@ -1797,6 +1837,9 @@ open htmlcov/index.html
   - Impact Analyzer: 20+ tests (risk levels, impact types)
   - Query Pattern Analyzer: 20+ tests (frequency, bottlenecks)
   - Frontend: 15+ tests (LineageGraph, heatmap visualization)
+- ✅ **Table Sorting**: 24/24 tests (100% coverage) - NEW!
+  - useTableSort hook: 14 tests (sorting logic, type detection, nulls)
+  - SortableTableHeader: 10 tests (click, keyboard, visual indicators)
 - ✅ Confidence Scoring: 31/31 tests (100% coverage)
 - ✅ Result Verification Agent: 14/14 tests (89% coverage)
 - ✅ Correction Learner: 13/13 tests (87% coverage)

@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: January 25, 2026
+**Last Updated**: January 28, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -86,6 +86,57 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                          DATA SOURCE EXPANSION (Phase 13) - NEW                         │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │                      CSV & EXCEL FILE SUPPORT (Phase 13) - HIGH PRIORITY                 │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
+    │  │ 13.1 Core   │   │ 13.2 DuckDB │   │ 13.3 Cross- │   │ 13.4 Frontend│                  │
+    │  │ Backend     │──▶│ Integration │──▶│ Source      │──▶│ UI          │                   │
+    │  │             │   │             │   │ Queries     │   │             │                   │
+    │  │ • File      │   │ • Virtual   │   │             │   │ • Upload    │                   │
+    │  │   upload    │   │   tables    │   │ • DB + File │   │   modal     │                   │
+    │  │ • Schema    │   │ • CSV/Excel │   │   JOINs     │   │ • Data      │                   │
+    │  │   inference │   │   parsing   │   │ • Result    │   │   sources   │                   │
+    │  │ • Storage   │   │ • Query     │   │   merging   │   │   panel     │                   │
+    │  │             │   │   execution │   │             │   │ • Preview   │                   │
+    │  │ ~5 days     │   │ ~5 days     │   │ ~5 days     │   │ ~5 days     │                   │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │                                                                                           │
+    │  Prereq: None (Independent) | Priority: HIGH | Est: 3-4 weeks | ~2,500 lines            │
+    │  Plan: CSV_EXCEL_SUPPORT_PLAN.md                                                         │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                         LLM PROVIDER EXPANSION (Phase 14) - NEW                         │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    MULTI-PROVIDER LLM SUPPORT (Phase 14) - HIGH PRIORITY                 │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
+    │  │ 14.1 Provider│   │ 14.2 Azure  │   │ 14.3-14.6   │   │ 14.7-14.9   │                  │
+    │  │ Abstraction │──▶│ OpenAI      │──▶│ More        │──▶│ Router &    │                   │
+    │  │             │   │             │   │ Providers   │   │ Frontend    │                   │
+    │  │ • Base class│   │ • Enterprise│   │             │   │             │                   │
+    │  │ • Registry  │   │   support   │   │ • OpenAI    │   │ • Multi-    │                   │
+    │  │ • Refactor  │   │ • Deployment│   │ • Anthropic │   │   provider  │                   │
+    │  │   Ollama    │   │   models    │   │ • Vertex AI │   │   routing   │                   │
+    │  │             │   │ • Azure Auth│   │ • Bedrock   │   │ • Fallback  │                   │
+    │  │ ~600 lines  │   │ ~500 lines  │   │ • LM Studio │   │ • Config UI │                   │
+    │  └─────────────┘   └─────────────┘   │ • vLLM      │   │             │                   │
+    │                                       │ ~1,700 lines│   │ ~1,200 lines│                   │
+    │                                       └─────────────┘   └─────────────┘                   │
+    │                                                                                           │
+    │  Prereq: None (Independent) | Priority: HIGH | Est: 3-4 weeks | ~3,000 lines            │
+    │  Plan: LLM_PROVIDER_EXPANSION_PLAN.md                                                    │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                              INSIGHT QUALITY IMPROVEMENTS                                │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -110,10 +161,10 @@
     │   (Quick Win)        │       │   (Enhancement)      │       │   (CSV, Excel, JSON) │
     │                      │       │                      │       │                      │
     │  • Click column head │       │  • Drag to resize    │       │  • Multiple formats  │
-    │  • Multi-column sort │       │  • Persist widths    │       │  • Filtered export   │
-    │  • Asc/Desc toggle   │       │  • Auto-fit option   │       │  • Streaming export  │
+    │  • Asc/Desc toggle   │       │  • Persist widths    │       │  • Filtered export   │
+    │  • Smart type sort   │       │  • Auto-fit option   │       │  • Streaming export  │
     │                      │       │                      │       │                      │
-    │  NOT STARTED         │       │  NOT STARTED         │       │  NOT STARTED         │
+    │  ✅ COMPLETE         │       │  NOT STARTED         │       │  NOT STARTED         │
     └──────────────────────┘       └──────────────────────┘       └──────────────────────┘
 
 
@@ -192,8 +243,26 @@
     INDEPENDENT FEATURES (Can Start Anytime):
     =========================================
 
+    ┌───────────────────────────────────────────────────────────────────┐
+    │        CSV & EXCEL FILE SUPPORT (Phase 13) ◀── HIGH PRIORITY      │
+    │                                                                   │
+    │  • Upload CSV/Excel as data sources                               │
+    │  • Query files alongside databases                                │
+    │  • Cross-source JOINs (file + DB)                                 │
+    │  • Est: 3-4 weeks | Plan: CSV_EXCEL_SUPPORT_PLAN.md               │
+    └───────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────┐
+    │        LLM PROVIDER EXPANSION (Phase 14) ◀── HIGH PRIORITY        │
+    │                                                                   │
+    │  • Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock            │
+    │  • Local alternatives: LM Studio, vLLM                            │
+    │  • Multi-provider routing with automatic fallback                 │
+    │  • Est: 3-4 weeks | Plan: LLM_PROVIDER_EXPANSION_PLAN.md          │
+    └───────────────────────────────────────────────────────────────────┘
+
     ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐
-    │  Table Sorting    │  │  Column Resizing  │  │  Export Options   │
+    │  Table Sorting ✅ │  │  Column Resizing  │  │  Export Options   │
     └───────────────────┘  └───────────────────┘  └───────────────────┘
 
     ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐
@@ -223,11 +292,44 @@
 - **12.5 Conversational Lineage**: Natural language queries about schema and lineage
 - See: [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) for full details
 
-### Priority 3: Table Sorting (Quick Win)
-**Why**: Immediate UX improvement, independent of lineage work
-- Click column header to sort
-- Asc/Desc toggle indicator
-- Multi-column sort support
+### Priority 3: Table Sorting ✅ COMPLETE
+**Status**: Implemented with reusable hook and accessible component
+- Click column header to sort (asc/desc toggle)
+- Smart type detection (numbers, dates, strings)
+- Keyboard accessible (Enter/Space to sort)
+- Visual indicators with Lucide icons
+- Integrated into QueryResults, MultiDatabaseResults, StreamingQueryResults
+
+### Priority 4: CSV & Excel File Support (Phase 13) - NEW
+**Why**: Major capability expansion - users can analyze spreadsheets alongside databases
+- **13.1 Core Backend**: File upload, storage, schema inference
+- **13.2 DuckDB Integration**: Virtual tables, CSV/Excel parsing, query execution
+- **13.3 Cross-Source Queries**: Database + File JOINs, result merging
+- **13.4 Frontend UI**: Upload modal, unified data sources panel, file preview
+- See: [CSV_EXCEL_SUPPORT_PLAN.md](CSV_EXCEL_SUPPORT_PLAN.md) for full implementation details
+
+**Key Use Cases**:
+- Upload sales.csv and query it with natural language
+- JOIN uploaded prospects.xlsx with production CRM database
+- Combine multiple spreadsheets into a single analysis
+
+**Technical Approach**: Leverages existing DuckDB integration for file queries
+
+### Priority 5: LLM Provider Expansion (Phase 14) - NEW
+**Why**: Enterprise integration and model flexibility - users can leverage cloud LLMs
+- **14.1 Provider Abstraction**: Unified interface, registry, refactor Ollama
+- **14.2 Azure OpenAI**: Enterprise-first cloud provider with deployment support
+- **14.3-14.6 Additional Providers**: OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM
+- **14.7-14.9 Enhanced Routing**: Multi-provider routing, fallback chains, frontend config UI
+- See: [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) for full implementation details
+
+**Key Use Cases**:
+- Connect to existing Azure OpenAI infrastructure
+- Use GPT-4 or Claude for complex queries, Ollama for simple ones
+- Automatic fallback when primary provider is unavailable
+- Cost optimization by routing cheaper tasks to cheaper providers
+
+**Technical Approach**: Abstract provider interface with pluggable implementations
 
 ---
 
@@ -237,8 +339,10 @@
 |----------|----------|--------|--------------|
 | **Visualization** | ER Diagrams, Data Lineage | Phase 7 ✅, Phase 11 ✅ | COMPLETE |
 | **LLM Intelligence** | Lineage Narrator, Impact Advisor, Schema Health, Pattern Intel, Lineage Chat | **NEXT (Phase 12)** | ~4,500 lines |
+| **Data Sources** | CSV & Excel File Support | **Phase 13 - NEW** | ~2,500 lines |
+| **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 14 - NEW** | ~3,000 lines |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
-| **Table UX** | Sorting, Resizing, Export | Not started | ~600 lines |
+| **Table UX** | Sorting ✅, Resizing, Export | Sorting complete | ~400 lines remaining |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
 | **Security** | Auth, Rate Limiting | Deferred | ~2,000 lines |
 
@@ -263,8 +367,9 @@
 | Multi-DB Validator | Pre-flight validation | 27 tests |
 | ER Diagrams (Phase 7) | Schema visualization | React Flow + Dagre |
 | Data Lineage (Phase 11) | Column-level lineage, impact analysis, query patterns | 185 tests (116 BE + 69 FE) |
+| Table Sorting | Click-to-sort columns, smart type detection | 24 tests |
 
-**Total Tests**: 780+ passing
+**Total Tests**: 800+ passing
 
 ---
 
@@ -274,8 +379,10 @@
 - [ADVANCED_VISUALIZATION_PHASE2_PLAN.md](ADVANCED_VISUALIZATION_PHASE2_PLAN.md) - Visualization features
 - [SMALL_MODEL_OPTIMIZATION_PHASE2.md](SMALL_MODEL_OPTIMIZATION_PHASE2.md) - LLM optimization features
 - [DATA_LINGEAGE_PLAN.md](DATA_LINGEAGE_PLAN.md) - Data Lineage & Impact Analysis plan (Phase 11)
-- [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) - **LLM-Powered Lineage Intelligence (Phase 12)** ← NEW
+- [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) - LLM-Powered Lineage Intelligence (Phase 12)
+- [CSV_EXCEL_SUPPORT_PLAN.md](CSV_EXCEL_SUPPORT_PLAN.md) - CSV & Excel File Support (Phase 13)
+- [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) - **LLM Provider Expansion (Phase 14)** ← NEW
 
 ---
 
-**Updated**: January 25, 2026 (Phase 11 Data Lineage complete, ready for merge)
+**Updated**: January 28, 2026 (Added LLM Provider Expansion Phase 14 plan)
