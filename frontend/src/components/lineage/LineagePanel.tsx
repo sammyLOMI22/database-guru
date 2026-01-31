@@ -5,6 +5,8 @@
  * - Explore: SQL textarea → parse → LineageGraph + ColumnLineage table
  * - History: Dropdown of recent queries → LineageGraph
  * - Impact: Table/column input → ImpactAnalysisPanel
+ * - Patterns: Query pattern heatmap and analytics
+ * - Chat: Natural language Q&A about lineage (Phase 12.5)
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -13,25 +15,35 @@ import LineageGraph from './LineageGraph';
 import { ColumnLineage } from './ColumnLineage';
 import { ImpactAnalysisPanel } from './ImpactAnalysisPanel';
 import { QueryPatternHeatmap } from './QueryPatternHeatmap';
+import { LineageChat } from './LineageChat';
 import { lineageAPI } from '../../services/lineageApi';
 import type { LineageGraphResponse } from '../../types/lineage';
 
-type TabId = 'explore' | 'history' | 'impact' | 'patterns';
+type TabId = 'explore' | 'history' | 'impact' | 'patterns' | 'chat';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'explore', label: 'Explore', icon: '🔍' },
   { id: 'history', label: 'History', icon: '📜' },
   { id: 'impact', label: 'Impact', icon: '💥' },
   { id: 'patterns', label: 'Patterns', icon: '🔥' },
+  { id: 'chat', label: 'Chat', icon: '💬' },
 ];
 
 interface LineagePanelProps {
   initialSql?: string;
   initialTab?: TabId;
   initialImpactTable?: string;
+  connectionId?: number;
+  connectionName?: string;
 }
 
-export function LineagePanel({ initialSql, initialTab, initialImpactTable }: LineagePanelProps) {
+export function LineagePanel({
+  initialSql,
+  initialTab,
+  initialImpactTable,
+  connectionId = 1,
+  connectionName,
+}: LineagePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>(initialTab || 'explore');
   const [lineageResult, setLineageResult] = useState<LineageGraphResponse | null>(null);
   const [showColumnLineage, setShowColumnLineage] = useState(true);
@@ -229,6 +241,21 @@ export function LineagePanel({ initialSql, initialTab, initialImpactTable }: Lin
         {activeTab === 'patterns' && (
           <div className="flex-1 min-h-0 overflow-auto p-4">
             <QueryPatternHeatmap />
+          </div>
+        )}
+
+        {activeTab === 'chat' && (
+          <div className="flex-1 min-h-0 p-4">
+            <LineageChat
+              connectionId={connectionId}
+              connectionName={connectionName}
+              onTableClick={(tableName) => {
+                setImpactTable(tableName);
+                setSubmittedImpact({ table: tableName });
+                setImpactKey((k) => k + 1);
+                setActiveTab('impact');
+              }}
+            />
           </div>
         )}
       </div>

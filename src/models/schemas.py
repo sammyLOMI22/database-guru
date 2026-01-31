@@ -493,6 +493,18 @@ class SystemSettingsResponse(BaseModel):
     enable_multi_db_validation: bool = True  # Pre-flight schema validation
     multi_db_validation_threshold: float = 0.6  # Fuzzy match threshold for alternatives
 
+    # Phase 12: Lineage Intelligence Model Configuration
+    model_lineage_narrative: Optional[str] = None  # Model for lineage explanations
+    model_impact_analysis: Optional[str] = None  # Model for impact advisor
+    model_schema_health: Optional[str] = None  # Model for schema health analysis
+    model_lineage_conversation: Optional[str] = None  # Model for lineage chat
+
+    # Phase 12: Lineage Intelligence Timeout Configuration
+    timeout_lineage_narrative: int = 15
+    timeout_impact_analysis: int = 20
+    timeout_schema_health: int = 30
+    timeout_lineage_conversation: int = 15
+
     created_at: datetime
     updated_at: datetime
 
@@ -544,6 +556,18 @@ class SystemSettingsUpdateRequest(BaseModel):
     enable_multi_db_validation: Optional[bool] = None  # Pre-flight schema validation
     multi_db_validation_threshold: Optional[float] = Field(None, ge=0.0, le=1.0)  # Fuzzy match threshold
 
+    # Phase 12: Lineage Intelligence Model Configuration
+    model_lineage_narrative: Optional[str] = None  # Model for lineage explanations
+    model_impact_analysis: Optional[str] = None  # Model for impact advisor
+    model_schema_health: Optional[str] = None  # Model for schema health analysis
+    model_lineage_conversation: Optional[str] = None  # Model for lineage chat
+
+    # Phase 12: Lineage Intelligence Timeout Configuration
+    timeout_lineage_narrative: Optional[int] = Field(None, ge=1, le=300)
+    timeout_impact_analysis: Optional[int] = Field(None, ge=1, le=300)
+    timeout_schema_health: Optional[int] = Field(None, ge=1, le=300)
+    timeout_lineage_conversation: Optional[int] = Field(None, ge=1, le=300)
+
 
 # ============================================================================
 # Data Lineage Schemas (Phase 11)
@@ -580,6 +604,33 @@ class LineageParseRequest(BaseModel):
         default=None,
         description="Optional connection ID for context",
     )
+    question: Optional[str] = Field(
+        default=None,
+        description="Original natural language question (for narrative context)",
+        max_length=1000,
+    )
+
+
+class TransformationExplanationSchema(BaseModel):
+    """Explanation of a transformation in the lineage graph."""
+    node_id: str
+    transformation_type: str
+    input_columns: List[str] = Field(default_factory=list)
+    output_column: str
+    explanation: str
+    business_meaning: Optional[str] = None
+
+
+class LineageNarrativeSchema(BaseModel):
+    """LLM-generated narrative explanation of lineage (Phase 12.1)."""
+    summary: str
+    data_flow_description: str = ""
+    column_explanations: Dict[str, str] = Field(default_factory=dict)
+    transformations_explained: List[TransformationExplanationSchema] = Field(default_factory=list)
+    business_context: Dict[str, str] = Field(default_factory=dict)
+    potential_issues: List[str] = Field(default_factory=list)
+    confidence: float = 0.5
+    generated_at: Optional[str] = None
 
 
 class LineageGraphResponse(BaseModel):
@@ -590,6 +641,7 @@ class LineageGraphResponse(BaseModel):
     tables_used: List[str] = Field(default_factory=list)
     columns_used: List[str] = Field(default_factory=list)
     output_columns: List[str] = Field(default_factory=list)
+    narrative: Optional[LineageNarrativeSchema] = None  # Phase 12.1: LLM narrative
 
 
 class ImpactedQuerySchema(BaseModel):
@@ -673,3 +725,306 @@ class HeatmapDataResponse(BaseModel):
     time_range_days: Optional[int] = None
     total_queries_analyzed: int = 0
     connection_id: Optional[int] = None
+
+
+# ============================================================================
+# Impact Advisor Schemas (Phase 12.2)
+# ============================================================================
+
+class SQLPatchSchema(BaseModel):
+    """A suggested SQL modification for an impacted query."""
+    query_id: int
+    original_sql: str
+    patched_sql: str
+    change_description: str
+    confidence: float = 0.8
+    requires_review: bool = False
+
+
+class MigrationStepSchema(BaseModel):
+    """A single step in a migration plan."""
+    step_number: int
+    action: str
+    description: str
+    sql: Optional[str] = None
+    reversible: bool = True
+    risk_level: str = "low"
+
+
+class MigrationPlanSchema(BaseModel):
+    """Complete migration plan for a schema change."""
+    change_type: str
+    target_object: str
+    new_value: Optional[str] = None
+    steps: List[MigrationStepSchema] = Field(default_factory=list)
+    estimated_downtime: str = "none"
+    rollback_possible: bool = True
+    warnings: List[str] = Field(default_factory=list)
+    generated_at: Optional[str] = None
+
+
+class RiskExplanationSchema(BaseModel):
+    """LLM-generated explanation of why a change is risky."""
+    risk_level: str
+    summary: str
+    detailed_explanation: str
+    affected_areas: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+    confidence: float = 0.8
+
+
+class ImpactAdviceRequest(BaseModel):
+    """Request for LLM-enhanced impact analysis."""
+    change_type: str = Field(
+        ...,
+        description="Type of change: rename_column, rename_table, drop_column, drop_table, change_type",
+    )
+    table_name: str = Field(
+        ...,
+        description="Table being modified",
+        min_length=1,
+        max_length=255,
+    )
+    column_name: Optional[str] = Field(
+        default=None,
+        description="Column being modified (for column-level changes)",
+        max_length=255,
+    )
+    new_value: Optional[str] = Field(
+        default=None,
+        description="New name or type (for renames/type changes)",
+        max_length=255,
+    )
+    include_patches: bool = Field(
+        default=True,
+        description="Whether to generate SQL patches for affected queries",
+    )
+
+
+class ImpactAdviceResponse(BaseModel):
+    """Complete LLM-enhanced impact analysis with recommendations."""
+    # Base impact
+    impact: ImpactAnalysisResponse
+    change_type: str
+    new_value: Optional[str] = None
+
+    # LLM-generated content
+    risk_explanation: Optional[RiskExplanationSchema] = None
+    migration_plan: Optional[MigrationPlanSchema] = None
+    sql_patches: List[SQLPatchSchema] = Field(default_factory=list)
+
+    # Metadata
+    generated_at: Optional[str] = None
+    llm_used: bool = False
+
+
+# ============================================================================
+# Schema Health Analyzer Schemas (Phase 12.3)
+# ============================================================================
+
+class IndexSuggestionSchema(BaseModel):
+    """A suggested index to improve query performance."""
+    table_name: str
+    columns: List[str]
+    index_type: str = "btree"
+    reason: str = ""
+    estimated_impact: str = "medium"
+    create_sql: str = ""
+    query_count_benefiting: int = 0
+
+
+class SchemaIssueSchema(BaseModel):
+    """A detected schema issue or anti-pattern."""
+    category: str
+    severity: str
+    title: str
+    description: str
+    affected_objects: List[str] = Field(default_factory=list)
+    recommendation: str = ""
+    fix_sql: Optional[str] = None
+
+
+class NormalizationIssueSchema(BaseModel):
+    """A normalization violation."""
+    table_name: str
+    issue_type: str
+    description: str
+    affected_columns: List[str] = Field(default_factory=list)
+    recommendation: str = ""
+
+
+class TableHealthSummarySchema(BaseModel):
+    """Health summary for a single table."""
+    table_name: str
+    column_count: int
+    has_primary_key: bool
+    foreign_key_count: int
+    index_count: int
+    issues: List[SchemaIssueSchema] = Field(default_factory=list)
+    suggestions: List[IndexSuggestionSchema] = Field(default_factory=list)
+
+
+class SchemaHealthReportSchema(BaseModel):
+    """Complete schema health analysis report."""
+    connection_id: int
+    database_name: str
+    grade: str = "B"
+    score: int = 75
+    table_count: int = 0
+    total_issues: int = 0
+    critical_issues: int = 0
+
+    # Detailed findings
+    index_suggestions: List[IndexSuggestionSchema] = Field(default_factory=list)
+    normalization_issues: List[NormalizationIssueSchema] = Field(default_factory=list)
+    anti_patterns: List[SchemaIssueSchema] = Field(default_factory=list)
+    table_summaries: List[TableHealthSummarySchema] = Field(default_factory=list)
+
+    # LLM-generated summary
+    summary: str = ""
+    recommendations: List[str] = Field(default_factory=list)
+
+    # Metadata
+    analyzed_at: Optional[str] = None
+    llm_used: bool = False
+
+
+# ============================================================================
+# Pattern Intelligence Schemas (Phase 12.4)
+# ============================================================================
+
+class BottleneckAnalysisSchema(BaseModel):
+    """LLM-enhanced analysis of a performance bottleneck."""
+    table_name: str
+    bottleneck_score: float
+    root_causes: List[str] = Field(default_factory=list)
+    contributing_factors: List[str] = Field(default_factory=list)
+    optimization_suggestions: List[str] = Field(default_factory=list)
+    estimated_improvement: str = "medium"
+    sample_slow_queries: List[str] = Field(default_factory=list)
+    confidence: float = 0.0
+
+
+class OptimizationSuggestionSchema(BaseModel):
+    """A suggested optimization for query patterns."""
+    category: str  # "index", "query_rewrite", "caching", "schema"
+    title: str
+    description: str
+    affected_tables: List[str] = Field(default_factory=list)
+    estimated_impact: str = "medium"
+    implementation_sql: Optional[str] = None
+    priority: int = 0
+
+
+class QueryAntiPatternSchema(BaseModel):
+    """A detected query anti-pattern."""
+    pattern_type: str
+    severity: str
+    title: str
+    description: str
+    affected_queries: List[int] = Field(default_factory=list)
+    sample_sql: str = ""
+    recommendation: str = ""
+    occurrence_count: int = 0
+
+
+class UsageTrendSchema(BaseModel):
+    """Trend data for a table's usage over time."""
+    table_name: str
+    period: str = "daily"
+    data_points: List[Dict[str, Any]] = Field(default_factory=list)
+    trend_direction: str = "stable"
+    change_percentage: float = 0.0
+
+
+class TrendAnalysisSchema(BaseModel):
+    """Complete trend analysis for a connection."""
+    connection_id: int
+    time_range_days: int
+    table_trends: List[UsageTrendSchema] = Field(default_factory=list)
+    busiest_tables: List[str] = Field(default_factory=list)
+    emerging_tables: List[str] = Field(default_factory=list)
+    declining_tables: List[str] = Field(default_factory=list)
+    summary: str = ""
+
+
+class PatternIntelligenceReportSchema(BaseModel):
+    """Complete pattern intelligence report."""
+    connection_id: int
+    bottleneck_analyses: List[BottleneckAnalysisSchema] = Field(default_factory=list)
+    optimization_suggestions: List[OptimizationSuggestionSchema] = Field(default_factory=list)
+    anti_patterns: List[QueryAntiPatternSchema] = Field(default_factory=list)
+    trend_analysis: Optional[TrendAnalysisSchema] = None
+    summary: str = ""
+    recommendations: List[str] = Field(default_factory=list)
+    analyzed_at: Optional[str] = None
+    llm_used: bool = False
+
+
+# =============================================================================
+# Phase 12.5: Conversational Lineage Schemas
+# =============================================================================
+
+class LineageQuestionRequest(BaseModel):
+    """Request model for asking lineage questions."""
+    question: str = Field(
+        ...,
+        description="Natural language question about lineage, schema, or patterns",
+        min_length=3,
+        max_length=500,
+    )
+    connection_id: int = Field(
+        ...,
+        description="Database connection ID",
+    )
+    session_id: Optional[str] = Field(
+        default=None,
+        description="Session ID for multi-turn conversation context",
+    )
+
+    @validator('question')
+    def question_not_empty(cls, v):
+        """Validate and sanitize user question."""
+        if not v or not v.strip():
+            raise ValueError('Question cannot be empty')
+        sanitized = sanitize_user_input(v)
+        if not sanitized:
+            raise ValueError('Question cannot be empty after sanitization')
+        return sanitized
+
+
+class LineageAnswerSchema(BaseModel):
+    """Response model for lineage questions."""
+    question: str
+    question_type: str = Field(
+        ...,
+        description="Classified question type (lineage, impact, pattern, schema, recommendation, general)",
+    )
+    answer: str = Field(
+        ...,
+        description="Natural language answer to the question",
+    )
+    supporting_data: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Supporting data that informed the answer",
+    )
+    related_tables: List[str] = Field(
+        default_factory=list,
+        description="Tables related to the answer",
+    )
+    related_queries: List[int] = Field(
+        default_factory=list,
+        description="Query IDs related to the answer",
+    )
+    confidence: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score for the answer",
+    )
+    follow_up_suggestions: List[str] = Field(
+        default_factory=list,
+        description="Suggested follow-up questions",
+    )
+    generated_at: Optional[str] = None
+    llm_used: bool = False

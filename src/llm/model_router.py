@@ -36,6 +36,12 @@ class TaskType(Enum):
     NARRATIVES = "narratives"
     QUERY_PLANNING = "query_planning"
     ERROR_CORRECTION = "error_correction"
+    # Phase 12: Lineage Intelligence
+    LINEAGE_NARRATIVE = "lineage_narrative"
+    IMPACT_ANALYSIS = "impact_analysis"
+    SCHEMA_HEALTH = "schema_health"
+    LINEAGE_CONVERSATION = "lineage_conversation"
+    PATTERN_INTELLIGENCE = "pattern_intelligence"
 
 
 @dataclass
@@ -68,6 +74,12 @@ class ModelRouter:
         TaskType.NARRATIVES: 15,
         TaskType.QUERY_PLANNING: 20,
         TaskType.ERROR_CORRECTION: 15,
+        # Phase 12: Lineage Intelligence
+        TaskType.LINEAGE_NARRATIVE: 15,
+        TaskType.IMPACT_ANALYSIS: 20,
+        TaskType.SCHEMA_HEALTH: 30,
+        TaskType.LINEAGE_CONVERSATION: 15,
+        TaskType.PATTERN_INTELLIGENCE: 20,
     }
 
     def __init__(
@@ -270,6 +282,15 @@ async def get_model_router(db_session=None) -> ModelRouter:
                 'timeout_narratives': sys_settings.timeout_narratives,
                 'timeout_query_planning': sys_settings.timeout_query_planning,
                 'timeout_error_correction': sys_settings.timeout_error_correction,
+                # Phase 12: Lineage Intelligence
+                'model_lineage_narrative': getattr(sys_settings, 'model_lineage_narrative', None),
+                'model_impact_analysis': getattr(sys_settings, 'model_impact_analysis', None),
+                'model_schema_health': getattr(sys_settings, 'model_schema_health', None),
+                'model_lineage_conversation': getattr(sys_settings, 'model_lineage_conversation', None),
+                'timeout_lineage_narrative': getattr(sys_settings, 'timeout_lineage_narrative', 15),
+                'timeout_impact_analysis': getattr(sys_settings, 'timeout_impact_analysis', 20),
+                'timeout_schema_health': getattr(sys_settings, 'timeout_schema_health', 30),
+                'timeout_lineage_conversation': getattr(sys_settings, 'timeout_lineage_conversation', 15),
             }
 
             logger.debug(f"Loaded model settings from database: {model_settings}")
