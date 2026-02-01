@@ -11,7 +11,7 @@ This report provides a deep-dive audit of the Lineage Intelligence implementatio
 - **Task-Specific Routing**: Leveraging the `ModelRouter` to select different models/timeouts for tasks like `SCHEMA_HEALTH` vs `LINEAGE_NARRATIVE` is an excellent optimization for latency and cost.
 
 ### ⚠️ Critical Issues
-- **Recursion Risk in Tracing**: The `_trace_sources` method in `LineageNarrator` uses recursion to navigate the lineage graph. While limited to 5 results, there is no hard `max_depth` check on the recursion itself, which could lead to `RecursionError` on circular or extremely deep column lineages.
+- ~~**Recursion Risk in Tracing**~~: ✅ FIXED (2026-02-01). Added `max_depth=50` parameter to `_trace_sources` method to prevent stack overflow on deep lineage chains. The `visited` set already prevented cycles.
 - **Unvalidated Patch Execution**: The `ImpactAdvisor` generates SQL patches but currently lacks a validation step (e.g., a "dry run" or syntax check) before presenting them to the user. This relies entirely on the LLM's accuracy.
 
 ### 🛠️ Optimization Suggestions
@@ -68,7 +68,7 @@ This report provides a deep-dive audit of the Lineage Intelligence implementatio
 | Priority | Persona | Action Item | Description |
 | :--- | :--- | :--- | :--- |
 | **High** | Data Architect | Persistent Session Store | Move `ConversationContext` from in-memory to Redis for scalability. |
-| **High** | Sr. Engineer | Harden Graph Recursion | Add `max_depth` or iterative logic to `_trace_sources`. |
+| **High** | Sr. Engineer | ~~Harden Graph Recursion~~ | ✅ FIXED: Added `max_depth=50` parameter to `_trace_sources` (2026-02-01). |
 | **Medium** | Project Manager | Grade Explanation | Update UI to detail the scoring components for the A-F grade. |
 | **Medium** | Sr. Engineer | SQL Patch Validation | Implement a syntax-check or "Explain Plan" validation for generated patches. |
 | **Low** | Sr. Engineer | Memoization | Add `@lru_cache` or internal memoization to lineage traversal methods. |

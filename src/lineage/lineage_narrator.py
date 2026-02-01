@@ -337,13 +337,22 @@ Return JSON mapping technical names to business terms:
             column_lineage_formatted=column_lineage_formatted,
         )
 
-    def _trace_sources(self, node_id: str, graph: LineageGraph) -> List[str]:
-        """Trace back to find source columns for a given node."""
+    def _trace_sources(
+        self, node_id: str, graph: LineageGraph, max_depth: int = 50
+    ) -> List[str]:
+        """Trace back to find source columns for a given node.
+
+        Args:
+            node_id: The node ID to trace sources for.
+            graph: The lineage graph to traverse.
+            max_depth: Maximum recursion depth to prevent stack overflow on deep graphs.
+        """
         sources = []
         visited = set()
 
-        def trace(current_id: str):
-            if current_id in visited:
+        def trace(current_id: str, depth: int = 0):
+            # Guard against deep recursion and cycles
+            if depth > max_depth or current_id in visited:
                 return
             visited.add(current_id)
 
@@ -356,7 +365,7 @@ Return JSON mapping technical names to business terms:
                             col = source_node.column_name or source_node.label
                             sources.append(f"{table}.{col}" if table else col)
                         else:
-                            trace(source_node.id)
+                            trace(source_node.id, depth + 1)
 
         trace(node_id)
         return sources[:5]  # Limit to 5 sources
