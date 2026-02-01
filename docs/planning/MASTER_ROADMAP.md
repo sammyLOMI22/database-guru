@@ -91,14 +91,38 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                         LLM PROVIDER EXPANSION (Phase 14) - NEW                         │
+    │                         NOSQL EXPANSION (Phase 14) - DATA SOURCES                       │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    MULTI-PROVIDER LLM SUPPORT (Phase 14) - HIGH PRIORITY                 │
+    │                    NOSQL DATABASE SUPPORT (Phase 14) - MEDIUM PRIORITY                   │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐ │
+    │  │ 14.1        │   │ 14.2        │   │ 14.3        │   │ 14.4        │   │ 14.5        │ │
+    │  │ MongoDB     │──▶│ Redis       │──▶│ Cassandra   │──▶│ DynamoDB    │──▶│ Elastic-    │ │
+    │  │             │   │             │   │             │   │             │   │ search      │ │
+    │  │ • MQL gen   │   │ • Commands  │   │ • CQL gen   │   │ • PartiQL   │   │ • Query DSL │ │
+    │  │ • Aggreg.   │   │ • All data  │   │ • Partition │   │ • boto3 API │   │ • Aggreg.   │ │
+    │  │ • Schema    │   │   types     │   │   aware     │   │ • GSI query │   │ • Search    │ │
+    │  │   inference │   │ • RediSearch│   │ • Keyspaces │   │ • Cost est. │   │ • Highlight │ │
+    │  │             │   │             │   │             │   │             │   │             │ │
+    │  │ ~1,500 lines│   │ ~1,000 lines│   │ ~1,000 lines│   │ ~1,200 lines│   │ ~1,300 lines│ │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘ │
+    │                                                                                           │
+    │  Prereq: None (Independent) | Priority: MEDIUM | Est: 6-8 weeks | ~6,000 lines          │
+    │  Plan: NOSQL_EXPANSION_PLAN.md                                                           │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                         LLM PROVIDER EXPANSION (Phase 15)                               │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    MULTI-PROVIDER LLM SUPPORT (Phase 15) - HIGH PRIORITY                 │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
-    │  │ 14.1 Provider│   │ 14.2 Azure  │   │ 14.3-14.6   │   │ 14.7-14.9   │                  │
+    │  │ 15.1 Provider│   │ 15.2 Azure  │   │ 15.3-15.6   │   │ 15.7-15.9   │                  │
     │  │ Abstraction │──▶│ OpenAI      │──▶│ More        │──▶│ Router &    │                   │
     │  │             │   │             │   │ Providers   │   │ Frontend    │                   │
     │  │ • Base class│   │ • Enterprise│   │             │   │             │                   │
@@ -117,14 +141,14 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                         LLM USAGE MONITORING (Phase 15) - NEW                           │
+    │                         LLM USAGE MONITORING (Phase 16)                                 │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    LLM TOKEN USAGE MONITORING (Phase 15) - MEDIUM PRIORITY               │
+    │                    LLM TOKEN USAGE MONITORING (Phase 16) - MEDIUM PRIORITY               │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
-    │  │ 15.1 Core   │   │ 15.2 Agent  │   │ 15.3 Dash-  │   │ 15.4 Inline │                   │
+    │  │ 16.1 Core   │   │ 16.2 Agent  │   │ 16.3 Dash-  │   │ 16.4 Inline │                   │
     │  │ Infrastruc- │──▶│ Integration │──▶│ board       │──▶│ Chat Stats  │                   │
     │  │ ture        │   │             │   │ Frontend    │   │             │                   │
     │  │             │   │             │   │             │   │             │                   │
@@ -143,14 +167,14 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                   MULTI-PROVIDER MONITORING (Phase 16) - NEW                            │
+    │                   MULTI-PROVIDER MONITORING (Phase 17)                                  │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │               MULTI-PROVIDER MONITORING INTEGRATION (Phase 16) - MEDIUM PRIORITY         │
+    │               MULTI-PROVIDER MONITORING INTEGRATION (Phase 17) - MEDIUM PRIORITY         │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
-    │  │ 16.1 Token  │   │ 16.2 Base   │   │ 16.3 API &  │   │ 16.4 Dash-  │                   │
+    │  │ 17.1 Token  │   │ 17.2 Base   │   │ 17.3 API &  │   │ 17.4 Dash-  │                   │
     │  │ Extractors  │──▶│ Provider    │──▶│ Schema      │──▶│ board       │                   │
     │  │             │   │ Updates     │   │ Updates     │   │ Widgets     │                   │
     │  │             │   │             │   │             │   │             │                   │
@@ -163,8 +187,34 @@
     │  │ ~300 lines  │   │ ~200 lines  │   │ ~300 lines  │   │ ~400 lines  │                   │
     │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
     │                                                                                           │
-    │  Prereq: Phase 14 + Phase 15 | Priority: MEDIUM | Est: 1-2 weeks | ~1,200 lines         │
+    │  Prereq: Phase 15 + Phase 16 | Priority: MEDIUM | Est: 1-2 weeks | ~1,200 lines         │
     │  Plan: MULTI_PROVIDER_MONITORING_INTEGRATION.md                                          │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    DATA INSIGHTS ENHANCEMENT (Phase 19) - NEW                           │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │                 DATA INSIGHTS ENHANCEMENT (Phase 19) - MEDIUM PRIORITY                   │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐ │
+    │  │ 19.1 Small  │   │ 19.2        │   │ 19.3 Multi- │   │ 19.4 Chart  │   │ 19.5        │ │
+    │  │ Model       │──▶│ Analytics   │──▶│ Source      │──▶│ Intelligence│──▶│ Parallel    │ │
+    │  │ Optimization│   │ Caching     │   │ Insights    │   │ Enhance     │   │ Analysis    │ │
+    │  │             │   │             │   │             │   │             │   │             │ │
+    │  │ • Tiered    │   │ • Stats     │   │ • Quality   │   │ • Adaptive  │   │ • Async     │ │
+    │  │   prompts   │   │   cache     │   │   metrics   │   │   weights   │   │   analysis  │ │
+    │  │ • Token     │   │ • Pattern   │   │ • Gap       │   │ • Smart     │   │ • Early     │ │
+    │  │   budgets   │   │   cache     │   │   analysis  │   │   columns   │   │   exit      │ │
+    │  │ • 40% save  │   │ • 24hr TTL  │   │ • Freshness │   │ • Context   │   │ • 30-40%    │ │
+    │  │             │   │             │   │             │   │   insights  │   │   speedup   │ │
+    │  │ ~400 lines  │   │ ~350 lines  │   │ ~450 lines  │   │ ~350 lines  │   │ ~250 lines  │ │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘ │
+    │                                                                                           │
+    │  Prereq: None (Independent) | Priority: MEDIUM | Est: 2-3 weeks | ~1,800 lines          │
+    │  Plan: DATA_INSIGHTS_ENHANCEMENT_PLAN.md                                                 │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -201,14 +251,14 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                            EDIT MODE & DML (Phase 17) - NEW                             │
+    │                            EDIT MODE & DML (Phase 18) - NEW                             │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                  EDIT MODE & DML OPERATIONS (Phase 17) - MEDIUM PRIORITY                 │
+    │                  EDIT MODE & DML OPERATIONS (Phase 18) - MEDIUM PRIORITY                 │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
-    │  │ 17.1 Core   │   │ 17.2 API &  │   │ 17.3 Inline │   │ 17.4 NL DML │                   │
+    │  │ 18.1 Core   │   │ 18.2 API &  │   │ 18.3 Inline │   │ 18.4 NL DML │                   │
     │  │ Backend     │──▶│ Execution   │──▶│ Editing UI  │──▶│ & Polish    │                   │
     │  │             │   │             │   │             │   │             │                   │
     │  │ • Change    │   │ • DML       │   │ • Editable  │   │ • Natural   │                   │
@@ -321,7 +371,16 @@
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │        LLM PROVIDER EXPANSION (Phase 14) ◀── HIGH PRIORITY        │
+    │        NOSQL DATABASE EXPANSION (Phase 14) ◀── MEDIUM PRIORITY    │
+    │                                                                   │
+    │  • MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch             │
+    │  • Schema inference for schema-less databases                     │
+    │  • Natural language to native query languages                     │
+    │  • Est: 6-8 weeks | Plan: NOSQL_EXPANSION_PLAN.md                 │
+    └───────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────┐
+    │        LLM PROVIDER EXPANSION (Phase 15) ◀── HIGH PRIORITY        │
     │                                                                   │
     │  • Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock            │
     │  • Local alternatives: LM Studio, vLLM                            │
@@ -330,7 +389,7 @@
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │        LLM USAGE MONITORING (Phase 15) ◀── MEDIUM PRIORITY        │
+    │        LLM USAGE MONITORING (Phase 16) ◀── MEDIUM PRIORITY        │
     │                                                                   │
     │  • Track token usage across all 23+ agents                        │
     │  • Dashboard with charts and per-agent analytics                  │
@@ -343,9 +402,9 @@
     ============================================
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │   MULTI-PROVIDER MONITORING (Phase 16) ◀── MEDIUM PRIORITY        │
+    │   MULTI-PROVIDER MONITORING (Phase 17) ◀── MEDIUM PRIORITY        │
     │                                                                   │
-    │   REQUIRES: Phase 14 (Providers) + Phase 15 (Monitoring)          │
+    │   REQUIRES: Phase 15 (Providers) + Phase 16 (Monitoring)          │
     │                                                                   │
     │  • Native token counts from OpenAI, Anthropic, Google, etc.       │
     │  • Accurate cost tracking per provider/model                      │
@@ -354,7 +413,7 @@
     └───────────────────────────────────────────────────────────────────┘
 
             ┌─────────────────┐          ┌─────────────────┐
-            │   Phase 14      │          │   Phase 15      │
+            │   Phase 15      │          │   Phase 16      │
             │   Provider      │          │   Usage         │
             │   Expansion     │          │   Monitoring    │
             └────────┬────────┘          └────────┬────────┘
@@ -363,7 +422,7 @@
                                 │
                                 ▼
                      ┌─────────────────────┐
-                     │     Phase 16        │
+                     │     Phase 17        │
                      │   Multi-Provider    │
                      │     Monitoring      │
                      └─────────────────────┘
@@ -420,12 +479,28 @@
 
 **Technical Approach**: Leverages existing DuckDB integration for file queries
 
-### Priority 5: LLM Provider Expansion (Phase 14) - NEW
+### Priority 5: NoSQL Database Expansion (Phase 14) - NEW
+**Why**: Extend natural language querying to document, key-value, wide-column, and search databases
+- **14.1 MongoDB**: MQL generation, aggregation pipelines, schema inference
+- **14.2 Redis**: Command generation for all data types, RediSearch
+- **14.3 Cassandra**: CQL generation with partition-key awareness
+- **14.4 DynamoDB**: PartiQL and boto3 API, GSI optimization
+- **14.5 Elasticsearch**: Query DSL with aggregations and highlighting
+- See: [NOSQL_EXPANSION_PLAN.md](NOSQL_EXPANSION_PLAN.md) for full implementation details
+
+**Key Use Cases**:
+- Natural language queries for MongoDB collections
+- Unified interface across all NoSQL database types
+- Schema inference for schema-less databases
+
+**Technical Approach**: Database-specific query generators with unified interface
+
+### Priority 6: LLM Provider Expansion (Phase 15) - NEW
 **Why**: Enterprise integration and model flexibility - users can leverage cloud LLMs
-- **14.1 Provider Abstraction**: Unified interface, registry, refactor Ollama
-- **14.2 Azure OpenAI**: Enterprise-first cloud provider with deployment support
-- **14.3-14.6 Additional Providers**: OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM
-- **14.7-14.9 Enhanced Routing**: Multi-provider routing, fallback chains, frontend config UI
+- **15.1 Provider Abstraction**: Unified interface, registry, refactor Ollama
+- **15.2 Azure OpenAI**: Enterprise-first cloud provider with deployment support
+- **15.3-15.6 Additional Providers**: OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM
+- **15.7-15.9 Enhanced Routing**: Multi-provider routing, fallback chains, frontend config UI
 - See: [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) for full implementation details
 
 **Key Use Cases**:
@@ -436,12 +511,12 @@
 
 **Technical Approach**: Abstract provider interface with pluggable implementations
 
-### Priority 6: LLM Usage Monitoring (Phase 15) - NEW
+### Priority 7: LLM Usage Monitoring (Phase 16) - NEW
 **Why**: Visibility into LLM resource consumption across all agents
-- **15.1 Core Infrastructure**: LLMUsage table, tracker service, API endpoints
-- **15.2 Agent Integration**: Update SQL Generator, Result Narrator, Query Planning, Lineage agents
-- **15.3 Dashboard Frontend**: Stats cards, time series charts, agent breakdown, recent calls table
-- **15.4 Inline Chat Stats**: Per-message token display, session totals, collapsible detail view
+- **16.1 Core Infrastructure**: LLMUsage table, tracker service, API endpoints
+- **16.2 Agent Integration**: Update SQL Generator, Result Narrator, Query Planning, Lineage agents
+- **16.3 Dashboard Frontend**: Stats cards, time series charts, agent breakdown, recent calls table
+- **16.4 Inline Chat Stats**: Per-message token display, session totals, collapsible detail view
 - See: [LLM_USAGE_MONITORING_PLAN.md](LLM_USAGE_MONITORING_PLAN.md) for full implementation details
 
 **Key Use Cases**:
@@ -452,13 +527,13 @@
 
 **Technical Approach**: Centralized tracker service with database persistence
 
-### Priority 7: Multi-Provider Monitoring Integration (Phase 16) - NEW
+### Priority 8: Multi-Provider Monitoring Integration (Phase 17) - NEW
 **Why**: Extend monitoring to all LLM providers with accurate cost tracking
-- **Prerequisite**: Requires BOTH Phase 14 (Provider Expansion) AND Phase 15 (Usage Monitoring)
-- **16.1 Token Extractors**: Provider-specific token extraction (OpenAI, Anthropic, Google formats)
-- **16.2 Provider Updates**: Enrich responses with native token counts and costs
-- **16.3 API & Schema**: Add provider column, cost endpoints, comparison APIs
-- **16.4 Dashboard Widgets**: Cost by provider chart, provider comparison table, cost trends
+- **Prerequisite**: Requires BOTH Phase 15 (Provider Expansion) AND Phase 16 (Usage Monitoring)
+- **17.1 Token Extractors**: Provider-specific token extraction (OpenAI, Anthropic, Google formats)
+- **17.2 Provider Updates**: Enrich responses with native token counts and costs
+- **17.3 API & Schema**: Add provider column, cost endpoints, comparison APIs
+- **17.4 Dashboard Widgets**: Cost by provider chart, provider comparison table, cost trends
 - See: [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md) for full details
 
 **Key Use Cases**:
@@ -478,10 +553,11 @@
 | **Visualization** | ER Diagrams, Data Lineage | Phase 7 ✅, Phase 11 ✅ | COMPLETE |
 | **LLM Intelligence** | Lineage Narrator, Impact Advisor, Schema Health, Pattern Intel, Lineage Chat | **Phase 12 ✅ COMPLETE** | ~11,266 lines |
 | **Data Sources** | CSV & Excel File Support | **Phase 13 - PLANNED** | ~2,500 lines |
-| **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 14 - PLANNED** | ~3,000 lines |
-| **LLM Monitoring** | Token usage tracking, dashboard, inline stats (Ollama) | **Phase 15 - PLANNED** | ~1,500 lines |
-| **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 16 - PLANNED** (needs 14+15) | ~1,200 lines |
-| **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, natural language DML | **Phase 17 - PLANNED** | ~4,000 lines |
+| **NoSQL Expansion** | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch | **Phase 14 - PLANNED** | ~6,000 lines |
+| **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 15 - PLANNED** | ~3,000 lines |
+| **LLM Monitoring** | Token usage tracking, dashboard, inline stats (Ollama) | **Phase 16 - PLANNED** | ~1,500 lines |
+| **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 17 - PLANNED** (needs 15+16) | ~1,200 lines |
+| **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, natural language DML | **Phase 18 - PLANNED** | ~4,000 lines |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Table UX** | Sorting ✅, Resizing, Export | Sorting complete | ~400 lines remaining |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
@@ -520,10 +596,12 @@
 | Phase | Feature | Dependencies | Est. Effort | Priority |
 |-------|---------|--------------|-------------|----------|
 | **Phase 13** | CSV & Excel File Support | None | ~2,500 lines | HIGH |
-| **Phase 14** | LLM Provider Expansion | None | ~3,000 lines | HIGH |
-| **Phase 15** | LLM Usage Monitoring | None | ~1,500 lines | MEDIUM |
-| **Phase 16** | Multi-Provider Monitoring | Phase 14 + 15 | ~1,200 lines | MEDIUM |
-| **Phase 17** | Edit Mode & DML Operations | None | ~4,000 lines | MEDIUM |
+| **Phase 14** | NoSQL Database Expansion | None | ~6,000 lines | MEDIUM |
+| **Phase 15** | LLM Provider Expansion | None | ~3,000 lines | HIGH |
+| **Phase 16** | LLM Usage Monitoring | None | ~1,500 lines | MEDIUM |
+| **Phase 17** | Multi-Provider Monitoring | Phase 15 + 16 | ~1,200 lines | MEDIUM |
+| **Phase 18** | Edit Mode & DML Operations | None | ~4,000 lines | MEDIUM |
+| **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | MEDIUM |
 
 ---
 
@@ -535,11 +613,13 @@
 - [DATA_LINGEAGE_PLAN.md](DATA_LINGEAGE_PLAN.md) - Data Lineage & Impact Analysis plan (Phase 11)
 - [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) - LLM-Powered Lineage Intelligence (Phase 12)
 - [CSV_EXCEL_SUPPORT_PLAN.md](CSV_EXCEL_SUPPORT_PLAN.md) - CSV & Excel File Support (Phase 13)
-- [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) - LLM Provider Expansion (Phase 14)
-- [LLM_USAGE_MONITORING_PLAN.md](LLM_USAGE_MONITORING_PLAN.md) - LLM Usage Monitoring (Phase 15)
-- [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md) - Multi-Provider Monitoring (Phase 16)
-- [EDIT_MODE_DML_PLAN.md](EDIT_MODE_DML_PLAN.md) - **Edit Mode & DML Operations (Phase 17)** ← NEW
+- [NOSQL_EXPANSION_PLAN.md](NOSQL_EXPANSION_PLAN.md) - NoSQL Database Expansion (Phase 14)
+- [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) - LLM Provider Expansion (Phase 15)
+- [LLM_USAGE_MONITORING_PLAN.md](LLM_USAGE_MONITORING_PLAN.md) - LLM Usage Monitoring (Phase 16)
+- [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md) - Multi-Provider Monitoring (Phase 17)
+- [EDIT_MODE_DML_PLAN.md](EDIT_MODE_DML_PLAN.md) - Edit Mode & DML Operations (Phase 18)
+- [DATA_INSIGHTS_ENHANCEMENT_PLAN.md](DATA_INSIGHTS_ENHANCEMENT_PLAN.md) - Data Insights Enhancement (Phase 19)
 
 ---
 
-**Updated**: February 1, 2026 (Added Phase 15-17: LLM Monitoring, Multi-Provider Monitoring, Edit Mode & DML)
+**Updated**: February 1, 2026 (Added Phase 19: Data Insights Enhancement for multi-source insights and charts)
