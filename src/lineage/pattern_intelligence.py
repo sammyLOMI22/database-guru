@@ -28,6 +28,7 @@ from src.lineage.query_pattern_analyzer import (
     PerformanceBottleneck,
     HeatmapData,
 )
+from src.lineage.llm_utils import parse_json_response
 
 logger = logging.getLogger(__name__)
 
@@ -714,7 +715,7 @@ class PatternIntelligenceAgent:
                 self.client.generate(prompt=prompt, model=model, temperature=0.2),
                 timeout=self.timeout_seconds,
             )
-            return self._extract_json_object(response)
+            return parse_json_response(response)
         except Exception as e:
             logger.warning(f"LLM bottleneck analysis error: {e}")
             return None
@@ -879,43 +880,6 @@ class PatternIntelligenceAgent:
                             result.append(v)
                             break
         return result
-
-    def _extract_json_object(self, text: str) -> Optional[Dict]:
-        """Extract JSON object from LLM response."""
-        start_idx = text.find('{')
-        if start_idx == -1:
-            return None
-
-        depth = 0
-        in_string = False
-        escape_next = False
-
-        for i, char in enumerate(text[start_idx:], start=start_idx):
-            if escape_next:
-                escape_next = False
-                continue
-
-            if char == '\\' and in_string:
-                escape_next = True
-                continue
-
-            if char == '"' and not escape_next:
-                in_string = not in_string
-                continue
-
-            if not in_string:
-                if char == '{':
-                    depth += 1
-                elif char == '}':
-                    depth -= 1
-                    if depth == 0:
-                        try:
-                            return json.loads(text[start_idx:i + 1])
-                        except json.JSONDecodeError:
-                            return None
-
-        return None
-
 
 # =============================================================================
 # Factory Function

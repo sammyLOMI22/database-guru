@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: January 28, 2026
+**Last Updated**: January 31, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -45,43 +45,23 @@
     │   ✅ COMPLETE        │  │   ✅ COMPLETE        │  │   ✅ COMPLETE        │
     └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
 
-    ┌──────────────────────┐
-    │   Data Lineage       │
-    │   (Phase 11)         │
-    │   185 tests passing  │
-    │   ✅ COMPLETE        │
-    └──────────────────────┘
+    ┌──────────────────────┐  ┌──────────────────────┐
+    │   Data Lineage       │  │ Lineage Intelligence │
+    │   (Phase 11)         │  │   (Phase 12)         │
+    │   185 tests passing  │  │   151 tests passing  │
+    │   ✅ COMPLETE        │  │   ✅ COMPLETE        │
+    └──────────────────────┘  └──────────────────────┘
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                                    READY TO IMPLEMENT                                    │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
-    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                      LINEAGE INTELLIGENCE (Phase 12) - LLM-Powered                        │
-    │                                                                                           │
-    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐ │
-    │  │ 12.1 Lineage│   │ 12.2 Impact │   │ 12.3 Schema │   │ 12.4 Pattern│   │ 12.5 Lineage│ │
-    │  │ Narrator    │──▶│ Advisor     │──▶│ Health      │──▶│ Intelligence│──▶│ Chat        │ │
-    │  │             │   │             │   │ Analyzer    │   │             │   │             │ │
-    │  │ • Data flow │   │ • Migration │   │             │   │ • Bottleneck│   │ • NL queries│ │
-    │  │   explain   │   │   guides    │   │ • Index     │   │   root cause│   │ • Multi-turn│ │
-    │  │ • Column    │   │ • Risk      │   │   suggest   │   │ • Anti-     │   │ • Schema Q&A│ │
-    │  │   semantics │   │   explain   │   │ • Normal-   │   │   patterns  │   │             │ │
-    │  │ • Business  │   │ • SQL patch │   │   ization   │   │ • Trend     │   │ ~1000 lines │ │
-    │  │   context   │   │   generate  │   │ • Type      │   │   analysis  │   │             │ │
-    │  │             │   │             │   │   suggest   │   │             │   │             │ │
-    │  │ ~800 lines  │   │ ~900 lines  │   │ ~1000 lines │   │ ~800 lines  │   │             │ │
-    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘ │
-    │                                                                                           │
-    │  Prereq: Phase 11 (Data Lineage) | Priority: HIGH | Est: 8-10 days | ~4,500 lines        │
-    └───────────────────────────────────────────────────────────────────────────────────────────┘
-
     ┌──────────────────────┐  ┌──────────────────────┐
-    │   Table Statistics   │  │   Schema Health      │
-    │   (Row counts, size) │  │   (Missing PKs, etc) │
-    │   Est: ~280 lines    │  │   Est: ~270 lines    │
-    │   Standalone         │  │   (Part of 12.3)     │
+    │   Table Statistics   │  │   Column Resizing    │
+    │   (Row counts, size) │  │   (Drag to resize)   │
+    │   Est: ~280 lines    │  │   Est: ~300 lines    │
+    │   Standalone         │  │   Enhancement        │
     └──────────────────────┘  └──────────────────────┘
 
 
@@ -228,15 +208,16 @@
             │
             ▼
     ┌─────────────────────────────────────────────────────────────────┐
-    │                LINEAGE INTELLIGENCE (Phase 12)                   │  ◀── NEXT
+    │        LINEAGE INTELLIGENCE (Phase 12) - COMPLETE ✅            │
     │                     LLM-Powered Features                         │
     │                                                                  │
     │  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
-    │  │ 12.1    │──▶│ 12.2    │──▶│ 12.3    │──▶│ 12.4    │──▶│ 12.5    │
+    │  │ 12.1 ✅ │──▶│ 12.2 ✅ │──▶│ 12.3 ✅ │──▶│ 12.4 ✅ │──▶│ 12.5 ✅ │
     │  │ Lineage │   │ Impact  │   │ Schema  │   │ Pattern │   │ Lineage │
     │  │ Narrator│   │ Advisor │   │ Health  │   │ Intel.  │   │ Chat    │
     │  └─────────┘   └─────────┘   └─────────┘   └─────────┘   └─────────┘
     │                                                                  │
+    │  151 tests | ~11,266 lines | 5 LLM agents                        │
     └─────────────────────────────────────────────────────────────────┘
 
 
@@ -276,23 +257,17 @@
 
 ## Recommended Next Steps
 
-### Priority 1: Merge Data Lineage Branch
-**Status**: Phase 11 COMPLETE ✅ (185 tests passing)
-- All 6 sub-phases complete (11.1-11.6)
-- Backend: 116 tests passing
-- Frontend: 69 tests passing
-- Ready to merge `data-lineage` → `main`
+### Priority 1: Lineage Intelligence Phase 12 ✅ COMPLETE
+**Status**: All 5 sub-phases implemented (151 tests passing, ~11,266 lines)
+- **12.1 Lineage Narrator** ✅: Natural language explanations of data lineage graphs
+- **12.2 Impact Advisor** ✅: Migration plans, SQL patches, risk explanations
+- **12.3 Schema Health Analyzer** ✅: Database design quality scoring with index suggestions
+- **12.4 Pattern Intelligence** ✅: Query anti-pattern detection and optimization suggestions
+- **12.5 Lineage Conversation Agent** ✅: Multi-turn Q&A about schema/lineage
+- New shared utility: `src/lineage/llm_utils.py` for JSON extraction
+- See: [LINEAGE_INTELLIGENCE_USER_GUIDE.md](../guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md)
 
-### Priority 2: Lineage Intelligence Phase 12 (LLM-Powered)
-**Why**: Transforms Database Guru from query tool to intelligence platform
-- **12.1 Lineage Narrator**: Explain data flows in business terms
-- **12.2 Impact Advisor**: Migration guides, risk explanations, SQL patches
-- **12.3 Schema Health Analyzer**: Index suggestions, normalization, type improvements
-- **12.4 Pattern Intelligence**: Bottleneck root cause, anti-pattern detection
-- **12.5 Conversational Lineage**: Natural language queries about schema and lineage
-- See: [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) for full details
-
-### Priority 3: Table Sorting ✅ COMPLETE
+### Priority 2: Table Sorting ✅ COMPLETE
 **Status**: Implemented with reusable hook and accessible component
 - Click column header to sort (asc/desc toggle)
 - Smart type detection (numbers, dates, strings)
@@ -338,9 +313,9 @@
 | Category | Features | Status | Total Effort |
 |----------|----------|--------|--------------|
 | **Visualization** | ER Diagrams, Data Lineage | Phase 7 ✅, Phase 11 ✅ | COMPLETE |
-| **LLM Intelligence** | Lineage Narrator, Impact Advisor, Schema Health, Pattern Intel, Lineage Chat | **NEXT (Phase 12)** | ~4,500 lines |
-| **Data Sources** | CSV & Excel File Support | **Phase 13 - NEW** | ~2,500 lines |
-| **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 14 - NEW** | ~3,000 lines |
+| **LLM Intelligence** | Lineage Narrator, Impact Advisor, Schema Health, Pattern Intel, Lineage Chat | **Phase 12 ✅ COMPLETE** | ~11,266 lines |
+| **Data Sources** | CSV & Excel File Support | **Phase 13 - NEXT** | ~2,500 lines |
+| **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 14 - NEXT** | ~3,000 lines |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Table UX** | Sorting ✅, Resizing, Export | Sorting complete | ~400 lines remaining |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
@@ -367,9 +342,10 @@
 | Multi-DB Validator | Pre-flight validation | 27 tests |
 | ER Diagrams (Phase 7) | Schema visualization | React Flow + Dagre |
 | Data Lineage (Phase 11) | Column-level lineage, impact analysis, query patterns | 185 tests (116 BE + 69 FE) |
+| Lineage Intelligence (Phase 12) | LLM-powered lineage explanations, schema health, impact advisor | 151 tests |
 | Table Sorting | Click-to-sort columns, smart type detection | 24 tests |
 
-**Total Tests**: 800+ passing
+**Total Tests**: 950+ passing
 
 ---
 
@@ -385,4 +361,4 @@
 
 ---
 
-**Updated**: January 28, 2026 (Added LLM Provider Expansion Phase 14 plan)
+**Updated**: January 31, 2026 (Phase 12 Lineage Intelligence COMPLETE - 151 tests, ~11,266 lines)

@@ -7,6 +7,7 @@ Classifies questions and routes to appropriate handlers.
 import asyncio
 import logging
 import re
+import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from enum import Enum
@@ -63,6 +64,11 @@ class ConversationContext:
     mentioned_tables: List[str] = field(default_factory=list)
     mentioned_columns: List[str] = field(default_factory=list)
     last_question_type: Optional[QuestionType] = None
+    last_accessed: float = field(default_factory=time.time)  # Unix timestamp
+
+    def touch(self):
+        """Update last accessed time."""
+        self.last_accessed = time.time()
 
     def add_turn(self, question: str, answer: str):
         """Add a conversation turn."""
@@ -177,6 +183,10 @@ class QuestionClassifier:
 class LineageConversationAgent:
     """Handles natural language questions about schema and lineage."""
 
+    # Session management settings
+    SESSION_TTL_SECONDS = 3600  # 1 hour TTL for inactive sessions
+    MAX_SESSIONS = 100  # Maximum concurrent sessions
+
     def __init__(
         self,
         client: OllamaClient,
@@ -188,6 +198,40 @@ class LineageConversationAgent:
         self.model = model  # Model override from settings
         self.classifier = QuestionClassifier()
         self._conversation_contexts: Dict[str, ConversationContext] = {}
+        self._last_cleanup = time.time()
+
+    def _cleanup_expired_sessions(self):
+        """Remove expired sessions to prevent memory leaks."""
+        now = time.time()
+
+        # Only run cleanup every 60 seconds
+        if now - self._last_cleanup < 60:
+            return
+
+        self._last_cleanup = now
+        expired = []
+
+        for session_id, context in self._conversation_contexts.items():
+            if now - context.last_accessed > self.SESSION_TTL_SECONDS:
+                expired.append(session_id)
+
+        for session_id in expired:
+            del self._conversation_contexts[session_id]
+            logger.debug(f"Expired conversation session: {session_id}")
+
+        if expired:
+            logger.info(f"Cleaned up {len(expired)} expired conversation sessions")
+
+        # If still over limit, remove oldest sessions
+        if len(self._conversation_contexts) > self.MAX_SESSIONS:
+            sorted_sessions = sorted(
+                self._conversation_contexts.items(),
+                key=lambda x: x[1].last_accessed
+            )
+            to_remove = len(self._conversation_contexts) - self.MAX_SESSIONS
+            for session_id, _ in sorted_sessions[:to_remove]:
+                del self._conversation_contexts[session_id]
+            logger.info(f"Evicted {to_remove} oldest sessions (over limit)")
 
     def _get_or_create_context(
         self,
@@ -195,8 +239,13 @@ class LineageConversationAgent:
         connection_id: int,
     ) -> ConversationContext:
         """Get or create a conversation context."""
+        # Periodic cleanup
+        self._cleanup_expired_sessions()
+
         if session_id and session_id in self._conversation_contexts:
-            return self._conversation_contexts[session_id]
+            context = self._conversation_contexts[session_id]
+            context.touch()  # Update last accessed time
+            return context
 
         context = ConversationContext(
             session_id=session_id or "default",
@@ -495,42 +544,30 @@ class LineageConversationAgent:
         db: AsyncSession,
     ) -> List[QueryHistory]:
         """Get queries that reference specific tables."""
-        # Build LIKE conditions for table names
-        conditions = []
-        params = {}
-        for i, table in enumerate(tables):
-            param_name = f"table_{i}"
-            conditions.append(f"generated_sql LIKE :{param_name}")
-            params[param_name] = f"%{table}%"
+        from sqlalchemy import or_
 
-        if not conditions:
+        if not tables:
             return []
 
-        where_clause = " OR ".join(conditions)
+        # Build LIKE conditions using SQLAlchemy ORM (safe from SQL injection)
+        like_conditions = [
+            QueryHistory.generated_sql.ilike(f"%{table}%")
+            for table in tables
+        ]
 
-        query = text(f"""
-            SELECT id, natural_language_query, generated_sql, execution_time_ms, created_at
-            FROM query_history
-            WHERE connection_id = :conn_id AND ({where_clause})
-            ORDER BY created_at DESC
-            LIMIT 50
-        """)
+        stmt = (
+            select(QueryHistory)
+            .where(
+                QueryHistory.connection_id == connection_id,
+                QueryHistory.generated_sql.isnot(None),
+                or_(*like_conditions)
+            )
+            .order_by(QueryHistory.created_at.desc())
+            .limit(50)
+        )
 
-        result = await db.execute(query, {"conn_id": connection_id, **params})
-        rows = result.fetchall()
-
-        # Convert to QueryHistory-like objects
-        queries = []
-        for row in rows:
-            q = QueryHistory()
-            q.id = row[0]
-            q.natural_language_query = row[1]
-            q.generated_sql = row[2]
-            q.execution_time_ms = row[3]
-            q.created_at = row[4]
-            queries.append(q)
-
-        return queries
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
     async def _build_lineage_info(
         self,

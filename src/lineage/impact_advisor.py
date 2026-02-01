@@ -23,6 +23,7 @@ from src.lineage.impact_analyzer import (
     ImpactedQuery,
     RiskLevel,
 )
+from src.lineage.llm_utils import extract_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -445,7 +446,7 @@ class ImpactAdvisor:
         )
 
         # Parse response
-        json_str = self._extract_json_object(response)
+        json_str = extract_json_object(response)
         if not json_str:
             raise ValueError("No valid JSON in response")
 
@@ -488,7 +489,7 @@ class ImpactAdvisor:
         )
 
         # Parse response
-        json_str = self._extract_json_object(response)
+        json_str = extract_json_object(response)
         if not json_str:
             raise ValueError("No valid JSON in response")
 
@@ -547,7 +548,7 @@ class ImpactAdvisor:
         )
 
         # Parse response
-        json_str = self._extract_json_object(response)
+        json_str = extract_json_object(response)
         if not json_str:
             return []
 
@@ -719,44 +720,6 @@ class ImpactAdvisor:
             from src.llm.model_router import TaskType
             return self.router.get_model_for_task(TaskType.IMPACT_ANALYSIS)
         return None
-
-    def _extract_json_object(self, text: str) -> Optional[str]:
-        """
-        Extract JSON object from LLM response using balanced brace matching.
-
-        Handles cases where LLM includes text before/after JSON.
-        """
-        start_idx = text.find('{')
-        if start_idx == -1:
-            return None
-
-        depth = 0
-        in_string = False
-        escape_next = False
-
-        for i, char in enumerate(text[start_idx:], start=start_idx):
-            if escape_next:
-                escape_next = False
-                continue
-
-            if char == '\\' and in_string:
-                escape_next = True
-                continue
-
-            if char == '"' and not escape_next:
-                in_string = not in_string
-                continue
-
-            if not in_string:
-                if char == '{':
-                    depth += 1
-                elif char == '}':
-                    depth -= 1
-                    if depth == 0:
-                        return text[start_idx:i + 1]
-
-        return None
-
 
 async def get_impact_advisor(
     db=None,

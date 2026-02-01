@@ -498,12 +498,14 @@ class SystemSettingsResponse(BaseModel):
     model_impact_analysis: Optional[str] = None  # Model for impact advisor
     model_schema_health: Optional[str] = None  # Model for schema health analysis
     model_lineage_conversation: Optional[str] = None  # Model for lineage chat
+    model_pattern_intelligence: Optional[str] = None  # Model for pattern analysis
 
     # Phase 12: Lineage Intelligence Timeout Configuration
     timeout_lineage_narrative: int = 15
     timeout_impact_analysis: int = 20
     timeout_schema_health: int = 30
     timeout_lineage_conversation: int = 15
+    timeout_pattern_intelligence: int = 20
 
     created_at: datetime
     updated_at: datetime
@@ -561,12 +563,14 @@ class SystemSettingsUpdateRequest(BaseModel):
     model_impact_analysis: Optional[str] = None  # Model for impact advisor
     model_schema_health: Optional[str] = None  # Model for schema health analysis
     model_lineage_conversation: Optional[str] = None  # Model for lineage chat
+    model_pattern_intelligence: Optional[str] = None  # Model for pattern analysis
 
     # Phase 12: Lineage Intelligence Timeout Configuration
     timeout_lineage_narrative: Optional[int] = Field(None, ge=1, le=300)
     timeout_impact_analysis: Optional[int] = Field(None, ge=1, le=300)
     timeout_schema_health: Optional[int] = Field(None, ge=1, le=300)
     timeout_lineage_conversation: Optional[int] = Field(None, ge=1, le=300)
+    timeout_pattern_intelligence: Optional[int] = Field(None, ge=1, le=300)
 
 
 # ============================================================================

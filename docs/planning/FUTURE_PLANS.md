@@ -1,8 +1,8 @@
 # Database Guru - Future Plans & Roadmap
 
-**Last Updated**: November 22, 2025
-**Branch**: semantic-caching
-**Current Status**: Phase 1, 2, 3.1, 3.2 & 3.3 COMPLETE + Semantic Caching UI + Tool-Using Agent + Parallel Performance
+**Last Updated**: January 31, 2026
+**Branch**: lineage-intelligence
+**Current Status**: Phases 1-12 COMPLETE including Lineage Intelligence (5 LLM agents, 151 tests)
 
 ---
 
@@ -381,6 +381,52 @@ src/api/endpoints/
 tests/
 ├── test_cache_endpoints.py    # 9 backend tests
 ```
+
+---
+
+### Phase 12: Lineage Intelligence - ✅ COMPLETE
+**Priority**: HIGH
+**Effort**: ~11,266 lines across 27 files
+**Impact**: Transforms Database Guru from query tool to intelligence platform
+**Completed**: January 31, 2026
+
+**Problem**: Data lineage (Phase 11) provided raw technical analysis but lacked business-friendly explanations and actionable recommendations.
+
+**Solution Implemented**: 5 new LLM-powered agents that interpret lineage data:
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| **12.1 Lineage Narrator** | `lineage_narrator.py` | Natural language explanations of data lineage graphs |
+| **12.2 Impact Advisor** | `impact_advisor.py` | Migration plans, SQL patches, risk explanations |
+| **12.3 Schema Health Analyzer** | `schema_health_analyzer.py` | Database design quality scoring (A-F grades) |
+| **12.4 Pattern Intelligence** | `pattern_intelligence.py` | Query anti-pattern detection, bottleneck analysis |
+| **12.5 Lineage Conversation** | `lineage_conversation_agent.py` | Multi-turn Q&A about schema/lineage |
+
+**Key Features**:
+- **Consistent architecture** - All agents follow ResultNarrator pattern (async, timeout-wrapped, graceful degradation)
+- **Shared utilities** - `src/lineage/llm_utils.py` for JSON extraction
+- **151 tests** covering happy paths, timeouts, LLM errors, malformed responses
+- **Model router integration** - Per-task model/timeout configuration
+- **Frontend components** - LineageChat with question type badges and confidence indicators
+
+**API Endpoints**:
+- `POST /api/lineage/parse?explain=true` - Parse with optional narrative
+- `POST /api/lineage/impact/advise` - LLM-enhanced impact analysis
+- `GET /api/lineage/schema/health/{connection_id}` - Schema health report
+- `POST /api/lineage/ask` - Conversational interface
+
+**Test Coverage**:
+```
+tests/test_lineage_narrator.py      - 474 lines
+tests/test_impact_advisor.py        - 455 lines
+tests/test_schema_health.py         - 817 lines
+tests/test_pattern_intelligence.py  - 584 lines
+tests/test_lineage_conversation.py  - 630 lines
+```
+
+**Documentation**:
+- [Lineage Intelligence User Guide](../guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md)
+- [Testing Guide](../guides/testing/LINEAGE_INTELLIGENCE_TESTING.md)
 
 ---
 
@@ -813,7 +859,11 @@ class RedisQueryCompiler(QueryCompiler):
 | ~~Tool-Using Agent~~ | ~~HIGH~~ | ~~3d~~ | ~~High~~ | ✅ **DONE** (Phase 3.1 - 10 tools, 26 tests) |
 | ~~Semantic Caching~~ | ~~HIGH~~ | ~~2d~~ | ~~High~~ | ✅ **DONE** (Phase 3.2 - 30-50% hit rate increase) |
 | ~~Semantic Cache UI~~ | ~~MEDIUM~~ | ~~2-3d~~ | ~~Medium~~ | ✅ **DONE** (Phase 3.3 - 5 components, 43 tests) |
-| **Authorization Fix** | CRITICAL | 3-5d | High | Next Priority |
+| ~~Data Lineage~~ | ~~HIGH~~ | ~~2w~~ | ~~High~~ | ✅ **DONE** (Phase 11 - 185 tests) |
+| ~~Lineage Intelligence~~ | ~~HIGH~~ | ~~10d~~ | ~~High~~ | ✅ **DONE** (Phase 12 - 5 agents, 151 tests) |
+| **CSV & Excel Support** | HIGH | 3-4w | High | Phase 13 - Next |
+| **LLM Provider Expansion** | HIGH | 3-4w | High | Phase 14 - Next |
+| **Authorization Fix** | CRITICAL | 3-5d | High | Deferred by user |
 | Authorization Tests | HIGH | 2d | High | After auth |
 | Code Deduplication | HIGH | 1d | Medium | Anytime |
 | Enhanced Error Handling | HIGH | 2-3d | High | After auth |
@@ -903,17 +953,31 @@ class RedisQueryCompiler(QueryCompiler):
 - ⬜ Load testing passed
 - ⬜ Concurrent access tests
 
-### Milestone 3: Streaming Results (Week 4-6)
+### Milestone 3: Data Intelligence (January 2026) ✅ COMPLETE
+- ✅ Data Lineage (Phase 11 - 185 tests, column-level tracking!)
+- ✅ Lineage Narrator (Phase 12.1 - natural language explanations!)
+- ✅ Impact Advisor (Phase 12.2 - migration plans, SQL patches!)
+- ✅ Schema Health Analyzer (Phase 12.3 - database design grades!)
+- ✅ Pattern Intelligence (Phase 12.4 - anti-pattern detection!)
+- ✅ Lineage Conversation (Phase 12.5 - multi-turn Q&A!)
+
+### Milestone 4: Data Source Expansion (Phase 13 - Next)
+- ⬜ CSV & Excel file upload
+- ⬜ DuckDB virtual tables
+- ⬜ Cross-source queries (file + DB JOINs)
+- ⬜ Frontend upload UI
+
+### Milestone 5: LLM Provider Expansion (Phase 14 - Next)
+- ⬜ Provider abstraction layer
+- ⬜ Azure OpenAI integration
+- ⬜ Additional providers (OpenAI, Anthropic, etc.)
+- ⬜ Multi-provider routing with fallback
+
+### Milestone 6: Streaming Results (Future)
 - ⬜ SSE implementation
 - ⬜ Progressive rendering
 - ⬜ Large dataset handling
 - ⬜ User testing passed
-
-### Milestone 4: Advanced Features (Month 2-3)
-- ⬜ Query caching
-- ⬜ Query suggestions
-- ⬜ Advanced visualizations
-- ⬜ Collaborative features
 
 ---
 
@@ -1010,7 +1074,7 @@ touch src/auth/models.py
 
 ---
 
-**Document Version**: 1.2
+**Document Version**: 1.3
 **Created**: November 2, 2025
-**Last Updated**: November 22, 2025
-**Next Update**: November 29, 2025
+**Last Updated**: January 31, 2026
+**Next Update**: February 7, 2026

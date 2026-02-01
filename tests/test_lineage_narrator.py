@@ -358,37 +358,42 @@ class TestFallbackNarrative:
 class TestJsonExtraction:
     """Tests for JSON extraction from LLM responses."""
 
-    def test_extract_simple_json(self, narrator):
+    def test_extract_simple_json(self):
         """Test extraction of simple JSON object."""
+        from src.lineage.llm_utils import extract_json_object
         text = '{"key": "value"}'
-        result = narrator._extract_json_object(text)
+        result = extract_json_object(text)
         assert result == '{"key": "value"}'
 
-    def test_extract_json_with_prefix(self, narrator):
+    def test_extract_json_with_prefix(self):
         """Test extraction of JSON with text prefix."""
+        from src.lineage.llm_utils import extract_json_object
         text = 'Here is the result:\n{"summary": "test"}'
-        result = narrator._extract_json_object(text)
+        result = extract_json_object(text)
         assert result is not None
         assert json.loads(result)["summary"] == "test"
 
-    def test_extract_nested_json(self, narrator):
+    def test_extract_nested_json(self):
         """Test extraction of nested JSON object."""
+        from src.lineage.llm_utils import extract_json_object
         text = '{"outer": {"inner": "value"}}'
-        result = narrator._extract_json_object(text)
+        result = extract_json_object(text)
         assert result == '{"outer": {"inner": "value"}}'
 
-    def test_extract_json_with_string_braces(self, narrator):
+    def test_extract_json_with_string_braces(self):
         """Test JSON extraction handles braces in strings."""
+        from src.lineage.llm_utils import extract_json_object
         text = '{"message": "Use {} for templates"}'
-        result = narrator._extract_json_object(text)
+        result = extract_json_object(text)
         assert result is not None
         parsed = json.loads(result)
         assert "templates" in parsed["message"]
 
-    def test_extract_no_json(self, narrator):
+    def test_extract_no_json(self):
         """Test returns None when no JSON found."""
+        from src.lineage.llm_utils import extract_json_object
         text = "This is just plain text"
-        result = narrator._extract_json_object(text)
+        result = extract_json_object(text)
         assert result is None
 
 

@@ -75,6 +75,9 @@ from src.lineage.lineage_conversation_agent import (
     get_lineage_conversation_agent,
 )
 
+# Shared utilities
+from src.lineage.llm_utils import extract_json_object, parse_json_response
+
 __all__ = [
     # Phase 11
     "SQLLineageParser",
@@ -131,4 +134,7 @@ __all__ = [
     "QuestionClassifier",
     "QuestionType",
     "get_lineage_conversation_agent",
+    # Utilities
+    "extract_json_object",
+    "parse_json_response",
 ]

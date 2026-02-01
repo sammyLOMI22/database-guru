@@ -179,3 +179,44 @@ Quick reference for finding important code in the Database Guru codebase.
 | Impact tests | `tests/test_impact_analyzer.py` (20+ tests) |
 | Pattern tests | `tests/test_query_pattern_analyzer.py` (20+ tests) |
 | Frontend tests | `frontend/tests/LineageGraph.test.tsx` (15+ tests) |
+
+## Lineage Intelligence (Phase 12 - January 2026)
+| Component | Location |
+|-----------|----------|
+| **Phase 12.1: Lineage Narrator** | |
+| Narrator agent | `src/lineage/lineage_narrator.py` (553 lines) |
+| Narrative generation | `src/lineage/lineage_narrator.py:generate_narrative()` |
+| Prompt building | `src/lineage/lineage_narrator.py:_build_prompt()` |
+| UI component | `frontend/src/components/lineage/LineageNarrative.tsx` (215 lines) |
+| Tests | `tests/test_lineage_narrator.py` (474 tests) |
+| **Phase 12.2: Impact Advisor** | |
+| Advisor agent | `src/lineage/impact_advisor.py` (796 lines) |
+| Recommendations | `src/lineage/impact_advisor.py:analyze_with_recommendations()` |
+| Migration plans | `src/lineage/impact_advisor.py:_generate_migration_plan()` |
+| SQL patches | `src/lineage/impact_advisor.py:_generate_sql_patches()` |
+| UI component | `frontend/src/components/lineage/ImpactAdvisorPanel.tsx` (408 lines) |
+| Tests | `tests/test_impact_advisor.py` (455 tests) |
+| **Phase 12.3: Schema Health Analyzer** | |
+| Health analyzer | `src/lineage/schema_health_analyzer.py` (1105 lines) |
+| Health analysis | `src/lineage/schema_health_analyzer.py:analyze_schema_health()` |
+| Score calculation | `src/lineage/schema_health_analyzer.py:_calculate_score()` |
+| Index suggestions | `src/lineage/schema_health_analyzer.py:_suggest_indexes()` |
+| UI component | `frontend/src/components/schema/SchemaHealthDashboard.tsx` (739 lines) |
+| Tests | `tests/test_schema_health.py` (817 tests) |
+| **Phase 12.4: Pattern Intelligence** | |
+| Intelligence agent | `src/lineage/pattern_intelligence.py` (959 lines) |
+| Pattern analysis | `src/lineage/pattern_intelligence.py:analyze_patterns()` |
+| Bottleneck analysis | `src/lineage/pattern_intelligence.py:analyze_bottleneck()` |
+| Anti-pattern detection | `src/lineage/pattern_intelligence.py:_detect_anti_patterns()` |
+| UI enhancement | `frontend/src/components/lineage/QueryPatternHeatmap.tsx` (429 lines) |
+| Tests | `tests/test_pattern_intelligence.py` (584 tests) |
+| **Phase 12.5: Conversational Lineage** | |
+| Conversation agent | `src/lineage/lineage_conversation_agent.py` (1055 lines) |
+| Question answering | `src/lineage/lineage_conversation_agent.py:ask()` |
+| Question classifier | `src/lineage/lineage_conversation_agent.py:_classify_question()` |
+| UI component | `frontend/src/components/lineage/LineageChat.tsx` (363 lines) |
+| Tests | `tests/test_lineage_conversation.py` (630 tests) |
+| **API Integration** | |
+| Lineage endpoints | `src/api/endpoints/lineage.py` (773 lines, 11 endpoints) |
+| API service | `frontend/src/services/lineageApi.ts` (165 lines) |
+| Type definitions | `frontend/src/types/lineage.ts` (264 lines) |

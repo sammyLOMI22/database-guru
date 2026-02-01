@@ -287,10 +287,12 @@ async def get_model_router(db_session=None) -> ModelRouter:
                 'model_impact_analysis': getattr(sys_settings, 'model_impact_analysis', None),
                 'model_schema_health': getattr(sys_settings, 'model_schema_health', None),
                 'model_lineage_conversation': getattr(sys_settings, 'model_lineage_conversation', None),
+                'model_pattern_intelligence': getattr(sys_settings, 'model_pattern_intelligence', None),
                 'timeout_lineage_narrative': getattr(sys_settings, 'timeout_lineage_narrative', 15),
                 'timeout_impact_analysis': getattr(sys_settings, 'timeout_impact_analysis', 20),
                 'timeout_schema_health': getattr(sys_settings, 'timeout_schema_health', 30),
                 'timeout_lineage_conversation': getattr(sys_settings, 'timeout_lineage_conversation', 15),
+                'timeout_pattern_intelligence': getattr(sys_settings, 'timeout_pattern_intelligence', 20),
             }
 
             logger.debug(f"Loaded model settings from database: {model_settings}")

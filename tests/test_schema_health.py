@@ -598,8 +598,9 @@ class TestSchemaHealthAnalyzer:
 
         assert "attention" in summary.lower()
 
-    def test_extract_json_object(self, analyzer):
+    def test_extract_json_object(self):
         """Test JSON extraction from LLM response."""
+        from src.lineage.llm_utils import extract_json_object
         response = '''Here's my analysis:
         {
             "summary": "Good schema",
@@ -608,14 +609,15 @@ class TestSchemaHealthAnalyzer:
         }
         Some trailing text.'''
 
-        result = analyzer._extract_json_object(response)
+        result = extract_json_object(response)
 
         assert result is not None
         parsed = json.loads(result)
         assert parsed["grade"] == "B"
 
-    def test_extract_json_object_nested(self, analyzer):
+    def test_extract_json_object_nested(self):
         """Test JSON extraction with nested objects."""
+        from src.lineage.llm_utils import extract_json_object
         response = '''Analysis:
         {
             "summary": "Test",
@@ -624,27 +626,29 @@ class TestSchemaHealthAnalyzer:
             ]
         }'''
 
-        result = analyzer._extract_json_object(response)
+        result = extract_json_object(response)
 
         assert result is not None
         parsed = json.loads(result)
         assert len(parsed["additional_issues"]) == 1
 
-    def test_extract_json_object_with_strings(self, analyzer):
+    def test_extract_json_object_with_strings(self):
         """Test JSON extraction with special characters in strings."""
+        from src.lineage.llm_utils import extract_json_object
         response = '''{
             "summary": "Schema has \\"good\\" design with {special} chars"
         }'''
 
-        result = analyzer._extract_json_object(response)
+        result = extract_json_object(response)
 
         assert result is not None
 
-    def test_extract_json_object_no_json(self, analyzer):
+    def test_extract_json_object_no_json(self):
         """Test JSON extraction when no JSON present."""
+        from src.lineage.llm_utils import extract_json_object
         response = "This response has no JSON data."
 
-        result = analyzer._extract_json_object(response)
+        result = extract_json_object(response)
 
         assert result is None
 

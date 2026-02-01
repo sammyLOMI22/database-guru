@@ -263,6 +263,99 @@ Analyzes query patterns for heatmap visualization:
 
 **Key methods**: `get_table_usage_frequency()`, `get_common_join_patterns()`, `identify_bottlenecks()`, `get_heatmap_data()`
 
+## Lineage Intelligence System (Phase 12)
+**Location**: `src/lineage/`
+**Added**: January 2026
+
+LLM-powered intelligence layer for data lineage, transforming technical analysis into actionable insights.
+
+### 19. Lineage Narrator (Phase 12.1)
+**File**: `src/lineage/lineage_narrator.py` (553 lines)
+
+Generates natural language explanations of data lineage graphs:
+- **Summary**: 2-3 sentence business overview
+- **Data Flow Description**: Step-by-step explanation of data movement
+- **Column Explanations**: Business meaning of each output column
+- **Transformation Explanations**: SUM, JOIN, CASE in business terms
+- **Potential Issues**: Data quality and logic concerns
+
+**Key methods**: `generate_narrative()`, `_build_prompt()`, `_parse_response()`
+
+**Output**: `LineageNarrative` dataclass with confidence score (0.0-1.0)
+
+### 20. Impact Advisor (Phase 12.2)
+**File**: `src/lineage/impact_advisor.py` (796 lines)
+
+Provides LLM-enhanced recommendations for schema changes:
+- **Risk Explanations**: Why a change is risky in business terms
+- **Migration Plans**: Step-by-step migration guides with SQL
+- **SQL Patches**: Auto-generated corrected queries for new schema
+- **Change Types**: RENAME_COLUMN, DROP_COLUMN, RENAME_TABLE, etc.
+
+**Key methods**: `analyze_with_recommendations()`, `_generate_migration_plan()`, `_generate_sql_patches()`
+
+**Output**: `ImpactAdvice` with `MigrationPlan` and list of `SQLPatch`
+
+### 21. Schema Health Analyzer (Phase 12.3)
+**File**: `src/lineage/schema_health_analyzer.py` (1105 lines)
+
+Comprehensive database design quality analysis:
+- **Health Grade**: A (Excellent) to F (Critical)
+- **Health Score**: 0-100 numeric score
+- **Index Suggestions**: Based on query patterns with CREATE SQL
+- **Normalization Issues**: 1NF, 2NF, 3NF violations
+- **Anti-Patterns**: Missing PKs, wide tables, naming issues
+
+**Sub-analyzers**:
+- `StructuralAnalyzer`: Schema structure issues
+- `IndexAnalyzer`: Missing index detection
+
+**Key methods**: `analyze_schema_health()`, `_calculate_score()`, `_suggest_indexes()`
+
+**Output**: `SchemaHealthReport` with grade, score, and detailed issues
+
+### 22. Pattern Intelligence Agent (Phase 12.4)
+**File**: `src/lineage/pattern_intelligence.py` (959 lines)
+
+LLM-enhanced query pattern analysis:
+- **Bottleneck Analysis**: Root causes and contributing factors
+- **Optimization Suggestions**: Prioritized recommendations with SQL
+- **Anti-Pattern Detection**: SELECT *, N+1, Cartesian joins, missing WHERE
+- **Trend Analysis**: Usage trends (increasing/decreasing/stable)
+
+**Sub-analyzers**:
+- `AntiPatternDetector`: Detects query anti-patterns
+- `TrendAnalyzer`: Analyzes usage trends over time
+
+**Key methods**: `analyze_patterns()`, `analyze_bottleneck()`, `_detect_anti_patterns()`
+
+**Output**: `PatternIntelligenceReport` with bottlenecks, suggestions, anti-patterns
+
+### 23. Lineage Conversation Agent (Phase 12.5)
+**File**: `src/lineage/lineage_conversation_agent.py` (1055 lines)
+
+Natural language Q&A about schema and lineage:
+- **Question Classification**: Automatically routes to appropriate handler
+- **Multi-Turn Conversations**: Maintains context via session_id
+- **6 Question Types**: lineage, impact, pattern, schema, recommendation, general
+
+**Sub-components**:
+- `QuestionClassifier`: Classifies question type with confidence
+
+**Question Types**:
+| Type | Example Questions |
+|------|------------------|
+| LINEAGE | "What feeds into X?", "Where does Y come from?" |
+| IMPACT | "What breaks if I change X?" |
+| PATTERN | "Most used tables?", "Bottlenecks?" |
+| SCHEMA | "What columns does X have?" |
+| RECOMMENDATION | "How to optimize?", "Suggest indexes?" |
+| GENERAL | Other database questions |
+
+**Key methods**: `ask()`, `_classify_question()`, `_answer_lineage_question()`
+
+**Output**: `LineageAnswer` with answer, supporting data, and follow-up suggestions
+
 ## Tool System
 **Location**: `src/tools/`
 

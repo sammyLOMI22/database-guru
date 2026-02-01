@@ -106,13 +106,45 @@ frontend/src/
 | `lineage/ColumnLineage.tsx` | 224 | Table view of column-to-column transformations |
 | `lineage/ImpactAnalysisPanel.tsx` | 105 | Schema change impact with risk badges |
 | `lineage/ImpactedQueryCard.tsx` | 42 | Individual impacted query display |
-| `lineage/QueryPatternHeatmap.tsx` | 100 | 3-view heatmap (Frequency, Joins, Performance) |
-| `types/lineage.ts` | - | TypeScript interfaces |
-| `services/lineageApi.ts` | 100 | API client (6 methods) |
+| `lineage/QueryPatternHeatmap.tsx` | 429 | Enhanced 3-view heatmap (Frequency, Joins, Performance) |
+| `types/lineage.ts` | 264 | TypeScript interfaces |
+| `services/lineageApi.ts` | 165 | API client (11 methods) |
 | `utils/lineageLayoutUtils.ts` | - | Dagre layout engine |
 | **Total** | **~1,200** | |
 
 **Tests**: `LineageGraph.test.tsx` (15+ tests), `QueryPatternHeatmap.test.tsx`
+
+### Lineage Intelligence UI Components (Phase 12 - January 2026)
+| Component | Lines | Purpose |
+|-----------|-------|---------|
+| `lineage/LineageNarrative.tsx` | 215 | LLM-generated narrative display (12.1) |
+| `lineage/ImpactAdvisorPanel.tsx` | 408 | Migration plans & SQL patches (12.2) |
+| `lineage/LineageChat.tsx` | 363 | Natural language Q&A interface (12.5) |
+| `schema/SchemaHealthDashboard.tsx` | 739 | Health grades, index suggestions, anti-patterns (12.3) |
+| `lineage/QueryPatternHeatmap.tsx` | 429 | Enhanced with pattern intelligence (12.4) |
+| **Total** | **~2,154** | |
+
+**Phase 12 Features**:
+- **LineageNarrative**: Displays summary, data flow, column explanations, confidence
+- **ImpactAdvisorPanel**: Change type selector, migration steps, SQL patch copy buttons
+- **SchemaHealthDashboard**: Grade badge (A-F), score bar, expandable sections, copy SQL
+- **LineageChat**: Chat interface with question type badges, follow-up suggestions
+- **QueryPatternHeatmap**: Bottleneck analysis, anti-pattern badges, trend charts
+
+**New Types** (`types/lineage.ts`):
+- `LineageNarrative`, `TransformationExplanation`
+- `ImpactAdvice`, `MigrationPlan`, `MigrationStep`, `SQLPatch`
+- `SchemaHealthReport`, `IndexSuggestion`, `SchemaIssue`, `HealthGrade`
+- `PatternIntelligenceReport`, `BottleneckAnalysis`, `QueryAntiPattern`
+- `LineageAnswer`, `QuestionType`
+
+**New API Methods** (`services/lineageApi.ts`):
+- `parseWithNarrative()` - Parse SQL with LLM explanation
+- `getImpactAdvice()` - Get migration plan and SQL patches
+- `getSchemaHealth()` - Get schema health report
+- `getPatternIntelligence()` - Get pattern analysis
+- `getBottleneckAnalysis()` - Get table bottleneck details
+- `askQuestion()` - Natural language Q&A
 
 ### Advanced Visualization Components (December 20-26, 2025)
 | Component | Lines | Purpose |

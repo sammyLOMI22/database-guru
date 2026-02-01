@@ -340,29 +340,33 @@ class TestFallbackNarratives:
 class TestJsonExtraction:
     """Tests for JSON extraction from LLM responses."""
 
-    def test_extract_simple_json(self, advisor):
+    def test_extract_simple_json(self):
         """Test extraction of simple JSON."""
+        from src.lineage.llm_utils import extract_json_object
         text = '{"key": "value"}'
-        result = advisor._extract_json_object(text)
+        result = extract_json_object(text)
         assert result == '{"key": "value"}'
 
-    def test_extract_json_with_prefix(self, advisor):
+    def test_extract_json_with_prefix(self):
         """Test extraction with text prefix."""
+        from src.lineage.llm_utils import extract_json_object
         text = 'Here is the analysis:\n{"summary": "test"}'
-        result = advisor._extract_json_object(text)
+        result = extract_json_object(text)
         assert result is not None
         assert json.loads(result)["summary"] == "test"
 
-    def test_extract_nested_json(self, advisor):
+    def test_extract_nested_json(self):
         """Test extraction of nested JSON."""
+        from src.lineage.llm_utils import extract_json_object
         text = '{"outer": {"inner": "value"}}'
-        result = advisor._extract_json_object(text)
+        result = extract_json_object(text)
         assert result == '{"outer": {"inner": "value"}}'
 
-    def test_extract_no_json(self, advisor):
+    def test_extract_no_json(self):
         """Test returns None when no JSON found."""
+        from src.lineage.llm_utils import extract_json_object
         text = "This is just plain text"
-        result = advisor._extract_json_object(text)
+        result = extract_json_object(text)
         assert result is None
 
 

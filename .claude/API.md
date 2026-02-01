@@ -121,6 +121,7 @@ All endpoints are in `src/api/endpoints/`.
 ## Lineage API (January 2026)
 **File**: `lineage.py`
 
+### Core Lineage (Phase 11)
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | POST | `/api/lineage/parse` | Parse SQL and return lineage graph |
@@ -129,3 +130,20 @@ All endpoints are in `src/api/endpoints/`.
 | GET | `/api/lineage/table/{table_name}/queries` | Get queries referencing a table |
 | GET | `/api/lineage/stats` | Get lineage statistics |
 | GET | `/api/lineage/patterns/{connection_id}` | Get query pattern heatmap data |
+
+### Lineage Intelligence (Phase 12)
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/lineage/parse?explain=true` | Parse SQL with LLM narrative (12.1) |
+| POST | `/api/lineage/impact/advise` | Get impact advice with migration plan & SQL patches (12.2) |
+| GET | `/api/lineage/schema/health/{connection_id}` | Get schema health report with grade (12.3) |
+| GET | `/api/lineage/patterns/{connection_id}/analyze` | Get pattern intelligence analysis (12.4) |
+| GET | `/api/lineage/patterns/{connection_id}/bottlenecks/{table}` | Get bottleneck analysis for table (12.4) |
+| POST | `/api/lineage/ask` | Ask natural language question about schema/lineage (12.5) |
+
+**Phase 12 Features**:
+- **12.1 Lineage Narrator**: Add `explain=true` to `/parse` for LLM-generated narrative
+- **12.2 Impact Advisor**: Migration plans, SQL patches, risk explanations
+- **12.3 Schema Health**: Health grades (A-F), index suggestions, anti-patterns
+- **12.4 Pattern Intelligence**: Bottleneck analysis, query anti-patterns, trends
+- **12.5 Conversational Lineage**: Natural language Q&A with multi-turn support

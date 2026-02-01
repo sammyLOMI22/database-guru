@@ -456,8 +456,9 @@ class TestPatternIntelligenceAgent:
         assert len(recs) > 0
         assert any("[Bottleneck]" in r for r in recs)
 
-    def test_extract_json_object(self, agent):
+    def test_extract_json_object(self):
         """Test JSON extraction from LLM response."""
+        from src.lineage.llm_utils import parse_json_response
         response = '''Here's the analysis:
         {
             "root_causes": ["Missing index"],
@@ -465,16 +466,17 @@ class TestPatternIntelligenceAgent:
         }
         '''
 
-        result = agent._extract_json_object(response)
+        result = parse_json_response(response)
 
         assert result is not None
         assert result["confidence"] == 0.8
 
-    def test_extract_json_object_no_json(self, agent):
+    def test_extract_json_object_no_json(self):
         """Test JSON extraction when no JSON present."""
+        from src.lineage.llm_utils import parse_json_response
         response = "This response has no JSON."
 
-        result = agent._extract_json_object(response)
+        result = parse_json_response(response)
 
         assert result is None
 
