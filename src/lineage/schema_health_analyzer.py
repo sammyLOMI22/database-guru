@@ -650,10 +650,9 @@ class SchemaHealthAnalyzer:
 
         # Step 2: Get schema from connection
         try:
-            from src.core.connection_manager import ConnectionManager
+            from src.core.user_db_connector import UserDatabaseConnector
 
-            conn_manager = ConnectionManager()
-            async with conn_manager.get_session(connection_id) as conn_session:
+            async with UserDatabaseConnector.get_user_db_session(connection) as conn_session:
                 schema = await self.schema_inspector.get_full_schema(
                     conn_session, include_samples=False
                 )
