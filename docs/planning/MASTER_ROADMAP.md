@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: January 31, 2026
+**Last Updated**: February 1, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -117,6 +117,58 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                         LLM USAGE MONITORING (Phase 15) - NEW                           │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    LLM TOKEN USAGE MONITORING (Phase 15) - MEDIUM PRIORITY               │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
+    │  │ 15.1 Core   │   │ 15.2 Agent  │   │ 15.3 Dash-  │   │ 15.4 Inline │                   │
+    │  │ Infrastruc- │──▶│ Integration │──▶│ board       │──▶│ Chat Stats  │                   │
+    │  │ ture        │   │             │   │ Frontend    │   │             │                   │
+    │  │             │   │             │   │             │   │             │                   │
+    │  │ • LLMUsage  │   │ • SQL Gen   │   │ • Stats     │   │ • Per-msg   │                   │
+    │  │   table     │   │ • Narrator  │   │   cards     │   │   tokens    │                   │
+    │  │ • Tracker   │   │ • Planning  │   │ • Charts    │   │ • Session   │                   │
+    │  │   service   │   │ • Lineage   │   │ • Recent    │   │   totals    │                   │
+    │  │ • API       │   │   agents    │   │   calls     │   │ • Agent     │                   │
+    │  │             │   │             │   │             │   │   breakdown │                   │
+    │  │ ~400 lines  │   │ ~300 lines  │   │ ~500 lines  │   │ ~300 lines  │                   │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │                                                                                           │
+    │  Prereq: None (Independent) | Priority: MEDIUM | Est: 2 weeks | ~1,500 lines            │
+    │  Plan: LLM_USAGE_MONITORING_PLAN.md                                                      │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                   MULTI-PROVIDER MONITORING (Phase 16) - NEW                            │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │               MULTI-PROVIDER MONITORING INTEGRATION (Phase 16) - MEDIUM PRIORITY         │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
+    │  │ 16.1 Token  │   │ 16.2 Base   │   │ 16.3 API &  │   │ 16.4 Dash-  │                   │
+    │  │ Extractors  │──▶│ Provider    │──▶│ Schema      │──▶│ board       │                   │
+    │  │             │   │ Updates     │   │ Updates     │   │ Widgets     │                   │
+    │  │             │   │             │   │             │   │             │                   │
+    │  │ • Per-      │   │ • Enrich    │   │ • /by-      │   │ • Cost by   │                   │
+    │  │   provider  │   │   response  │   │   provider  │   │   provider  │                   │
+    │  │   formats   │   │ • Native    │   │ • /cost-    │   │ • Provider  │                   │
+    │  │ • Pricing   │   │   tokens    │   │   summary   │   │   compare   │                   │
+    │  │   data      │   │ • Cost calc │   │ • Provider  │   │ • Cost      │                   │
+    │  │             │   │             │   │   column    │   │   trends    │                   │
+    │  │ ~300 lines  │   │ ~200 lines  │   │ ~300 lines  │   │ ~400 lines  │                   │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │                                                                                           │
+    │  Prereq: Phase 14 + Phase 15 | Priority: MEDIUM | Est: 1-2 weeks | ~1,200 lines         │
+    │  Plan: MULTI_PROVIDER_MONITORING_INTEGRATION.md                                          │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                              INSIGHT QUALITY IMPROVEMENTS                                │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -146,6 +198,41 @@
     │                      │       │                      │       │                      │
     │  ✅ COMPLETE         │       │  NOT STARTED         │       │  NOT STARTED         │
     └──────────────────────┘       └──────────────────────┘       └──────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                            EDIT MODE & DML (Phase 17) - NEW                             │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │                  EDIT MODE & DML OPERATIONS (Phase 17) - MEDIUM PRIORITY                 │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
+    │  │ 17.1 Core   │   │ 17.2 API &  │   │ 17.3 Inline │   │ 17.4 NL DML │                   │
+    │  │ Backend     │──▶│ Execution   │──▶│ Editing UI  │──▶│ & Polish    │                   │
+    │  │             │   │             │   │             │   │             │                   │
+    │  │ • Change    │   │ • DML       │   │ • Editable  │   │ • Natural   │                   │
+    │  │   tracker   │   │   endpoints │   │   cells     │   │   language  │                   │
+    │  │ • DML gen   │   │ • Execute   │   │ • Add row   │   │   to DML    │                   │
+    │  │ • Audit log │   │   w/ Tx     │   │ • Delete    │   │ • Audit     │                   │
+    │  │ • Validator │   │ • Preview   │   │ • Preview   │   │   viewer    │                   │
+    │  │             │   │             │   │             │   │             │                   │
+    │  │ ~1,000 lines│   │ ~800 lines  │   │ ~1,200 lines│   │ ~1,000 lines│                   │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │                                                                                           │
+    │  Prereq: None (Independent) | Priority: MEDIUM | Est: 4-5 weeks | ~4,000 lines          │
+    │  Plan: EDIT_MODE_DML_PLAN.md                                                             │
+    │                                                                                           │
+    │  Key Features:                                                                           │
+    │  • Inline cell editing in query results                                                  │
+    │  • Add new rows with schema-aware forms                                                  │
+    │  • Delete rows with confirmation                                                         │
+    │  • Generate & preview INSERT/UPDATE/DELETE scripts                                       │
+    │  • Transaction support with rollback                                                     │
+    │  • Natural language DML ("delete inactive users")                                        │
+    │  • Complete audit trail                                                                  │
+    │  • Per-connection write permissions                                                      │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
@@ -242,6 +329,49 @@
     │  • Est: 3-4 weeks | Plan: LLM_PROVIDER_EXPANSION_PLAN.md          │
     └───────────────────────────────────────────────────────────────────┘
 
+    ┌───────────────────────────────────────────────────────────────────┐
+    │        LLM USAGE MONITORING (Phase 15) ◀── MEDIUM PRIORITY        │
+    │                                                                   │
+    │  • Track token usage across all 23+ agents                        │
+    │  • Dashboard with charts and per-agent analytics                  │
+    │  • Inline chat usage display per message/session                  │
+    │  • Est: 2 weeks | Plan: LLM_USAGE_MONITORING_PLAN.md              │
+    └───────────────────────────────────────────────────────────────────┘
+
+
+    DEPENDENT FEATURES (Requires Prerequisites):
+    ============================================
+
+    ┌───────────────────────────────────────────────────────────────────┐
+    │   MULTI-PROVIDER MONITORING (Phase 16) ◀── MEDIUM PRIORITY        │
+    │                                                                   │
+    │   REQUIRES: Phase 14 (Providers) + Phase 15 (Monitoring)          │
+    │                                                                   │
+    │  • Native token counts from OpenAI, Anthropic, Google, etc.       │
+    │  • Accurate cost tracking per provider/model                      │
+    │  • Provider performance comparison dashboard                      │
+    │  • Est: 1-2 weeks | Plan: MULTI_PROVIDER_MONITORING_INTEGRATION.md│
+    └───────────────────────────────────────────────────────────────────┘
+
+            ┌─────────────────┐          ┌─────────────────┐
+            │   Phase 14      │          │   Phase 15      │
+            │   Provider      │          │   Usage         │
+            │   Expansion     │          │   Monitoring    │
+            └────────┬────────┘          └────────┬────────┘
+                     │                            │
+                     └──────────┬─────────────────┘
+                                │
+                                ▼
+                     ┌─────────────────────┐
+                     │     Phase 16        │
+                     │   Multi-Provider    │
+                     │     Monitoring      │
+                     └─────────────────────┘
+
+
+    OTHER INDEPENDENT FEATURES:
+    ===========================
+
     ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐
     │  Table Sorting ✅ │  │  Column Resizing  │  │  Export Options   │
     └───────────────────┘  └───────────────────┘  └───────────────────┘
@@ -306,6 +436,39 @@
 
 **Technical Approach**: Abstract provider interface with pluggable implementations
 
+### Priority 6: LLM Usage Monitoring (Phase 15) - NEW
+**Why**: Visibility into LLM resource consumption across all agents
+- **15.1 Core Infrastructure**: LLMUsage table, tracker service, API endpoints
+- **15.2 Agent Integration**: Update SQL Generator, Result Narrator, Query Planning, Lineage agents
+- **15.3 Dashboard Frontend**: Stats cards, time series charts, agent breakdown, recent calls table
+- **15.4 Inline Chat Stats**: Per-message token display, session totals, collapsible detail view
+- See: [LLM_USAGE_MONITORING_PLAN.md](LLM_USAGE_MONITORING_PLAN.md) for full implementation details
+
+**Key Use Cases**:
+- Track which agents consume the most tokens
+- View usage per chat session
+- Dashboard showing usage trends over time
+- Debug and optimize LLM calls
+
+**Technical Approach**: Centralized tracker service with database persistence
+
+### Priority 7: Multi-Provider Monitoring Integration (Phase 16) - NEW
+**Why**: Extend monitoring to all LLM providers with accurate cost tracking
+- **Prerequisite**: Requires BOTH Phase 14 (Provider Expansion) AND Phase 15 (Usage Monitoring)
+- **16.1 Token Extractors**: Provider-specific token extraction (OpenAI, Anthropic, Google formats)
+- **16.2 Provider Updates**: Enrich responses with native token counts and costs
+- **16.3 API & Schema**: Add provider column, cost endpoints, comparison APIs
+- **16.4 Dashboard Widgets**: Cost by provider chart, provider comparison table, cost trends
+- See: [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md) for full details
+
+**Key Use Cases**:
+- Compare costs across providers (OpenAI vs Anthropic vs Ollama)
+- Track actual spend with real provider pricing
+- Optimize routing based on cost/performance data
+- Provider performance comparison by task type
+
+**Technical Approach**: Provider-specific token extractors feeding unified monitoring system
+
 ---
 
 ## Summary by Category
@@ -314,8 +477,11 @@
 |----------|----------|--------|--------------|
 | **Visualization** | ER Diagrams, Data Lineage | Phase 7 ✅, Phase 11 ✅ | COMPLETE |
 | **LLM Intelligence** | Lineage Narrator, Impact Advisor, Schema Health, Pattern Intel, Lineage Chat | **Phase 12 ✅ COMPLETE** | ~11,266 lines |
-| **Data Sources** | CSV & Excel File Support | **Phase 13 - NEXT** | ~2,500 lines |
-| **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 14 - NEXT** | ~3,000 lines |
+| **Data Sources** | CSV & Excel File Support | **Phase 13 - PLANNED** | ~2,500 lines |
+| **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 14 - PLANNED** | ~3,000 lines |
+| **LLM Monitoring** | Token usage tracking, dashboard, inline stats (Ollama) | **Phase 15 - PLANNED** | ~1,500 lines |
+| **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 16 - PLANNED** (needs 14+15) | ~1,200 lines |
+| **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, natural language DML | **Phase 17 - PLANNED** | ~4,000 lines |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Table UX** | Sorting ✅, Resizing, Export | Sorting complete | ~400 lines remaining |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
@@ -349,6 +515,18 @@
 
 ---
 
+## Upcoming Phases Summary
+
+| Phase | Feature | Dependencies | Est. Effort | Priority |
+|-------|---------|--------------|-------------|----------|
+| **Phase 13** | CSV & Excel File Support | None | ~2,500 lines | HIGH |
+| **Phase 14** | LLM Provider Expansion | None | ~3,000 lines | HIGH |
+| **Phase 15** | LLM Usage Monitoring | None | ~1,500 lines | MEDIUM |
+| **Phase 16** | Multi-Provider Monitoring | Phase 14 + 15 | ~1,200 lines | MEDIUM |
+| **Phase 17** | Edit Mode & DML Operations | None | ~4,000 lines | MEDIUM |
+
+---
+
 ## Source Documents
 
 - [FUTURE_PLANS.md](FUTURE_PLANS.md) - Core roadmap
@@ -357,8 +535,11 @@
 - [DATA_LINGEAGE_PLAN.md](DATA_LINGEAGE_PLAN.md) - Data Lineage & Impact Analysis plan (Phase 11)
 - [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) - LLM-Powered Lineage Intelligence (Phase 12)
 - [CSV_EXCEL_SUPPORT_PLAN.md](CSV_EXCEL_SUPPORT_PLAN.md) - CSV & Excel File Support (Phase 13)
-- [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) - **LLM Provider Expansion (Phase 14)** ← NEW
+- [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) - LLM Provider Expansion (Phase 14)
+- [LLM_USAGE_MONITORING_PLAN.md](LLM_USAGE_MONITORING_PLAN.md) - LLM Usage Monitoring (Phase 15)
+- [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md) - Multi-Provider Monitoring (Phase 16)
+- [EDIT_MODE_DML_PLAN.md](EDIT_MODE_DML_PLAN.md) - **Edit Mode & DML Operations (Phase 17)** ← NEW
 
 ---
 
-**Updated**: January 31, 2026 (Phase 12 Lineage Intelligence COMPLETE - 151 tests, ~11,266 lines)
+**Updated**: February 1, 2026 (Added Phase 15-17: LLM Monitoring, Multi-Provider Monitoring, Edit Mode & DML)

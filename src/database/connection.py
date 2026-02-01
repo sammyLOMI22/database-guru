@@ -11,6 +11,34 @@ from src.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
+
+def run_alembic_migrations() -> None:
+    """Run pending Alembic migrations.
+
+    This should be called during application startup to ensure the database
+    schema is up to date. Uses synchronous execution since Alembic requires it.
+    """
+    from alembic.config import Config
+    from alembic import command
+    import os
+
+    # Get the path to alembic.ini
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    alembic_ini = os.path.join(base_dir, "alembic.ini")
+
+    if not os.path.exists(alembic_ini):
+        logger.warning(f"alembic.ini not found at {alembic_ini}, skipping migrations")
+        return
+
+    try:
+        alembic_cfg = Config(alembic_ini)
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Alembic migrations completed successfully")
+    except Exception as e:
+        logger.error(f"Failed to run Alembic migrations: {e}")
+        raise
+
+
 # Base class for SQLAlchemy models
 Base = declarative_base()
 

@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config.settings import Settings
-from src.database.connection import get_db_manager
+from src.database.connection import get_db_manager, run_alembic_migrations
 from src.cache.redis_client import get_redis_cache
 from src.core.connection_pool_manager import get_pool_manager_async
 from src.middleware.rate_limit import RateLimitMiddleware
@@ -30,6 +30,10 @@ async def lifespan(app: FastAPI):
     # Initialize database
     logger.info("📊 Initializing database...")
     db_manager = get_db_manager(settings)
+
+    # Run Alembic migrations first (uses sync connection)
+    run_alembic_migrations()
+
     await db_manager.initialize_async()
     await db_manager.create_tables_async()
     logger.info("✅ Database ready")

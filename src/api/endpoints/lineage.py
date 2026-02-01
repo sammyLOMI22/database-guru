@@ -25,11 +25,12 @@ import logging
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.common import get_db
+from src.middleware.rate_limit import llm_rate_limiter
 from src.database.models import QueryHistory
 from src.lineage.sql_lineage_parser import SQLLineageParser
 from src.lineage.impact_analyzer import ImpactAnalyzer
@@ -721,7 +722,9 @@ def _convert_trend_analysis(trend) -> TrendAnalysisSchema:
 @router.post("/ask", response_model=LineageAnswerSchema)
 async def ask_lineage_question(
     request: LineageQuestionRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(llm_rate_limiter),
 ):
     """
     Ask a natural language question about lineage, schema, or patterns.
@@ -738,6 +741,8 @@ async def ask_lineage_question(
     - GENERAL: Other questions about the database
 
     Use session_id for multi-turn conversations to maintain context.
+
+    Rate limited to 20 requests per minute per client to prevent LLM exhaustion.
     """
     try:
         from src.lineage.lineage_conversation_agent import get_lineage_conversation_agent
