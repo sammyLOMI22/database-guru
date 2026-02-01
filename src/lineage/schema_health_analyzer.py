@@ -708,7 +708,18 @@ class SchemaHealthAnalyzer:
                 )
                 if llm_result:
                     report.summary = llm_result.get("summary", report.summary)
-                    report.recommendations = llm_result.get("recommendations", [])
+                    
+                    # Ensure recommendations are strings (LLM sometimes returns dicts)
+                    raw_recs = llm_result.get("recommendations", [])
+                    processed_recs = []
+                    for rec in raw_recs:
+                        if isinstance(rec, dict):
+                            title = rec.get("title", "")
+                            desc = rec.get("description", "")
+                            processed_recs.append(f"{title}: {desc}" if title and desc else (title or desc or str(rec)))
+                        else:
+                            processed_recs.append(str(rec))
+                    report.recommendations = processed_recs
 
                     # Add any additional issues found by LLM
                     for issue_data in llm_result.get("additional_issues", []):
