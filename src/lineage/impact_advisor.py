@@ -498,11 +498,18 @@ class ImpactAdvisor:
         # Build migration steps
         steps = []
         for step_data in data.get("steps", []):
+            # Handle sql field - LLM sometimes returns list instead of string
+            raw_sql = step_data.get("sql")
+            if isinstance(raw_sql, list):
+                sql = "\n".join(str(s) for s in raw_sql)
+            else:
+                sql = raw_sql
+
             steps.append(MigrationStep(
                 step_number=step_data.get("step_number", len(steps) + 1),
                 action=step_data.get("action", "unknown"),
                 description=step_data.get("description", ""),
-                sql=step_data.get("sql"),
+                sql=sql,
                 reversible=step_data.get("reversible", True),
                 risk_level=step_data.get("risk_level", "low"),
             ))
