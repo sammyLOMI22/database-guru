@@ -18,6 +18,7 @@ htmlcov/
 
 # Node / Frontend
 node_modules/
+**/node_modules/
 .vite/
 yarn.lock
 pnpm-lock.yaml
