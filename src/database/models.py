@@ -159,6 +159,9 @@ class ChatSession(Base):
     # Multi-database support - stores array of connection IDs
     active_connection_ids = Column(JSON, nullable=False, default=list)  # [1, 2, 3]
 
+    # File sources support - stores array of file source IDs (Phase 13)
+    active_file_source_ids = Column(JSON, nullable=False, default=list)  # [1, 2, 3]
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -190,6 +193,66 @@ class ChatMessage(Base):
     # Relationships
     chat_session = relationship("ChatSession", backref="messages")
     query_history = relationship("QueryHistory", backref="chat_messages")
+
+
+class FileSource(Base):
+    """Store uploaded file data sources (CSV, Excel) for querying via DuckDB
+
+    Phase 13: CSV & Excel File Support
+    Files are uploaded, schema is inferred via DuckDB, and they become
+    queryable data sources alongside traditional database connections.
+    """
+    __tablename__ = "file_sources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)  # Display name
+
+    # File metadata
+    original_filename = Column(String(255), nullable=False)
+    file_type = Column(String(20), nullable=False)  # 'csv', 'xlsx', 'xls'
+    file_size_bytes = Column(Integer, nullable=False)
+    file_path = Column(String(512), nullable=False)
+    file_hash = Column(String(64), nullable=True)  # SHA-256 for deduplication
+
+    # Excel sheet handling
+    sheet_name = Column(String(255), nullable=True)
+
+    # Schema information (cached from DuckDB inference)
+    schema_cache = Column(JSON, nullable=True)  # {columns: [...], row_count: N, sample_values: {...}}
+    schema_updated_at = Column(DateTime, nullable=True)
+    row_count = Column(Integer, nullable=True)
+
+    # DuckDB integration
+    duckdb_table_name = Column(String(255), nullable=False, unique=True)  # e.g., "file_1_q4_sales"
+
+    # Ownership and scope
+    user_id = Column(String(255), index=True, nullable=True)
+    chat_session_id = Column(String(36), ForeignKey("chat_sessions.id", ondelete="SET NULL"), nullable=True)
+    is_global = Column(Boolean, default=False)  # Available across all sessions
+
+    # Status
+    is_active = Column(Boolean, default=True)
+    processing_status = Column(String(20), default='pending')  # pending, processing, ready, error
+    processing_error = Column(Text, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True, index=True)  # Auto-cleanup after N days
+
+    # Relationships
+    chat_session = relationship("ChatSession", backref="file_sources")
+
+    # Indexes for common queries
+    __table_args__ = (
+        Index('idx_file_user_session', 'user_id', 'chat_session_id'),
+        Index('idx_file_hash', 'file_hash'),
+        Index('idx_file_status', 'processing_status'),
+        Index('idx_file_global', 'is_global', 'is_active'),
+    )
+
+    def __repr__(self):
+        return f"<FileSource(id={self.id}, name='{self.name}', type='{self.file_type}', status='{self.processing_status}')>"
 
 
 class LearnedCorrection(Base):

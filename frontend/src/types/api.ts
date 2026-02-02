@@ -625,3 +625,66 @@ export interface SchemaCompareResponse {
     suggestion: string;
   }>;
 }
+
+// File Source Types (Phase 13: CSV & Excel Support)
+export interface FileColumnInfo {
+  name: string;
+  type: string;
+  nullable: boolean;
+  sample_values?: unknown[];
+}
+
+export interface FileSchemaResponse {
+  columns: FileColumnInfo[];
+  row_count: number;
+  sample_values: Record<string, unknown[]>;
+  inferred_at: string;
+}
+
+export interface FileSource {
+  id: number;
+  name: string;
+  original_filename: string;
+  file_type: 'csv' | 'xlsx' | 'xls';
+  file_size_bytes: number;
+  file_path: string;
+  file_hash?: string;
+  sheet_name?: string;
+  schema_cache?: FileSchemaResponse;
+  row_count?: number;
+  duckdb_table_name: string;
+  user_id?: string;
+  chat_session_id?: string;
+  is_global: boolean;
+  is_active: boolean;
+  processing_status: 'pending' | 'processing' | 'ready' | 'error';
+  processing_error?: string;
+  created_at: string;
+  updated_at?: string;
+  expires_at?: string;
+}
+
+export interface FilePreviewResponse {
+  columns: string[];
+  data: Record<string, unknown>[];
+  row_count: number;
+  total_rows: number;
+  truncated: boolean;
+}
+
+export interface ExcelSheetsResponse {
+  sheets: string[];
+  filename: string;
+}
+
+export interface FileUploadOptions {
+  name?: string;
+  sheet_name?: string;
+  session_id?: string;
+  is_global?: boolean;
+}
+
+export interface FileSourceListResponse {
+  file_sources: FileSource[];
+  count: number;
+}

@@ -62,6 +62,17 @@ class Settings(BaseSettings):
     MAX_SCHEMA_TABLES: int = 10  # Max tables before compression triggers
     MAX_FEW_SHOT_EXAMPLES: int = 3  # Max examples to include in prompts
 
+    # File Upload Settings (Phase 13: CSV & Excel Support)
+    FILE_UPLOAD_DIR: str = "uploads"  # Directory for uploaded files
+    FILE_MAX_SIZE_MB: int = 100  # Maximum file size in MB
+    FILE_ALLOWED_TYPES: str = ".csv,.xlsx,.xls"  # Comma-separated allowed extensions
+    FILE_AUTO_CLEANUP_DAYS: int = 30  # Auto-delete files after N days (0 = never)
+    FILE_SESSION_CLEANUP_ON_DELETE: bool = True  # Delete session-scoped files when session is deleted
+
+    # DuckDB Settings for File Queries (Phase 13)
+    DUCKDB_FILE_MEMORY_LIMIT: str = "1GB"  # Memory limit for file query DuckDB session
+    DUCKDB_FILE_THREADS: int = 4  # Number of threads for file query processing
+
     class Config:
         env_file = ".env"
         case_sensitive = True

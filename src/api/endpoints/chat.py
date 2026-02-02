@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_db
-from src.database.models import ChatSession, ChatMessage, DatabaseConnection
+from src.database.models import ChatSession, ChatMessage, DatabaseConnection, FileSource
 
 from src.llm.conversational_memory_agent import get_memory_agent
 
@@ -671,3 +671,216 @@ async def clear_conversation_context(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to clear conversation context: {str(e)}"
         )
+
+
+# =============================================================================
+# Phase 13: File Source Management Endpoints
+# =============================================================================
+
+class FileSourceInfo(BaseModel):
+    """File source information for chat response"""
+    id: int
+    name: str
+    file_type: str
+    original_filename: str
+    row_count: Optional[int] = None
+
+
+class SessionFilesResponse(BaseModel):
+    """Response for session file operations"""
+    success: bool
+    session_id: str
+    active_file_source_ids: List[int]
+    file_sources: List[FileSourceInfo]
+
+
+@router.post("/sessions/{session_id}/files/{file_id}", response_model=SessionFilesResponse)
+async def add_file_to_session(
+    session_id: str,
+    file_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Add a file source to a chat session (Phase 13).
+
+    The file must exist and be in 'ready' status to be added.
+    """
+    try:
+        # Verify session exists
+        session_result = await db.execute(
+            select(ChatSession).where(ChatSession.id == session_id)
+        )
+        session = session_result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat session {session_id} not found"
+            )
+
+        # Verify file source exists and is ready
+        file_result = await db.execute(
+            select(FileSource).where(
+                FileSource.id == file_id,
+                FileSource.processing_status == 'ready',
+            )
+        )
+        file_source = file_result.scalar_one_or_none()
+
+        if not file_source:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File source {file_id} not found or not ready"
+            )
+
+        # Add file to session's active files
+        current_files = session.active_file_source_ids or []
+        if file_id not in current_files:
+            session.active_file_source_ids = current_files + [file_id]
+            session.updated_at = datetime.utcnow()
+            await db.commit()
+            await db.refresh(session)
+
+            logger.info(f"Added file source {file_id} to session {session_id}")
+
+        # Get all active file sources for response
+        file_sources = await _get_session_file_sources(session, db)
+
+        return SessionFilesResponse(
+            success=True,
+            session_id=session_id,
+            active_file_source_ids=session.active_file_source_ids or [],
+            file_sources=file_sources,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to add file to session: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add file to session: {str(e)}"
+        )
+
+
+@router.delete("/sessions/{session_id}/files/{file_id}", response_model=SessionFilesResponse)
+async def remove_file_from_session(
+    session_id: str,
+    file_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Remove a file source from a chat session (Phase 13).
+
+    This only removes the file from the session's active sources.
+    The file itself is not deleted.
+    """
+    try:
+        # Verify session exists
+        session_result = await db.execute(
+            select(ChatSession).where(ChatSession.id == session_id)
+        )
+        session = session_result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat session {session_id} not found"
+            )
+
+        # Remove file from session's active files
+        current_files = session.active_file_source_ids or []
+        if file_id in current_files:
+            session.active_file_source_ids = [f for f in current_files if f != file_id]
+            session.updated_at = datetime.utcnow()
+            await db.commit()
+            await db.refresh(session)
+
+            logger.info(f"Removed file source {file_id} from session {session_id}")
+
+        # Get remaining active file sources for response
+        file_sources = await _get_session_file_sources(session, db)
+
+        return SessionFilesResponse(
+            success=True,
+            session_id=session_id,
+            active_file_source_ids=session.active_file_source_ids or [],
+            file_sources=file_sources,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to remove file from session: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to remove file from session: {str(e)}"
+        )
+
+
+@router.get("/sessions/{session_id}/files", response_model=SessionFilesResponse)
+async def get_session_files(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all active file sources for a chat session (Phase 13).
+    """
+    try:
+        # Verify session exists
+        session_result = await db.execute(
+            select(ChatSession).where(ChatSession.id == session_id)
+        )
+        session = session_result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat session {session_id} not found"
+            )
+
+        # Get active file sources
+        file_sources = await _get_session_file_sources(session, db)
+
+        return SessionFilesResponse(
+            success=True,
+            session_id=session_id,
+            active_file_source_ids=session.active_file_source_ids or [],
+            file_sources=file_sources,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get session files: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get session files: {str(e)}"
+        )
+
+
+async def _get_session_file_sources(
+    session: ChatSession,
+    db: AsyncSession,
+) -> List[FileSourceInfo]:
+    """Helper to get file source info for a session."""
+    file_sources = []
+    file_ids = session.active_file_source_ids or []
+
+    if file_ids:
+        result = await db.execute(
+            select(FileSource).where(
+                FileSource.id.in_(file_ids),
+                FileSource.processing_status == 'ready',
+            )
+        )
+        for fs in result.scalars().all():
+            file_sources.append(FileSourceInfo(
+                id=fs.id,
+                name=fs.name,
+                file_type=fs.file_type,
+                original_filename=fs.original_filename,
+                row_count=fs.row_count,
+            ))
+
+    return file_sources

@@ -9,7 +9,7 @@ from src.database.connection import get_db_manager, run_alembic_migrations
 from src.cache.redis_client import get_redis_cache
 from src.core.connection_pool_manager import get_pool_manager_async
 from src.middleware.rate_limit import RateLimitMiddleware
-from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage
+from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files
 
 # Configure logging
 logging.basicConfig(
@@ -129,6 +129,7 @@ app.include_router(tools.router, prefix="/api")
 app.include_router(cache.router, prefix="/api")
 app.include_router(pools.router, prefix="/api")
 app.include_router(lineage.router, prefix="/api")
+app.include_router(files.router, prefix="/api")  # Phase 13: CSV & Excel file support
 
 if __name__ == "__main__":
     import uvicorn

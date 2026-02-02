@@ -5,7 +5,7 @@ from asyncio import Semaphore
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database.models import DatabaseConnection
+from src.database.models import DatabaseConnection, FileSource
 from src.core.user_db_connector import UserDatabaseConnector
 from src.core.schema_inspector import SchemaInspector
 from src.core.executor import SQLExecutor
@@ -88,19 +88,23 @@ class MultiDatabaseHandler:
             }
 
     async def build_combined_schema(
-        self, connections: List[DatabaseConnection]
+        self,
+        connections: List[DatabaseConnection],
+        file_sources: Optional[List[FileSource]] = None,
     ) -> Dict[str, Any]:
         """
-        Build a combined schema from multiple database connections (parallelized)
+        Build a combined schema from multiple database connections and file sources (parallelized)
 
         Args:
             connections: List of DatabaseConnection objects
+            file_sources: Optional list of FileSource objects (Phase 13: CSV/Excel files)
 
         Returns:
-            Dict with combined schema information including database prefixes
+            Dict with combined schema information including database prefixes and file sources
         """
         combined_schema = {
             "databases": [],
+            "file_sources": [],  # Phase 13: CSV/Excel file sources
             "total_tables": 0,
             "total_columns": 0,
         }
@@ -142,11 +146,122 @@ class MultiDatabaseHandler:
                 )
 
         logger.info(
-            f"✓ Schema introspection complete: {combined_schema['total_tables']} tables "
+            f"✓ Database schema introspection complete: {combined_schema['total_tables']} tables "
             f"across {len(connections)} database(s)"
         )
 
+        # Phase 13: Add file source schemas
+        if file_sources:
+            await self._add_file_source_schemas(combined_schema, file_sources)
+
         return combined_schema
+
+    async def _add_file_source_schemas(
+        self,
+        combined_schema: Dict[str, Any],
+        file_sources: List[FileSource],
+    ) -> None:
+        """
+        Add file source schemas to combined schema (Phase 13).
+
+        Args:
+            combined_schema: Combined schema dict to update in place
+            file_sources: List of FileSource objects
+        """
+        from src.core.file_source_session import FileSourceDuckDBSession
+
+        for file_source in file_sources:
+            if file_source.processing_status != 'ready':
+                logger.warning(
+                    f"Skipping file source '{file_source.name}' - status: {file_source.processing_status}"
+                )
+                continue
+
+            try:
+                # Get schema from DuckDB session (lazy loads table if needed)
+                schema = await FileSourceDuckDBSession.get_table_schema(file_source)
+
+                file_schema = {
+                    "source_id": file_source.id,
+                    "name": file_source.name,
+                    "source_type": "file",
+                    "file_type": file_source.file_type,
+                    "original_filename": file_source.original_filename,
+                    "duckdb_table_name": file_source.duckdb_table_name,
+                    "tables": [{
+                        "name": file_source.duckdb_table_name,
+                        "columns": schema.get("columns", []),
+                        "row_count": schema.get("row_count", 0),
+                    }],
+                }
+
+                combined_schema["file_sources"].append(file_schema)
+                combined_schema["total_tables"] += 1
+                combined_schema["total_columns"] += len(schema.get("columns", []))
+
+                logger.info(
+                    f"Added file source schema: '{file_source.name}' "
+                    f"({len(schema.get('columns', []))} columns, {schema.get('row_count', 0)} rows)"
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to get schema for file source '{file_source.name}': {e}")
+                combined_schema["file_sources"].append({
+                    "source_id": file_source.id,
+                    "name": file_source.name,
+                    "source_type": "file",
+                    "error": str(e),
+                    "tables": [],
+                })
+
+    async def execute_file_query(
+        self,
+        sql: str,
+        file_sources: List[FileSource],
+        max_rows: int = 1000,
+    ) -> Dict[str, Any]:
+        """
+        Execute SQL query against file sources via DuckDB (Phase 13).
+
+        Args:
+            sql: SQL query to execute
+            file_sources: List of FileSource objects that may be referenced
+            max_rows: Maximum rows to return
+
+        Returns:
+            Dict with success, data, columns, row_count, error
+        """
+        from src.core.file_source_session import FileSourceDuckDBSession
+
+        try:
+            result = await FileSourceDuckDBSession.execute_query(
+                sql=sql,
+                file_sources=file_sources,
+                max_rows=max_rows,
+            )
+
+            # Add source type indicator
+            result["source_type"] = "file"
+
+            if result.get("success"):
+                logger.info(
+                    f"File query executed successfully: {result.get('row_count', 0)} rows"
+                )
+            else:
+                logger.error(f"File query failed: {result.get('error')}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to execute file query: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "source_type": "file",
+                "data": [],
+                "columns": [],
+                "row_count": 0,
+            }
 
     def format_schema_for_llm(self, combined_schema: Dict[str, Any]) -> str:
         """
@@ -156,12 +271,23 @@ class MultiDatabaseHandler:
             combined_schema: Combined schema from build_combined_schema()
 
         Returns:
-            Formatted string with database prefixes for LLM
+            Formatted string with database prefixes and file sources for LLM
         """
         lines = []
-        lines.append(
-            f"# Multi-Database Schema ({combined_schema['total_tables']} tables across {len(combined_schema['databases'])} databases)\n"
-        )
+
+        # Count sources
+        db_count = len(combined_schema.get('databases', []))
+        file_count = len(combined_schema.get('file_sources', []))
+        total_tables = combined_schema.get('total_tables', 0)
+
+        if file_count > 0:
+            lines.append(
+                f"# Data Sources ({total_tables} tables across {db_count} databases and {file_count} files)\n"
+            )
+        else:
+            lines.append(
+                f"# Multi-Database Schema ({total_tables} tables across {db_count} databases)\n"
+            )
 
         for db_info in combined_schema["databases"]:
             if "error" in db_info:
@@ -210,6 +336,52 @@ class MultiDatabaseHandler:
                     lines.append(f"  Indexes: {len(table['indexes'])}")
 
                 lines.append("")  # Empty line between tables
+
+        # Phase 13: Add file sources to LLM prompt
+        file_sources = combined_schema.get("file_sources", [])
+        if file_sources:
+            lines.append("\n## FILE SOURCES (CSV/Excel uploads)")
+            lines.append("These are uploaded files queryable as SQL tables via DuckDB.\n")
+
+            for file_source in file_sources:
+                if "error" in file_source:
+                    lines.append(
+                        f"\n--- File: {file_source['name']} (ERROR: {file_source['error']}) ---\n"
+                    )
+                    continue
+
+                lines.append(f"\n--- File: {file_source['name']} ({file_source['file_type'].upper()}) ---")
+                lines.append(f"Original Filename: {file_source['original_filename']}")
+                lines.append(f"Query as table: {file_source['duckdb_table_name']}")
+
+                for table in file_source.get("tables", []):
+                    lines.append(f"Row Count: {table.get('row_count', 'unknown')}")
+                    lines.append("Columns:")
+
+                    for col in table.get("columns", []):
+                        col_name = col.get("name", "unknown")
+                        col_type = col.get("type", "VARCHAR")
+                        col_def = f"  - {col_name} ({col_type})"
+
+                        # Add sample values if available
+                        samples = col.get("sample_values", [])
+                        if samples:
+                            sample_str = ", ".join(repr(s) for s in samples[:3])
+                            col_def += f"  // Examples: {sample_str}"
+
+                        lines.append(col_def)
+
+                lines.append("")
+
+            # Add cross-source guidance if both DBs and files present
+            if combined_schema.get("databases") and file_sources:
+                lines.append("\n## CROSS-SOURCE QUERY GUIDANCE")
+                lines.append("When querying across databases and files:")
+                lines.append("- Database tables: Prefix with database connection name (e.g., db_name.table)")
+                lines.append("- File tables: Use the DuckDB table name directly (e.g., file_1_sales)")
+                lines.append("- Generate SEPARATE queries for databases vs files - they use different engines")
+                lines.append("- For file queries, use: FILE_SOURCE: file_name prefix")
+                lines.append("")
 
         return "\n".join(lines)
 

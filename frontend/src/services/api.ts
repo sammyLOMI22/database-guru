@@ -467,4 +467,98 @@ export const settingsAPI = {
   },
 };
 
+// File Source Types (Phase 13: CSV & Excel Support)
+import type {
+  FileSource,
+  FileSchemaResponse,
+  FilePreviewResponse,
+  ExcelSheetsResponse,
+  FileSourceListResponse,
+  FileUploadOptions,
+} from '../types/api';
+
+export const filesAPI = {
+  // Upload a file
+  async uploadFile(file: File, options?: FileUploadOptions): Promise<FileSource> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (options?.name) formData.append('name', options.name);
+    if (options?.sheet_name) formData.append('sheet_name', options.sheet_name);
+    if (options?.session_id) formData.append('session_id', options.session_id);
+    if (options?.is_global !== undefined) formData.append('is_global', String(options.is_global));
+
+    const { data } = await api.post<FileSource>('/api/files/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000, // 2 minutes for large files
+    });
+    return data;
+  },
+
+  // List file sources
+  async listFiles(sessionId?: string, includeGlobal = true): Promise<FileSourceListResponse> {
+    const { data } = await api.get<FileSourceListResponse>('/api/files/', {
+      params: { session_id: sessionId, include_global: includeGlobal },
+    });
+    return data;
+  },
+
+  // Get specific file source
+  async getFile(fileId: number): Promise<FileSource> {
+    const { data } = await api.get<FileSource>(`/api/files/${fileId}`);
+    return data;
+  },
+
+  // Delete file source
+  async deleteFile(fileId: number): Promise<void> {
+    await api.delete(`/api/files/${fileId}`);
+  },
+
+  // Get file schema
+  async getFileSchema(fileId: number): Promise<FileSchemaResponse> {
+    const { data } = await api.get<FileSchemaResponse>(`/api/files/${fileId}/schema`);
+    return data;
+  },
+
+  // Get file preview
+  async getFilePreview(fileId: number, limit = 20): Promise<FilePreviewResponse> {
+    const { data } = await api.get<FilePreviewResponse>(`/api/files/${fileId}/preview`, {
+      params: { limit },
+    });
+    return data;
+  },
+
+  // Refresh file schema
+  async refreshFileSchema(fileId: number): Promise<FileSource> {
+    const { data } = await api.post<FileSource>(`/api/files/${fileId}/refresh`);
+    return data;
+  },
+
+  // Get Excel sheets before upload
+  async getExcelSheets(file: File): Promise<ExcelSheetsResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const { data } = await api.post<ExcelSheetsResponse>('/api/files/excel-sheets', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+
+  // Add file to chat session
+  async addFileToSession(sessionId: string, fileId: number): Promise<void> {
+    await api.post(`/api/chat/sessions/${sessionId}/files/${fileId}`);
+  },
+
+  // Remove file from chat session
+  async removeFileFromSession(sessionId: string, fileId: number): Promise<void> {
+    await api.delete(`/api/chat/sessions/${sessionId}/files/${fileId}`);
+  },
+
+  // Get files in chat session
+  async getSessionFiles(sessionId: string): Promise<{ files: FileSource[]; count: number }> {
+    const { data } = await api.get(`/api/chat/sessions/${sessionId}/files`);
+    return data;
+  },
+};
+
 export default api;

@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from src.models.schemas import QueryRequest, QueryResponse
 from src.api.dependencies import get_db, get_cache, get_sql_generator, get_settings, get_semantic_cache_dep
-from src.database.models import QueryHistory, DatabaseConnection, ChatSession, ChatMessage
+from src.database.models import QueryHistory, DatabaseConnection, ChatSession, ChatMessage, FileSource
 from src.llm.sql_generator import SQLGenerator
 from src.llm.conversational_memory_agent import get_memory_agent
 from src.cache.redis_client import RedisCache
@@ -251,6 +251,8 @@ async def process_multi_database_query(
     try:
         # Determine which connections to use
         connections = []
+        file_sources = []  # Phase 13: File sources for cross-source queries
+        file_source_ids = []  # Track IDs to fetch later
 
         if request.connection_ids:
             # Use explicitly provided connection IDs
@@ -295,6 +297,13 @@ async def process_multi_database_query(
             )
             connections = list(result.scalars().all())
 
+            # Phase 13: Fetch file sources from session
+            file_source_ids = session.active_file_source_ids or []
+            if isinstance(file_source_ids, int):
+                file_source_ids = [file_source_ids]
+            elif not isinstance(file_source_ids, list):
+                file_source_ids = list(file_source_ids) if file_source_ids else []
+
         else:
             # Fall back to global active connection (backward compatible)
             result = await db.execute(
@@ -310,13 +319,24 @@ async def process_multi_database_query(
 
             connections = [active_conn]
 
-        if not connections:
+        if not connections and not file_source_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No valid database connections found"
+                detail="No valid database connections or file sources found"
             )
 
-        logger.info(f"Processing query across {len(connections)} database(s): {[c.name for c in connections]}")
+        # Phase 13: Fetch file sources if IDs were collected from session
+        if file_source_ids:
+            file_result = await db.execute(
+                select(FileSource).where(
+                    FileSource.id.in_(file_source_ids),
+                    FileSource.processing_status == 'ready'  # Only include ready files
+                )
+            )
+            file_sources = list(file_result.scalars().all())
+            logger.info(f"Found {len(file_sources)} ready file source(s) for query")
+
+        logger.info(f"Processing query across {len(connections)} database(s) and {len(file_sources)} file source(s)")
 
         # DEBUG: Log session info if using chat session
         if request.chat_session_id:
@@ -329,8 +349,11 @@ async def process_multi_database_query(
         if not sql_generator.ollama.client:
             await sql_generator.initialize()
 
-        # Build combined schema
-        combined_schema_data = await multi_db_handler.build_combined_schema(connections)
+        # Build combined schema (including file sources for Phase 13)
+        combined_schema_data = await multi_db_handler.build_combined_schema(
+            connections,
+            file_sources=file_sources if file_sources else None
+        )
         combined_schema_text = multi_db_handler.format_schema_for_llm(combined_schema_data)
 
         # Generate cache key with version to handle schema changes
@@ -1144,6 +1167,8 @@ async def stream_multi_database_query(
 
             # Determine which connections to use
             connections = []
+            file_sources = []  # Phase 13: File sources
+            file_source_ids = []
 
             if request.connection_ids:
                 # Use explicitly provided connection IDs
@@ -1156,24 +1181,32 @@ async def stream_multi_database_query(
 
             elif request.chat_session_id and session:
                 # Get connections from chat session
-                if not session.active_connection_ids:
-                    yield f"event: error\ndata: {json.dumps({'error': 'Chat session has no active database connections'})}\n\n"
+                if not session.active_connection_ids and not session.active_file_source_ids:
+                    yield f"event: error\ndata: {json.dumps({'error': 'Chat session has no active database connections or file sources'})}\n\n"
                     return
 
                 # Ensure active_connection_ids is a list
-                connection_ids = session.active_connection_ids
+                connection_ids = session.active_connection_ids or []
                 if isinstance(connection_ids, int):
                     connection_ids = [connection_ids]
                 elif not isinstance(connection_ids, list):
                     connection_ids = list(connection_ids) if connection_ids else []
 
+                # Phase 13: Get file source IDs from session
+                file_source_ids = session.active_file_source_ids or []
+                if isinstance(file_source_ids, int):
+                    file_source_ids = [file_source_ids]
+                elif not isinstance(file_source_ids, list):
+                    file_source_ids = list(file_source_ids) if file_source_ids else []
+
                 # Fetch connections
-                result = await db.execute(
-                    select(DatabaseConnection).where(
-                        DatabaseConnection.id.in_(connection_ids)
+                if connection_ids:
+                    result = await db.execute(
+                        select(DatabaseConnection).where(
+                            DatabaseConnection.id.in_(connection_ids)
+                        )
                     )
-                )
-                connections = list(result.scalars().all())
+                    connections = list(result.scalars().all())
 
             else:
                 # Fall back to global active connection
@@ -1188,17 +1221,29 @@ async def stream_multi_database_query(
 
                 connections = [active_conn]
 
-            if not connections:
-                yield f"event: error\ndata: {json.dumps({'error': 'No valid database connections found'})}\n\n"
+            # Phase 13: Fetch file sources if IDs were collected
+            if file_source_ids:
+                file_result = await db.execute(
+                    select(FileSource).where(
+                        FileSource.id.in_(file_source_ids),
+                        FileSource.processing_status == 'ready'
+                    )
+                )
+                file_sources = list(file_result.scalars().all())
+
+            if not connections and not file_sources:
+                yield f"event: error\ndata: {json.dumps({'error': 'No valid database connections or file sources found'})}\n\n"
                 return
 
-            logger.info(f"[Multi-Stream] Processing query across {len(connections)} database(s): {[c.name for c in connections]}")
+            logger.info(f"[Multi-Stream] Processing query across {len(connections)} database(s) and {len(file_sources)} file source(s)")
 
             # Send initial status
+            source_count = len(connections) + len(file_sources)
             status_data = {
                 'status': 'initializing',
-                'message': f'Preparing to query {len(connections)} database(s)...',
+                'message': f'Preparing to query {source_count} data source(s)...',
                 'database_count': len(connections),
+                'file_source_count': len(file_sources),
                 'used_context': used_context
             }
             yield f"event: status\ndata: {json.dumps(status_data)}\n\n"
@@ -1207,9 +1252,12 @@ async def stream_multi_database_query(
             multi_db_handler = MultiDatabaseHandler()
 
             # Build combined schema (needed for context, but each DB will use its own schema)
-            yield f"event: status\ndata: {json.dumps({'status': 'introspecting', 'message': 'Introspecting database schemas...'})}\n\n"
+            yield f"event: status\ndata: {json.dumps({'status': 'introspecting', 'message': 'Introspecting schemas...'})}\n\n"
 
-            combined_schema_data = await multi_db_handler.build_combined_schema(connections)
+            combined_schema_data = await multi_db_handler.build_combined_schema(
+                connections,
+                file_sources=file_sources if file_sources else None
+            )
 
             # Create a shared queue for events from all databases
             event_queue = asyncio.Queue()
