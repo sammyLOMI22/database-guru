@@ -170,6 +170,49 @@ frontend/src/
 
 **Tests**: `AdvancedCharts.test.tsx` (61 tests), `chartIntelligence.test.ts`
 
+### File Data Source UI Components (Phase 13 - January 2026)
+| Component | Lines | Purpose |
+|-----------|-------|---------|
+| `FileUploadModal.tsx` | ~400 | Drag-and-drop file upload modal |
+| `FilePreviewPanel.tsx` | ~350 | Schema and data preview panel |
+| **Total** | **~750** | |
+
+**FileUploadModal Features**:
+- Drag-and-drop interface using `react-dropzone`
+- Supported formats: CSV, XLSX, XLS (max 100MB)
+- Multi-stage workflow: Idle → Selecting Sheet → Uploading → Success/Error
+- Excel sheet selection dropdown
+- Display name input field
+- File icon indicators (CSV vs Excel)
+- Progress indicator with timeout handling
+
+**FilePreviewPanel Features**:
+- Two-tab interface: Schema tab and Preview tab
+- Schema tab: Column list with types, nullability, sample values
+- Preview tab: Data table with configurable row limit
+- Type color coding (INT=blue, FLOAT=purple, VARCHAR=green, DATE=orange, BOOL=pink)
+- Refresh schema button
+- DuckDB table name display for SQL reference
+- Truncation indicator for large datasets
+
+**API Service** (`services/api.ts:filesAPI`):
+| Method | Purpose |
+|--------|---------|
+| `uploadFile(file, options)` | FormData multipart upload |
+| `listFiles(sessionId?, includeGlobal?)` | List with filters |
+| `getFile(fileId)` | Get file details |
+| `deleteFile(fileId)` | Delete file |
+| `getFileSchema(fileId)` | Get inferred schema |
+| `getFilePreview(fileId, limit)` | Get data preview |
+| `refreshFileSchema(fileId)` | Re-infer schema |
+| `getExcelSheets(file)` | Inspect sheets before upload |
+
+**Type Definitions** (`types/api.ts`):
+- `FileSource`: Complete file source interface
+- `FilePreviewResponse`: Preview data with columns and rows
+- `ExcelSheetsResponse`: Available sheets
+- `FileUploadOptions`: Upload configuration
+
 ## App.tsx Tab Structure
 
 | Tab | Color | Purpose |

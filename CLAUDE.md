@@ -53,6 +53,8 @@ The system uses a multi-agent architecture with 23+ specialized agents. See [.cl
 | Query Planning | `src/llm/query_planning_agent.py` | Chain-of-thought reasoning |
 | Confidence Scorer | `src/llm/confidence_scorer.py` | Success probability prediction |
 | Multi-DB Handler | `src/core/multi_db_handler.py` | Parallel database execution |
+| File Source Handler | `src/core/file_source_handler.py` | CSV/Excel file processing (Phase 13) |
+| File Source Session | `src/core/file_source_session.py` | DuckDB session for file queries |
 | Result Narrator | `src/llm/result_narrator.py` | Human-readable insights |
 | Model Router | `src/llm/model_router.py` | Per-task model selection |
 | SQL Lineage Parser | `src/lineage/sql_lineage_parser.py` | Column-level lineage |
@@ -122,7 +124,7 @@ Key docs in `docs/`:
 
 | Category | Key Files |
 |----------|-----------|
-| **Guides** | `guides/MULTI_DATABASE_GUIDE.md`, `guides/CONNECTION_POOLING_GUIDE.md`, `guides/DATA_LINEAGE_GUIDE.md`, `guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md` |
+| **Guides** | `guides/MULTI_DATABASE_GUIDE.md`, `guides/CONNECTION_POOLING_GUIDE.md`, `guides/DATA_LINEAGE_GUIDE.md`, `guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md`, `guides/FILE_DATA_SOURCE_USER_GUIDE.md` |
 | **Technical** | `technical/PARALLEL_EXECUTION.md`, `technical/SEMANTIC_CACHING.md`, `technical/SQL_GENERATION_PIPELINE.md` |
 | **Modules** | `modules/QUERY_PLANNING_AGENT.md`, `modules/TOOL_USING_AGENT.md` |
 | **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |

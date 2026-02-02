@@ -111,6 +111,46 @@ Intelligent query similarity matching:
 - Security logging for monitoring
 - 29 comprehensive security tests passing
 
+## File Data Source System (Phase 13 - January 2026)
+**Status**: PRODUCTION-READY
+
+### Components
+- `FileSourceHandler` (`src/core/file_source_handler.py`) - File validation, saving, and schema inference
+- `FileSourceDuckDBSession` (`src/core/file_source_session.py`) - Singleton in-memory DuckDB session manager
+- `files.py` (`src/api/endpoints/files.py`) - REST API endpoints for file management
+
+### Features
+- **File Upload Support** - CSV, XLSX, XLS files up to 100MB
+- **Automatic Schema Inference** - DuckDB auto-detects column types (INTEGER, DOUBLE, VARCHAR, DATE, etc.)
+- **Content Deduplication** - SHA-256 hashing prevents duplicate file storage
+- **Lazy Table Loading** - DuckDB tables only created when first queried
+- **Thread Safety** - AsyncIO locks protect concurrent access to DuckDB session
+- **Memory Management** - Configurable memory limit (1GB default) and thread count (4)
+- **Session Scoping** - Files can be session-specific or global (shared)
+- **Auto-Cleanup** - Automatic file deletion after configurable days (30 default)
+- **Security** - Filename sanitization, path traversal protection, content validation via magic bytes
+
+### File Storage Structure
+```
+uploads/
+├── global/           # Shared files (is_global=true)
+│   └── {hash}_{filename}
+└── sessions/
+    └── {session_id}/  # Session-scoped files
+        └── {hash}_{filename}
+```
+
+### DuckDB Table Naming
+- Format: `file_{id}_{sanitized_name}`
+- Example: `file_1_sales_data`, `file_3_revenue_2024`
+- Max length: 40 characters
+- Special characters removed for SQL compatibility
+
+### Integration with Multi-Database Queries
+- File sources automatically added to combined schema for LLM context
+- Query planning considers both database and file sources
+- DuckDB session ensures all file tables are loaded before query execution
+
 ## Database Schema
 
 The system maintains its own metadata database (`database_guru.db`):
@@ -121,6 +161,7 @@ The system maintains its own metadata database (`database_guru.db`):
 | `database_connections` | User database connection configs |
 | `query_history` | All executed queries with results |
 | `chat_sessions` | Conversation sessions with context |
+| `file_sources` | Uploaded CSV/Excel file metadata (Phase 13) |
 | `learned_corrections` | Patterns learned from successful fixes |
 | `confidence_scores` | Historical confidence predictions |
 | `user_feedback` | User-submitted corrections and reports |

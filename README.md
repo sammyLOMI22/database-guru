@@ -113,6 +113,7 @@ The demo showcases:
 - 🔗 **Data Lineage (NEW!)** - Column-level lineage visualization, impact analysis, query pattern heatmaps
 - 🧠 **Lineage Intelligence (NEW!)** - LLM-powered explanations, schema health analysis, conversational Q&A
 - 🔀 **Table Sorting (NEW!)** - Click any column header to sort results (numbers, dates, strings auto-detected)
+- 📁 **CSV/Excel File Data Sources (NEW!)** - Upload CSV/Excel files as queryable data sources with DuckDB
 
 All with mock data - no database connection needed!
 
@@ -221,6 +222,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Result Table Pagination** - Navigate through large result sets with 10/25/50/100 rows per page
 - ✅ **Table Sorting (NEW!)** - Click column headers to sort results, with smart type detection for numbers, dates, and strings
 - ✅ **Small Model Optimization (NEW!)** - Per-task model routing, query templates, location preprocessing, and dialect-aware SQL generation for faster responses with smaller models
+- ✅ **CSV/Excel File Data Sources (NEW!)** - Upload and query CSV/Excel files as DuckDB tables
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
@@ -683,19 +685,28 @@ curl -X DELETE http://localhost:8000/api/cache/connection/1
 database-guru/
 ├── src/                    # Backend source
 │   ├── api/               # API endpoints
+│   │   └── endpoints/
+│   │       └── files.py   # File upload endpoints (NEW!)
 │   ├── core/              # Business logic
+│   │   ├── file_source_handler.py    # File processing (NEW!)
+│   │   └── file_source_session.py    # DuckDB session (NEW!)
 │   ├── database/          # Database layer
 │   ├── llm/               # LLM integration
-│   ├── lineage/           # Data lineage system (NEW!)
+│   ├── lineage/           # Data lineage system
 │   └── main.py            # Entry point
 ├── frontend/              # React frontend
 │   ├── src/
 │   │   ├── components/    # React components
-│   │   │   └── lineage/   # Lineage visualization (NEW!)
+│   │   │   ├── lineage/   # Lineage visualization
+│   │   │   ├── FileUploadModal.tsx   # File upload UI (NEW!)
+│   │   │   └── FilePreviewPanel.tsx  # File preview UI (NEW!)
 │   │   ├── hooks/         # Custom hooks
 │   │   ├── services/      # API client
 │   │   └── types/         # TypeScript types
 │   └── index.html
+├── uploads/               # File storage directory (NEW!)
+│   ├── global/           # Shared files
+│   └── sessions/         # Session-scoped files
 ├── scripts/               # Utility scripts
 │   └── create_sample_db.py
 ├── start.sh              # Startup script
@@ -1146,6 +1157,142 @@ curl -X POST http://localhost:8000/api/lineage/ask \
 - [Lineage Intelligence User Guide](docs/guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md) - Complete feature guide
 - [Lineage Intelligence Testing Guide](docs/guides/testing/LINEAGE_INTELLIGENCE_TESTING.md) - How to test
 - [Data Lineage Guide](docs/guides/DATA_LINEAGE_GUIDE.md) - Core lineage documentation
+
+---
+
+## 📁 CSV/Excel File Data Sources (NEW!)
+
+Database Guru now supports **CSV and Excel files as queryable data sources**! Upload your files and query them using SQL alongside your traditional databases.
+
+### Key Features:
+
+**1. File Upload Support**
+Upload CSV, XLSX, and XLS files directly through the UI:
+
+| Format | Extension | Max Size | Features |
+|--------|-----------|----------|----------|
+| **CSV** | `.csv` | 100MB | Auto-detect delimiters, encoding |
+| **Excel** | `.xlsx` | 100MB | Sheet selection, multiple sheets |
+| **Legacy Excel** | `.xls` | 100MB | Full compatibility |
+
+**2. Automatic Schema Inference**
+DuckDB automatically detects column types from your data:
+
+| Detected Type | Examples |
+|---------------|----------|
+| **INTEGER** | `1`, `42`, `1000` |
+| **DOUBLE** | `3.14`, `99.99` |
+| **VARCHAR** | `"hello"`, `"world"` |
+| **BOOLEAN** | `true`, `false`, `1`, `0` |
+| **DATE** | `2024-01-15` |
+| **TIMESTAMP** | `2024-01-15 10:30:00` |
+
+**3. File Scoping**
+Files can be scoped to sessions or shared globally:
+
+| Scope | Use Case | Behavior |
+|-------|----------|----------|
+| **Session-Scoped** | Temporary analysis | Deleted when session ends |
+| **Global** | Shared reference data | Available to all sessions |
+
+**4. Content Deduplication**
+Identical files are stored once using SHA-256 hashing, saving storage space.
+
+### How to Use:
+
+**Via UI:**
+1. Click the **"📁 Upload File"** button in the sidebar
+2. Drag-and-drop or click to select your CSV/Excel file
+3. (For Excel) Select which sheet to import
+4. Optionally provide a display name
+5. Click **"Upload"** to process the file
+6. View schema and preview in the **File Preview Panel**
+7. Query using the generated DuckDB table name (e.g., `file_1_sales_data`)
+
+**Via API:**
+```bash
+# Upload a file
+curl -X POST http://localhost:8000/api/files/upload \
+  -F "file=@sales_data.csv" \
+  -F "name=Sales Data" \
+  -F "is_global=false"
+
+# List uploaded files
+curl http://localhost:8000/api/files/
+
+# Get file schema
+curl http://localhost:8000/api/files/1/schema
+
+# Preview file data
+curl http://localhost:8000/api/files/1/preview?limit=20
+
+# Inspect Excel sheets before upload
+curl -X POST http://localhost:8000/api/files/excel-sheets \
+  -F "file=@workbook.xlsx"
+
+# Delete a file
+curl -X DELETE http://localhost:8000/api/files/1
+```
+
+### Example Workflow:
+
+```
+1. Upload "sales_data.csv" (500 rows)
+   → Auto-detects: product_id (INT), name (VARCHAR), revenue (DOUBLE), sale_date (DATE)
+   → Creates DuckDB table: file_1_sales_data
+
+2. Query naturally:
+   "Show me total revenue by product from sales_data"
+   → SELECT product_id, name, SUM(revenue) FROM file_1_sales_data GROUP BY product_id, name
+
+3. Join with database tables:
+   "Compare sales_data revenue with our products table"
+   → Joins file source with connected database
+```
+
+### UI Components:
+
+- **FileUploadModal** - Drag-and-drop upload with progress indicator
+- **FilePreviewPanel** - Two-tab interface with schema and data preview
+- **Sheet Selection** - Choose which Excel sheet to import
+- **Type Badges** - Color-coded column type indicators
+
+### Configuration:
+
+Settings in `.env`:
+```bash
+# File upload settings
+FILE_UPLOAD_DIR=uploads/          # Storage directory
+FILE_MAX_SIZE_MB=100              # Maximum file size
+FILE_ALLOWED_TYPES=.csv,.xlsx,.xls  # Accepted extensions
+FILE_AUTO_CLEANUP_DAYS=30         # Auto-delete after N days
+
+# DuckDB settings for file queries
+DUCKDB_FILE_MEMORY_LIMIT=1GB      # Max memory for queries
+DUCKDB_FILE_THREADS=4             # Processing threads
+```
+
+### Benefits:
+
+| Feature | Benefit |
+|---------|---------|
+| **No ETL Required** | Query files directly without importing to databases |
+| **Fast Processing** | DuckDB's columnar engine handles large files efficiently |
+| **Type Safety** | Automatic type inference prevents data errors |
+| **Session Isolation** | Each user's files are isolated by session |
+| **Storage Efficiency** | Content deduplication saves disk space |
+
+### Technical Details:
+
+- **Storage**: Files stored in `uploads/` with hash-based naming
+- **Processing**: DuckDB's `read_csv_auto()` and `read_excel()` functions
+- **Memory**: Lazy table loading - tables only loaded when queried
+- **Thread Safety**: AsyncIO locks protect concurrent access
+- **Cleanup**: Automatic expiration after configurable days
+
+**Documentation:**
+- [File Data Source User Guide](docs/guides/FILE_DATA_SOURCE_USER_GUIDE.md) - Complete feature guide
+- [File Data Source Testing Guide](docs/guides/testing/FILE_DATA_SOURCE_TESTING.md) - How to test
 
 ---
 
@@ -1972,9 +2119,15 @@ open htmlcov/index.html
   - Schema Health Analyzer: 817 tests (grades, index suggestions, anti-patterns)
   - Pattern Intelligence: 584 tests (bottleneck analysis, anti-pattern detection)
   - Conversational Lineage: 630 tests (question classification, multi-turn dialog)
-- ✅ **Table Sorting**: 24/24 tests (100% coverage) - NEW!
+- ✅ **Table Sorting**: 24/24 tests (100% coverage)
   - useTableSort hook: 14 tests (sorting logic, type detection, nulls)
   - SortableTableHeader: 10 tests (click, keyboard, visual indicators)
+- ✅ **CSV/Excel File Data Sources**: 50+ tests (100% coverage) - NEW!
+  - File validation and sanitization tests
+  - Schema inference tests (CSV, Excel)
+  - DuckDB session management tests
+  - File preview and API endpoint tests
+  - Content validation and deduplication tests
 - ✅ Confidence Scoring: 31/31 tests (100% coverage)
 - ✅ Result Verification Agent: 14/14 tests (89% coverage)
 - ✅ Correction Learner: 13/13 tests (87% coverage)

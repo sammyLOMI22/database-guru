@@ -147,3 +147,62 @@ All endpoints are in `src/api/endpoints/`.
 - **12.3 Schema Health**: Health grades (A-F), index suggestions, anti-patterns
 - **12.4 Pattern Intelligence**: Bottleneck analysis, query anti-patterns, trends
 - **12.5 Conversational Lineage**: Natural language Q&A with multi-turn support
+
+## File Data Source API (Phase 13 - January 2026)
+**File**: `files.py`
+
+Upload and query CSV/Excel files as DuckDB data sources.
+
+### File Management Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/files/upload` | Upload CSV/XLSX/XLS file (multipart form) |
+| GET | `/api/files/` | List file sources with optional filtering |
+| GET | `/api/files/{file_id}` | Get file source details |
+| DELETE | `/api/files/{file_id}` | Delete file source and physical file |
+| GET | `/api/files/{file_id}/schema` | Get inferred schema with column types |
+| GET | `/api/files/{file_id}/preview` | Get data preview (default 20, max 100 rows) |
+| POST | `/api/files/{file_id}/refresh` | Re-infer schema for updated files |
+| POST | `/api/files/excel-sheets` | Inspect Excel sheets before upload |
+
+### Session File Management
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/sessions/{session_id}/files/{file_id}` | Add file to chat session |
+| DELETE | `/sessions/{session_id}/files/{file_id}` | Remove file from session |
+| GET | `/sessions/{session_id}/files` | List files in session |
+
+### Upload Parameters
+```
+POST /api/files/upload
+Content-Type: multipart/form-data
+
+Parameters:
+- file (required): The file to upload (.csv, .xlsx, .xls)
+- name (optional): Display name for the file
+- sheet_name (optional): Excel sheet to import (default: first sheet)
+- session_id (optional): Chat session ID for session-scoped files
+- is_global (optional): true for global scope, false for session-scoped
+```
+
+### Query Parameters for Listing
+```
+GET /api/files/?session_id=xxx&include_global=true&status=ready
+- session_id: Filter by chat session
+- is_global: Filter by global flag
+- include_global: Include global files with session files
+- status: Filter by processing status (pending/processing/ready/error)
+```
+
+### Response Models
+- **FileSourceResponse**: Complete file source with schema_cache
+- **FileSchemaResponse**: Column types, nullable, sample_values, row_count
+- **FilePreviewResponse**: Columns, data array, truncation indicator
+- **ExcelSheetsResponse**: Available sheets in Excel file
+
+### Features
+- **Auto Schema Inference**: DuckDB detects column types automatically
+- **Type Normalization**: Maps to standard types (INTEGER, VARCHAR, etc.)
+- **Content Deduplication**: SHA-256 hashing prevents duplicate storage
+- **Lazy Table Loading**: Tables loaded to DuckDB only when queried
+- **Session Isolation**: Files scoped to chat sessions or global
