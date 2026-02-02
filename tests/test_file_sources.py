@@ -460,3 +460,80 @@ class TestFileSourceIntegration:
         _, hash2, _ = await handler.save_file(file2, None, True)
 
         assert hash1 == hash2
+
+
+class TestPathValidation:
+    """Tests for file path validation security."""
+
+    def test_validate_file_path_valid(self, handler, settings, sample_csv_content):
+        """Test that valid paths within upload dir are accepted."""
+        path = Path(settings.FILE_UPLOAD_DIR) / "test.csv"
+        path.write_bytes(sample_csv_content)
+
+        try:
+            result = handler._validate_file_path(str(path))
+            assert result == str(path.resolve())
+        finally:
+            path.unlink()
+
+    def test_validate_file_path_traversal_blocked(self, handler):
+        """Test that path traversal attempts are blocked."""
+        with pytest.raises(ValueError, match="must be within upload directory"):
+            handler._validate_file_path("/etc/passwd")
+
+    def test_validate_file_path_relative_traversal_blocked(self, handler, settings):
+        """Test that relative path traversal is blocked."""
+        traversal_path = str(Path(settings.FILE_UPLOAD_DIR) / ".." / ".." / "etc" / "passwd")
+        with pytest.raises(ValueError, match="must be within upload directory"):
+            handler._validate_file_path(traversal_path)
+
+    def test_validate_file_path_empty(self, handler):
+        """Test that empty paths are rejected."""
+        with pytest.raises(ValueError, match="cannot be empty"):
+            handler._validate_file_path("")
+
+    def test_validate_file_path_nonexistent(self, handler, settings):
+        """Test that nonexistent files are rejected."""
+        nonexistent = str(Path(settings.FILE_UPLOAD_DIR) / "nonexistent.csv")
+        with pytest.raises(ValueError, match="does not exist"):
+            handler._validate_file_path(nonexistent)
+
+
+class TestSheetNameSanitization:
+    """Tests for Excel sheet name sanitization."""
+
+    def test_sanitize_sheet_name_valid(self):
+        """Test that valid sheet names pass through."""
+        from src.core.file_source_handler import _sanitize_sheet_name
+
+        assert _sanitize_sheet_name("Sheet1") == "Sheet1"
+        assert _sanitize_sheet_name("Sales Data") == "Sales Data"
+        assert _sanitize_sheet_name("Q4-2024") == "Q4-2024"
+        assert _sanitize_sheet_name("data_backup") == "data_backup"
+
+    def test_sanitize_sheet_name_removes_sql_injection(self):
+        """Test that SQL injection attempts are sanitized."""
+        from src.core.file_source_handler import _sanitize_sheet_name
+
+        # Single quotes removed
+        assert "'" not in _sanitize_sheet_name("Sheet'; DROP TABLE--")
+        # Semicolons removed
+        assert ";" not in _sanitize_sheet_name("Sheet1; DELETE FROM")
+        # Comments removed
+        assert "--" not in _sanitize_sheet_name("Sheet1--")
+
+    def test_sanitize_sheet_name_empty_returns_default(self):
+        """Test that empty sheet names return default."""
+        from src.core.file_source_handler import _sanitize_sheet_name
+
+        assert _sanitize_sheet_name("") == "Sheet1"
+        assert _sanitize_sheet_name(None) == "Sheet1"
+        assert _sanitize_sheet_name("   ") == "Sheet1"
+
+    def test_sanitize_sheet_name_length_limit(self):
+        """Test that long sheet names are truncated."""
+        from src.core.file_source_handler import _sanitize_sheet_name
+
+        long_name = "A" * 200
+        result = _sanitize_sheet_name(long_name)
+        assert len(result) <= 100

@@ -26,6 +26,36 @@ from src.database.models import FileSource
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_sheet_name(sheet_name: Optional[str]) -> str:
+    """
+    Sanitize Excel sheet name to prevent SQL injection.
+
+    Args:
+        sheet_name: The sheet name to sanitize
+
+    Returns:
+        Sanitized sheet name safe for SQL queries
+    """
+    if not sheet_name:
+        return 'Sheet1'
+
+    # Remove any characters that could be used for SQL injection
+    # Allow only alphanumeric, spaces, underscores, hyphens
+    sanitized = re.sub(r"[^a-zA-Z0-9 _\-]", '', sheet_name)
+
+    # Remove SQL comment sequences (double hyphens)
+    sanitized = sanitized.replace('--', '')
+
+    # Limit length
+    sanitized = sanitized[:100]
+
+    # Ensure not empty after sanitization
+    if not sanitized.strip():
+        return 'Sheet1'
+
+    return sanitized
+
+
 class FileSourceHandler:
     """Handle file uploads and convert to queryable data sources."""
 
@@ -117,6 +147,7 @@ class FileSourceHandler:
             file.filename, file_source.id
         )
 
+        file_path = None
         try:
             # Save file to disk
             file_path, file_hash, file_size = await self.save_file(
@@ -152,6 +183,15 @@ class FileSourceHandler:
             file_source.processing_status = 'error'
             file_source.processing_error = str(e)
             await db.commit()
+
+            # Clean up partial file on failure
+            if file_path and file_path.exists():
+                try:
+                    file_path.unlink()
+                    logger.debug(f"Cleaned up partial file: {file_path}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to clean up partial file {file_path}: {cleanup_error}")
+
             raise
 
     async def validate_file(self, file: UploadFile) -> Tuple[bool, str]:
@@ -302,8 +342,18 @@ class FileSourceHandler:
         file_type: str,
         sheet_name: Optional[str],
     ) -> Dict[str, Any]:
-        """Synchronous schema inference using DuckDB."""
+        """Synchronous schema inference using DuckDB.
+
+        Security: Validates file path is within upload directory and sanitizes
+        sheet name to prevent SQL injection.
+        """
         conn = duckdb.connect(':memory:')
+
+        # Validate file path
+        validated_path = self._validate_file_path(file_path)
+
+        # Sanitize sheet name
+        safe_sheet = _sanitize_sheet_name(sheet_name)
 
         try:
             # Install and load Excel extension if needed
@@ -312,10 +362,9 @@ class FileSourceHandler:
 
             # Build query based on file type
             if file_type == 'csv':
-                read_query = f"SELECT * FROM read_csv_auto('{file_path}', header=true)"
+                read_query = f"SELECT * FROM read_csv_auto('{validated_path}', header=true)"
             else:
-                sheet = sheet_name or 'Sheet1'
-                read_query = f"SELECT * FROM read_excel('{file_path}', sheet='{sheet}')"
+                read_query = f"SELECT * FROM read_excel('{validated_path}', sheet='{safe_sheet}')"
 
             # Get column info
             result = conn.execute(f"{read_query} LIMIT 0")
@@ -439,18 +488,27 @@ class FileSourceHandler:
         sheet_name: Optional[str],
         limit: int,
     ) -> Dict[str, Any]:
-        """Synchronously get preview data."""
+        """Synchronously get preview data.
+
+        Security: Validates file path is within upload directory and sanitizes
+        sheet name to prevent SQL injection.
+        """
         conn = duckdb.connect(':memory:')
+
+        # Validate file path
+        validated_path = self._validate_file_path(file_path)
+
+        # Sanitize sheet name
+        safe_sheet = _sanitize_sheet_name(sheet_name)
 
         try:
             if file_type in ('xlsx', 'xls'):
                 conn.execute("INSTALL excel; LOAD excel;")
 
             if file_type == 'csv':
-                read_query = f"SELECT * FROM read_csv_auto('{file_path}', header=true)"
+                read_query = f"SELECT * FROM read_csv_auto('{validated_path}', header=true)"
             else:
-                sheet = sheet_name or 'Sheet1'
-                read_query = f"SELECT * FROM read_excel('{file_path}', sheet='{sheet}')"
+                read_query = f"SELECT * FROM read_excel('{validated_path}', sheet='{safe_sheet}')"
 
             # Get total count
             count_result = conn.execute(f"SELECT COUNT(*) FROM ({read_query})").fetchone()
@@ -595,6 +653,43 @@ class FileSourceHandler:
             filename = 'unnamed_file'
 
         return filename
+
+    def _validate_file_path(self, file_path: str) -> str:
+        """
+        Validate and canonicalize file path to prevent path traversal attacks.
+
+        Args:
+            file_path: The file path to validate
+
+        Returns:
+            Canonicalized absolute path
+
+        Raises:
+            ValueError: If path is invalid or outside allowed directory
+        """
+        if not file_path:
+            raise ValueError("File path cannot be empty")
+
+        # Get the allowed upload directory
+        upload_dir = self.upload_dir.resolve()
+
+        # Canonicalize the path (resolves symlinks and ..)
+        try:
+            canonical_path = Path(file_path).resolve()
+        except (OSError, ValueError) as e:
+            raise ValueError(f"Invalid file path: {e}")
+
+        # Ensure path is within upload directory
+        try:
+            canonical_path.relative_to(upload_dir)
+        except ValueError:
+            raise ValueError(f"File path must be within upload directory: {upload_dir}")
+
+        # Check file exists
+        if not canonical_path.exists():
+            raise ValueError(f"File does not exist: {canonical_path}")
+
+        return str(canonical_path)
 
 
 async def get_file_source_by_id(

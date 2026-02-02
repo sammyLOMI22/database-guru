@@ -7,6 +7,9 @@ Tables are lazily loaded when first accessed to optimize memory usage.
 """
 import asyncio
 import logging
+import os
+import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 import duckdb
@@ -14,6 +17,77 @@ import duckdb
 from src.config.settings import Settings
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_file_path(file_path: str, settings: Optional[Settings] = None) -> str:
+    """
+    Validate and canonicalize file path to prevent path traversal attacks.
+
+    Args:
+        file_path: The file path to validate
+        settings: Optional settings for upload directory
+
+    Returns:
+        Canonicalized absolute path
+
+    Raises:
+        ValueError: If path is invalid or outside allowed directory
+    """
+    if not file_path:
+        raise ValueError("File path cannot be empty")
+
+    # Get the allowed upload directory
+    if settings is None:
+        settings = Settings()
+    upload_dir = Path(settings.FILE_UPLOAD_DIR).resolve()
+
+    # Canonicalize the path (resolves symlinks and ..)
+    try:
+        canonical_path = Path(file_path).resolve()
+    except (OSError, ValueError) as e:
+        raise ValueError(f"Invalid file path: {e}")
+
+    # Ensure path is within upload directory
+    try:
+        canonical_path.relative_to(upload_dir)
+    except ValueError:
+        raise ValueError(f"File path must be within upload directory: {upload_dir}")
+
+    # Check file exists
+    if not canonical_path.exists():
+        raise ValueError(f"File does not exist: {canonical_path}")
+
+    return str(canonical_path)
+
+
+def _sanitize_sheet_name(sheet_name: Optional[str]) -> str:
+    """
+    Sanitize Excel sheet name to prevent SQL injection.
+
+    Args:
+        sheet_name: The sheet name to sanitize
+
+    Returns:
+        Sanitized sheet name safe for SQL queries
+    """
+    if not sheet_name:
+        return 'Sheet1'
+
+    # Remove any characters that could be used for SQL injection
+    # Allow only alphanumeric, spaces, underscores, hyphens
+    sanitized = re.sub(r"[^a-zA-Z0-9 _\-]", '', sheet_name)
+
+    # Remove SQL comment sequences (double hyphens)
+    sanitized = sanitized.replace('--', '')
+
+    # Limit length
+    sanitized = sanitized[:100]
+
+    # Ensure not empty after sanitization
+    if not sanitized.strip():
+        return 'Sheet1'
+
+    return sanitized
 
 
 class FileSourceDuckDBSession:
@@ -90,11 +164,18 @@ class FileSourceDuckDBSession:
         Uses lazy loading - table is created on first access.
         Subsequent calls return immediately if table exists.
 
+        Thread Safety: Lock is held during the entire load operation to prevent
+        race conditions. On failure, state is cleaned up before releasing lock.
+
         Args:
             file_source: FileSource model instance
 
         Returns:
             The DuckDB table name
+
+        Raises:
+            ValueError: If file path validation fails
+            Exception: If table loading fails
         """
         table_name = file_source.duckdb_table_name
 
@@ -105,19 +186,39 @@ class FileSourceDuckDBSession:
 
             # Load table in executor (DuckDB is sync)
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                None,
-                cls._load_table_sync,
-                file_source.file_path,
-                file_source.file_type,
-                file_source.sheet_name,
-                table_name,
-            )
+            try:
+                await loop.run_in_executor(
+                    None,
+                    cls._load_table_sync,
+                    file_source.file_path,
+                    file_source.file_type,
+                    file_source.sheet_name,
+                    table_name,
+                )
 
-            cls._loaded_tables.add(table_name)
-            logger.info(
-                f"Loaded file '{file_source.original_filename}' as table '{table_name}'"
-            )
+                # Only add to loaded tables after successful load
+                cls._loaded_tables.add(table_name)
+                logger.info(
+                    f"Loaded file '{file_source.original_filename}' as table '{table_name}'"
+                )
+
+            except Exception as e:
+                # Clean up any partial state on failure
+                cls._loaded_tables.discard(table_name)
+                cls._table_metadata.pop(table_name, None)
+
+                # Try to drop the table if it was partially created
+                try:
+                    session = cls.get_session()
+                    session.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+                except Exception:
+                    pass  # Ignore cleanup errors
+
+                logger.error(
+                    f"Failed to load table '{table_name}' for file "
+                    f"'{file_source.original_filename}': {e}"
+                )
+                raise
 
         return table_name
 
@@ -129,20 +230,34 @@ class FileSourceDuckDBSession:
         sheet_name: Optional[str],
         table_name: str,
     ) -> None:
-        """Synchronously load file into DuckDB table."""
+        """Synchronously load file into DuckDB table.
+
+        Security: Uses validated/canonicalized paths and sanitized sheet names
+        to prevent SQL injection attacks.
+        """
         session = cls.get_session()
+
+        # Validate file path to prevent path traversal
+        try:
+            validated_path = _validate_file_path(file_path, cls._settings)
+        except ValueError as e:
+            logger.error(f"Invalid file path for table '{table_name}': {e}")
+            raise
+
+        # Sanitize sheet name to prevent SQL injection
+        safe_sheet = _sanitize_sheet_name(sheet_name)
 
         try:
             if file_type == 'csv':
+                # Use parameterized-style approach: path is validated above
                 session.execute(f"""
                     CREATE OR REPLACE TABLE "{table_name}" AS
-                    SELECT * FROM read_csv_auto('{file_path}', header=true, all_varchar=false)
+                    SELECT * FROM read_csv_auto('{validated_path}', header=true, all_varchar=false)
                 """)
             elif file_type in ('xlsx', 'xls'):
-                sheet = sheet_name or 'Sheet1'
                 session.execute(f"""
                     CREATE OR REPLACE TABLE "{table_name}" AS
-                    SELECT * FROM read_excel('{file_path}', sheet='{sheet}')
+                    SELECT * FROM read_excel('{validated_path}', sheet='{safe_sheet}')
                 """)
             else:
                 raise ValueError(f"Unsupported file type: {file_type}")

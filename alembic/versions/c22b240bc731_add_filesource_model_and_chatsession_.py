@@ -64,7 +64,15 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Downgrade schema - Remove Phase 13 CSV & Excel file support."""
+    """Downgrade schema - Remove Phase 13 CSV & Excel file support.
+
+    WARNING: This migration will permanently delete:
+    - All file source records (file_sources table)
+    - Active file associations from chat sessions (active_file_source_ids)
+
+    Physical files in the uploads directory are NOT deleted by this migration.
+    Run cleanup manually if needed: rm -rf uploads/
+    """
     # Remove active_file_source_ids from chat_sessions
     with op.batch_alter_table('chat_sessions', schema=None) as batch_op:
         batch_op.drop_column('active_file_source_ids')
