@@ -33,6 +33,15 @@ interface SystemSettings {
   max_schema_tables: number;
   enable_example_selection: boolean;
   max_few_shot_examples: number;
+  // Phase 12: Lineage Intelligence
+  model_lineage_narrative: string | null;
+  model_impact_analysis: string | null;
+  model_schema_health: string | null;
+  model_lineage_conversation: string | null;
+  timeout_lineage_narrative: number;
+  timeout_impact_analysis: number;
+  timeout_schema_health: number;
+  timeout_lineage_conversation: number;
   created_at: string;
   updated_at: string;
 }
@@ -390,6 +399,15 @@ export function SettingsPanel() {
                 max_schema_tables: settings.max_schema_tables,
                 enable_example_selection: settings.enable_example_selection,
                 max_few_shot_examples: settings.max_few_shot_examples,
+                // Phase 12: Lineage Intelligence
+                model_lineage_narrative: settings.model_lineage_narrative,
+                model_impact_analysis: settings.model_impact_analysis,
+                model_schema_health: settings.model_schema_health,
+                model_lineage_conversation: settings.model_lineage_conversation,
+                timeout_lineage_narrative: settings.timeout_lineage_narrative,
+                timeout_impact_analysis: settings.timeout_impact_analysis,
+                timeout_schema_health: settings.timeout_schema_health,
+                timeout_lineage_conversation: settings.timeout_lineage_conversation,
               }}
               onChange={(modelConfig) => setSettings({ ...settings, ...modelConfig })}
               disabled={saving}

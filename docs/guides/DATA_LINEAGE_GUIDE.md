@@ -348,8 +348,46 @@ User SQL → SQLLineageParser → LineageGraph (nodes, edges)
                               Interactive Visualization
 ```
 
+## Phase 12: Lineage Intelligence
+
+The Data Lineage system has been enhanced with LLM-powered intelligence features:
+
+| Phase | Feature | Description |
+|-------|---------|-------------|
+| 12.1 | **Lineage Narrator** | Natural language explanations of data flow |
+| 12.2 | **Impact Advisor** | Migration plans and SQL patches for schema changes |
+| 12.3 | **Schema Health Analyzer** | Database design quality grading (A-F) |
+| 12.4 | **Pattern Intelligence** | Bottleneck analysis and optimization suggestions |
+| 12.5 | **Conversational Lineage** | Natural language Q&A about your schema |
+
+### Quick Start with Phase 12
+
+**Enable Narrative Generation:**
+```bash
+# Add explain=true to get LLM-generated narrative
+curl -X POST "http://localhost:8000/api/lineage/parse?explain=true" \
+  -H "Content-Type: application/json" \
+  -d '{"sql": "SELECT * FROM customers JOIN orders ON ..."}'
+```
+
+**Get Schema Health:**
+```bash
+curl http://localhost:8000/api/lineage/schema/health/1
+```
+
+**Ask Questions:**
+```bash
+curl -X POST http://localhost:8000/api/lineage/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What tables are used most?", "connection_id": 1}'
+```
+
+See [Lineage Intelligence User Guide](LINEAGE_INTELLIGENCE_USER_GUIDE.md) for complete Phase 12 documentation.
+
 ## Related Documentation
 
+- [Lineage Intelligence User Guide](LINEAGE_INTELLIGENCE_USER_GUIDE.md) - LLM-powered lineage features (Phase 12)
+- [Lineage Intelligence Testing Guide](testing/LINEAGE_INTELLIGENCE_TESTING.md) - How to test Phase 12
 - [Multi-Database Validation Guide](MULTI_DB_VALIDATION_GUIDE.md) - Pre-flight query validation
 - [SQL Generation Pipeline](../technical/SQL_GENERATION_PIPELINE.md) - Query processing flow
 - [Query Planning Agent](../modules/QUERY_PLANNING_AGENT.md) - Query planning system

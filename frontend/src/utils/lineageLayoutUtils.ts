@@ -7,7 +7,7 @@
 
 import dagre from 'dagre';
 import type { Node, Edge } from 'reactflow';
-import type { LineageGraphResponse, LineageNode, LineageEdge, LineageNodeType } from '../types/lineage';
+import type { LineageGraphResponse, LineageNodeType } from '../types/lineage';
 
 // =============================================================================
 // Constants

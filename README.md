@@ -111,6 +111,7 @@ The demo showcases:
 - 🗄️ **Dialect-Aware SQL (NEW!)** - Database-specific SQL generation for PostgreSQL, MySQL, SQLite, DuckDB
 - 🔍 **Multi-Database Query Validation (NEW!)** - Pre-flight validation with schema assessment
 - 🔗 **Data Lineage (NEW!)** - Column-level lineage visualization, impact analysis, query pattern heatmaps
+- 🧠 **Lineage Intelligence (NEW!)** - LLM-powered explanations, schema health analysis, conversational Q&A
 - 🔀 **Table Sorting (NEW!)** - Click any column header to sort results (numbers, dates, strings auto-detected)
 
 All with mock data - no database connection needed!
@@ -1020,6 +1021,134 @@ curl http://localhost:8000/api/lineage/stats
 
 ---
 
+## 🧠 Lineage Intelligence (NEW!)
+
+Database Guru now includes **LLM-powered lineage intelligence** that transforms technical data lineage into actionable insights. Phase 12 adds five powerful features:
+
+### Key Features:
+
+**1. Lineage Narrator (Phase 12.1)**
+Get natural language explanations of your data lineage:
+
+```
+SQL: SELECT c.name, SUM(o.total) as revenue FROM customers c JOIN orders o...
+
+📖 Narrative:
+"This query calculates total revenue per customer by joining the customers
+and orders tables. The SUM aggregation provides customer lifetime value,
+which is useful for identifying high-value customers and sales trends."
+```
+
+**2. Impact Advisor (Phase 12.2)**
+Get LLM-enhanced recommendations before schema changes:
+
+```
+Change: Rename column 'state' to 'region' in customers table
+
+🎯 Impact Advice:
+├── Risk Level: MEDIUM (15 queries affected)
+├── Migration Plan: 5-step guide with SQL
+├── SQL Patches: Auto-generated fixes for all affected queries
+└── Rollback Strategy: Reversible steps included
+```
+
+**3. Schema Health Analyzer (Phase 12.3)**
+Comprehensive database design quality analysis:
+
+| Grade | Score | Meaning |
+|-------|-------|---------|
+| **A** | 90-100 | Excellent - Well-designed schema |
+| **B** | 80-89 | Good - Minor improvements possible |
+| **C** | 70-79 | Fair - Several issues detected |
+| **D** | 60-69 | Poor - Significant problems |
+| **F** | <60 | Critical - Requires immediate attention |
+
+**Features:**
+- Index suggestions with CREATE SQL
+- Normalization issue detection (1NF, 2NF, 3NF)
+- Anti-pattern detection (missing PKs, wide tables, etc.)
+- Per-table health summaries
+
+**4. Pattern Intelligence (Phase 12.4)**
+LLM-enhanced query pattern analysis:
+
+- **Bottleneck Root Cause Analysis**: Why is this table slow?
+- **Anti-Pattern Detection**: SELECT *, N+1 queries, Cartesian joins
+- **Optimization Suggestions**: Prioritized recommendations with SQL
+- **Usage Trends**: Table usage over time (increasing/decreasing/stable)
+
+**5. Conversational Lineage (Phase 12.5)**
+Ask questions about your schema in natural language:
+
+```
+User: "What tables are used most frequently?"
+🤖: Based on query patterns from the last 30 days:
+    1. orders (45% of queries) - High traffic table
+    2. customers (30%) - Frequently joined with orders
+    3. products (25%) - Used in catalog queries
+
+    Suggestion: Consider adding indexes on orders.created_at
+
+User: "What breaks if I rename customers.state?"
+🤖: 15 queries would be affected...
+```
+
+**Question Types Supported:**
+- **Lineage**: "What feeds into this column?"
+- **Impact**: "What breaks if I change X?"
+- **Pattern**: "What are the bottlenecks?"
+- **Schema**: "What columns does this table have?"
+- **Recommendation**: "How can I optimize this?"
+
+### UI Access:
+
+Navigate to the **Lineage** tab to access:
+- **Narrative** panel - View LLM-generated explanations
+- **Health** panel - Schema health dashboard with grades
+- **Patterns** panel - Enhanced query pattern analysis
+- **Chat** panel - Natural language Q&A interface
+
+### API Endpoints:
+
+```bash
+# Get lineage with narrative explanation
+curl -X POST "http://localhost:8000/api/lineage/parse?explain=true" \
+  -H "Content-Type: application/json" \
+  -d '{"sql": "SELECT * FROM customers JOIN orders ON ..."}'
+
+# Get impact advice with migration plan
+curl -X POST http://localhost:8000/api/lineage/impact/advise \
+  -H "Content-Type: application/json" \
+  -d '{
+    "change_type": "rename_column",
+    "table_name": "customers",
+    "column_name": "state",
+    "new_value": "region",
+    "include_patches": true
+  }'
+
+# Get schema health report
+curl http://localhost:8000/api/lineage/schema/health/1?include_patterns=true
+
+# Get pattern intelligence analysis
+curl http://localhost:8000/api/lineage/patterns/1/analyze?time_range=30
+
+# Ask natural language question
+curl -X POST http://localhost:8000/api/lineage/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What are the most used tables?",
+    "connection_id": 1
+  }'
+```
+
+**Documentation:**
+- [Lineage Intelligence User Guide](docs/guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md) - Complete feature guide
+- [Lineage Intelligence Testing Guide](docs/guides/testing/LINEAGE_INTELLIGENCE_TESTING.md) - How to test
+- [Data Lineage Guide](docs/guides/DATA_LINEAGE_GUIDE.md) - Core lineage documentation
+
+---
+
 ## 🎯 Confidence Scoring (NEW!)
 
 Database Guru now predicts the success probability of SQL corrections BEFORE executing them! Get instant feedback on whether a fix is likely to work.
@@ -1832,11 +1961,17 @@ open htmlcov/index.html
   - SQL parsing with sqlparse
   - Fuzzy matching and alternatives
   - Location detection and validation
-- ✅ **Data Lineage System**: 135+ tests (100% coverage) - NEW!
+- ✅ **Data Lineage System**: 135+ tests (100% coverage)
   - SQL Lineage Parser: 100+ tests (JOINs, subqueries, aggregations)
   - Impact Analyzer: 20+ tests (risk levels, impact types)
   - Query Pattern Analyzer: 20+ tests (frequency, bottlenecks)
   - Frontend: 15+ tests (LineageGraph, heatmap visualization)
+- ✅ **Lineage Intelligence (Phase 12)**: 2960+ tests (100% coverage) - NEW!
+  - Lineage Narrator: 474 tests (narrative generation, LLM integration)
+  - Impact Advisor: 455 tests (migration plans, SQL patches)
+  - Schema Health Analyzer: 817 tests (grades, index suggestions, anti-patterns)
+  - Pattern Intelligence: 584 tests (bottleneck analysis, anti-pattern detection)
+  - Conversational Lineage: 630 tests (question classification, multi-turn dialog)
 - ✅ **Table Sorting**: 24/24 tests (100% coverage) - NEW!
   - useTableSort hook: 14 tests (sorting logic, type detection, nulls)
   - SortableTableHeader: 10 tests (click, keyboard, visual indicators)

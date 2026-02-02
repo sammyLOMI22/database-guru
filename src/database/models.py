@@ -280,6 +280,20 @@ class SystemSettings(Base):
     timeout_query_planning = Column(Integer, default=20, nullable=False)
     timeout_error_correction = Column(Integer, default=15, nullable=False)
 
+    # Phase 12: Lineage Intelligence Model Overrides
+    model_lineage_narrative = Column(String(100), nullable=True)  # Model for lineage explanations
+    model_impact_analysis = Column(String(100), nullable=True)  # Model for impact/migration advice
+    model_schema_health = Column(String(100), nullable=True)  # Model for schema analysis
+    model_lineage_conversation = Column(String(100), nullable=True)  # Model for lineage Q&A
+    model_pattern_intelligence = Column(String(100), nullable=True)  # Model for pattern analysis
+
+    # Phase 12: Lineage Intelligence Timeouts (seconds)
+    timeout_lineage_narrative = Column(Integer, default=15, nullable=False)
+    timeout_impact_analysis = Column(Integer, default=20, nullable=False)
+    timeout_schema_health = Column(Integer, default=30, nullable=False)
+    timeout_lineage_conversation = Column(Integer, default=15, nullable=False)
+    timeout_pattern_intelligence = Column(Integer, default=20, nullable=False)
+
     # Small Model Optimization Feature Flags
     enable_query_templates = Column(Boolean, default=True, nullable=False)  # Bypass LLM for simple patterns
     enable_location_preprocessing = Column(Boolean, default=True, nullable=False)  # Normalize locations before LLM

@@ -43,7 +43,7 @@ ollama serve     # Ensure Ollama is running
 
 ## Architecture Overview
 
-The system uses a multi-agent architecture with 18+ specialized agents. See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
+The system uses a multi-agent architecture with 23+ specialized agents. See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
 
 ### Key Agents (Quick Reference)
 | Agent | File | Purpose |
@@ -56,6 +56,11 @@ The system uses a multi-agent architecture with 18+ specialized agents. See [.cl
 | Result Narrator | `src/llm/result_narrator.py` | Human-readable insights |
 | Model Router | `src/llm/model_router.py` | Per-task model selection |
 | SQL Lineage Parser | `src/lineage/sql_lineage_parser.py` | Column-level lineage |
+| Lineage Narrator | `src/lineage/lineage_narrator.py` | LLM-powered lineage explanations (Phase 12.1) |
+| Impact Advisor | `src/lineage/impact_advisor.py` | Migration plans & SQL patches (Phase 12.2) |
+| Schema Health Analyzer | `src/lineage/schema_health_analyzer.py` | Database design quality (Phase 12.3) |
+| Pattern Intelligence | `src/lineage/pattern_intelligence.py` | Query pattern insights (Phase 12.4) |
+| Lineage Conversation | `src/lineage/lineage_conversation_agent.py` | Natural language Q&A (Phase 12.5) |
 
 ### Data Flow
 ```
@@ -117,7 +122,8 @@ Key docs in `docs/`:
 
 | Category | Key Files |
 |----------|-----------|
-| **Guides** | `guides/MULTI_DATABASE_GUIDE.md`, `guides/CONNECTION_POOLING_GUIDE.md`, `guides/DATA_LINEAGE_GUIDE.md` |
+| **Guides** | `guides/MULTI_DATABASE_GUIDE.md`, `guides/CONNECTION_POOLING_GUIDE.md`, `guides/DATA_LINEAGE_GUIDE.md`, `guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md` |
 | **Technical** | `technical/PARALLEL_EXECUTION.md`, `technical/SEMANTIC_CACHING.md`, `technical/SQL_GENERATION_PIPELINE.md` |
 | **Modules** | `modules/QUERY_PLANNING_AGENT.md`, `modules/TOOL_USING_AGENT.md` |
+| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
 | **Planning** | `planning/FUTURE_PLANS.md`, `planning/MASTER_ROADMAP.md` |

@@ -8,7 +8,7 @@
  * - Error Correction: Use code-focused models
  */
 import { useState, useEffect } from 'react';
-import { Cpu, Clock, Zap, MessageSquare, GitBranch, AlertTriangle, Info, RefreshCw } from 'lucide-react';
+import { Cpu, Clock, Zap, MessageSquare, GitBranch, AlertTriangle, Info, RefreshCw, FileText, Activity, MessageCircle } from 'lucide-react';
 
 interface ModelConfig {
   model_sql_generation: string | null;
@@ -28,6 +28,15 @@ interface ModelConfig {
   max_schema_tables: number;
   enable_example_selection: boolean;
   max_few_shot_examples: number;
+  // Phase 12: Lineage Intelligence
+  model_lineage_narrative: string | null;
+  model_impact_analysis: string | null;
+  model_schema_health: string | null;
+  model_lineage_conversation: string | null;
+  timeout_lineage_narrative: number;
+  timeout_impact_analysis: number;
+  timeout_schema_health: number;
+  timeout_lineage_conversation: number;
 }
 
 interface AvailableModel {
@@ -87,6 +96,51 @@ const TASK_CONFIGS = [
     modelKey: 'model_error_correction' as const,
     timeoutKey: 'timeout_error_correction' as const,
     color: 'orange',
+  },
+  // Phase 12: Lineage Intelligence
+  {
+    key: 'lineage_narrative',
+    label: 'Lineage Narrative',
+    icon: FileText,
+    description: 'Model for explaining data lineage in business terms',
+    hint: 'Recommended: General-purpose models with good reasoning',
+    defaultTimeout: 15,
+    modelKey: 'model_lineage_narrative' as const,
+    timeoutKey: 'timeout_lineage_narrative' as const,
+    color: 'indigo',
+  },
+  {
+    key: 'impact_analysis',
+    label: 'Impact Advisor',
+    icon: AlertTriangle,
+    description: 'Model for generating migration plans and risk explanations',
+    hint: 'Recommended: Models with SQL and reasoning ability',
+    defaultTimeout: 20,
+    modelKey: 'model_impact_analysis' as const,
+    timeoutKey: 'timeout_impact_analysis' as const,
+    color: 'red',
+  },
+  {
+    key: 'schema_health',
+    label: 'Schema Health',
+    icon: Activity,
+    description: 'Model for analyzing database design and suggesting improvements',
+    hint: 'Recommended: Models familiar with database best practices',
+    defaultTimeout: 30,
+    modelKey: 'model_schema_health' as const,
+    timeoutKey: 'timeout_schema_health' as const,
+    color: 'teal',
+  },
+  {
+    key: 'lineage_conversation',
+    label: 'Lineage Chat',
+    icon: MessageCircle,
+    description: 'Model for answering natural language questions about schema',
+    hint: 'Recommended: Conversational models with good context handling',
+    defaultTimeout: 15,
+    modelKey: 'model_lineage_conversation' as const,
+    timeoutKey: 'timeout_lineage_conversation' as const,
+    color: 'cyan',
   },
 ];
 
@@ -167,6 +221,35 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
         text: 'text-orange-600 dark:text-orange-400',
         iconBg: 'bg-orange-500/20',
         icon: 'text-orange-500',
+      },
+      // Phase 12: Lineage Intelligence colors
+      indigo: {
+        gradient: 'bg-gradient-to-br from-indigo-500/10 via-transparent to-violet-500/5',
+        border: 'border-indigo-500/20',
+        text: 'text-indigo-600 dark:text-indigo-400',
+        iconBg: 'bg-indigo-500/20',
+        icon: 'text-indigo-500',
+      },
+      red: {
+        gradient: 'bg-gradient-to-br from-red-500/10 via-transparent to-rose-500/5',
+        border: 'border-red-500/20',
+        text: 'text-red-600 dark:text-red-400',
+        iconBg: 'bg-red-500/20',
+        icon: 'text-red-500',
+      },
+      teal: {
+        gradient: 'bg-gradient-to-br from-teal-500/10 via-transparent to-emerald-500/5',
+        border: 'border-teal-500/20',
+        text: 'text-teal-600 dark:text-teal-400',
+        iconBg: 'bg-teal-500/20',
+        icon: 'text-teal-500',
+      },
+      cyan: {
+        gradient: 'bg-gradient-to-br from-cyan-500/10 via-transparent to-sky-500/5',
+        border: 'border-cyan-500/20',
+        text: 'text-cyan-600 dark:text-cyan-400',
+        iconBg: 'bg-cyan-500/20',
+        icon: 'text-cyan-500',
       },
     };
     return colors[color] || colors.blue;

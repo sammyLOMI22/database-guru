@@ -102,14 +102,31 @@ class SchemaCache:
             16-character hex fingerprint string
         """
         try:
-            # Use lightweight schema inspection
-            inspector = SchemaInspector()
-            # Get just table names and columns (no samples, no FK analysis)
-            schema_data = await inspector.get_full_schema(
-                session=user_db_session,
-                include_samples=False  # Skip expensive sampling
-            )
-            return SchemaCache.create_fingerprint_from_schema_dict(schema_data)
+            from sqlalchemy import inspect, text
+            import asyncio
+
+            # Determine if async or sync session
+            is_async = hasattr(user_db_session, 'run_sync')
+
+            def get_tables_and_columns(sync_conn):
+                """Lightweight query for just table/column names."""
+                insp = inspect(sync_conn)
+                fingerprint_parts = []
+                for table_name in sorted(insp.get_table_names()):
+                    columns = insp.get_columns(table_name)
+                    col_names = sorted([col["name"] for col in columns])
+                    fingerprint_parts.append(f"{table_name}:{','.join(col_names)}")
+                return "|".join(fingerprint_parts)
+
+            if is_async:
+                fingerprint_data = await user_db_session.run_sync(
+                    lambda conn: get_tables_and_columns(conn.connection())
+                )
+            else:
+                # Sync session (e.g., DuckDB)
+                fingerprint_data = get_tables_and_columns(user_db_session.connection())
+
+            return hashlib.sha256(fingerprint_data.encode()).hexdigest()[:16]
         except Exception as e:
             logger.warning(f"Quick fingerprint failed: {e}")
             return ""  # Empty fingerprint will force cache miss

@@ -1,12 +1,110 @@
-"""Rate limiting middleware using Redis"""
+"""Rate limiting middleware and dependencies"""
 import logging
 import time
-from typing import Callable
-from fastapi import Request, Response, status
+from typing import Callable, Dict
+from fastapi import Request, Response, status, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Endpoint-Specific Rate Limiter (for expensive LLM operations)
+# ============================================================================
+
+class EndpointRateLimiter:
+    """
+    Stricter rate limiter for computationally expensive endpoints.
+
+    Use as a FastAPI dependency to add per-endpoint rate limits that are
+    stricter than the global middleware limit.
+
+    Example:
+        llm_limiter = EndpointRateLimiter(calls=10, period=60)
+
+        @router.post("/ask")
+        async def ask(request: Request, _: None = Depends(llm_limiter)):
+            ...
+    """
+
+    def __init__(self, calls: int = 10, period: int = 60):
+        """
+        Initialize endpoint rate limiter.
+
+        Args:
+            calls: Maximum calls allowed per period
+            period: Time window in seconds
+        """
+        self.calls = calls
+        self.period = period
+        self._clients: Dict[str, Dict] = {}
+
+    def _cleanup_old_entries(self, now: float) -> None:
+        """Remove expired client entries to prevent memory growth."""
+        expired = [
+            client_id for client_id, data in self._clients.items()
+            if not data["calls"] or max(data["calls"]) < now - self.period * 2
+        ]
+        for client_id in expired:
+            del self._clients[client_id]
+
+    async def __call__(self, request: Request) -> None:
+        """Check rate limit for the request."""
+        client_ip = request.client.host if request.client else "unknown"
+        now = time.time()
+
+        # Periodic cleanup (every 100 requests approximately)
+        if len(self._clients) > 100:
+            self._cleanup_old_entries(now)
+
+        # Initialize client record
+        if client_ip not in self._clients:
+            self._clients[client_ip] = {"calls": [], "blocked_until": 0}
+
+        client_data = self._clients[client_ip]
+
+        # Check if blocked
+        if client_data["blocked_until"] > now:
+            retry_after = int(client_data["blocked_until"] - now)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded for this endpoint. "
+                       f"Maximum {self.calls} requests per {self.period} seconds. "
+                       f"Retry after {retry_after} seconds.",
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        # Clean old calls
+        client_data["calls"] = [
+            t for t in client_data["calls"] if t > now - self.period
+        ]
+
+        # Check limit
+        if len(client_data["calls"]) >= self.calls:
+            oldest = min(client_data["calls"])
+            client_data["blocked_until"] = oldest + self.period
+            retry_after = int(client_data["blocked_until"] - now)
+
+            logger.warning(
+                f"Endpoint rate limit exceeded for {client_ip}: "
+                f"{self.calls}/{self.period}s"
+            )
+
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded for this endpoint. "
+                       f"Maximum {self.calls} requests per {self.period} seconds. "
+                       f"Retry after {retry_after} seconds.",
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        # Record this call
+        client_data["calls"].append(now)
+
+
+# Pre-configured limiters for different endpoint types
+llm_rate_limiter = EndpointRateLimiter(calls=20, period=60)  # 20 LLM calls/min
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
