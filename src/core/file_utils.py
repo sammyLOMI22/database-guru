@@ -40,11 +40,11 @@ def validate_file_path(file_path: str, upload_dir: Path) -> str:
     try:
         canonical_path.relative_to(resolved_upload_dir)
     except ValueError:
-        raise ValueError(f"File path must be within upload directory: {resolved_upload_dir}")
+        raise ValueError("File path is outside the allowed upload directory")
 
     # Check file exists
     if not canonical_path.exists():
-        raise ValueError(f"File does not exist: {canonical_path}")
+        raise ValueError("File does not exist or has been removed")
 
     return str(canonical_path)
 

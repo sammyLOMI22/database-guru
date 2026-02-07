@@ -8,6 +8,7 @@ Tables are lazily loaded when first accessed to optimize memory usage.
 import asyncio
 import logging
 import os
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
@@ -39,14 +40,21 @@ class FileSourceDuckDBSession:
     _instance: Optional[duckdb.DuckDBPyConnection] = None
     _loaded_tables: Set[str] = set()
     _lock: Optional[asyncio.Lock] = None
+    _lock_guard: threading.Lock = threading.Lock()
     _table_metadata: Dict[str, Dict[str, Any]] = {}
     _settings: Optional[Settings] = None
 
     @classmethod
     def _get_lock(cls) -> asyncio.Lock:
-        """Get or create the async lock (lazy to avoid event loop issues)."""
+        """Get or create the async lock (lazy to avoid event loop issues).
+
+        Uses a threading lock to prevent two coroutines from both creating
+        a new asyncio.Lock after reset_session() sets _lock to None.
+        """
         if cls._lock is None:
-            cls._lock = asyncio.Lock()
+            with cls._lock_guard:
+                if cls._lock is None:
+                    cls._lock = asyncio.Lock()
         return cls._lock
 
     @classmethod

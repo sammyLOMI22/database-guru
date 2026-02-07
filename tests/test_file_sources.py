@@ -445,30 +445,30 @@ class TestFileSourceIntegration:
         handler.upload_dir = Path(temp_upload_dir)
         handler._ensure_upload_dir()
 
-        # Create two files with same content
-        file1 = MagicMock(spec=UploadFile)
-        file1.filename = "file1.csv"
+        # Create two files with same content (mock chunked reads)
+        def make_mock_file(filename, content):
+            f = MagicMock(spec=UploadFile)
+            f.filename = filename
+            pos = [0]
 
-        async def read1():
-            return sample_csv_content
+            async def read(size=-1):
+                if size == -1:
+                    chunk = content[pos[0]:]
+                    pos[0] = len(content)
+                    return chunk
+                chunk = content[pos[0]:pos[0] + size]
+                pos[0] += len(chunk)
+                return chunk
 
-        async def seek1(pos):
-            pass
+            async def seek(p):
+                pos[0] = p
 
-        file1.read = read1
-        file1.seek = seek1
+            f.read = read
+            f.seek = seek
+            return f
 
-        file2 = MagicMock(spec=UploadFile)
-        file2.filename = "file2.csv"
-
-        async def read2():
-            return sample_csv_content
-
-        async def seek2(pos):
-            pass
-
-        file2.read = read2
-        file2.seek = seek2
+        file1 = make_mock_file("file1.csv", sample_csv_content)
+        file2 = make_mock_file("file2.csv", sample_csv_content)
 
         _, hash1, _ = await handler.save_file(file1, None, True)
         _, hash2, _ = await handler.save_file(file2, None, True)
@@ -492,13 +492,13 @@ class TestPathValidation:
 
     def test_validate_file_path_traversal_blocked(self, handler):
         """Test that path traversal attempts are blocked."""
-        with pytest.raises(ValueError, match="must be within upload directory"):
+        with pytest.raises(ValueError, match="outside the allowed upload directory"):
             validate_file_path("/etc/passwd", handler.upload_dir)
 
     def test_validate_file_path_relative_traversal_blocked(self, handler, settings):
         """Test that relative path traversal is blocked."""
         traversal_path = str(Path(settings.FILE_UPLOAD_DIR) / ".." / ".." / "etc" / "passwd")
-        with pytest.raises(ValueError, match="must be within upload directory"):
+        with pytest.raises(ValueError, match="outside the allowed upload directory"):
             validate_file_path(traversal_path, handler.upload_dir)
 
     def test_validate_file_path_empty(self, handler):

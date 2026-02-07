@@ -346,17 +346,8 @@ class FileSourceHandler:
         Returns:
             Tuple of (file_path, file_hash, file_size)
         """
-        # Read file content
-        await file.seek(0)
-        content = await file.read()
-        file_size = len(content)
-
-        # Calculate hash for deduplication
-        file_hash = hashlib.sha256(content).hexdigest()
-
         # Sanitize filename
         safe_filename = self._sanitize_filename(file.filename)
-        ext = Path(file.filename).suffix.lower()
 
         # Determine storage path
         if is_global:
@@ -367,13 +358,35 @@ class FileSourceHandler:
         else:
             storage_dir = self.upload_dir / 'global'
 
+        # Stream file to disk while computing hash to avoid loading
+        # the entire file (up to 100MB) into memory at once.
+        await file.seek(0)
+        hasher = hashlib.sha256()
+        file_size = 0
+
+        # Write to a temp file first, then rename once hash is known
+        fd, tmp_path = tempfile.mkstemp(dir=str(storage_dir))
+        try:
+            async with aiofiles.open(fd, 'wb', closefd=True) as f:
+                while True:
+                    chunk = await file.read(1024 * 1024)  # 1MB chunks
+                    if not chunk:
+                        break
+                    hasher.update(chunk)
+                    await f.write(chunk)
+                    file_size += len(chunk)
+        except Exception:
+            os.unlink(tmp_path)
+            raise
+
+        file_hash = hasher.hexdigest()
+
         # Use hash in filename to handle duplicates
         stored_filename = f"{file_hash[:12]}_{safe_filename}"
         file_path = storage_dir / stored_filename
 
-        # Write file asynchronously
-        async with aiofiles.open(file_path, 'wb') as f:
-            await f.write(content)
+        # Rename temp file to final path
+        os.replace(tmp_path, str(file_path))
 
         logger.debug(f"Saved file to {file_path} ({file_size} bytes)")
 
@@ -818,7 +831,7 @@ async def list_file_sources(
         else:
             filters.append(FileSource.chat_session_id == session_id)
     elif include_global:
-        filters.append(FileSource.is_global == True)
+        filters.append(FileSource.is_global.is_(True))
 
     if user_id:
         filters.append(FileSource.user_id == user_id)

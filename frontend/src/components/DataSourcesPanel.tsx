@@ -5,7 +5,7 @@ import DatabaseConnectionModal from './DatabaseConnectionModal';
 import FileUploadModal from './FileUploadModal';
 import FilePreviewPanel from './FilePreviewPanel';
 import type { FileSource } from '../types/api';
-import { filesAPI } from '../services/api';
+import { connectionsAPI, filesAPI } from '../services/api';
 
 interface DatabaseConnection {
   id: number;
@@ -54,11 +54,8 @@ export default function DataSourcesPanel({
 
   const loadConnections = async () => {
     try {
-      const response = await fetch('/api/connections/');
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
-      }
+      const data = await connectionsAPI.listConnections();
+      setConnections(data.connections || []);
     } catch (error) {
       console.error('Failed to load connections:', error);
     }
@@ -80,7 +77,7 @@ export default function DataSourcesPanel({
     }
     try {
       const response = await filesAPI.getSessionFiles(sessionId);
-      setSessionFileIds((response as any).active_file_source_ids || []);
+      setSessionFileIds(response.active_file_source_ids || []);
     } catch (error) {
       console.error('Failed to load session files:', error);
     }
@@ -99,26 +96,16 @@ export default function DataSourcesPanel({
   const handleSaveConnection = async (connectionData: any) => {
     setLoading(true);
     try {
-      const url = editingConnection
-        ? `/api/connections/${editingConnection.id}`
-        : '/api/connections/';
-      const method = editingConnection ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(connectionData),
-      });
-
-      if (response.ok) {
-        await loadConnections();
-        setIsDbModalOpen(false);
+      if (editingConnection) {
+        await connectionsAPI.updateConnection(editingConnection.id, connectionData);
       } else {
-        const error = await response.json();
-        alert(`Failed to save connection: ${error.detail}`);
+        await connectionsAPI.createConnection(connectionData);
       }
+      await loadConnections();
+      setIsDbModalOpen(false);
     } catch (error: any) {
-      alert(`Error: ${error.message}`);
+      const detail = error.response?.data?.detail || error.message;
+      alert(`Failed to save connection: ${detail}`);
     } finally {
       setLoading(false);
     }
@@ -128,10 +115,8 @@ export default function DataSourcesPanel({
     if (!confirm('Are you sure you want to delete this connection?')) return;
 
     try {
-      const response = await fetch(`/api/connections/${id}`, { method: 'DELETE' });
-      if (response.ok) {
-        await loadConnections();
-      }
+      await connectionsAPI.deleteConnection(id);
+      await loadConnections();
     } catch (error) {
       console.error('Failed to delete connection:', error);
     }
@@ -139,11 +124,9 @@ export default function DataSourcesPanel({
 
   const handleSelectConnection = async (id: number) => {
     try {
-      const response = await fetch(`/api/connections/${id}/activate`, { method: 'POST' });
-      if (response.ok) {
-        await loadConnections();
-        onConnectionSelect?.(id);
-      }
+      await connectionsAPI.activateConnection(id);
+      await loadConnections();
+      onConnectionSelect?.(id);
     } catch (error) {
       console.error('Failed to activate connection:', error);
     }

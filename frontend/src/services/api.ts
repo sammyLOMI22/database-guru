@@ -286,6 +286,23 @@ export const connectionsAPI = {
     return data;
   },
 
+  // Create a new connection
+  async createConnection(connectionData: Record<string, unknown>): Promise<DatabaseConnection> {
+    const { data } = await api.post<DatabaseConnection>('/api/connections/', connectionData);
+    return data;
+  },
+
+  // Update an existing connection
+  async updateConnection(id: number, connectionData: Record<string, unknown>): Promise<DatabaseConnection> {
+    const { data } = await api.put<DatabaseConnection>(`/api/connections/${id}`, connectionData);
+    return data;
+  },
+
+  // Delete a connection
+  async deleteConnection(id: number): Promise<void> {
+    await api.delete(`/api/connections/${id}`);
+  },
+
   // Activate a connection
   async activateConnection(id: number): Promise<DatabaseConnection> {
     const { data } = await api.post<DatabaseConnection>(`/api/connections/${id}/activate`);
@@ -555,7 +572,7 @@ export const filesAPI = {
   },
 
   // Get files in chat session
-  async getSessionFiles(sessionId: string): Promise<{ files: FileSource[]; count: number }> {
+  async getSessionFiles(sessionId: string): Promise<{ success: boolean; session_id: string; active_file_source_ids: number[]; file_sources: Array<{ id: number; name: string; file_type: string; original_filename: string; row_count?: number }> }> {
     const { data } = await api.get(`/api/chat/sessions/${sessionId}/files`);
     return data;
   },
