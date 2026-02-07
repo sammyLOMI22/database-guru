@@ -460,6 +460,7 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
             promptTuning: perTaskModels.enable_prompt_optimization,
           } : null}
           connectionIds={currentSession?.connections.map(c => c.id)}
+          fileSourceCount={currentSession?.file_sources?.length || 0}
         />
       </div>
     </div>

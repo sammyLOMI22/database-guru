@@ -121,7 +121,7 @@ async def upload_file(
         logger.error(f"File upload failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"File upload failed: {str(e)}",
+            detail="File upload failed. Please try again or contact support.",
         )
 
 
@@ -290,7 +290,7 @@ async def get_file_preview(
         logger.error(f"Failed to get preview for file {file_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get preview: {str(e)}",
+            detail="Failed to get file preview. Please try again.",
         )
 
 
@@ -328,7 +328,7 @@ async def refresh_file_schema(
         logger.error(f"Failed to refresh schema for file {file_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to refresh schema: {str(e)}",
+            detail="Failed to refresh schema. Please try again.",
         )
 
 
@@ -372,5 +372,5 @@ async def get_excel_sheets(
         logger.error(f"Failed to get sheets from Excel file: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to read Excel file: {str(e)}",
+            detail="Failed to read Excel file. Please verify the file is valid.",
         )

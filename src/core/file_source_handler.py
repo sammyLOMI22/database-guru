@@ -736,6 +736,52 @@ async def get_file_source_by_id(
     return result.scalar_one_or_none()
 
 
+async def cleanup_expired_files(db: AsyncSession) -> int:
+    """
+    Delete file sources that have passed their expiration date.
+
+    Removes both the physical files on disk and database records.
+
+    Args:
+        db: Database session
+
+    Returns:
+        Number of expired files cleaned up
+    """
+    from sqlalchemy import and_
+
+    now = datetime.now(timezone.utc)
+    stmt = select(FileSource).where(
+        and_(
+            FileSource.expires_at.isnot(None),
+            FileSource.expires_at < now,
+            FileSource.is_active.is_(True),
+        )
+    )
+
+    result = await db.execute(stmt)
+    expired_files = list(result.scalars().all())
+
+    if not expired_files:
+        return 0
+
+    cleaned = 0
+    handler = FileSourceHandler()
+
+    for file_source in expired_files:
+        try:
+            await handler.cleanup_file(file_source, db)
+            cleaned += 1
+            logger.info(f"Cleaned up expired file source {file_source.id}: {file_source.name}")
+        except Exception as e:
+            logger.error(f"Failed to clean up expired file {file_source.id}: {e}")
+
+    if cleaned:
+        logger.info(f"Expired file cleanup: removed {cleaned}/{len(expired_files)} files")
+
+    return cleaned
+
+
 async def list_file_sources(
     db: AsyncSession,
     session_id: Optional[str] = None,

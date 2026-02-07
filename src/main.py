@@ -1,4 +1,6 @@
 """Database Guru - Main Application"""
+import asyncio
+import contextlib
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -11,6 +13,7 @@ from src.core.connection_pool_manager import get_pool_manager_async
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files
 from src.core.file_source_session import FileSourceDuckDBSession
+from src.core.file_source_handler import cleanup_expired_files
 
 # Configure logging
 logging.basicConfig(
@@ -18,6 +21,25 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+FILE_CLEANUP_INTERVAL_SECONDS = 3600  # Run every hour
+
+
+async def _file_expiration_task(db_manager):
+    """Background task that periodically cleans up expired file sources."""
+    while True:
+        try:
+            await asyncio.sleep(FILE_CLEANUP_INTERVAL_SECONDS)
+            async with db_manager.get_async_session() as db:
+                cleaned = await cleanup_expired_files(db)
+                if cleaned:
+                    logger.info(f"File expiration task: cleaned {cleaned} expired files")
+        except asyncio.CancelledError:
+            logger.info("File expiration task cancelled")
+            break
+        except Exception as e:
+            logger.error(f"File expiration task error: {e}")
 
 
 @asynccontextmanager
@@ -70,12 +92,21 @@ async def lifespan(app: FastAPI):
         logger.warning("⚠️  Connection pooling is DISABLED")
         pool_manager = None
 
+    # Start background file expiration cleanup task
+    file_cleanup_task = asyncio.create_task(_file_expiration_task(db_manager))
+    logger.info("🗑️  File expiration cleanup task started (runs every hour)")
+
     logger.info("🧙‍♂️ Database Guru is ready!")
 
     yield
 
     # Shutdown
     logger.info("🛑 Shutting down Database Guru...")
+
+    # Cancel background tasks
+    file_cleanup_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await file_cleanup_task
 
     # Close DuckDB file source session
     await FileSourceDuckDBSession.reset_session()
