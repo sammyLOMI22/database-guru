@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Set
 import duckdb
 
 from src.config.settings import Settings
+from src.core.file_source_handler import excel_to_temp_csv
 
 logger = logging.getLogger(__name__)
 
@@ -139,13 +140,6 @@ class FileSourceDuckDBSession:
             threads = settings.DUCKDB_FILE_THREADS
             cls._instance.execute(f"SET threads={threads}")
 
-            # Load Excel extension
-            try:
-                cls._instance.execute("INSTALL excel; LOAD excel;")
-                logger.debug("Loaded DuckDB Excel extension")
-            except Exception as e:
-                logger.warning(f"Failed to load Excel extension: {e}")
-
             logger.info(
                 f"FileSourceDuckDBSession initialized with in-memory database "
                 f"(memory_limit={memory_limit}, threads={threads})"
@@ -244,9 +238,7 @@ class FileSourceDuckDBSession:
             logger.error(f"Invalid file path for table '{table_name}': {e}")
             raise
 
-        # Sanitize sheet name to prevent SQL injection
-        safe_sheet = _sanitize_sheet_name(sheet_name)
-
+        temp_csv_path = None
         try:
             if file_type == 'csv':
                 # Use parameterized-style approach: path is validated above
@@ -255,9 +247,12 @@ class FileSourceDuckDBSession:
                     SELECT * FROM read_csv_auto('{validated_path}', header=true, all_varchar=false)
                 """)
             elif file_type in ('xlsx', 'xls'):
+                # Convert Excel to temp CSV (DuckDB 1.1.x lacks read_excel)
+                safe_sheet = _sanitize_sheet_name(sheet_name)
+                temp_csv_path = excel_to_temp_csv(validated_path, safe_sheet)
                 session.execute(f"""
                     CREATE OR REPLACE TABLE "{table_name}" AS
-                    SELECT * FROM read_excel('{validated_path}', sheet='{safe_sheet}')
+                    SELECT * FROM read_csv_auto('{temp_csv_path}', header=true, all_varchar=false)
                 """)
             else:
                 raise ValueError(f"Unsupported file type: {file_type}")
@@ -272,6 +267,12 @@ class FileSourceDuckDBSession:
         except Exception as e:
             logger.error(f"Failed to load table '{table_name}': {e}")
             raise
+        finally:
+            if temp_csv_path:
+                try:
+                    os.unlink(temp_csv_path)
+                except OSError:
+                    pass
 
     @classmethod
     async def execute_query(

@@ -3,7 +3,8 @@
 Phase 13: CSV & Excel File Support
 
 Handles file upload, validation, storage, schema inference, and DuckDB integration.
-Files are stored on disk and queried via DuckDB's read_csv_auto() and read_excel().
+Files are stored on disk and queried via DuckDB's read_csv_auto(). Excel files are
+converted to CSV using openpyxl/xlrd before loading into DuckDB.
 """
 import asyncio
 import hashlib
@@ -13,6 +14,9 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+import csv
+import tempfile
 
 import aiofiles
 import duckdb
@@ -54,6 +58,75 @@ def _sanitize_sheet_name(sheet_name: Optional[str]) -> str:
         return 'Sheet1'
 
     return sanitized
+
+
+def excel_to_temp_csv(file_path: str, sheet_name: Optional[str] = None) -> str:
+    """
+    Convert an Excel file to a temporary CSV file for DuckDB ingestion.
+
+    DuckDB 1.1.x does not include a read_excel() table function, so Excel files
+    must be converted to CSV before loading.
+
+    Args:
+        file_path: Path to the Excel file (.xlsx or .xls)
+        sheet_name: Sheet name to convert (defaults to first/active sheet)
+
+    Returns:
+        Path to the temporary CSV file. Caller is responsible for cleanup
+        via os.unlink().
+    """
+    ext = Path(file_path).suffix.lower()
+
+    if ext == '.xlsx':
+        from openpyxl import load_workbook
+
+        wb = load_workbook(file_path, read_only=True, data_only=True)
+        try:
+            if sheet_name and sheet_name in wb.sheetnames:
+                ws = wb[sheet_name]
+            else:
+                ws = wb.active
+
+            fd, temp_path = tempfile.mkstemp(suffix='.csv')
+            try:
+                with os.fdopen(fd, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    for row in ws.iter_rows(values_only=True):
+                        writer.writerow(row)
+            except Exception:
+                os.unlink(temp_path)
+                raise
+        finally:
+            wb.close()
+
+        return temp_path
+
+    elif ext == '.xls':
+        import xlrd
+
+        wb = xlrd.open_workbook(file_path)
+        if sheet_name:
+            try:
+                ws = wb.sheet_by_name(sheet_name)
+            except xlrd.biffh.XLRDError:
+                ws = wb.sheet_by_index(0)
+        else:
+            ws = wb.sheet_by_index(0)
+
+        fd, temp_path = tempfile.mkstemp(suffix='.csv')
+        try:
+            with os.fdopen(fd, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                for row_idx in range(ws.nrows):
+                    writer.writerow(ws.row_values(row_idx))
+        except Exception:
+            os.unlink(temp_path)
+            raise
+
+        return temp_path
+
+    else:
+        raise ValueError(f"Unsupported Excel format: {ext}")
 
 
 class FileSourceHandler:
@@ -352,19 +425,15 @@ class FileSourceHandler:
         # Validate file path
         validated_path = self._validate_file_path(file_path)
 
-        # Sanitize sheet name
-        safe_sheet = _sanitize_sheet_name(sheet_name)
-
+        # For Excel files, convert to temp CSV first
+        temp_csv_path = None
         try:
-            # Install and load Excel extension if needed
             if file_type in ('xlsx', 'xls'):
-                conn.execute("INSTALL excel; LOAD excel;")
-
-            # Build query based on file type
-            if file_type == 'csv':
-                read_query = f"SELECT * FROM read_csv_auto('{validated_path}', header=true)"
+                safe_sheet = _sanitize_sheet_name(sheet_name)
+                temp_csv_path = excel_to_temp_csv(validated_path, safe_sheet)
+                read_query = f"SELECT * FROM read_csv_auto('{temp_csv_path}', header=true)"
             else:
-                read_query = f"SELECT * FROM read_excel('{validated_path}', sheet='{safe_sheet}')"
+                read_query = f"SELECT * FROM read_csv_auto('{validated_path}', header=true)"
 
             # Get column info
             result = conn.execute(f"{read_query} LIMIT 0")
@@ -420,6 +489,11 @@ class FileSourceHandler:
 
         finally:
             conn.close()
+            if temp_csv_path:
+                try:
+                    os.unlink(temp_csv_path)
+                except OSError:
+                    pass
 
     async def get_excel_sheets(self, file: UploadFile) -> List[str]:
         """
@@ -498,17 +572,15 @@ class FileSourceHandler:
         # Validate file path
         validated_path = self._validate_file_path(file_path)
 
-        # Sanitize sheet name
-        safe_sheet = _sanitize_sheet_name(sheet_name)
-
+        # For Excel files, convert to temp CSV first
+        temp_csv_path = None
         try:
             if file_type in ('xlsx', 'xls'):
-                conn.execute("INSTALL excel; LOAD excel;")
-
-            if file_type == 'csv':
-                read_query = f"SELECT * FROM read_csv_auto('{validated_path}', header=true)"
+                safe_sheet = _sanitize_sheet_name(sheet_name)
+                temp_csv_path = excel_to_temp_csv(validated_path, safe_sheet)
+                read_query = f"SELECT * FROM read_csv_auto('{temp_csv_path}', header=true)"
             else:
-                read_query = f"SELECT * FROM read_excel('{validated_path}', sheet='{safe_sheet}')"
+                read_query = f"SELECT * FROM read_csv_auto('{validated_path}', header=true)"
 
             # Get total count
             count_result = conn.execute(f"SELECT COUNT(*) FROM ({read_query})").fetchone()
@@ -540,6 +612,11 @@ class FileSourceHandler:
 
         finally:
             conn.close()
+            if temp_csv_path:
+                try:
+                    os.unlink(temp_csv_path)
+                except OSError:
+                    pass
 
     async def refresh_schema(
         self,

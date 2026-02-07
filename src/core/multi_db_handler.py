@@ -639,6 +639,119 @@ class MultiDatabaseHandler:
                 "attempts": [],
             }
 
+    async def _execute_single_file_query_task(
+        self,
+        file_source: FileSource,
+        question: str,
+        schema: str,
+        sql_generator: "SQLGenerator",
+        model_used: str = "unknown",
+        row_limit: int = 100,
+    ) -> Dict[str, Any]:
+        """
+        Execute a query against a file source via DuckDB (Phase 13).
+
+        Generates SQL using the LLM against the file's schema,
+        then executes via DuckDB.
+        """
+        import time
+        from src.core.file_source_session import FileSourceDuckDBSession
+
+        start_time = time.time()
+
+        try:
+            # Build a focused schema string for this file source
+            file_schema = await FileSourceDuckDBSession.get_table_schema(file_source)
+            schema_lines = [
+                f"Table: {file_source.duckdb_table_name}",
+                f"Row Count: {file_schema.get('row_count', 'unknown')}",
+                "Columns:",
+            ]
+            for col in file_schema.get("columns", []):
+                col_def = f"  - {col['name']} ({col['type']})"
+                samples = col.get("sample_values", [])
+                if samples:
+                    col_def += f"  // Examples: {', '.join(repr(s) for s in samples[:3])}"
+                schema_lines.append(col_def)
+            file_schema_text = "\n".join(schema_lines)
+
+            # Generate SQL using the LLM
+            sql_result = await sql_generator.generate_sql(
+                question=question,
+                schema=file_schema_text,
+                model=model_used,
+            )
+
+            generated_sql = sql_result.get("sql", "") if isinstance(sql_result, dict) else str(sql_result)
+
+            if not generated_sql:
+                return {
+                    "success": False,
+                    "error": "Failed to generate SQL for file source",
+                    "source_type": "file",
+                    "file_source": file_source,
+                    "connection_name": f"📄 {file_source.name}",
+                    "database_type": "duckdb",
+                    "model_used": model_used,
+                    "data": [],
+                    "row_count": 0,
+                }
+
+            # Execute via DuckDB
+            exec_result = await self.execute_file_query(
+                sql=generated_sql,
+                file_sources=[file_source],
+                max_rows=row_limit,
+            )
+
+            elapsed_ms = (time.time() - start_time) * 1000
+
+            if exec_result.get("success"):
+                return {
+                    "success": True,
+                    "sql": generated_sql,
+                    "data": exec_result.get("data", []),
+                    "columns": exec_result.get("columns", []),
+                    "row_count": exec_result.get("row_count", 0),
+                    "execution_time_ms": round(elapsed_ms, 2),
+                    "source_type": "file",
+                    "file_source": file_source,
+                    "connection_name": f"📄 {file_source.name}",
+                    "database_type": "duckdb",
+                    "model_used": model_used,
+                    "total_attempts": 1,
+                    "attempts": [],
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": exec_result.get("error", "Unknown DuckDB error"),
+                    "sql": generated_sql,
+                    "source_type": "file",
+                    "file_source": file_source,
+                    "connection_name": f"📄 {file_source.name}",
+                    "database_type": "duckdb",
+                    "model_used": model_used,
+                    "data": [],
+                    "row_count": 0,
+                    "execution_time_ms": round(elapsed_ms, 2),
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to execute query on file source '{file_source.name}': {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "source_type": "file",
+                "file_source": file_source,
+                "connection_name": f"📄 {file_source.name}",
+                "database_type": "duckdb",
+                "model_used": model_used,
+                "data": [],
+                "row_count": 0,
+                "execution_time_ms": 0,
+            }
+
     async def execute_query_with_self_correction(
         self,
         connection: DatabaseConnection,

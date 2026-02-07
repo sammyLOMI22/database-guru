@@ -303,12 +303,22 @@ export interface ConnectionInfo {
   database_name: string;
 }
 
+export interface FileSourceInfo {
+  id: number;
+  name: string;
+  file_type: string;
+  original_filename: string;
+  row_count?: number;
+}
+
 export interface ChatSession {
   id: string;
   name: string;
   user_id?: string;
   active_connection_ids: number[];
   connections: ConnectionInfo[];
+  active_file_source_ids: number[];
+  file_sources: FileSourceInfo[];
   created_at: string;
   updated_at: string;
   last_active_at: string;
@@ -332,6 +342,7 @@ export interface ChatMessage {
 export interface CreateChatSessionRequest {
   name: string;
   connection_ids: number[];
+  file_source_ids?: number[];
   user_id?: string;
 }
 
@@ -685,6 +696,6 @@ export interface FileUploadOptions {
 }
 
 export interface FileSourceListResponse {
-  file_sources: FileSource[];
-  count: number;
+  files: FileSource[];
+  total: number;
 }

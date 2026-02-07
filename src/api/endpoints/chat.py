@@ -22,6 +22,7 @@ class ChatSessionCreate(BaseModel):
     """Request model for creating a chat session"""
     name: str = Field(..., min_length=1, max_length=255)
     connection_ids: List[int] = Field(default_factory=list)
+    file_source_ids: List[int] = Field(default_factory=list)
     user_id: Optional[str] = None
 
 
@@ -29,6 +30,7 @@ class ChatSessionUpdate(BaseModel):
     """Request model for updating a chat session"""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     connection_ids: Optional[List[int]] = None
+    file_source_ids: Optional[List[int]] = None
 
 
 class ConnectionInfo(BaseModel):
@@ -39,6 +41,15 @@ class ConnectionInfo(BaseModel):
     database_name: str
 
 
+class FileSourceInfo(BaseModel):
+    """File source information for chat response"""
+    id: int
+    name: str
+    file_type: str
+    original_filename: str
+    row_count: Optional[int] = None
+
+
 class ChatSessionResponse(BaseModel):
     """Response model for chat session"""
     id: str
@@ -46,6 +57,8 @@ class ChatSessionResponse(BaseModel):
     user_id: Optional[str]
     active_connection_ids: List[int]
     connections: List[ConnectionInfo]
+    active_file_source_ids: List[int] = Field(default_factory=list)
+    file_sources: List[FileSourceInfo] = Field(default_factory=list)
     created_at: str
     updated_at: str
     last_active_at: str
@@ -100,11 +113,27 @@ async def create_chat_session(
                     detail="One or more connection IDs are invalid"
                 )
 
+        # Validate file source IDs if provided
+        if session_data.file_source_ids:
+            file_result = await db.execute(
+                select(FileSource).where(
+                    FileSource.id.in_(session_data.file_source_ids),
+                    FileSource.processing_status == 'ready',
+                )
+            )
+            valid_files = file_result.scalars().all()
+            if len(valid_files) != len(session_data.file_source_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="One or more file source IDs are invalid or not ready"
+                )
+
         # Create new chat session
         new_session = ChatSession(
             name=session_data.name,
             user_id=session_data.user_id,
             active_connection_ids=session_data.connection_ids,
+            active_file_source_ids=session_data.file_source_ids or [],
         )
 
         db.add(new_session)
@@ -114,7 +143,6 @@ async def create_chat_session(
         # Get connection details
         connections = []
         if new_session.active_connection_ids:
-            # Ensure active_connection_ids is a list (defensive against bad data)
             connection_ids = new_session.active_connection_ids
             if isinstance(connection_ids, int):
                 connection_ids = [connection_ids]
@@ -136,6 +164,9 @@ async def create_chat_session(
                 for conn in result.scalars().all()
             ]
 
+        # Get file source details
+        file_sources = await _get_session_file_sources(new_session, db)
+
         # Ensure active_connection_ids in response is always a list
         active_conn_ids = new_session.active_connection_ids
         if isinstance(active_conn_ids, int):
@@ -149,6 +180,8 @@ async def create_chat_session(
             user_id=new_session.user_id,
             active_connection_ids=active_conn_ids,
             connections=connections,
+            active_file_source_ids=new_session.active_file_source_ids or [],
+            file_sources=file_sources,
             created_at=new_session.created_at.isoformat(),
             updated_at=new_session.updated_at.isoformat(),
             last_active_at=new_session.last_active_at.isoformat(),
@@ -225,6 +258,9 @@ async def list_chat_sessions(
             elif not isinstance(active_conn_ids, list):
                 active_conn_ids = list(active_conn_ids) if active_conn_ids else []
 
+            # Get file source details
+            file_sources = await _get_session_file_sources(session, db)
+
             response_sessions.append(
                 ChatSessionResponse(
                     id=session.id,
@@ -232,6 +268,8 @@ async def list_chat_sessions(
                     user_id=session.user_id,
                     active_connection_ids=active_conn_ids,
                     connections=connections,
+                    active_file_source_ids=session.active_file_source_ids or [],
+                    file_sources=file_sources,
                     created_at=session.created_at.isoformat(),
                     updated_at=session.updated_at.isoformat(),
                     last_active_at=session.last_active_at.isoformat(),
@@ -305,12 +343,17 @@ async def get_chat_session(
         elif not isinstance(active_conn_ids, list):
             active_conn_ids = list(active_conn_ids) if active_conn_ids else []
 
+        # Get file source details
+        file_sources = await _get_session_file_sources(session, db)
+
         return ChatSessionResponse(
             id=session.id,
             name=session.name,
             user_id=session.user_id,
             active_connection_ids=active_conn_ids,
             connections=connections,
+            active_file_source_ids=session.active_file_source_ids or [],
+            file_sources=file_sources,
             created_at=session.created_at.isoformat(),
             updated_at=session.updated_at.isoformat(),
             last_active_at=session.last_active_at.isoformat(),
@@ -676,15 +719,6 @@ async def clear_conversation_context(
 # =============================================================================
 # Phase 13: File Source Management Endpoints
 # =============================================================================
-
-class FileSourceInfo(BaseModel):
-    """File source information for chat response"""
-    id: int
-    name: str
-    file_type: str
-    original_filename: str
-    row_count: Optional[int] = None
-
 
 class SessionFilesResponse(BaseModel):
     """Response for session file operations"""

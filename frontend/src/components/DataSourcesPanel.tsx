@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Database, FileSpreadsheet, Plus, Trash2, Check, Circle, Pencil, Loader2, Upload, Eye } from 'lucide-react';
 import DatabaseConnectionModal from './DatabaseConnectionModal';
 import FileUploadModal from './FileUploadModal';
+import FilePreviewPanel from './FilePreviewPanel';
 import type { FileSource } from '../types/api';
 import { filesAPI } from '../services/api';
 
@@ -30,7 +32,6 @@ export default function DataSourcesPanel({
   onConnectionSelect,
   onFileSelect,
   selectedConnectionIds = [],
-  selectedFileIds = [],
   sessionId,
   onDataSourcesChange,
 }: Props) {
@@ -39,13 +40,16 @@ export default function DataSourcesPanel({
   const [fileSources, setFileSources] = useState<FileSource[]>([]);
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
   const [isFileModalOpen, setIsFileModalOpen] = useState(false);
+  const [previewFileId, setPreviewFileId] = useState<number | null>(null);
   const [editingConnection, setEditingConnection] = useState<DatabaseConnection | undefined>();
   const [loading, setLoading] = useState(false);
+  const [sessionFileIds, setSessionFileIds] = useState<number[]>([]);
 
   // Load data on mount
   useEffect(() => {
     loadConnections();
     loadFileSources();
+    loadSessionFiles();
   }, [sessionId]);
 
   const loadConnections = async () => {
@@ -63,9 +67,22 @@ export default function DataSourcesPanel({
   const loadFileSources = async () => {
     try {
       const response = await filesAPI.listFiles(sessionId);
-      setFileSources(response.file_sources || []);
+      setFileSources(response.files || []);
     } catch (error) {
       console.error('Failed to load file sources:', error);
+    }
+  };
+
+  const loadSessionFiles = async () => {
+    if (!sessionId) {
+      setSessionFileIds([]);
+      return;
+    }
+    try {
+      const response = await filesAPI.getSessionFiles(sessionId);
+      setSessionFileIds((response as any).active_file_source_ids || []);
+    } catch (error) {
+      console.error('Failed to load session files:', error);
     }
   };
 
@@ -149,8 +166,21 @@ export default function DataSourcesPanel({
     }
   };
 
-  const handleSelectFile = (id: number) => {
-    onFileSelect?.(id);
+  const handleSelectFile = async (id: number) => {
+    if (!sessionId) return;
+    try {
+      const isActive = sessionFileIds.includes(id);
+      if (isActive) {
+        await filesAPI.removeFileFromSession(sessionId, id);
+        setSessionFileIds(prev => prev.filter(fid => fid !== id));
+      } else {
+        await filesAPI.addFileToSession(sessionId, id);
+        setSessionFileIds(prev => [...prev, id]);
+        onFileSelect?.(id);
+      }
+    } catch (error) {
+      console.error('Failed to toggle file in session:', error);
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -347,29 +377,41 @@ export default function DataSourcesPanel({
               </div>
             ) : (
               <div className="p-2 space-y-1">
+                {!sessionId && fileSources.length > 0 && (
+                  <div className="px-3 py-2 mb-2 text-[11px] text-gray-500 dark:text-gray-400 bg-yellow-500/5 border border-yellow-500/20 rounded-xl text-center">
+                    Select a chat session to add files to it
+                  </div>
+                )}
                 {fileSources.map((file) => {
-                  const isSelected = selectedFileIds.includes(file.id);
+                  const isInSession = sessionFileIds.includes(file.id);
                   const isReady = file.processing_status === 'ready';
+                  const canToggle = isReady && !!sessionId;
                   return (
                     <div
                       key={file.id}
-                      onClick={() => isReady && handleSelectFile(file.id)}
+                      onClick={() => canToggle && handleSelectFile(file.id)}
                       className={`group p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden ${
-                        isReady ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+                        !isReady ? 'cursor-not-allowed opacity-60'
+                        : !sessionId ? 'cursor-default'
+                        : 'cursor-pointer'
                       } ${
-                        isSelected && isReady
+                        isInSession && isReady
                           ? 'glass-card bg-green-500/5 border-green-500/30 shadow-[0_10px_30px_rgba(34,197,94,0.1)]'
                           : 'glass-panel bg-transparent border-transparent hover:bg-white/5 hover:border-white/10'
                       }`}
                     >
-                      {isSelected && isReady && (
+                      {isInSession && isReady && (
                         <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/10 blur-3xl -mr-12 -mt-12 pointer-events-none" />
                       )}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className={`p-1.5 rounded-lg ${getFileTypeColor(file.file_type)}`}>
-                              <FileSpreadsheet className="w-3.5 h-3.5" />
+                            <div className={`p-1.5 rounded-lg transition-all ${
+                              isInSession
+                                ? 'bg-green-500 text-white shadow-lg shadow-green-500/30 scale-110'
+                                : getFileTypeColor(file.file_type)
+                            }`}>
+                              {isInSession ? <Check className="w-3.5 h-3.5" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
                             </div>
                             <span className="text-sm font-black uppercase tracking-tight text-gray-900 dark:text-white truncate">
                               {file.name}
@@ -408,8 +450,7 @@ export default function DataSourcesPanel({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              // Open preview modal (to be implemented)
-                              console.log('Preview file:', file.id);
+                              setPreviewFileId(file.id);
                             }}
                             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
                             title="Preview"
@@ -461,6 +502,23 @@ export default function DataSourcesPanel({
         onSuccess={handleFileUploadSuccess}
         sessionId={sessionId}
       />
+
+      {/* File Preview Modal - portal to escape sidebar containment */}
+      {previewFileId !== null && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setPreviewFileId(null)}>
+          <div
+            className="bg-gray-900 border border-white/10 w-[90vw] max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            style={{ maxHeight: '85vh' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <FilePreviewPanel
+              fileId={previewFileId}
+              onClose={() => setPreviewFileId(null)}
+            />
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

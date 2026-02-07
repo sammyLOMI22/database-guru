@@ -276,10 +276,10 @@ async def process_multi_database_query(
                     detail=f"Chat session {request.chat_session_id} not found"
                 )
 
-            if not session.active_connection_ids:
+            if not session.active_connection_ids and not session.active_file_source_ids:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Chat session has no active database connections"
+                    detail="Chat session has no active database connections or file sources"
                 )
 
             # Ensure active_connection_ids is a list (defensive against bad data)
@@ -289,13 +289,14 @@ async def process_multi_database_query(
             elif not isinstance(connection_ids, list):
                 connection_ids = list(connection_ids) if connection_ids else []
 
-            # Fetch connections
-            result = await db.execute(
-                select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(connection_ids)
+            # Fetch connections (skip if no connection IDs - e.g. file-only session)
+            if connection_ids:
+                result = await db.execute(
+                    select(DatabaseConnection).where(
+                        DatabaseConnection.id.in_(connection_ids)
+                    )
                 )
-            )
-            connections = list(result.scalars().all())
+                connections = list(result.scalars().all())
 
             # Phase 13: Fetch file sources from session
             file_source_ids = session.active_file_source_ids or []
@@ -651,6 +652,25 @@ async def process_multi_database_query(
                     "has_schema_hints": conn_id in per_db_hints,
                 })
 
+        # Phase 13: Add file source execution tasks
+        for file_source in file_sources:
+            parallel_tasks.append(
+                multi_db_handler._execute_single_file_query_task(
+                    file_source=file_source,
+                    question=request.question,
+                    schema=combined_schema_text,
+                    sql_generator=sql_generator,
+                    model_used=model_used,
+                    row_limit=request.row_limit,
+                )
+            )
+            task_metadata.append({
+                "has_error": False,
+                "is_file_source": True,
+                "file_source": file_source,
+                "from_cache": False,
+            })
+
         # Execute all queries in parallel!
         logger.info(f"⚡ Executing {len(parallel_tasks)} database queries IN PARALLEL...")
         import time
@@ -693,6 +713,53 @@ async def process_multi_database_query(
                         error=exec_result.get("error"),
                     )
                 )
+                continue
+
+            # Phase 13: Handle file source results
+            if metadata.get("is_file_source"):
+                file_source = metadata.get("file_source") or exec_result.get("file_source")
+
+                # Create QueryHistory record for file source
+                individual_query_record = None
+                try:
+                    individual_query_record = QueryHistory(
+                        natural_language_query=request.question,
+                        generated_sql=exec_result.get("sql", ""),
+                        sql_validated=exec_result.get("success", False),
+                        executed=exec_result.get("success", False),
+                        execution_time_ms=exec_result.get("execution_time_ms", 0),
+                        result_count=exec_result.get("row_count", 0),
+                        error_message=exec_result.get("error"),
+                        database_type="duckdb",
+                        model_used=model_used,
+                    )
+                    db.add(individual_query_record)
+                    await db.flush()
+                    await db.refresh(individual_query_record)
+                except Exception as e:
+                    logger.error(f"Failed to create QueryHistory for file source: {e}")
+                    individual_query_record = None
+
+                file_name = file_source.name if file_source else "File"
+                database_results.append(
+                    DatabaseQueryResult(
+                        connection_id=file_source.id if file_source else 0,
+                        connection_name=exec_result.get("connection_name", f"📄 {file_name}"),
+                        database_type="duckdb",
+                        sql=exec_result.get("sql", ""),
+                        success=exec_result.get("success", False),
+                        results=exec_result.get("data"),
+                        row_count=exec_result.get("row_count", 0),
+                        execution_time_ms=exec_result.get("execution_time_ms", 0),
+                        error=exec_result.get("error"),
+                        query_id=individual_query_record.id if individual_query_record else None,
+                        total_attempts=1,
+                    )
+                )
+
+                if exec_result.get("success"):
+                    total_rows += exec_result.get("row_count", 0)
+                    total_execution_time += exec_result.get("execution_time_ms", 0)
                 continue
 
             # Get connection for this result
@@ -849,6 +916,7 @@ async def process_multi_database_query(
             if not q.get("is_valid", True) and q.get("warnings"):
                 error_messages.append(f"[Validation] {'; '.join(q['warnings'])}")
 
+        source_type_label = f"multi_db_{len(connections)}" + (f"_files_{len(file_sources)}" if file_sources else "")
         query_record = QueryHistory(
             natural_language_query=request.question,
             generated_sql=primary_sql,
@@ -857,7 +925,7 @@ async def process_multi_database_query(
             execution_time_ms=total_execution_time,
             result_count=total_rows,
             error_message="; ".join(error_messages) if error_messages else None,
-            database_type=f"multi_db_{len(connections)}",
+            database_type=source_type_label,
             model_used=model_used,
         )
         db.add(query_record)
@@ -875,7 +943,12 @@ async def process_multi_database_query(
             db.add(user_message)
 
             # Save assistant message with results summary
-            result_summary = f"Queried {len(database_results)} database(s), returned {total_rows} rows"
+            source_parts = []
+            if connections:
+                source_parts.append(f"{len(connections)} database(s)")
+            if file_sources:
+                source_parts.append(f"{len(file_sources)} file(s)")
+            result_summary = f"Queried {' and '.join(source_parts)}, returned {total_rows} rows"
             assistant_message = ChatMessage(
                 chat_session_id=request.chat_session_id,
                 role="assistant",

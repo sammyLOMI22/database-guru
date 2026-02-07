@@ -10,11 +10,13 @@ interface SidebarProps {
   onClose: () => void;
   onSelectQuery?: (question: string) => void;
   onConnectionSelect?: (connectionId: number) => void;
+  sessionId?: string;
+  onFileSelect?: (fileId: number) => void;
 }
 
 type Tab = 'connections' | 'schema' | 'history';
 
-export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: SidebarProps) {
+export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect, sessionId, onFileSelect }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<Tab>('connections');
   const [connections, setConnections] = useState<DatabaseConnection[]>([]);
   const [selectedConnId, setSelectedConnId] = useState<number | null>(null);
@@ -104,6 +106,8 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
                 setSelectedConnId(id);
                 onConnectionSelect?.(id);
               }}
+              onFileSelect={onFileSelect}
+              sessionId={sessionId}
             />
           )}
           {activeTab === 'schema' && (
