@@ -10,6 +10,7 @@ from src.cache.redis_client import get_redis_cache
 from src.core.connection_pool_manager import get_pool_manager_async
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files
+from src.core.file_source_session import FileSourceDuckDBSession
 
 # Configure logging
 logging.basicConfig(
@@ -75,6 +76,11 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("🛑 Shutting down Database Guru...")
+
+    # Close DuckDB file source session
+    await FileSourceDuckDBSession.reset_session()
+    logger.info("✅ DuckDB file source session closed")
+
     await cache.disconnect()
     await db_manager.close_async()
 

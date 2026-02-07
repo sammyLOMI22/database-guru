@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from src.api.dependencies import get_db
+from src.api.dependencies import get_db, get_settings
 from src.config.settings import Settings
 from src.core.file_source_handler import (
     FileSourceHandler,
@@ -80,6 +80,7 @@ async def upload_file(
     chat_session_id: Optional[str] = Form(None, description="Chat session ID (optional)"),
     is_global: bool = Form(False, description="Make available across all sessions"),
     db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ):
     """
     Upload a CSV or Excel file as a queryable data source.
@@ -92,7 +93,6 @@ async def upload_file(
 
     Returns the created file source with inferred schema.
     """
-    settings = Settings()
     handler = FileSourceHandler(settings)
 
     try:
@@ -174,6 +174,7 @@ async def get_file(
 async def delete_file(
     file_id: int,
     db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ):
     """
     Delete a file source and its physical file.
@@ -192,7 +193,6 @@ async def delete_file(
     await FileSourceDuckDBSession.unload_table(file_source.duckdb_table_name)
 
     # Delete file and record
-    settings = Settings()
     handler = FileSourceHandler(settings)
     await handler.cleanup_file(file_source, db)
 
@@ -250,6 +250,7 @@ async def get_file_preview(
     file_id: int,
     limit: int = Query(20, ge=1, le=100, description="Number of rows to preview"),
     db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ):
     """
     Get a preview of the file data.
@@ -270,7 +271,6 @@ async def get_file_preview(
             detail=f"File is not ready (status: {file_source.processing_status})",
         )
 
-    settings = Settings()
     handler = FileSourceHandler(settings)
 
     try:
@@ -298,6 +298,7 @@ async def get_file_preview(
 async def refresh_file_schema(
     file_id: int,
     db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ):
     """
     Refresh the schema for a file source.
@@ -316,7 +317,6 @@ async def refresh_file_schema(
     # Unload from DuckDB to force reload
     await FileSourceDuckDBSession.unload_table(file_source.duckdb_table_name)
 
-    settings = Settings()
     handler = FileSourceHandler(settings)
 
     try:
@@ -335,6 +335,7 @@ async def refresh_file_schema(
 @router.post("/excel-sheets", response_model=ExcelSheetsResponse)
 async def get_excel_sheets(
     file: UploadFile = File(..., description="Excel file to inspect"),
+    settings: Settings = Depends(get_settings),
 ):
     """
     Get list of sheets from an Excel file.
@@ -357,7 +358,6 @@ async def get_excel_sheets(
             detail="Only Excel files (.xlsx, .xls) are supported",
         )
 
-    settings = Settings()
     handler = FileSourceHandler(settings)
 
     try:

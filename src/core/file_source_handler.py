@@ -11,10 +11,11 @@ import hashlib
 import logging
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import contextlib
 import csv
 import tempfile
 
@@ -25,39 +26,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from src.config.settings import Settings
+from src.core.file_utils import validate_file_path, sanitize_sheet_name
 from src.database.models import FileSource
 
 logger = logging.getLogger(__name__)
-
-
-def _sanitize_sheet_name(sheet_name: Optional[str]) -> str:
-    """
-    Sanitize Excel sheet name to prevent SQL injection.
-
-    Args:
-        sheet_name: The sheet name to sanitize
-
-    Returns:
-        Sanitized sheet name safe for SQL queries
-    """
-    if not sheet_name:
-        return 'Sheet1'
-
-    # Remove any characters that could be used for SQL injection
-    # Allow only alphanumeric, spaces, underscores, hyphens
-    sanitized = re.sub(r"[^a-zA-Z0-9 _\-]", '', sheet_name)
-
-    # Remove SQL comment sequences (double hyphens)
-    sanitized = sanitized.replace('--', '')
-
-    # Limit length
-    sanitized = sanitized[:100]
-
-    # Ensure not empty after sanitization
-    if not sanitized.strip():
-        return 'Sheet1'
-
-    return sanitized
 
 
 def excel_to_temp_csv(file_path: str, sheet_name: Optional[str] = None) -> str:
@@ -209,7 +181,7 @@ class FileSourceHandler:
             is_global=is_global,
             user_id=user_id,
             processing_status='processing',
-            expires_at=datetime.utcnow() + timedelta(days=self.settings.FILE_AUTO_CLEANUP_DAYS)
+            expires_at=datetime.now(timezone.utc) + timedelta(days=self.settings.FILE_AUTO_CLEANUP_DAYS)
             if self.settings.FILE_AUTO_CLEANUP_DAYS > 0 else None,
         )
         db.add(file_source)
@@ -235,7 +207,7 @@ class FileSourceHandler:
             # Infer schema using DuckDB
             schema = await self.infer_schema(file_path, file_type, sheet_name)
             file_source.schema_cache = schema
-            file_source.schema_updated_at = datetime.utcnow()
+            file_source.schema_updated_at = datetime.now(timezone.utc)
             file_source.row_count = schema.get('row_count', 0)
 
             # Mark as ready
@@ -286,27 +258,38 @@ class FileSourceHandler:
         if ext not in self.allowed_extensions:
             return False, f"File type '{ext}' is not allowed. Allowed types: {', '.join(self.allowed_extensions)}"
 
-        # Check file size by reading content
+        # Read a small header for content-type validation, then measure
+        # total size by chunked reading to avoid loading the entire file
+        # (up to 100MB) into memory just for validation.
         await file.seek(0)
-        content = await file.read()
-        file_size = len(content)
-        await file.seek(0)  # Reset for later use
+        header = await file.read(4096)
 
-        if file_size > self.max_size_bytes:
-            return False, f"File size ({file_size / 1024 / 1024:.1f}MB) exceeds limit ({self.settings.FILE_MAX_SIZE_MB}MB)"
-
-        if file_size == 0:
+        if len(header) == 0:
+            await file.seek(0)
             return False, "File is empty"
 
         # Validate content type using magic bytes (basic check)
         try:
-            # Try to detect file type from content
-            is_valid_content = await self._validate_content(content, ext)
+            is_valid_content = await self._validate_content(header, ext)
             if not is_valid_content:
+                await file.seek(0)
                 return False, f"File content does not match expected type for {ext}"
         except Exception as e:
             logger.warning(f"Content validation failed: {e}")
             # Continue if content validation fails - DuckDB will catch issues
+
+        # Check file size by reading in chunks (avoids full file in memory)
+        file_size = len(header)
+        while True:
+            chunk = await file.read(1024 * 1024)  # 1MB chunks
+            if not chunk:
+                break
+            file_size += len(chunk)
+            if file_size > self.max_size_bytes:
+                await file.seek(0)
+                return False, f"File size ({file_size / 1024 / 1024:.1f}MB) exceeds limit ({self.settings.FILE_MAX_SIZE_MB}MB)"
+
+        await file.seek(0)  # Reset for later use
 
         return True, ""
 
@@ -321,13 +304,26 @@ class FileSourceHandler:
             if ext == '.xls':
                 return content[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'
 
-        # CSV files are text - check for valid UTF-8/ASCII
+        # CSV files are text with delimiter-separated fields
         if ext == '.csv':
             try:
-                # Try to decode as UTF-8
                 sample = content[:4096].decode('utf-8')
-                # Check it contains at least some printable content
-                return any(c.isprintable() or c in '\n\r\t,' for c in sample)
+                # Must have at least one line with a comma or tab delimiter
+                lines = sample.splitlines()
+                if not lines:
+                    return False
+                # Check that the first non-empty line contains a delimiter
+                for line in lines:
+                    stripped = line.strip()
+                    if stripped:
+                        has_comma = ',' in stripped
+                        has_tab = '\t' in stripped
+                        if has_comma or has_tab:
+                            return True
+                        # Single-column CSV is still valid but rare;
+                        # accept if it looks like plain text (not binary)
+                        return stripped.isprintable()
+                return False
             except UnicodeDecodeError:
                 return False
 
@@ -400,7 +396,7 @@ class FileSourceHandler:
         Returns:
             Dict with columns, row_count, and sample_values
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None,
             self._infer_schema_sync,
@@ -408,6 +404,38 @@ class FileSourceHandler:
             file_type,
             sheet_name,
         )
+
+    @contextlib.contextmanager
+    def _duckdb_read_context(self, file_path: str, file_type: str, sheet_name: Optional[str]):
+        """Context manager for DuckDB file reads with connection/cleanup management.
+
+        Handles: DuckDB connection lifecycle, path validation, Excel-to-CSV
+        conversion, and temp file cleanup.
+
+        Yields:
+            Tuple of (conn, read_query) - the DuckDB connection and the
+            read_csv_auto query string for the file.
+        """
+        conn = duckdb.connect(':memory:')
+        validated_path = validate_file_path(file_path, self.upload_dir)
+        temp_csv_path = None
+        try:
+            if file_type in ('xlsx', 'xls'):
+                safe_sheet = sanitize_sheet_name(sheet_name)
+                temp_csv_path = excel_to_temp_csv(validated_path, safe_sheet)
+                safe_csv_path = temp_csv_path.replace("'", "''")
+                read_query = f"SELECT * FROM read_csv_auto('{safe_csv_path}', header=true)"
+            else:
+                safe_path = validated_path.replace("'", "''")
+                read_query = f"SELECT * FROM read_csv_auto('{safe_path}', header=true)"
+            yield conn, read_query
+        finally:
+            conn.close()
+            if temp_csv_path:
+                try:
+                    os.unlink(temp_csv_path)
+                except OSError:
+                    pass
 
     def _infer_schema_sync(
         self,
@@ -420,21 +448,7 @@ class FileSourceHandler:
         Security: Validates file path is within upload directory and sanitizes
         sheet name to prevent SQL injection.
         """
-        conn = duckdb.connect(':memory:')
-
-        # Validate file path
-        validated_path = self._validate_file_path(file_path)
-
-        # For Excel files, convert to temp CSV first
-        temp_csv_path = None
-        try:
-            if file_type in ('xlsx', 'xls'):
-                safe_sheet = _sanitize_sheet_name(sheet_name)
-                temp_csv_path = excel_to_temp_csv(validated_path, safe_sheet)
-                read_query = f"SELECT * FROM read_csv_auto('{temp_csv_path}', header=true)"
-            else:
-                read_query = f"SELECT * FROM read_csv_auto('{validated_path}', header=true)"
-
+        with self._duckdb_read_context(file_path, file_type, sheet_name) as (conn, read_query):
             # Get column info
             result = conn.execute(f"{read_query} LIMIT 0")
             columns = []
@@ -487,14 +501,6 @@ class FileSourceHandler:
                 'sample_values': sample_values,
             }
 
-        finally:
-            conn.close()
-            if temp_csv_path:
-                try:
-                    os.unlink(temp_csv_path)
-                except OSError:
-                    pass
-
     async def get_excel_sheets(self, file: UploadFile) -> List[str]:
         """
         Get list of sheets from an Excel file.
@@ -510,7 +516,7 @@ class FileSourceHandler:
         content = await file.read()
         await file.seek(0)
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None,
             self._get_sheets_sync,
@@ -545,7 +551,7 @@ class FileSourceHandler:
         Returns:
             Dict with columns, data, row_count, total_rows, truncated
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None,
             self._get_preview_sync,
@@ -567,21 +573,7 @@ class FileSourceHandler:
         Security: Validates file path is within upload directory and sanitizes
         sheet name to prevent SQL injection.
         """
-        conn = duckdb.connect(':memory:')
-
-        # Validate file path
-        validated_path = self._validate_file_path(file_path)
-
-        # For Excel files, convert to temp CSV first
-        temp_csv_path = None
-        try:
-            if file_type in ('xlsx', 'xls'):
-                safe_sheet = _sanitize_sheet_name(sheet_name)
-                temp_csv_path = excel_to_temp_csv(validated_path, safe_sheet)
-                read_query = f"SELECT * FROM read_csv_auto('{temp_csv_path}', header=true)"
-            else:
-                read_query = f"SELECT * FROM read_csv_auto('{validated_path}', header=true)"
-
+        with self._duckdb_read_context(file_path, file_type, sheet_name) as (conn, read_query):
             # Get total count
             count_result = conn.execute(f"SELECT COUNT(*) FROM ({read_query})").fetchone()
             total_rows = count_result[0] if count_result else 0
@@ -610,14 +602,6 @@ class FileSourceHandler:
                 'truncated': len(data) < total_rows,
             }
 
-        finally:
-            conn.close()
-            if temp_csv_path:
-                try:
-                    os.unlink(temp_csv_path)
-                except OSError:
-                    pass
-
     async def refresh_schema(
         self,
         file_source: FileSource,
@@ -641,7 +625,7 @@ class FileSourceHandler:
             )
 
             file_source.schema_cache = schema
-            file_source.schema_updated_at = datetime.utcnow()
+            file_source.schema_updated_at = datetime.now(timezone.utc)
             file_source.row_count = schema.get('row_count', 0)
             file_source.processing_status = 'ready'
             file_source.processing_error = None
@@ -731,43 +715,6 @@ class FileSourceHandler:
 
         return filename
 
-    def _validate_file_path(self, file_path: str) -> str:
-        """
-        Validate and canonicalize file path to prevent path traversal attacks.
-
-        Args:
-            file_path: The file path to validate
-
-        Returns:
-            Canonicalized absolute path
-
-        Raises:
-            ValueError: If path is invalid or outside allowed directory
-        """
-        if not file_path:
-            raise ValueError("File path cannot be empty")
-
-        # Get the allowed upload directory
-        upload_dir = self.upload_dir.resolve()
-
-        # Canonicalize the path (resolves symlinks and ..)
-        try:
-            canonical_path = Path(file_path).resolve()
-        except (OSError, ValueError) as e:
-            raise ValueError(f"Invalid file path: {e}")
-
-        # Ensure path is within upload directory
-        try:
-            canonical_path.relative_to(upload_dir)
-        except ValueError:
-            raise ValueError(f"File path must be within upload directory: {upload_dir}")
-
-        # Check file exists
-        if not canonical_path.exists():
-            raise ValueError(f"File does not exist: {canonical_path}")
-
-        return str(canonical_path)
-
 
 async def get_file_source_by_id(
     file_id: int,
@@ -811,7 +758,7 @@ async def list_file_sources(
     """
     from sqlalchemy import or_
 
-    query = select(FileSource).where(FileSource.is_active == True)
+    query = select(FileSource).where(FileSource.is_active.is_(True))
 
     # Build filters
     filters = []
@@ -820,7 +767,7 @@ async def list_file_sources(
         if include_global:
             filters.append(or_(
                 FileSource.chat_session_id == session_id,
-                FileSource.is_global == True,
+                FileSource.is_global.is_(True),
             ))
         else:
             filters.append(FileSource.chat_session_id == session_id)

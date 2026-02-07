@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from statistics import mean, median, stdev
 
+from src.lineage.llm_utils import extract_json_object
+
 logger = logging.getLogger(__name__)
 
 
@@ -463,64 +465,11 @@ class ResultNarrator:
 
         return prompt
 
-    def _extract_json_object(self, text: str) -> Optional[str]:
-        """Extract a valid JSON object from text using balanced brace matching.
-
-        This is more robust than simple find/rfind as it handles nested objects
-        and multiple JSON objects in the response.
-        """
-        # Find the first opening brace
-        start = text.find("{")
-        if start == -1:
-            return None
-
-        # Count braces to find the matching closing brace
-        brace_count = 0
-        in_string = False
-        escape_next = False
-
-        for i, char in enumerate(text[start:], start):
-            if escape_next:
-                escape_next = False
-                continue
-
-            if char == '\\':
-                escape_next = True
-                continue
-
-            if char == '"' and not escape_next:
-                in_string = not in_string
-                continue
-
-            if in_string:
-                continue
-
-            if char == '{':
-                brace_count += 1
-            elif char == '}':
-                brace_count -= 1
-                if brace_count == 0:
-                    json_str = text[start:i+1]
-                    # Validate it's actually valid JSON
-                    try:
-                        json.loads(json_str)
-                        return json_str
-                    except json.JSONDecodeError:
-                        # This block wasn't valid JSON, try to find another
-                        continue
-
-        # If we get here, try the simple approach as fallback
-        end = text.rfind("}") + 1
-        if end > start:
-            return text[start:end]
-
-        return None
-
     def _parse_response(self, response_text: str) -> NarrativeResult:
         """Parse LLM response and extract narrative components"""
         try:
             # Try to extract JSON from response using balanced brace matching
-            json_str = self._extract_json_object(response_text)
+            json_str = extract_json_object(response_text)
 
             if not json_str:
                 # No valid JSON found, parse as text

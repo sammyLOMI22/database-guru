@@ -8,7 +8,6 @@ Tables are lazily loaded when first accessed to optimize memory usage.
 import asyncio
 import logging
 import os
-import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
@@ -16,79 +15,9 @@ import duckdb
 
 from src.config.settings import Settings
 from src.core.file_source_handler import excel_to_temp_csv
+from src.core.file_utils import validate_file_path, sanitize_sheet_name
 
 logger = logging.getLogger(__name__)
-
-
-def _validate_file_path(file_path: str, settings: Optional[Settings] = None) -> str:
-    """
-    Validate and canonicalize file path to prevent path traversal attacks.
-
-    Args:
-        file_path: The file path to validate
-        settings: Optional settings for upload directory
-
-    Returns:
-        Canonicalized absolute path
-
-    Raises:
-        ValueError: If path is invalid or outside allowed directory
-    """
-    if not file_path:
-        raise ValueError("File path cannot be empty")
-
-    # Get the allowed upload directory
-    if settings is None:
-        settings = Settings()
-    upload_dir = Path(settings.FILE_UPLOAD_DIR).resolve()
-
-    # Canonicalize the path (resolves symlinks and ..)
-    try:
-        canonical_path = Path(file_path).resolve()
-    except (OSError, ValueError) as e:
-        raise ValueError(f"Invalid file path: {e}")
-
-    # Ensure path is within upload directory
-    try:
-        canonical_path.relative_to(upload_dir)
-    except ValueError:
-        raise ValueError(f"File path must be within upload directory: {upload_dir}")
-
-    # Check file exists
-    if not canonical_path.exists():
-        raise ValueError(f"File does not exist: {canonical_path}")
-
-    return str(canonical_path)
-
-
-def _sanitize_sheet_name(sheet_name: Optional[str]) -> str:
-    """
-    Sanitize Excel sheet name to prevent SQL injection.
-
-    Args:
-        sheet_name: The sheet name to sanitize
-
-    Returns:
-        Sanitized sheet name safe for SQL queries
-    """
-    if not sheet_name:
-        return 'Sheet1'
-
-    # Remove any characters that could be used for SQL injection
-    # Allow only alphanumeric, spaces, underscores, hyphens
-    sanitized = re.sub(r"[^a-zA-Z0-9 _\-]", '', sheet_name)
-
-    # Remove SQL comment sequences (double hyphens)
-    sanitized = sanitized.replace('--', '')
-
-    # Limit length
-    sanitized = sanitized[:100]
-
-    # Ensure not empty after sanitization
-    if not sanitized.strip():
-        return 'Sheet1'
-
-    return sanitized
 
 
 class FileSourceDuckDBSession:
@@ -109,9 +38,16 @@ class FileSourceDuckDBSession:
 
     _instance: Optional[duckdb.DuckDBPyConnection] = None
     _loaded_tables: Set[str] = set()
-    _lock: asyncio.Lock = asyncio.Lock()
+    _lock: Optional[asyncio.Lock] = None
     _table_metadata: Dict[str, Dict[str, Any]] = {}
     _settings: Optional[Settings] = None
+
+    @classmethod
+    def _get_lock(cls) -> asyncio.Lock:
+        """Get or create the async lock (lazy to avoid event loop issues)."""
+        if cls._lock is None:
+            cls._lock = asyncio.Lock()
+        return cls._lock
 
     @classmethod
     def _get_settings(cls) -> Settings:
@@ -125,25 +61,34 @@ class FileSourceDuckDBSession:
         """
         Get or create shared DuckDB session.
 
+        Thread Safety: Uses a threading lock to prevent double-initialization
+        from concurrent callers.
+
         Returns:
             DuckDB connection instance
         """
         if cls._instance is None:
-            settings = cls._get_settings()
-            cls._instance = duckdb.connect(':memory:')
+            import threading
+            if not hasattr(cls, '_init_lock'):
+                cls._init_lock = threading.Lock()
+            with cls._init_lock:
+                # Double-check after acquiring lock
+                if cls._instance is None:
+                    settings = cls._get_settings()
+                    cls._instance = duckdb.connect(':memory:')
 
-            # Configure memory limit
-            memory_limit = settings.DUCKDB_FILE_MEMORY_LIMIT
-            cls._instance.execute(f"SET memory_limit='{memory_limit}'")
+                    # Configure memory limit
+                    memory_limit = settings.DUCKDB_FILE_MEMORY_LIMIT
+                    cls._instance.execute(f"SET memory_limit='{memory_limit}'")
 
-            # Configure threads
-            threads = settings.DUCKDB_FILE_THREADS
-            cls._instance.execute(f"SET threads={threads}")
+                    # Configure threads
+                    threads = settings.DUCKDB_FILE_THREADS
+                    cls._instance.execute(f"SET threads={threads}")
 
-            logger.info(
-                f"FileSourceDuckDBSession initialized with in-memory database "
-                f"(memory_limit={memory_limit}, threads={threads})"
-            )
+                    logger.info(
+                        f"FileSourceDuckDBSession initialized with in-memory database "
+                        f"(memory_limit={memory_limit}, threads={threads})"
+                    )
 
         return cls._instance
 
@@ -173,13 +118,13 @@ class FileSourceDuckDBSession:
         """
         table_name = file_source.duckdb_table_name
 
-        async with cls._lock:
+        async with cls._get_lock():
             if table_name in cls._loaded_tables:
                 logger.debug(f"Table '{table_name}' already loaded")
                 return table_name
 
             # Load table in executor (DuckDB is sync)
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             try:
                 await loop.run_in_executor(
                     None,
@@ -203,8 +148,11 @@ class FileSourceDuckDBSession:
 
                 # Try to drop the table if it was partially created
                 try:
-                    session = cls.get_session()
-                    session.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+                    cleanup_cursor = cls.get_session().cursor()
+                    try:
+                        cleanup_cursor.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+                    finally:
+                        cleanup_cursor.close()
                 except Exception:
                     pass  # Ignore cleanup errors
 
@@ -228,12 +176,15 @@ class FileSourceDuckDBSession:
 
         Security: Uses validated/canonicalized paths and sanitized sheet names
         to prevent SQL injection attacks.
+
+        Thread Safety: Uses a cursor from the shared connection so that
+        concurrent run_in_executor calls don't corrupt connection state.
         """
-        session = cls.get_session()
+        cursor = cls.get_session().cursor()
 
         # Validate file path to prevent path traversal
         try:
-            validated_path = _validate_file_path(file_path, cls._settings)
+            validated_path = validate_file_path(file_path, Path(cls._get_settings().FILE_UPLOAD_DIR))
         except ValueError as e:
             logger.error(f"Invalid file path for table '{table_name}': {e}")
             raise
@@ -241,24 +192,25 @@ class FileSourceDuckDBSession:
         temp_csv_path = None
         try:
             if file_type == 'csv':
-                # Use parameterized-style approach: path is validated above
-                session.execute(f"""
+                safe_path = validated_path.replace("'", "''")
+                cursor.execute(f"""
                     CREATE OR REPLACE TABLE "{table_name}" AS
-                    SELECT * FROM read_csv_auto('{validated_path}', header=true, all_varchar=false)
+                    SELECT * FROM read_csv_auto('{safe_path}', header=true, all_varchar=false)
                 """)
             elif file_type in ('xlsx', 'xls'):
                 # Convert Excel to temp CSV (DuckDB 1.1.x lacks read_excel)
-                safe_sheet = _sanitize_sheet_name(sheet_name)
+                safe_sheet = sanitize_sheet_name(sheet_name)
                 temp_csv_path = excel_to_temp_csv(validated_path, safe_sheet)
-                session.execute(f"""
+                safe_csv_path = temp_csv_path.replace("'", "''")
+                cursor.execute(f"""
                     CREATE OR REPLACE TABLE "{table_name}" AS
-                    SELECT * FROM read_csv_auto('{temp_csv_path}', header=true, all_varchar=false)
+                    SELECT * FROM read_csv_auto('{safe_csv_path}', header=true, all_varchar=false)
                 """)
             else:
                 raise ValueError(f"Unsupported file type: {file_type}")
 
             # Get row count for metadata
-            result = session.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()
+            result = cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()
             row_count = result[0] if result else 0
             cls._table_metadata[table_name] = {'row_count': row_count}
 
@@ -268,6 +220,7 @@ class FileSourceDuckDBSession:
             logger.error(f"Failed to load table '{table_name}': {e}")
             raise
         finally:
+            cursor.close()
             if temp_csv_path:
                 try:
                     os.unlink(temp_csv_path)
@@ -299,7 +252,7 @@ class FileSourceDuckDBSession:
             await cls.ensure_table_loaded(fs)
 
         # Execute query in executor
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             None,
             cls._execute_sync,
@@ -310,11 +263,15 @@ class FileSourceDuckDBSession:
 
     @classmethod
     def _execute_sync(cls, sql: str, max_rows: int) -> Dict[str, Any]:
-        """Execute query synchronously."""
-        session = cls.get_session()
+        """Execute query synchronously.
+
+        Thread Safety: Uses a cursor so concurrent executor threads
+        don't share mutable result state on the connection.
+        """
+        cursor = cls.get_session().cursor()
 
         try:
-            result = session.execute(sql)
+            result = cursor.execute(sql)
 
             if result.description:
                 columns = [desc[0] for desc in result.description]
@@ -365,6 +322,8 @@ class FileSourceDuckDBSession:
                 'row_count': 0,
                 'truncated': False,
             }
+        finally:
+            cursor.close()
 
     @classmethod
     async def get_table_schema(
@@ -382,7 +341,7 @@ class FileSourceDuckDBSession:
         """
         await cls.ensure_table_loaded(file_source)
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         schema = await loop.run_in_executor(
             None,
             cls._get_schema_sync,
@@ -392,52 +351,58 @@ class FileSourceDuckDBSession:
 
     @classmethod
     def _get_schema_sync(cls, table_name: str) -> Dict[str, Any]:
-        """Get schema synchronously."""
-        session = cls.get_session()
+        """Get schema synchronously.
 
-        # Get column info using DESCRIBE
-        result = session.execute(f'DESCRIBE "{table_name}"')
-        columns = []
-        for row in result.fetchall():
-            columns.append({
-                'name': row[0],
-                'type': str(row[1]).upper(),
-                'nullable': row[2] == 'YES' if len(row) > 2 else True,
-            })
+        Thread Safety: Uses a cursor for thread-safe access.
+        """
+        cursor = cls.get_session().cursor()
 
-        # Get row count
-        count_result = session.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()
-        row_count = count_result[0] if count_result else 0
+        try:
+            # Get column info using DESCRIBE
+            result = cursor.execute(f'DESCRIBE "{table_name}"')
+            columns = []
+            for row in result.fetchall():
+                columns.append({
+                    'name': row[0],
+                    'type': str(row[1]).upper(),
+                    'nullable': row[2] == 'YES' if len(row) > 2 else True,
+                })
 
-        # Get sample values for each column
-        sample_values = {}
-        for col in columns:
-            try:
-                col_name = col['name']
-                sample_result = session.execute(f"""
-                    SELECT DISTINCT "{col_name}"
-                    FROM "{table_name}"
-                    WHERE "{col_name}" IS NOT NULL
-                    LIMIT 5
-                """)
-                values = []
-                for sample_row in sample_result.fetchall():
-                    val = sample_row[0]
-                    if hasattr(val, 'isoformat'):
-                        val = val.isoformat()
-                    values.append(val)
-                sample_values[col_name] = values
-                col['sample_values'] = values
-            except Exception as e:
-                logger.debug(f"Failed to get samples for column {col['name']}: {e}")
-                sample_values[col['name']] = []
-                col['sample_values'] = []
+            # Get row count
+            count_result = cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()
+            row_count = count_result[0] if count_result else 0
 
-        return {
-            'columns': columns,
-            'row_count': row_count,
-            'sample_values': sample_values,
-        }
+            # Get sample values for each column
+            sample_values = {}
+            for col in columns:
+                try:
+                    col_name = col['name']
+                    sample_result = cursor.execute(f"""
+                        SELECT DISTINCT "{col_name}"
+                        FROM "{table_name}"
+                        WHERE "{col_name}" IS NOT NULL
+                        LIMIT 5
+                    """)
+                    values = []
+                    for sample_row in sample_result.fetchall():
+                        val = sample_row[0]
+                        if hasattr(val, 'isoformat'):
+                            val = val.isoformat()
+                        values.append(val)
+                    sample_values[col_name] = values
+                    col['sample_values'] = values
+                except Exception as e:
+                    logger.debug(f"Failed to get samples for column {col['name']}: {e}")
+                    sample_values[col['name']] = []
+                    col['sample_values'] = []
+
+            return {
+                'columns': columns,
+                'row_count': row_count,
+                'sample_values': sample_values,
+            }
+        finally:
+            cursor.close()
 
     @classmethod
     async def unload_table(cls, table_name: str) -> None:
@@ -447,9 +412,9 @@ class FileSourceDuckDBSession:
         Args:
             table_name: The table name to unload
         """
-        async with cls._lock:
+        async with cls._get_lock():
             if table_name in cls._loaded_tables:
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 await loop.run_in_executor(
                     None,
                     cls._drop_table_sync,
@@ -462,11 +427,13 @@ class FileSourceDuckDBSession:
     @classmethod
     def _drop_table_sync(cls, table_name: str) -> None:
         """Synchronously drop table."""
-        session = cls.get_session()
+        cursor = cls.get_session().cursor()
         try:
-            session.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+            cursor.execute(f'DROP TABLE IF EXISTS "{table_name}"')
         except Exception as e:
             logger.warning(f"Failed to drop table '{table_name}': {e}")
+        finally:
+            cursor.close()
 
     @classmethod
     async def reset_session(cls) -> None:
@@ -475,7 +442,7 @@ class FileSourceDuckDBSession:
 
         Closes the current connection and clears all state.
         """
-        async with cls._lock:
+        async with cls._get_lock():
             if cls._instance:
                 try:
                     cls._instance.close()
@@ -485,7 +452,9 @@ class FileSourceDuckDBSession:
             cls._instance = None
             cls._loaded_tables.clear()
             cls._table_metadata.clear()
-            logger.info("FileSourceDuckDBSession reset")
+        # Reset the lock so a fresh one is created for the current event loop
+        cls._lock = None
+        logger.info("FileSourceDuckDBSession reset")
 
     @classmethod
     def get_loaded_tables(cls) -> List[str]:

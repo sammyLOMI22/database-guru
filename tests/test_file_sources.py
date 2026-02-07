@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.file_source_handler import FileSourceHandler, get_file_source_by_id, list_file_sources
 from src.core.file_source_session import FileSourceDuckDBSession
+from src.core.file_utils import validate_file_path, sanitize_sheet_name
 from src.database.models import FileSource
 
 
@@ -51,15 +52,21 @@ def sample_csv_file(sample_csv_content):
     file.filename = "test_data.csv"
     file.content_type = "text/csv"
 
-    # Create an async read function
+    # Create an async read function that supports optional size parameter
     content = sample_csv_content
-    read_called = [False]
+    pos = [0]
 
-    async def read():
-        return content
+    async def read(size=-1):
+        if size == -1:
+            chunk = content[pos[0]:]
+            pos[0] = len(content)
+            return chunk
+        chunk = content[pos[0]:pos[0] + size]
+        pos[0] += len(chunk)
+        return chunk
 
-    async def seek(pos):
-        pass
+    async def seek(p):
+        pos[0] = p
 
     file.read = read
     file.seek = seek
@@ -121,12 +128,19 @@ class TestFileValidation:
         """Test validation fails for oversized files."""
         file = MagicMock(spec=UploadFile)
         file.filename = "large.csv"
+        pos = [0]
 
-        async def read():
-            return large_csv_content
+        async def read(size=-1):
+            if size == -1:
+                chunk = large_csv_content[pos[0]:]
+                pos[0] = len(large_csv_content)
+                return chunk
+            chunk = large_csv_content[pos[0]:pos[0] + size]
+            pos[0] += len(chunk)
+            return chunk
 
-        async def seek(pos):
-            pass
+        async def seek(p):
+            pos[0] = p
 
         file.read = read
         file.seek = seek
@@ -141,10 +155,10 @@ class TestFileValidation:
         file = MagicMock(spec=UploadFile)
         file.filename = "empty.csv"
 
-        async def read():
+        async def read(size=-1):
             return b""
 
-        async def seek(pos):
+        async def seek(p):
             pass
 
         file.read = read
@@ -471,7 +485,7 @@ class TestPathValidation:
         path.write_bytes(sample_csv_content)
 
         try:
-            result = handler._validate_file_path(str(path))
+            result = validate_file_path(str(path), handler.upload_dir)
             assert result == str(path.resolve())
         finally:
             path.unlink()
@@ -479,24 +493,24 @@ class TestPathValidation:
     def test_validate_file_path_traversal_blocked(self, handler):
         """Test that path traversal attempts are blocked."""
         with pytest.raises(ValueError, match="must be within upload directory"):
-            handler._validate_file_path("/etc/passwd")
+            validate_file_path("/etc/passwd", handler.upload_dir)
 
     def test_validate_file_path_relative_traversal_blocked(self, handler, settings):
         """Test that relative path traversal is blocked."""
         traversal_path = str(Path(settings.FILE_UPLOAD_DIR) / ".." / ".." / "etc" / "passwd")
         with pytest.raises(ValueError, match="must be within upload directory"):
-            handler._validate_file_path(traversal_path)
+            validate_file_path(traversal_path, handler.upload_dir)
 
     def test_validate_file_path_empty(self, handler):
         """Test that empty paths are rejected."""
         with pytest.raises(ValueError, match="cannot be empty"):
-            handler._validate_file_path("")
+            validate_file_path("", handler.upload_dir)
 
     def test_validate_file_path_nonexistent(self, handler, settings):
         """Test that nonexistent files are rejected."""
         nonexistent = str(Path(settings.FILE_UPLOAD_DIR) / "nonexistent.csv")
         with pytest.raises(ValueError, match="does not exist"):
-            handler._validate_file_path(nonexistent)
+            validate_file_path(nonexistent, handler.upload_dir)
 
 
 class TestSheetNameSanitization:
@@ -504,36 +518,28 @@ class TestSheetNameSanitization:
 
     def test_sanitize_sheet_name_valid(self):
         """Test that valid sheet names pass through."""
-        from src.core.file_source_handler import _sanitize_sheet_name
-
-        assert _sanitize_sheet_name("Sheet1") == "Sheet1"
-        assert _sanitize_sheet_name("Sales Data") == "Sales Data"
-        assert _sanitize_sheet_name("Q4-2024") == "Q4-2024"
-        assert _sanitize_sheet_name("data_backup") == "data_backup"
+        assert sanitize_sheet_name("Sheet1") == "Sheet1"
+        assert sanitize_sheet_name("Sales Data") == "Sales Data"
+        assert sanitize_sheet_name("Q4-2024") == "Q4-2024"
+        assert sanitize_sheet_name("data_backup") == "data_backup"
 
     def test_sanitize_sheet_name_removes_sql_injection(self):
         """Test that SQL injection attempts are sanitized."""
-        from src.core.file_source_handler import _sanitize_sheet_name
-
         # Single quotes removed
-        assert "'" not in _sanitize_sheet_name("Sheet'; DROP TABLE--")
+        assert "'" not in sanitize_sheet_name("Sheet'; DROP TABLE--")
         # Semicolons removed
-        assert ";" not in _sanitize_sheet_name("Sheet1; DELETE FROM")
+        assert ";" not in sanitize_sheet_name("Sheet1; DELETE FROM")
         # Comments removed
-        assert "--" not in _sanitize_sheet_name("Sheet1--")
+        assert "--" not in sanitize_sheet_name("Sheet1--")
 
     def test_sanitize_sheet_name_empty_returns_default(self):
         """Test that empty sheet names return default."""
-        from src.core.file_source_handler import _sanitize_sheet_name
-
-        assert _sanitize_sheet_name("") == "Sheet1"
-        assert _sanitize_sheet_name(None) == "Sheet1"
-        assert _sanitize_sheet_name("   ") == "Sheet1"
+        assert sanitize_sheet_name("") == "Sheet1"
+        assert sanitize_sheet_name(None) == "Sheet1"
+        assert sanitize_sheet_name("   ") == "Sheet1"
 
     def test_sanitize_sheet_name_length_limit(self):
         """Test that long sheet names are truncated."""
-        from src.core.file_source_handler import _sanitize_sheet_name
-
         long_name = "A" * 200
-        result = _sanitize_sheet_name(long_name)
+        result = sanitize_sheet_name(long_name)
         assert len(result) <= 100

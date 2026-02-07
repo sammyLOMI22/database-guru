@@ -49,6 +49,9 @@ configs/*/
 logs/
 *.log
 
+# Uploads (user-uploaded CSV/Excel files)
+uploads/
+
 # Data
 data/
 !data/sample/

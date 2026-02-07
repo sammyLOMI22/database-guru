@@ -1,9 +1,9 @@
 """Chat session endpoints for Database Guru"""
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, update, delete, desc
+from sqlalchemy import func, select, update, delete, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
@@ -245,11 +245,11 @@ async def list_chat_sessions(
                     for conn in conn_result.scalars().all()
                 ]
 
-            # Count messages
+            # Count messages efficiently
             msg_count_result = await db.execute(
-                select(ChatMessage).where(ChatMessage.chat_session_id == session.id)
+                select(func.count()).select_from(ChatMessage).where(ChatMessage.chat_session_id == session.id)
             )
-            message_count = len(msg_count_result.scalars().all())
+            message_count = msg_count_result.scalar() or 0
 
             # Ensure active_connection_ids in response is always a list
             active_conn_ids = session.active_connection_ids
@@ -330,11 +330,11 @@ async def get_chat_session(
                 for conn in conn_result.scalars().all()
             ]
 
-        # Count messages
+        # Count messages efficiently
         msg_count_result = await db.execute(
-            select(ChatMessage).where(ChatMessage.chat_session_id == session.id)
+            select(func.count()).select_from(ChatMessage).where(ChatMessage.chat_session_id == session.id)
         )
-        message_count = len(msg_count_result.scalars().all())
+        message_count = msg_count_result.scalar() or 0
 
         # Ensure active_connection_ids in response is always a list
         active_conn_ids = session.active_connection_ids
@@ -410,8 +410,26 @@ async def update_chat_session(
 
             session.active_connection_ids = update_data.connection_ids
 
-        session.updated_at = datetime.utcnow()
-        session.last_active_at = datetime.utcnow()
+        if update_data.file_source_ids is not None:
+            # Validate file source IDs
+            if update_data.file_source_ids:
+                file_result = await db.execute(
+                    select(FileSource).where(
+                        FileSource.id.in_(update_data.file_source_ids),
+                        FileSource.processing_status == 'ready',
+                    )
+                )
+                valid_files = file_result.scalars().all()
+                if len(valid_files) != len(update_data.file_source_ids):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="One or more file source IDs are invalid or not ready"
+                    )
+
+            session.active_file_source_ids = update_data.file_source_ids
+
+        session.updated_at = datetime.now(timezone.utc)
+        session.last_active_at = datetime.now(timezone.utc)
 
         await db.commit()
         await db.refresh(session)
@@ -441,11 +459,11 @@ async def update_chat_session(
                 for conn in conn_result.scalars().all()
             ]
 
-        # Count messages
+        # Count messages efficiently
         msg_count_result = await db.execute(
-            select(ChatMessage).where(ChatMessage.chat_session_id == session.id)
+            select(func.count()).select_from(ChatMessage).where(ChatMessage.chat_session_id == session.id)
         )
-        message_count = len(msg_count_result.scalars().all())
+        message_count = msg_count_result.scalar() or 0
 
         # Ensure active_connection_ids in response is always a list
         active_conn_ids = session.active_connection_ids
@@ -454,12 +472,17 @@ async def update_chat_session(
         elif not isinstance(active_conn_ids, list):
             active_conn_ids = list(active_conn_ids) if active_conn_ids else []
 
+        # Get file source details
+        file_sources = await _get_session_file_sources(session, db)
+
         return ChatSessionResponse(
             id=session.id,
             name=session.name,
             user_id=session.user_id,
             active_connection_ids=active_conn_ids,
             connections=connections,
+            active_file_source_ids=session.active_file_source_ids or [],
+            file_sources=file_sources,
             created_at=session.created_at.isoformat(),
             updated_at=session.updated_at.isoformat(),
             last_active_at=session.last_active_at.isoformat(),
@@ -600,7 +623,7 @@ async def create_chat_message(
         db.add(new_message)
 
         # Update session last_active_at
-        session.last_active_at = datetime.utcnow()
+        session.last_active_at = datetime.now(timezone.utc)
 
         await db.commit()
         await db.refresh(new_message)
@@ -771,7 +794,7 @@ async def add_file_to_session(
         current_files = session.active_file_source_ids or []
         if file_id not in current_files:
             session.active_file_source_ids = current_files + [file_id]
-            session.updated_at = datetime.utcnow()
+            session.updated_at = datetime.now(timezone.utc)
             await db.commit()
             await db.refresh(session)
 
@@ -826,7 +849,7 @@ async def remove_file_from_session(
         current_files = session.active_file_source_ids or []
         if file_id in current_files:
             session.active_file_source_ids = [f for f in current_files if f != file_id]
-            session.updated_at = datetime.utcnow()
+            session.updated_at = datetime.now(timezone.utc)
             await db.commit()
             await db.refresh(session)
 
