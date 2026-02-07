@@ -1,80 +1,104 @@
-# PR Review: File Data Source Integration (Phase 13)
+# Multi-Dimensional Technical Audit: File Data Source Integration
 
-Review performed from the perspectives of **Senior Software Engineer**, **Project Manager**, **Data Architect**, and **Data Analyst**.
+## 1. Executive Summary
+The "File Data Source Integration" feature introduces the ability to upload CSV and Excel files, infer their schemas using DuckDB, and query them using the existing natural language interface. 
 
-## Executive Summary
-
-The **Phase 13: CSV & Excel File Support** is a robust and well-executed feature that significantly expands the utility of Database Guru. By leveraging **DuckDB** for in-memory processing, the system provides high-performance querying without the overhead of database migrations.
-
-The implementation is high-quality, with excellent UX considerations (especially Excel sheet selection) and strong security foundations (path sanitization).
+**Status**: ⚠️ **Near Production-Ready, but blocked by CI/Environment issues.**
+The core logic is sound and architecturally cohesive with Antigravity+Gemini. However, the testing environment is currently broken (missing `pytest`), and there are potential concurrency bottlenecks in the DuckDB session management.
 
 ---
 
-## 🏗️ Architectural Review (Senior Software Engineer)
+## 2. Persona-Based Audit
 
-### What Works Well
-- **DuckDB Integration**: Using a singleton `FileSourceDuckDBSession` for shared in-memory state is an efficient design.
-- **Lazy Loading**: Tables are loaded into DuckDB only when first accessed, optimizing memory usage.
-- **Clean Separation**: `FileSourceHandler` manages the filesystem and metadata, while the session manager handles the query engine.
-- **Error Handling**: Comprehensive cleanup of partial files and tables on failure in `process_upload` and `ensure_table_loaded`.
+### 👷‍♂️ Senior Software Engineer
+**Focus**: Code Quality, Patterns, Integrations, Tests.
 
-### Issues & Improvements
-> [!WARNING]
-> **SQL Injection Risk**: In `file_source_session.py`, the `read_csv_auto('{validated_path}')` call uses string interpolation for a file path. While the path is validated and sanitized, using parameterized paths or double-escaping single quotes in the path is a safer practice.
+*   **The Wins**:
+    *   **DuckDB Integration**: Using `duckdb` for both schema inference and querying is an excellent choice for performance and flexibility without needing a heavy database setup.
+    *   **Async I/O**: Proper use of `aiofiles` and `run_in_executor` to keep the main event loop non-blocking during file operations.
+    *   **Fallback Logic**: The `ResultNarrator` (lines 650-668) has robust fallback logic if the LLM fails, ensuring the user always gets *some* insight.
+    *   **Security**: `_sanitize_filename` and path validation prevent directory traversal attacks.
 
-```python
-# Current: Risk if filename contains '
-session.execute(f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto('{validated_path}')")
+*   **Issues & Bugs**:
+    *   **CRITICAL: Missing Test Dependencies**: The project uses `pytest` imports in `tests/`, but `pytest` is not listed in `requirements.txt` (only `fastapi`, `sqlalchemy`, etc.). This causes CI/CD reliability issues.
+    *   **Concurrency Risk**: `FileSourceDuckDBSession` uses a lock for *loading* tables, but `execute_query` relies on `duckdb`'s internal handling inside a thread pool. While DuckDB `cursor()` is generally thread-safe for read-only, high-load parallel queries might contend or crash if not managed carefully in in-memory mode.
+    *   **Error Handling**: Exception handling in `process_upload` is good, but `upload_file` endpoint could expose raw internal error strings to the user in some `HTTP 500` cases.
+
+*   **Recommendations**:
+    *   Add `pytest` and `httpx` to a `requirements-dev.txt`.
+    *   Verify thread safety of concurrent DuckDB queries under load.
+
+### 👩‍💼 Project Manager
+**Focus**: UX, Scope, "Definition of Done".
+
+*   **The Wins**:
+    *   **Feature Completeness**: Upload, auto-schema detection, and querying are all implemented. Frontend supports drag-and-drop and progress/status.
+    *   **User Value**: Significantly expands the tool's utility beyond connected DBs to ad-hoc analysis.
+
+*   **Issues**:
+    *   **UX Gaps**: The "Processing" state might hang if the backend restarts. There is no websocket/polling mechanism visible in `FileUploadModal` to update status from 'processing' to 'ready' without a refresh or manual action (though `handleFileUploadSuccess` does wait for the request to finish, which is synchronous-ish).
+    *   **Technical Debt**: `ResultNarrator.py` is becoming a "God Class" (1200+ lines). It handles stats, prompts, anomalies, and formatting.
+
+*   **Definition of Done**:
+    *   [x] Feature Implemented
+    *   [ ] Tests Passing (Failed)
+    *   [ ] CI Configured (Missing deps)
+
+### 🏗️ Data Architect
+**Focus**: Data Lineage, Schema, State.
+
+*   **The Wins**:
+    *   **Schema & Lineage**: `FileSource` model correctly links `user_id`, `chat_session_id`, and `original_filename`. We can trace exactly where data came from.
+    *   **Lazy Loading**: `FileSourceDuckDBSession` lazily loads tables into memory only when requested. This is crucial for memory management.
+
+*   **Issues**:
+    *   **State Management**: In-memory DuckDB tables are lost on server restart. The system handles this by reloading from disk on next query (`ensure_table_loaded`), which is good, but large files will cause a "cold start" delay after every restart.
+    *   **Data Types**: DuckDB inference is powerful but might misclassify columns with mixed types (e.g., ID columns that look like integers but are strings).
+
+### 🔍 Data Analyst
+**Focus**: Data Utility, Bias, Interpretability.
+
+*   **The Wins**:
+    *   **Smart Narratives**: The `ResultNarrator` ignores "ID" columns to focus on meaningful statistics (min/max/avg for numbers, distribution for strings).
+    *   **Anomaly Detection**: The Z-score implementation for outlier detection adds real analytical value beyond just "summarizing rows".
+
+*   **Issues**:
+    *   **LLM Hallucination Risk**: If `ResultNarrator` feeds too much raw data to Gemini Flash 3, it might truncate or hallucinate trends. The hard limit of `max_sample_rows=20` is safe but might miss broader context.
+
+---
+
+## 3. Data Lineage & Flow (Visual)
+
+```mermaid
+graph TD
+    User[User] -->|Uploads File| API[API /upload]
+    API -->|Validate & Sanitize| Handler[FileSourceHandler]
+    Handler -->|Write Stream| Disk[(Local Disk Storage)]
+    Handler -->|Connect| Duck[DuckDB (In-Memory)]
+    Duck -->|Read_CSV_Auto| Schema[Inferred Schema]
+    Handler -->|Save Metadata| DB[(PostgreSQL Metadata)]
+    
+    subgraph Query Execution
+    User -->|Ask Question| Chat[Chat Interface]
+    Chat -->|Natural Language| Planner[Query Planner]
+    Planner -->|Select Source| Router[Multi-DB Router]
+    Router -->|SQL Generation| Gen[LLM (Gemini)]
+    Gen -->|Execute SQL| Session[FileSourceDuckDBSession]
+    Session -->|Lazy Load| Duck
+    Duck -->|Query| Disk
+    Session -->|Result Set| Narrator[ResultNarrator]
+    Narrator -->|Stats & Insights| User
+    end
 ```
 
-### Future Improvements
-- **Native Excel Support**: Investigate DuckDB's native Excel extension to avoid the Python-based CSV conversion for large files.
-- **Connection Pooling**: As concurrent usage grows, a pool of DuckDB connections may be needed to avoid blocking on the singleton lock.
+## 4. Action Plan (Immediate Fixes)
 
----
-
-## 🎨 UI/UX & Aesthetics (Project Manager)
-
-### What Works Well
-- **Premium Aesthetics**: The high-fidelity glassmorphism design fits perfectly with the existing application theme.
-- **User Guidance**: The "Upload Data File" modal provides clear instructions and feedback.
-- **Excel UX**: Fetching sheet names *before* upload is a standout feature that prevents user frustration.
-
-### Next Steps
-1. **Discoverability**: The Data Sources panel is hidden by default. Consider an onboarding hint for new users.
-2. **Accessibility**: Add "Upload" text to the icon button in the sidebar to improve clarity.
-
----
-
-## 📊 Data & Strategy (Data Architect & Analyst)
-
-### What Works Well
-- **Automated Schema Inference**: Correctly detects types (INT, DOUBLE, DATE) and row counts.
-- **Sample Values**: Showing sample values in the UI is highly effective for exploratory analysis.
-
-### Foundational Issue
-> [!IMPORTANT]
-> **Cross-Source Limitations**: Current guidance to the LLM suggests generating *separate* queries for database connections vs file sources. This prevents the true power of "blending" data (e.g., joining a local CSV of leads with a production CRM database).
-
-### Recommended Evolution
-- **Federated Queries**: Implement a bridge where DuckDB can "see" external Postgres/MySQL tables using DuckDB extensions (e.g., `postgres_scanner`).
-
----
-
-## 🔐 Security & Stability
-
-### Breaking Issues
-- **None found**. The system is stable and handles large files (100MB limit) gracefully.
-
-### Security Concerns
-- **Path Traversal**: Well-protected by `_validate_file_path`.
-- **Global Files**: Ensure that "Global" scope correctly respects organizational multi-tenancy if implemented in the future.
-- **File Sanitization**: `_sanitize_filename` correctly handles special characters and null bytes.
-
----
-
-## ✅ Recommendation: **APPROVE with Minor Fixes**
-The feature is production-ready. I recommend addressing the SQL path escaping and the UI accessibility suggestions as follow-up tasks.
-
-**Reviewer**: Antigravity (AI Architect)
-**Status**: Verified on `localhost:3000`
+1.  **Fix Test Environment**:
+    *   Create `requirements-dev.txt` including `pytest`, `pytest-asyncio`, `httpx`.
+    *   Update `requirements.txt` if these are needed in production (unlikely for pytest).
+2.  **Hardening DuckDB Session**:
+    *   Add a test case that attempts concurrent queries to `FileSourceDuckDBSession` to verify thread safety.
+3.  **Refactor ResultNarrator**:
+    *   Extract `_extract_statistics`, `_detect_anomalies`, `_detect_trends` into a separate `DataProfiler` service class to reduce the size of `ResultNarrator`.
+4.  **UX Polish**:
+    *   Ensure `FileSource` cleanup (expiration) is actually scheduled (e.g., via a background task or cron), as `expires_at` exists in the model but no background job was seen in the diff.
