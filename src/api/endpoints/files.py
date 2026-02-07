@@ -34,6 +34,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/files", tags=["files"])
 
 
+def _check_file_accessible(file_source: Optional[FileSource], file_id: int) -> None:
+    """Check if a file source exists and is accessible.
+
+    Raises:
+        HTTPException: 404 if missing, 410 if deleted, 400 if not ready
+    """
+    if not file_source:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"File source {file_id} not found",
+        )
+    if file_source.processing_status == 'deleted':
+        raise HTTPException(
+            status_code=410,
+            detail=f"File source '{file_source.name}' has been removed",
+        )
+    if file_source.processing_status != 'ready':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File is not ready (status: {file_source.processing_status})",
+        )
+
+
 def _file_source_to_response(file_source: FileSource) -> FileSourceResponse:
     """Convert FileSource model to response schema."""
     schema = None
@@ -180,6 +203,7 @@ async def delete_file(
     Delete a file source and its physical file.
 
     Also unloads the table from the DuckDB session if loaded.
+    Idempotent: returns 204 if already deleted.
     """
     file_source = await get_file_source_by_id(file_id, db)
 
@@ -189,10 +213,14 @@ async def delete_file(
             detail=f"File source {file_id} not found",
         )
 
+    # Idempotent: already deleted
+    if file_source.processing_status == 'deleted':
+        return
+
     # Unload from DuckDB
     await FileSourceDuckDBSession.unload_table(file_source.duckdb_table_name)
 
-    # Delete file and record
+    # Soft-delete file and record
     handler = FileSourceHandler(settings)
     await handler.cleanup_file(file_source, db)
 
@@ -208,20 +236,10 @@ async def get_file_schema(
     Get the inferred schema for a file source.
 
     Returns column names, types, and sample values.
+    Returns 410 GONE if the file has been deleted.
     """
     file_source = await get_file_source_by_id(file_id, db)
-
-    if not file_source:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"File source {file_id} not found",
-        )
-
-    if file_source.processing_status != 'ready':
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File is not ready (status: {file_source.processing_status})",
-        )
+    _check_file_accessible(file_source, file_id)
 
     if not file_source.schema_cache:
         raise HTTPException(
@@ -256,20 +274,10 @@ async def get_file_preview(
     Get a preview of the file data.
 
     Returns the first N rows (default 20, max 100).
+    Returns 410 GONE if the file has been deleted.
     """
     file_source = await get_file_source_by_id(file_id, db)
-
-    if not file_source:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"File source {file_id} not found",
-        )
-
-    if file_source.processing_status != 'ready':
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File is not ready (status: {file_source.processing_status})",
-        )
+    _check_file_accessible(file_source, file_id)
 
     handler = FileSourceHandler(settings)
 
@@ -305,14 +313,10 @@ async def refresh_file_schema(
 
     Re-reads the file and updates the inferred schema.
     Useful if the file was updated externally.
+    Returns 410 GONE if the file has been deleted.
     """
     file_source = await get_file_source_by_id(file_id, db)
-
-    if not file_source:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"File source {file_id} not found",
-        )
+    _check_file_accessible(file_source, file_id)
 
     # Unload from DuckDB to force reload
     await FileSourceDuckDBSession.unload_table(file_source.duckdb_table_name)

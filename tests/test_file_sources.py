@@ -409,6 +409,108 @@ class TestContentValidation:
         assert result is False
 
 
+class TestCleanupSoftDelete:
+    """Tests for soft-delete behavior in cleanup_file and cleanup_expired_files."""
+
+    @pytest.mark.asyncio
+    async def test_cleanup_file_soft_deletes(self, handler, settings, sample_csv_content):
+        """Test that cleanup_file sets is_active=False and processing_status='deleted'."""
+        # Create a temp file on disk
+        path = Path(settings.FILE_UPLOAD_DIR) / "to_delete.csv"
+        path.write_bytes(sample_csv_content)
+
+        # Create a mock FileSource
+        fs = MagicMock(spec=FileSource)
+        fs.id = 42
+        fs.name = "To Delete"
+        fs.file_path = str(path)
+        fs.is_active = True
+        fs.processing_status = 'ready'
+        fs.processing_error = None
+
+        db = AsyncMock(spec=AsyncSession)
+
+        await handler.cleanup_file(fs, db)
+
+        # Should soft-delete, NOT call db.delete()
+        db.delete.assert_not_called()
+        db.commit.assert_called_once()
+
+        # Should mark as inactive/deleted
+        assert fs.is_active is False
+        assert fs.processing_status == 'deleted'
+        assert fs.processing_error == 'File has been removed'
+
+        # Physical file should be deleted
+        assert not path.exists()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_file_physical_file_deleted(self, handler, settings, sample_csv_content):
+        """Test that the physical file is still removed from disk."""
+        path = Path(settings.FILE_UPLOAD_DIR) / "physical_delete.csv"
+        path.write_bytes(sample_csv_content)
+        assert path.exists()
+
+        fs = MagicMock(spec=FileSource)
+        fs.id = 43
+        fs.name = "Physical Delete"
+        fs.file_path = str(path)
+        fs.is_active = True
+        fs.processing_status = 'ready'
+        fs.processing_error = None
+
+        db = AsyncMock(spec=AsyncSession)
+
+        await handler.cleanup_file(fs, db)
+
+        assert not path.exists()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_expired_files_calls_unload_table(self, settings, sample_csv_content):
+        """Test that cleanup_expired_files calls unload_table for each expired file."""
+        from datetime import timedelta
+        from src.core.file_source_handler import cleanup_expired_files
+
+        # Mock the database session
+        db = AsyncMock(spec=AsyncSession)
+
+        # Create mock expired file sources
+        fs1 = MagicMock(spec=FileSource)
+        fs1.id = 1
+        fs1.name = "Expired 1"
+        fs1.file_path = "/nonexistent/file1.csv"
+        fs1.duckdb_table_name = "file_1_expired1"
+        fs1.is_active = True
+        fs1.processing_status = 'ready'
+        fs1.processing_error = None
+
+        fs2 = MagicMock(spec=FileSource)
+        fs2.id = 2
+        fs2.name = "Expired 2"
+        fs2.file_path = "/nonexistent/file2.csv"
+        fs2.duckdb_table_name = "file_2_expired2"
+        fs2.is_active = True
+        fs2.processing_status = 'ready'
+        fs2.processing_error = None
+
+        # Mock the query result
+        mock_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [fs1, fs2]
+        mock_result.scalars.return_value = mock_scalars
+        db.execute.return_value = mock_result
+
+        with patch('src.core.file_source_session.FileSourceDuckDBSession') as mock_session_cls:
+            mock_session_cls.unload_table = AsyncMock()
+
+            count = await cleanup_expired_files(db)
+
+            # Should have called unload_table for each file
+            assert mock_session_cls.unload_table.call_count == 2
+            mock_session_cls.unload_table.assert_any_call("file_1_expired1")
+            mock_session_cls.unload_table.assert_any_call("file_2_expired2")
+
+
 # Integration tests would go here, using actual database and file system
 class TestFileSourceIntegration:
     """Integration tests for file source functionality."""

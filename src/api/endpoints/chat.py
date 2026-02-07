@@ -39,6 +39,7 @@ class ConnectionInfo(BaseModel):
     name: str
     database_type: str
     database_name: str
+    is_deleted: bool = False
 
 
 class FileSourceInfo(BaseModel):
@@ -48,6 +49,7 @@ class FileSourceInfo(BaseModel):
     file_type: str
     original_filename: str
     row_count: Optional[int] = None
+    processing_status: str = 'ready'
 
 
 class ChatSessionResponse(BaseModel):
@@ -140,31 +142,8 @@ async def create_chat_session(
         await db.commit()
         await db.refresh(new_session)
 
-        # Get connection details
-        connections = []
-        if new_session.active_connection_ids:
-            connection_ids = new_session.active_connection_ids
-            if isinstance(connection_ids, int):
-                connection_ids = [connection_ids]
-            elif not isinstance(connection_ids, list):
-                connection_ids = list(connection_ids) if connection_ids else []
-
-            result = await db.execute(
-                select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(connection_ids)
-                )
-            )
-            connections = [
-                ConnectionInfo(
-                    id=conn.id,
-                    name=conn.name,
-                    database_type=conn.database_type,
-                    database_name=conn.database_name,
-                )
-                for conn in result.scalars().all()
-            ]
-
-        # Get file source details
+        # Get connection and file source details
+        connections = await _build_connection_infos(new_session, db)
         file_sources = await _get_session_file_sources(new_session, db)
 
         # Ensure active_connection_ids in response is always a list
@@ -220,30 +199,9 @@ async def list_chat_sessions(
         # Build response with connection details
         response_sessions = []
         for session in sessions:
-            # Get connection details
-            connections = []
-            if session.active_connection_ids:
-                # Ensure active_connection_ids is a list (defensive against bad data)
-                connection_ids = session.active_connection_ids
-                if isinstance(connection_ids, int):
-                    connection_ids = [connection_ids]
-                elif not isinstance(connection_ids, list):
-                    connection_ids = list(connection_ids) if connection_ids else []
-
-                conn_result = await db.execute(
-                    select(DatabaseConnection).where(
-                        DatabaseConnection.id.in_(connection_ids)
-                    )
-                )
-                connections = [
-                    ConnectionInfo(
-                        id=conn.id,
-                        name=conn.name,
-                        database_type=conn.database_type,
-                        database_name=conn.database_name,
-                    )
-                    for conn in conn_result.scalars().all()
-                ]
+            # Get connection and file source details
+            connections = await _build_connection_infos(session, db)
+            file_sources = await _get_session_file_sources(session, db)
 
             # Count messages efficiently
             msg_count_result = await db.execute(
@@ -257,9 +215,6 @@ async def list_chat_sessions(
                 active_conn_ids = [active_conn_ids]
             elif not isinstance(active_conn_ids, list):
                 active_conn_ids = list(active_conn_ids) if active_conn_ids else []
-
-            # Get file source details
-            file_sources = await _get_session_file_sources(session, db)
 
             response_sessions.append(
                 ChatSessionResponse(
@@ -305,30 +260,9 @@ async def get_chat_session(
                 detail=f"Chat session {session_id} not found"
             )
 
-        # Get connection details
-        connections = []
-        if session.active_connection_ids:
-            # Ensure active_connection_ids is a list (defensive against bad data)
-            connection_ids = session.active_connection_ids
-            if isinstance(connection_ids, int):
-                connection_ids = [connection_ids]
-            elif not isinstance(connection_ids, list):
-                connection_ids = list(connection_ids) if connection_ids else []
-
-            conn_result = await db.execute(
-                select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(connection_ids)
-                )
-            )
-            connections = [
-                ConnectionInfo(
-                    id=conn.id,
-                    name=conn.name,
-                    database_type=conn.database_type,
-                    database_name=conn.database_name,
-                )
-                for conn in conn_result.scalars().all()
-            ]
+        # Get connection and file source details
+        connections = await _build_connection_infos(session, db)
+        file_sources = await _get_session_file_sources(session, db)
 
         # Count messages efficiently
         msg_count_result = await db.execute(
@@ -342,9 +276,6 @@ async def get_chat_session(
             active_conn_ids = [active_conn_ids]
         elif not isinstance(active_conn_ids, list):
             active_conn_ids = list(active_conn_ids) if active_conn_ids else []
-
-        # Get file source details
-        file_sources = await _get_session_file_sources(session, db)
 
         return ChatSessionResponse(
             id=session.id,
@@ -434,30 +365,9 @@ async def update_chat_session(
         await db.commit()
         await db.refresh(session)
 
-        # Get connection details
-        connections = []
-        if session.active_connection_ids:
-            # Ensure active_connection_ids is a list (defensive against bad data)
-            connection_ids = session.active_connection_ids
-            if isinstance(connection_ids, int):
-                connection_ids = [connection_ids]
-            elif not isinstance(connection_ids, list):
-                connection_ids = list(connection_ids) if connection_ids else []
-
-            conn_result = await db.execute(
-                select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(connection_ids)
-                )
-            )
-            connections = [
-                ConnectionInfo(
-                    id=conn.id,
-                    name=conn.name,
-                    database_type=conn.database_type,
-                    database_name=conn.database_name,
-                )
-                for conn in conn_result.scalars().all()
-            ]
+        # Get connection and file source details
+        connections = await _build_connection_infos(session, db)
+        file_sources = await _get_session_file_sources(session, db)
 
         # Count messages efficiently
         msg_count_result = await db.execute(
@@ -471,9 +381,6 @@ async def update_chat_session(
             active_conn_ids = [active_conn_ids]
         elif not isinstance(active_conn_ids, list):
             active_conn_ids = list(active_conn_ids) if active_conn_ids else []
-
-        # Get file source details
-        file_sources = await _get_session_file_sources(session, db)
 
         return ChatSessionResponse(
             id=session.id,
@@ -916,11 +823,50 @@ async def get_session_files(
         )
 
 
+async def _build_connection_infos(
+    session: ChatSession,
+    db: AsyncSession,
+) -> List[ConnectionInfo]:
+    """Helper to build ConnectionInfo list for a session.
+
+    Includes deleted connections (is_deleted=True) so chat history
+    can show them as 'removed' instead of silently dropping them.
+    """
+    connection_ids = session.active_connection_ids
+    if not connection_ids:
+        return []
+
+    if isinstance(connection_ids, int):
+        connection_ids = [connection_ids]
+    elif not isinstance(connection_ids, list):
+        connection_ids = list(connection_ids) if connection_ids else []
+
+    conn_result = await db.execute(
+        select(DatabaseConnection).where(
+            DatabaseConnection.id.in_(connection_ids)
+        )
+    )
+    return [
+        ConnectionInfo(
+            id=conn.id,
+            name=conn.name,
+            database_type=conn.database_type,
+            database_name=conn.database_name,
+            is_deleted=getattr(conn, 'is_deleted', False) or False,
+        )
+        for conn in conn_result.scalars().all()
+    ]
+
+
 async def _get_session_file_sources(
     session: ChatSession,
     db: AsyncSession,
 ) -> List[FileSourceInfo]:
-    """Helper to get file source info for a session."""
+    """Helper to get file source info for a session.
+
+    Includes both ready and deleted files so chat history can show
+    deleted files as 'removed' instead of silently dropping them.
+    """
     file_sources = []
     file_ids = session.active_file_source_ids or []
 
@@ -928,7 +874,7 @@ async def _get_session_file_sources(
         result = await db.execute(
             select(FileSource).where(
                 FileSource.id.in_(file_ids),
-                FileSource.processing_status == 'ready',
+                FileSource.processing_status.in_(['ready', 'deleted']),
             )
         )
         for fs in result.scalars().all():
@@ -938,6 +884,7 @@ async def _get_session_file_sources(
                 file_type=fs.file_type,
                 original_filename=fs.original_filename,
                 row_count=fs.row_count,
+                processing_status=fs.processing_status,
             ))
 
     return file_sources

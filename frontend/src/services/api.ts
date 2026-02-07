@@ -572,7 +572,7 @@ export const filesAPI = {
   },
 
   // Get files in chat session
-  async getSessionFiles(sessionId: string): Promise<{ success: boolean; session_id: string; active_file_source_ids: number[]; file_sources: Array<{ id: number; name: string; file_type: string; original_filename: string; row_count?: number }> }> {
+  async getSessionFiles(sessionId: string): Promise<{ success: boolean; session_id: string; active_file_source_ids: number[]; file_sources: Array<{ id: number; name: string; file_type: string; original_filename: string; row_count?: number; processing_status?: string }> }> {
     const { data } = await api.get(`/api/chat/sessions/${sessionId}/files`);
     return data;
   },

@@ -186,6 +186,7 @@ export default function DataSourcesPanel({
       case 'ready': return 'text-green-500';
       case 'processing': return 'text-yellow-500';
       case 'error': return 'text-red-500';
+      case 'deleted': return 'text-gray-400';
       default: return 'text-gray-500';
     }
   };
@@ -367,6 +368,7 @@ export default function DataSourcesPanel({
                 )}
                 {fileSources.map((file) => {
                   const isInSession = sessionFileIds.includes(file.id);
+                  const isDeleted = file.processing_status === 'deleted';
                   const isReady = file.processing_status === 'ready';
                   const canToggle = isReady && !!sessionId;
                   return (
@@ -374,7 +376,8 @@ export default function DataSourcesPanel({
                       key={file.id}
                       onClick={() => canToggle && handleSelectFile(file.id)}
                       className={`group p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden ${
-                        !isReady ? 'cursor-not-allowed opacity-60'
+                        isDeleted ? 'cursor-default opacity-60'
+                        : !isReady ? 'cursor-not-allowed opacity-60'
                         : !sessionId ? 'cursor-default'
                         : 'cursor-pointer'
                       } ${
@@ -390,13 +393,15 @@ export default function DataSourcesPanel({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
                             <div className={`p-1.5 rounded-lg transition-all ${
-                              isInSession
+                              isDeleted
+                                ? 'bg-gray-500/20 text-gray-400'
+                                : isInSession
                                 ? 'bg-green-500 text-white shadow-lg shadow-green-500/30 scale-110'
                                 : getFileTypeColor(file.file_type)
                             }`}>
-                              {isInSession ? <Check className="w-3.5 h-3.5" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+                              {isInSession && !isDeleted ? <Check className="w-3.5 h-3.5" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
                             </div>
-                            <span className="text-sm font-black uppercase tracking-tight text-gray-900 dark:text-white truncate">
+                            <span className={`text-sm font-black uppercase tracking-tight truncate ${isDeleted ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
                               {file.name}
                             </span>
                           </div>
@@ -405,52 +410,66 @@ export default function DataSourcesPanel({
                               <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-black uppercase tracking-widest ${getFileTypeColor(file.file_type)}`}>
                                 {file.file_type.toUpperCase()}
                               </span>
-                              <span className="text-[11px] text-gray-400 dark:text-gray-500 font-bold">
-                                {formatFileSize(file.file_size_bytes)}
-                              </span>
-                              {file.row_count && (
-                                <span className="text-[11px] text-gray-400 dark:text-gray-500 font-bold">
-                                  {file.row_count.toLocaleString()} rows
-                                </span>
+                              {!isDeleted && (
+                                <>
+                                  <span className="text-[11px] text-gray-400 dark:text-gray-500 font-bold">
+                                    {formatFileSize(file.file_size_bytes)}
+                                  </span>
+                                  {file.row_count && (
+                                    <span className="text-[11px] text-gray-400 dark:text-gray-500 font-bold">
+                                      {file.row_count.toLocaleString()} rows
+                                    </span>
+                                  )}
+                                </>
                               )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className={`text-[11px] font-bold uppercase tracking-widest ${getStatusColor(file.processing_status)}`}>
-                                {file.processing_status === 'processing' && (
-                                  <Loader2 className="w-3 h-3 inline animate-spin mr-1" />
-                                )}
-                                {file.processing_status}
-                              </span>
-                              {file.sheet_name && (
-                                <span className="text-[11px] text-gray-500 font-medium">
-                                  Sheet: {file.sheet_name}
+                              {isDeleted ? (
+                                <span className="text-[11px] font-bold italic text-gray-400 tracking-widest">
+                                  File removed
                                 </span>
+                              ) : (
+                                <>
+                                  <span className={`text-[11px] font-bold uppercase tracking-widest ${getStatusColor(file.processing_status)}`}>
+                                    {file.processing_status === 'processing' && (
+                                      <Loader2 className="w-3 h-3 inline animate-spin mr-1" />
+                                    )}
+                                    {file.processing_status}
+                                  </span>
+                                  {file.sheet_name && (
+                                    <span className="text-[11px] text-gray-500 font-medium">
+                                      Sheet: {file.sheet_name}
+                                    </span>
+                                  )}
+                                </>
                               )}
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPreviewFileId(file.id);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
-                            title="Preview"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteFile(file.id);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
-                          </button>
-                        </div>
+                        {!isDeleted && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewFileId(file.id);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
+                              title="Preview"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteFile(file.id);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

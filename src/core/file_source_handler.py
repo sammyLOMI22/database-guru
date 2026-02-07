@@ -662,7 +662,11 @@ class FileSourceHandler:
         db: AsyncSession,
     ) -> None:
         """
-        Delete a file source and its physical file.
+        Soft-delete a file source and remove its physical file.
+
+        The database record is preserved with processing_status='deleted'
+        so that chat sessions referencing this file can show it as removed
+        instead of silently losing it.
 
         Args:
             file_source: The file source to delete
@@ -677,8 +681,10 @@ class FileSourceHandler:
         except Exception as e:
             logger.warning(f"Failed to delete file {file_source.file_path}: {e}")
 
-        # Delete database record
-        await db.delete(file_source)
+        # Soft-delete: mark as inactive/deleted instead of removing the record
+        file_source.is_active = False
+        file_source.processing_status = 'deleted'
+        file_source.processing_error = 'File has been removed'
         await db.commit()
 
         logger.info(f"Cleaned up file source {file_source.id}: {file_source.name}")
@@ -781,8 +787,13 @@ async def cleanup_expired_files(db: AsyncSession) -> int:
     cleaned = 0
     handler = FileSourceHandler()
 
+    # Local import to avoid circular dependency
+    from src.core.file_source_session import FileSourceDuckDBSession
+
     for file_source in expired_files:
         try:
+            # Unload from DuckDB before cleanup to free in-memory tables
+            await FileSourceDuckDBSession.unload_table(file_source.duckdb_table_name)
             await handler.cleanup_file(file_source, db)
             cleaned += 1
             logger.info(f"Cleaned up expired file source {file_source.id}: {file_source.name}")

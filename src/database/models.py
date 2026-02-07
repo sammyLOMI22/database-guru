@@ -67,6 +67,7 @@ class DatabaseConnection(Base):
 
     # Status
     is_active = Column(Boolean, default=True)
+    is_deleted = Column(Boolean, default=False, index=True)
     last_tested_at = Column(DateTime, nullable=True)
 
     # Timestamps

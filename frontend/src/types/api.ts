@@ -301,6 +301,7 @@ export interface ConnectionInfo {
   name: string;
   database_type: string;
   database_name: string;
+  is_deleted?: boolean;
 }
 
 export interface FileSourceInfo {
@@ -309,6 +310,7 @@ export interface FileSourceInfo {
   file_type: string;
   original_filename: string;
   row_count?: number;
+  processing_status?: string;
 }
 
 export interface ChatSession {
@@ -668,7 +670,7 @@ export interface FileSource {
   chat_session_id?: string;
   is_global: boolean;
   is_active: boolean;
-  processing_status: 'pending' | 'processing' | 'ready' | 'error';
+  processing_status: 'pending' | 'processing' | 'ready' | 'error' | 'deleted';
   processing_error?: string;
   created_at: string;
   updated_at?: string;
