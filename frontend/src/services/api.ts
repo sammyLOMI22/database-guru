@@ -501,7 +501,7 @@ export const filesAPI = {
     formData.append('file', file);
     if (options?.name) formData.append('name', options.name);
     if (options?.sheet_name) formData.append('sheet_name', options.sheet_name);
-    if (options?.session_id) formData.append('session_id', options.session_id);
+    if (options?.session_id) formData.append('chat_session_id', options.session_id);
     if (options?.is_global !== undefined) formData.append('is_global', String(options.is_global));
 
     const { data } = await api.post<FileSource>('/api/files/upload', formData, {

@@ -864,20 +864,28 @@ async def _get_session_file_sources(
 ) -> List[FileSourceInfo]:
     """Helper to get file source info for a session.
 
-    Includes both ready and deleted files so chat history can show
-    deleted files as 'removed' instead of silently dropping them.
+    Only returns ready files. Deleted file IDs are removed from the
+    session's active_file_source_ids as a defensive cleanup (handles
+    stale references from before the delete-endpoint cleanup was added).
     """
     file_sources = []
     file_ids = session.active_file_source_ids or []
 
-    if file_ids:
-        result = await db.execute(
-            select(FileSource).where(
-                FileSource.id.in_(file_ids),
-                FileSource.processing_status.in_(['ready', 'deleted']),
-            )
+    if not file_ids:
+        return file_sources
+
+    result = await db.execute(
+        select(FileSource).where(
+            FileSource.id.in_(file_ids),
         )
-        for fs in result.scalars().all():
+    )
+    all_files = list(result.scalars().all())
+
+    # Separate ready files from stale/deleted references
+    ready_ids = []
+    for fs in all_files:
+        if fs.processing_status == 'ready':
+            ready_ids.append(fs.id)
             file_sources.append(FileSourceInfo(
                 id=fs.id,
                 name=fs.name,
@@ -886,5 +894,10 @@ async def _get_session_file_sources(
                 row_count=fs.row_count,
                 processing_status=fs.processing_status,
             ))
+
+    # Defensive cleanup: remove stale IDs from session
+    if set(ready_ids) != set(file_ids):
+        session.active_file_source_ids = ready_ids
+        await db.commit()
 
     return file_sources

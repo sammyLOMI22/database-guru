@@ -76,10 +76,7 @@ class FileSourceDuckDBSession:
             DuckDB connection instance
         """
         if cls._instance is None:
-            import threading
-            if not hasattr(cls, '_init_lock'):
-                cls._init_lock = threading.Lock()
-            with cls._init_lock:
+            with cls._lock_guard:
                 # Double-check after acquiring lock
                 if cls._instance is None:
                     settings = cls._get_settings()

@@ -12,9 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from src.api.dependencies import get_db, get_settings
+from src.database.models import ChatSession
 from src.config.settings import Settings
 from src.core.file_source_handler import (
     FileSourceHandler,
+    FileValidationError,
     get_file_source_by_id,
     list_file_sources,
 )
@@ -135,7 +137,7 @@ async def upload_file(
 
         return _file_source_to_response(file_source)
 
-    except ValueError as e:
+    except FileValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
@@ -223,6 +225,14 @@ async def delete_file(
     # Soft-delete file and record
     handler = FileSourceHandler(settings)
     await handler.cleanup_file(file_source, db)
+
+    # Remove file_id from all chat sessions that reference it
+    session_result = await db.execute(select(ChatSession))
+    for session in session_result.scalars().all():
+        file_ids = session.active_file_source_ids or []
+        if file_id in file_ids:
+            session.active_file_source_ids = [fid for fid in file_ids if fid != file_id]
+    await db.commit()
 
     logger.info(f"Deleted file source {file_id}: {file_source.name}")
 

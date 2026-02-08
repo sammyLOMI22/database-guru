@@ -32,6 +32,15 @@ from src.database.models import FileSource
 logger = logging.getLogger(__name__)
 
 
+class FileValidationError(ValueError):
+    """Raised for user-facing file validation failures.
+
+    Subclass of ValueError so callers that already catch ValueError still work,
+    but the API layer can distinguish safe validation messages from unexpected
+    internal ValueErrors that might leak implementation details.
+    """
+
+
 def excel_to_temp_csv(file_path: str, sheet_name: Optional[str] = None) -> str:
     """
     Convert an Excel file to a temporary CSV file for DuckDB ingestion.
@@ -159,7 +168,7 @@ class FileSourceHandler:
         # Validate file
         is_valid, error_msg = await self.validate_file(file)
         if not is_valid:
-            raise ValueError(error_msg)
+            raise FileValidationError(error_msg)
 
         # Determine file type
         ext = Path(file.filename).suffix.lower()
@@ -584,8 +593,11 @@ class FileSourceHandler:
         """Synchronously get preview data.
 
         Security: Validates file path is within upload directory and sanitizes
-        sheet name to prevent SQL injection.
+        sheet name to prevent SQL injection. Limit is clamped defensively.
         """
+        # Defensive clamp — API layer validates too, but this method is public
+        limit = max(1, min(int(limit), 10000))
+
         with self._duckdb_read_context(file_path, file_type, sheet_name) as (conn, read_query):
             # Get total count
             count_result = conn.execute(f"SELECT COUNT(*) FROM ({read_query})").fetchone()

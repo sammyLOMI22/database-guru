@@ -1,5 +1,5 @@
 """Database models for Database Guru"""
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey, Index
 from sqlalchemy.orm import relationship
@@ -32,7 +32,7 @@ class QueryHistory(Base):
     connection_id = Column(Integer, ForeignKey("database_connections.id"), nullable=True, index=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
     feedbacks = relationship("UserFeedback", back_populates="query", cascade="all, delete-orphan")
@@ -71,8 +71,8 @@ class DatabaseConnection(Base):
     last_tested_at = Column(DateTime, nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class QueryCache(Base):
@@ -91,11 +91,11 @@ class QueryCache(Base):
 
     # Cache metadata
     hit_count = Column(Integer, default=0)
-    last_accessed_at = Column(DateTime, default=datetime.utcnow)
+    last_accessed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Expiration
     expires_at = Column(DateTime, nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class UserFeedback(Base):
@@ -138,7 +138,7 @@ class UserFeedback(Base):
 
     # Metadata
     user_notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     applied_at = Column(DateTime, nullable=True)
 
     # Relationships
@@ -164,9 +164,9 @@ class ChatSession(Base):
     active_file_source_ids = Column(JSON, nullable=False, default=list)  # [1, 2, 3]
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    last_active_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    last_active_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Indexes
     __table_args__ = (
@@ -189,7 +189,7 @@ class ChatMessage(Base):
     query_history_id = Column(Integer, ForeignKey("query_history.id"), nullable=True)
     databases_used = Column(JSON, nullable=True)  # [{"conn_id": 1, "name": "ecommerce", "tables": ["products"]}]
 
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
     chat_session = relationship("ChatSession", backref="messages")
@@ -237,8 +237,8 @@ class FileSource(Base):
     processing_error = Column(Text, nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime, nullable=True, index=True)  # Auto-cleanup after N days
 
     # Relationships
@@ -285,7 +285,7 @@ class LearnedCorrection(Base):
     confidence_score = Column(Float, default=1.0)  # Confidence in this correction (0-1)
 
     # Timestamps
-    learned_at = Column(DateTime, default=datetime.utcnow, index=True)
+    learned_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     last_applied_at = Column(DateTime, nullable=True)
 
     # Indexes for efficient lookups
@@ -375,8 +375,8 @@ class SystemSettings(Base):
     multi_db_validation_threshold = Column(Float, default=0.6, nullable=False)  # Fuzzy match threshold for alternatives
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     def __repr__(self):
         return (

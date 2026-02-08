@@ -138,15 +138,18 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
                     <div className="flex items-center gap-2 opacity-60 overflow-hidden whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
                         <div className="flex items-center gap-1 bg-white/10 dark:bg-black/20 px-1.5 py-0.5 rounded-md border border-white/5">
-                          <span className="text-blue-500">{session.connections.length}</span>
+                          <span className="text-blue-500">{session.connections.filter(c => !c.is_deleted).length}</span>
                           <span>DBs</span>
                         </div>
-                        {(session.file_sources?.length > 0) && (
-                          <div className="flex items-center gap-1 bg-white/10 dark:bg-black/20 px-1.5 py-0.5 rounded-md border border-white/5">
-                            <span className="text-green-500">{session.file_sources.length}</span>
-                            <span>Files</span>
-                          </div>
-                        )}
+                        {(() => {
+                          const readyFiles = session.file_sources?.filter(f => f.processing_status !== 'deleted') || [];
+                          return readyFiles.length > 0 ? (
+                            <div className="flex items-center gap-1 bg-white/10 dark:bg-black/20 px-1.5 py-0.5 rounded-md border border-white/5">
+                              <span className="text-green-500">{readyFiles.length}</span>
+                              <span>Files</span>
+                            </div>
+                          ) : null;
+                        })()}
                         <div className="flex items-center gap-1 bg-white/10 dark:bg-black/20 px-1.5 py-0.5 rounded-md border border-white/5">
                           <span className="text-indigo-500">{session.message_count || 0}</span>
                           <span>MSGs</span>

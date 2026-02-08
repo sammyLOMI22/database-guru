@@ -7,7 +7,7 @@ import ConversationContextPanel from './ConversationContextPanel';
 import SchemaGlance from './SchemaGlance';
 import { useMultiQuery } from '../hooks/useMultiQuery';
 import { useModels } from '../hooks/useModels';
-import { connectionsAPI, settingsAPI, filesAPI } from '../services/api';
+import { connectionsAPI, settingsAPI, filesAPI, chatAPI } from '../services/api';
 import type { ChatSession, MultiDatabaseQueryResponse, DatabaseConnection } from '../types/api';
 
 interface ChatMessage {
@@ -82,6 +82,17 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
   useEffect(() => {
     fetchActiveConnection();
   }, []);
+
+  // Re-fetch current session from API (e.g. after file deletion)
+  const refreshCurrentSession = useCallback(async () => {
+    if (!currentSession) return;
+    try {
+      const updated = await chatAPI.getSession(currentSession.id);
+      setCurrentSession(updated);
+    } catch (error) {
+      console.error('Failed to refresh session:', error);
+    }
+  }, [currentSession]);
 
   // Fetch per-task model settings
   const fetchPerTaskModels = useCallback(async () => {
@@ -190,10 +201,12 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
             if (!currentSession) return;
             try {
               await filesAPI.addFileToSession(currentSession.id, fileId);
+              await refreshCurrentSession();
             } catch (error) {
               console.error('Failed to add file to session:', error);
             }
           }}
+          onFileDeleted={refreshCurrentSession}
         />
       )}
 
@@ -248,9 +261,14 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
                       <div>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">{currentSession.name}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {currentSession.connections.length} database{currentSession.connections.length !== 1 ? 's' : ''}
-                          {currentSession.file_sources?.length > 0 && ` + ${currentSession.file_sources.length} file${currentSession.file_sources.length !== 1 ? 's' : ''}`}
-                          {' '}connected
+                          {(() => {
+                            const liveConns = currentSession.connections.filter(c => !c.is_deleted);
+                            const liveFiles = currentSession.file_sources?.filter(f => f.processing_status !== 'deleted') || [];
+                            const parts: string[] = [];
+                            if (liveConns.length > 0) parts.push(`${liveConns.length} database${liveConns.length !== 1 ? 's' : ''}`);
+                            if (liveFiles.length > 0) parts.push(`${liveFiles.length} file${liveFiles.length !== 1 ? 's' : ''}`);
+                            return parts.length > 0 ? `${parts.join(' + ')} connected` : 'No active sources';
+                          })()}
                         </p>
                       </div>
                     ) : (
@@ -324,24 +342,40 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
               </div>
 
               {/* Connected databases & files pills */}
-              {currentSession && (currentSession.connections.length > 0 || (currentSession.file_sources?.length > 0)) && (
+              {currentSession && (currentSession.connections.length > 0 || (currentSession.file_sources?.length ?? 0) > 0) && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {currentSession.connections.map((conn) => (
                     <span
                       key={`db-${conn.id}`}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 transition-all border border-blue-200/50 dark:border-blue-400/10"
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border ${
+                        conn.is_deleted
+                          ? 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-500 border-gray-200/50 dark:border-gray-600/10 line-through opacity-60'
+                          : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-200/50 dark:border-blue-400/10'
+                      }`}
                     >
-                      <span className="w-1.5 h-1.5 bg-blue-500 dark:bg-blue-400 rounded-full mr-2 animate-pulse"></span>
-                      {conn.name}
+                      {conn.is_deleted ? (
+                        <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full mr-2"></span>
+                      ) : (
+                        <span className="w-1.5 h-1.5 bg-blue-500 dark:bg-blue-400 rounded-full mr-2 animate-pulse"></span>
+                      )}
+                      {conn.name}{conn.is_deleted ? ' (removed)' : ''}
                     </span>
                   ))}
                   {currentSession.file_sources?.map((file) => (
                     <span
                       key={`file-${file.id}`}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 transition-all border border-green-200/50 dark:border-green-400/10"
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border ${
+                        file.processing_status === 'deleted'
+                          ? 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-500 border-gray-200/50 dark:border-gray-600/10 line-through opacity-60'
+                          : 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200/50 dark:border-green-400/10'
+                      }`}
                     >
-                      <span className="w-1.5 h-1.5 bg-green-500 dark:bg-green-400 rounded-full mr-2 animate-pulse"></span>
-                      {file.name}
+                      {file.processing_status === 'deleted' ? (
+                        <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full mr-2"></span>
+                      ) : (
+                        <span className="w-1.5 h-1.5 bg-green-500 dark:bg-green-400 rounded-full mr-2 animate-pulse"></span>
+                      )}
+                      {file.name}{file.processing_status === 'deleted' ? ' (removed)' : ''}
                     </span>
                   ))}
                 </div>
@@ -421,7 +455,7 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
                       {(() => {
                         if (!currentSession) return 'SNIFFING OUT DATA...';
                         const dbCount = currentSession.connections.length;
-                        const fileCount = currentSession.file_sources?.length || 0;
+                        const fileCount = currentSession.file_sources?.filter(f => f.processing_status !== 'deleted').length || 0;
                         const total = dbCount + fileCount;
                         if (total <= 1) return 'SNIFFING OUT DATA...';
                         const parts: string[] = [];
@@ -460,7 +494,7 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
             promptTuning: perTaskModels.enable_prompt_optimization,
           } : null}
           connectionIds={currentSession?.connections.map(c => c.id)}
-          fileSourceCount={currentSession?.file_sources?.length || 0}
+          fileSourceCount={currentSession?.file_sources?.filter(f => f.processing_status !== 'deleted').length || 0}
         />
       </div>
     </div>

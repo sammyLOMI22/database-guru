@@ -20,6 +20,7 @@ interface DatabaseConnection {
 interface Props {
   onConnectionSelect?: (connectionId: number) => void;
   onFileSelect?: (fileId: number) => void;
+  onFileDeleted?: () => void;
   selectedConnectionIds?: number[];
   selectedFileIds?: number[];
   sessionId?: string;
@@ -31,6 +32,7 @@ type SourceType = 'databases' | 'files';
 export default function DataSourcesPanel({
   onConnectionSelect,
   onFileSelect,
+  onFileDeleted,
   selectedConnectionIds = [],
   sessionId,
   onDataSourcesChange,
@@ -136,6 +138,8 @@ export default function DataSourcesPanel({
     await loadFileSources();
     setIsFileModalOpen(false);
     onFileSelect?.(fileSource.id);
+    // Refresh session file list so the new file shows the "in session" checkmark
+    await loadSessionFiles();
   };
 
   const handleDeleteFile = async (id: number) => {
@@ -144,6 +148,8 @@ export default function DataSourcesPanel({
     try {
       await filesAPI.deleteFile(id);
       await loadFileSources();
+      await loadSessionFiles();
+      onFileDeleted?.();
     } catch (error) {
       console.error('Failed to delete file:', error);
     }
@@ -156,6 +162,7 @@ export default function DataSourcesPanel({
       if (isActive) {
         await filesAPI.removeFileFromSession(sessionId, id);
         setSessionFileIds(prev => prev.filter(fid => fid !== id));
+        onFileDeleted?.();
       } else {
         await filesAPI.addFileToSession(sessionId, id);
         setSessionFileIds(prev => [...prev, id]);

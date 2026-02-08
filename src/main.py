@@ -40,6 +40,8 @@ async def _file_expiration_task(db_manager):
             break
         except Exception as e:
             logger.error(f"File expiration task error: {e}")
+            # Back off before retrying to avoid tight-loop on persistent errors
+            await asyncio.sleep(60)
 
 
 @asynccontextmanager
