@@ -22,9 +22,7 @@ interface Props {
   onFileSelect?: (fileId: number) => void;
   onFileDeleted?: () => void;
   selectedConnectionIds?: number[];
-  selectedFileIds?: number[];
   sessionId?: string;
-  onDataSourcesChange?: (connections: number[], files: number[]) => void;
 }
 
 type SourceType = 'databases' | 'files';
@@ -35,7 +33,6 @@ export default function DataSourcesPanel({
   onFileDeleted,
   selectedConnectionIds = [],
   sessionId,
-  onDataSourcesChange,
 }: Props) {
   const [activeTab, setActiveTab] = useState<SourceType>('databases');
   const [connections, setConnections] = useState<DatabaseConnection[]>([]);

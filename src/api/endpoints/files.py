@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import cast, select, String
 
 from src.api.dependencies import get_db, get_settings
 from src.database.models import ChatSession
@@ -226,8 +226,14 @@ async def delete_file(
     handler = FileSourceHandler(settings)
     await handler.cleanup_file(file_source, db)
 
-    # Remove file_id from all chat sessions that reference it
-    session_result = await db.execute(select(ChatSession))
+    # Remove file_id from chat sessions that reference it
+    # Filter to only sessions whose JSON array contains this ID
+    session_result = await db.execute(
+        select(ChatSession).where(
+            ChatSession.active_file_source_ids.isnot(None),
+            cast(ChatSession.active_file_source_ids, String).contains(str(file_id)),
+        )
+    )
     for session in session_result.scalars().all():
         file_ids = session.active_file_source_ids or []
         if file_id in file_ids:
@@ -371,6 +377,22 @@ async def get_excel_sheets(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only Excel files (.xlsx, .xls) are supported",
         )
+
+    # Validate file size by chunked reading to avoid loading the entire
+    # file (up to 100MB) into memory just for a size check.
+    max_size = settings.FILE_MAX_SIZE_MB * 1024 * 1024
+    file_size = 0
+    while True:
+        chunk = await file.read(1024 * 1024)  # 1MB chunks
+        if not chunk:
+            break
+        file_size += len(chunk)
+        if file_size > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File exceeds maximum size of {settings.FILE_MAX_SIZE_MB}MB",
+            )
+    await file.seek(0)
 
     handler = FileSourceHandler(settings)
 

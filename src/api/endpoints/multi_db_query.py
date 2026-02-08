@@ -51,12 +51,13 @@ class MultiDatabaseQueryRequest(BaseModel):
 
 
 class DatabaseQueryResult(BaseModel):
-    """Result from querying a single database"""
+    """Result from querying a single database or file source"""
     connection_id: int
     connection_name: str
     database_type: str
     sql: str
     success: bool
+    source_type: str = "database"  # "database" or "file" — disambiguates connection_id
     results: Optional[List[Dict[str, Any]]] = None
     row_count: Optional[int] = None
     execution_time_ms: Optional[float] = None
@@ -358,9 +359,10 @@ async def process_multi_database_query(
         combined_schema_text = multi_db_handler.format_schema_for_llm(combined_schema_data)
 
         # Generate cache key with version to handle schema changes
-        # Version 2: includes query_id for each database result
-        CACHE_VERSION = "v2"
-        cache_key_data = f"{CACHE_VERSION}:{request.question}:{'-'.join(str(c.id) for c in connections)}"
+        # Version 3: includes file_source_ids to prevent cross-file cache collisions
+        CACHE_VERSION = "v3"
+        file_ids_str = '-'.join(str(f.id) for f in file_sources) if file_sources else ''
+        cache_key_data = f"{CACHE_VERSION}:{request.question}:{'-'.join(str(c.id) for c in connections)}:{file_ids_str}"
         cache_key_hash = hashlib.sha256(cache_key_data.encode()).hexdigest()[:16]
         cache_key = f"multi_query:{cache_key_hash}"
 
@@ -748,6 +750,7 @@ async def process_multi_database_query(
                         database_type="duckdb",
                         sql=exec_result.get("sql", ""),
                         success=exec_result.get("success", False),
+                        source_type="file",
                         results=exec_result.get("data"),
                         row_count=exec_result.get("row_count", 0),
                         execution_time_ms=exec_result.get("execution_time_ms", 0),

@@ -88,12 +88,12 @@ export default function FileUploadModal({ isOpen, onClose, onSuccess, sessionId 
     setUploadProgress(0);
     setError('');
 
-    try {
-      // Simulate progress for UX (actual upload doesn't provide progress events easily)
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => Math.min(prev + 10, 90));
-      }, 200);
+    // Simulate progress for UX (actual upload doesn't provide progress events easily)
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => Math.min(prev + 10, 90));
+    }, 200);
 
+    try {
       const result = await filesAPI.uploadFile(selectedFile, {
         name: displayName || selectedFile.name,
         sheet_name: selectedSheet || undefined,
@@ -101,7 +101,6 @@ export default function FileUploadModal({ isOpen, onClose, onSuccess, sessionId 
         is_global: !sessionId,
       });
 
-      clearInterval(progressInterval);
       setUploadProgress(100);
       setUploadedFile(result);
       setUploadState('success');
@@ -113,6 +112,8 @@ export default function FileUploadModal({ isOpen, onClose, onSuccess, sessionId 
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Upload failed');
       setUploadState('error');
+    } finally {
+      clearInterval(progressInterval);
     }
   };
 

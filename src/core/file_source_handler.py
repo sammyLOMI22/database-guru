@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import contextlib
 import csv
 import tempfile
+import uuid
 
 import aiofiles
 import duckdb
@@ -362,6 +363,11 @@ class FileSourceHandler:
         if is_global:
             storage_dir = self.upload_dir / 'global'
         elif session_id:
+            # Validate session_id as UUID to prevent path traversal
+            try:
+                uuid.UUID(session_id)
+            except ValueError:
+                raise FileValidationError(f"Invalid session ID format: {session_id}")
             storage_dir = self.upload_dir / 'sessions' / session_id
             storage_dir.mkdir(parents=True, exist_ok=True)
         else:

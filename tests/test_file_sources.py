@@ -530,14 +530,15 @@ class TestFileSourceIntegration:
         handler.upload_dir = Path(temp_upload_dir)
         handler._ensure_upload_dir()
 
+        test_uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         path, hash_, size = await handler.save_file(
             sample_csv_file,
-            session_id="test-session-123",
+            session_id=test_uuid,
             is_global=False,
         )
 
         assert path.exists()
-        assert path.parent.name == "test-session-123"
+        assert path.parent.name == test_uuid
         assert hash_ is not None
         assert size > 0
 

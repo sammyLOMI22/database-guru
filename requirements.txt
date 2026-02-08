@@ -39,7 +39,6 @@ numpy==1.26.2
 pyarrow==14.0.2
 openpyxl==3.1.2  # Excel .xlsx support
 xlrd==2.0.1  # Legacy .xls support (Phase 13)
-python-magic==0.4.27  # File type detection (Phase 13)
 aiofiles==24.1.0  # Async file operations (Phase 13)
 
 # Monitoring & Logging

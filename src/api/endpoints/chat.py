@@ -104,7 +104,8 @@ async def create_chat_session(
         if session_data.connection_ids:
             result = await db.execute(
                 select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(session_data.connection_ids)
+                    DatabaseConnection.id.in_(session_data.connection_ids),
+                    DatabaseConnection.is_deleted.isnot(True),
                 )
             )
             valid_connections = result.scalars().all()
@@ -112,7 +113,7 @@ async def create_chat_session(
             if len(valid_connections) != len(session_data.connection_ids):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more connection IDs are invalid"
+                    detail="One or more connection IDs are invalid or deleted"
                 )
 
         # Validate file source IDs if provided
@@ -325,10 +326,11 @@ async def update_chat_session(
             session.name = update_data.name
 
         if update_data.connection_ids is not None:
-            # Validate connection IDs
+            # Validate connection IDs (exclude soft-deleted)
             conn_result = await db.execute(
                 select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(update_data.connection_ids)
+                    DatabaseConnection.id.in_(update_data.connection_ids),
+                    DatabaseConnection.is_deleted.isnot(True),
                 )
             )
             valid_connections = conn_result.scalars().all()
@@ -336,7 +338,7 @@ async def update_chat_session(
             if len(valid_connections) != len(update_data.connection_ids):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more connection IDs are invalid"
+                    detail="One or more connection IDs are invalid or deleted"
                 )
 
             session.active_connection_ids = update_data.connection_ids
@@ -895,9 +897,13 @@ async def _get_session_file_sources(
                 processing_status=fs.processing_status,
             ))
 
-    # Defensive cleanup: remove stale IDs from session
+    # Defensive cleanup: mark stale IDs on the session object so the next
+    # explicit write (update/message) persists the fix.  We intentionally
+    # do NOT commit here -- this helper is called from GET endpoints and
+    # an implicit commit could flush unrelated pending changes.
     if set(ready_ids) != set(file_ids):
+        stale = set(file_ids) - set(ready_ids)
+        logger.debug(f"Session {session.id}: pruning stale file source IDs {stale}")
         session.active_file_source_ids = ready_ids
-        await db.commit()
 
     return file_sources

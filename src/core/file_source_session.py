@@ -8,6 +8,7 @@ Tables are lazily loaded when first accessed to optimize memory usage.
 import asyncio
 import logging
 import os
+import re
 import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -266,6 +267,12 @@ class FileSourceDuckDBSession:
         )
         return result
 
+    # Patterns that indicate non-read-only operations
+    _DANGEROUS_SQL = re.compile(
+        r'\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|COPY\s+TO|ATTACH|DETACH|EXPORT|IMPORT)\b',
+        re.IGNORECASE
+    )
+
     @classmethod
     def _execute_sync(cls, sql: str, max_rows: int) -> Dict[str, Any]:
         """Execute query synchronously.
@@ -273,6 +280,13 @@ class FileSourceDuckDBSession:
         Thread Safety: Uses a cursor so concurrent executor threads
         don't share mutable result state on the connection.
         """
+        # Enforce read-only: reject DDL/DML to prevent writes via LLM-generated SQL
+        if cls._DANGEROUS_SQL.search(sql):
+            raise PermissionError(
+                "Only SELECT queries are allowed on file sources. "
+                "Write operations (INSERT, UPDATE, DELETE, DROP, etc.) are not permitted."
+            )
+
         cursor = cls.get_session().cursor()
 
         try:

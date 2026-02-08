@@ -167,9 +167,6 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
             : 'Query executed.',
         multiQueryResponse: response,
       };
-      console.log('DEBUG: Response from multi-query:', response);
-      console.log('DEBUG: Combined analysis:', response.combined_analysis);
-      console.log('DEBUG: DB results[0].result_analysis:', response.database_results[0]?.result_analysis);
       setMessages((prev) => [...prev, assistantMessage]);
 
       // Track last executed SQL for ER diagram query path overlay

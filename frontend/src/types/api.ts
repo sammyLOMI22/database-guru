@@ -375,6 +375,7 @@ export interface DatabaseQueryResult {
   database_type: string;
   sql: string;
   success: boolean;
+  source_type?: 'database' | 'file';  // Disambiguates connection_id for file sources
   results?: Record<string, any>[];
   row_count?: number;
   execution_time_ms?: number;
