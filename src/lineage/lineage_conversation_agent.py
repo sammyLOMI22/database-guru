@@ -19,6 +19,7 @@ from sqlalchemy import select, text
 from src.database.models import QueryHistory, DatabaseConnection, SystemSettings
 from src.llm.ollama_client import OllamaClient, get_ollama_client
 from src.llm.model_router import ModelRouter, TaskType
+from src.security.prompt_sanitizer import sanitize_question_for_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +264,9 @@ class LineageConversationAgent:
         session_id: Optional[str] = None,
     ) -> LineageAnswer:
         """Answer a question about lineage, schema, or patterns."""
+        # Sanitize input to prevent prompt injection
+        question = sanitize_question_for_prompt(question)
+
         # Classify the question
         question_type = self.classifier.classify(question)
         entities = self.classifier.extract_entities(question)

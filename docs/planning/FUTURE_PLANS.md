@@ -1078,3 +1078,22 @@ touch src/auth/models.py
 **Created**: November 2, 2025
 **Last Updated**: January 31, 2026
 **Next Update**: February 7, 2026
+
+---
+
+## 🛠️ Migration Toolkit (New Proposal)
+
+**Status**: PROPOSED
+**Priority**: HIGH
+**Dependencies**: Phase 11 (Lineage), Phase 12 (Lineage Intelligence)
+
+**Overview**: A suite of tools to move Database Guru from "Read-Only" to "DevOps Companion".
+
+**Features**:
+1.  **Schema Diff**: Visual comparison between databases or schema files.
+2.  **Migration Planner**: AI-agent that plans safe migration steps (dependency aware).
+3.  **Script Generator**: Auto-generate `UP` and `DOWN` SQL scripts.
+4.  **Data Migration**: Helper tools for moving data (INSERT INTO ... SELECT).
+
+**See Detailed Proposal**: [MIGRATION_TOOLKIT_PROPOSAL.md](MIGRATION_TOOLKIT_PROPOSAL.md)
+

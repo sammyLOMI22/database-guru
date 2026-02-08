@@ -220,3 +220,45 @@ Quick reference for finding important code in the Database Guru codebase.
 | Lineage endpoints | `src/api/endpoints/lineage.py` (773 lines, 11 endpoints) |
 | API service | `frontend/src/services/lineageApi.ts` (165 lines) |
 | Type definitions | `frontend/src/types/lineage.ts` (264 lines) |
+
+## File Data Source System (Phase 13 - January 2026)
+| Component | Location |
+|-----------|----------|
+| **Backend Core** | |
+| File handler | `src/core/file_source_handler.py` (~400 lines) |
+| File validation | `src/core/file_source_handler.py:validate_file()` |
+| Schema inference | `src/core/file_source_handler.py:infer_schema()` |
+| File saving | `src/core/file_source_handler.py:save_file()` |
+| DuckDB session | `src/core/file_source_session.py` (~300 lines) |
+| Session singleton | `src/core/file_source_session.py:get_instance()` |
+| Table loading | `src/core/file_source_session.py:ensure_table_loaded()` |
+| Query execution | `src/core/file_source_session.py:execute_query()` |
+| **API Endpoints** | |
+| File endpoints | `src/api/endpoints/files.py` (~350 lines, 8 endpoints) |
+| Upload endpoint | `src/api/endpoints/files.py:upload_file()` |
+| Schema endpoint | `src/api/endpoints/files.py:get_file_schema()` |
+| Preview endpoint | `src/api/endpoints/files.py:get_file_preview()` |
+| Excel sheets | `src/api/endpoints/files.py:get_excel_sheets()` |
+| **Database Model** | |
+| FileSource model | `src/database/models.py:FileSource` (lines 198-256) |
+| Migration | `alembic/versions/c22b240bc731_*.py` |
+| **Schemas** | |
+| Request schemas | `src/models/schemas.py` (lines 1041-1158) |
+| FileSourceCreate | `src/models/schemas.py:FileSourceCreate` |
+| FileSchemaResponse | `src/models/schemas.py:FileSchemaResponse` |
+| FilePreviewResponse | `src/models/schemas.py:FilePreviewResponse` |
+| **Frontend Components** | |
+| Upload modal | `frontend/src/components/FileUploadModal.tsx` (~400 lines) |
+| Preview panel | `frontend/src/components/FilePreviewPanel.tsx` (~350 lines) |
+| API service | `frontend/src/services/api.ts:filesAPI` (lines 480-562) |
+| Type definitions | `frontend/src/types/api.ts` (lines 644-690) |
+| **Tests** | |
+| Backend tests | `tests/test_file_sources.py` (50+ tests) |
+| Validation tests | `tests/test_file_sources.py:TestFileValidation` |
+| Schema tests | `tests/test_file_sources.py:TestSchemaInference` |
+| Session tests | `tests/test_file_sources.py:TestDuckDBSession` |
+| **Configuration** | |
+| Settings | `src/config/settings.py` (lines 65-74) |
+| Upload directory | `FILE_UPLOAD_DIR` |
+| Max file size | `FILE_MAX_SIZE_MB` |
+| DuckDB memory | `DUCKDB_FILE_MEMORY_LIMIT` |

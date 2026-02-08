@@ -1,14 +1,14 @@
 """Chat session endpoints for Database Guru"""
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, update, delete, desc
+from sqlalchemy import func, select, update, delete, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_db
-from src.database.models import ChatSession, ChatMessage, DatabaseConnection
+from src.database.models import ChatSession, ChatMessage, DatabaseConnection, FileSource
 
 from src.llm.conversational_memory_agent import get_memory_agent
 
@@ -22,6 +22,7 @@ class ChatSessionCreate(BaseModel):
     """Request model for creating a chat session"""
     name: str = Field(..., min_length=1, max_length=255)
     connection_ids: List[int] = Field(default_factory=list)
+    file_source_ids: List[int] = Field(default_factory=list)
     user_id: Optional[str] = None
 
 
@@ -29,6 +30,7 @@ class ChatSessionUpdate(BaseModel):
     """Request model for updating a chat session"""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     connection_ids: Optional[List[int]] = None
+    file_source_ids: Optional[List[int]] = None
 
 
 class ConnectionInfo(BaseModel):
@@ -37,6 +39,17 @@ class ConnectionInfo(BaseModel):
     name: str
     database_type: str
     database_name: str
+    is_deleted: bool = False
+
+
+class FileSourceInfo(BaseModel):
+    """File source information for chat response"""
+    id: int
+    name: str
+    file_type: str
+    original_filename: str
+    row_count: Optional[int] = None
+    processing_status: str = 'ready'
 
 
 class ChatSessionResponse(BaseModel):
@@ -46,6 +59,8 @@ class ChatSessionResponse(BaseModel):
     user_id: Optional[str]
     active_connection_ids: List[int]
     connections: List[ConnectionInfo]
+    active_file_source_ids: List[int] = Field(default_factory=list)
+    file_sources: List[FileSourceInfo] = Field(default_factory=list)
     created_at: str
     updated_at: str
     last_active_at: str
@@ -89,7 +104,8 @@ async def create_chat_session(
         if session_data.connection_ids:
             result = await db.execute(
                 select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(session_data.connection_ids)
+                    DatabaseConnection.id.in_(session_data.connection_ids),
+                    DatabaseConnection.is_deleted.isnot(True),
                 )
             )
             valid_connections = result.scalars().all()
@@ -97,7 +113,22 @@ async def create_chat_session(
             if len(valid_connections) != len(session_data.connection_ids):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more connection IDs are invalid"
+                    detail="One or more connection IDs are invalid or deleted"
+                )
+
+        # Validate file source IDs if provided
+        if session_data.file_source_ids:
+            file_result = await db.execute(
+                select(FileSource).where(
+                    FileSource.id.in_(session_data.file_source_ids),
+                    FileSource.processing_status == 'ready',
+                )
+            )
+            valid_files = file_result.scalars().all()
+            if len(valid_files) != len(session_data.file_source_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="One or more file source IDs are invalid or not ready"
                 )
 
         # Create new chat session
@@ -105,36 +136,16 @@ async def create_chat_session(
             name=session_data.name,
             user_id=session_data.user_id,
             active_connection_ids=session_data.connection_ids,
+            active_file_source_ids=session_data.file_source_ids or [],
         )
 
         db.add(new_session)
         await db.commit()
         await db.refresh(new_session)
 
-        # Get connection details
-        connections = []
-        if new_session.active_connection_ids:
-            # Ensure active_connection_ids is a list (defensive against bad data)
-            connection_ids = new_session.active_connection_ids
-            if isinstance(connection_ids, int):
-                connection_ids = [connection_ids]
-            elif not isinstance(connection_ids, list):
-                connection_ids = list(connection_ids) if connection_ids else []
-
-            result = await db.execute(
-                select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(connection_ids)
-                )
-            )
-            connections = [
-                ConnectionInfo(
-                    id=conn.id,
-                    name=conn.name,
-                    database_type=conn.database_type,
-                    database_name=conn.database_name,
-                )
-                for conn in result.scalars().all()
-            ]
+        # Get connection and file source details
+        connections = await _build_connection_infos(new_session, db)
+        file_sources = await _get_session_file_sources(new_session, db)
 
         # Ensure active_connection_ids in response is always a list
         active_conn_ids = new_session.active_connection_ids
@@ -149,6 +160,8 @@ async def create_chat_session(
             user_id=new_session.user_id,
             active_connection_ids=active_conn_ids,
             connections=connections,
+            active_file_source_ids=new_session.active_file_source_ids or [],
+            file_sources=file_sources,
             created_at=new_session.created_at.isoformat(),
             updated_at=new_session.updated_at.isoformat(),
             last_active_at=new_session.last_active_at.isoformat(),
@@ -187,36 +200,15 @@ async def list_chat_sessions(
         # Build response with connection details
         response_sessions = []
         for session in sessions:
-            # Get connection details
-            connections = []
-            if session.active_connection_ids:
-                # Ensure active_connection_ids is a list (defensive against bad data)
-                connection_ids = session.active_connection_ids
-                if isinstance(connection_ids, int):
-                    connection_ids = [connection_ids]
-                elif not isinstance(connection_ids, list):
-                    connection_ids = list(connection_ids) if connection_ids else []
+            # Get connection and file source details
+            connections = await _build_connection_infos(session, db)
+            file_sources = await _get_session_file_sources(session, db)
 
-                conn_result = await db.execute(
-                    select(DatabaseConnection).where(
-                        DatabaseConnection.id.in_(connection_ids)
-                    )
-                )
-                connections = [
-                    ConnectionInfo(
-                        id=conn.id,
-                        name=conn.name,
-                        database_type=conn.database_type,
-                        database_name=conn.database_name,
-                    )
-                    for conn in conn_result.scalars().all()
-                ]
-
-            # Count messages
+            # Count messages efficiently
             msg_count_result = await db.execute(
-                select(ChatMessage).where(ChatMessage.chat_session_id == session.id)
+                select(func.count()).select_from(ChatMessage).where(ChatMessage.chat_session_id == session.id)
             )
-            message_count = len(msg_count_result.scalars().all())
+            message_count = msg_count_result.scalar() or 0
 
             # Ensure active_connection_ids in response is always a list
             active_conn_ids = session.active_connection_ids
@@ -232,6 +224,8 @@ async def list_chat_sessions(
                     user_id=session.user_id,
                     active_connection_ids=active_conn_ids,
                     connections=connections,
+                    active_file_source_ids=session.active_file_source_ids or [],
+                    file_sources=file_sources,
                     created_at=session.created_at.isoformat(),
                     updated_at=session.updated_at.isoformat(),
                     last_active_at=session.last_active_at.isoformat(),
@@ -267,36 +261,15 @@ async def get_chat_session(
                 detail=f"Chat session {session_id} not found"
             )
 
-        # Get connection details
-        connections = []
-        if session.active_connection_ids:
-            # Ensure active_connection_ids is a list (defensive against bad data)
-            connection_ids = session.active_connection_ids
-            if isinstance(connection_ids, int):
-                connection_ids = [connection_ids]
-            elif not isinstance(connection_ids, list):
-                connection_ids = list(connection_ids) if connection_ids else []
+        # Get connection and file source details
+        connections = await _build_connection_infos(session, db)
+        file_sources = await _get_session_file_sources(session, db)
 
-            conn_result = await db.execute(
-                select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(connection_ids)
-                )
-            )
-            connections = [
-                ConnectionInfo(
-                    id=conn.id,
-                    name=conn.name,
-                    database_type=conn.database_type,
-                    database_name=conn.database_name,
-                )
-                for conn in conn_result.scalars().all()
-            ]
-
-        # Count messages
+        # Count messages efficiently
         msg_count_result = await db.execute(
-            select(ChatMessage).where(ChatMessage.chat_session_id == session.id)
+            select(func.count()).select_from(ChatMessage).where(ChatMessage.chat_session_id == session.id)
         )
-        message_count = len(msg_count_result.scalars().all())
+        message_count = msg_count_result.scalar() or 0
 
         # Ensure active_connection_ids in response is always a list
         active_conn_ids = session.active_connection_ids
@@ -311,6 +284,8 @@ async def get_chat_session(
             user_id=session.user_id,
             active_connection_ids=active_conn_ids,
             connections=connections,
+            active_file_source_ids=session.active_file_source_ids or [],
+            file_sources=file_sources,
             created_at=session.created_at.isoformat(),
             updated_at=session.updated_at.isoformat(),
             last_active_at=session.last_active_at.isoformat(),
@@ -351,10 +326,11 @@ async def update_chat_session(
             session.name = update_data.name
 
         if update_data.connection_ids is not None:
-            # Validate connection IDs
+            # Validate connection IDs (exclude soft-deleted)
             conn_result = await db.execute(
                 select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(update_data.connection_ids)
+                    DatabaseConnection.id.in_(update_data.connection_ids),
+                    DatabaseConnection.is_deleted.isnot(True),
                 )
             )
             valid_connections = conn_result.scalars().all()
@@ -362,47 +338,44 @@ async def update_chat_session(
             if len(valid_connections) != len(update_data.connection_ids):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more connection IDs are invalid"
+                    detail="One or more connection IDs are invalid or deleted"
                 )
 
             session.active_connection_ids = update_data.connection_ids
 
-        session.updated_at = datetime.utcnow()
-        session.last_active_at = datetime.utcnow()
+        if update_data.file_source_ids is not None:
+            # Validate file source IDs
+            if update_data.file_source_ids:
+                file_result = await db.execute(
+                    select(FileSource).where(
+                        FileSource.id.in_(update_data.file_source_ids),
+                        FileSource.processing_status == 'ready',
+                    )
+                )
+                valid_files = file_result.scalars().all()
+                if len(valid_files) != len(update_data.file_source_ids):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="One or more file source IDs are invalid or not ready"
+                    )
+
+            session.active_file_source_ids = update_data.file_source_ids
+
+        session.updated_at = datetime.now(timezone.utc)
+        session.last_active_at = datetime.now(timezone.utc)
 
         await db.commit()
         await db.refresh(session)
 
-        # Get connection details
-        connections = []
-        if session.active_connection_ids:
-            # Ensure active_connection_ids is a list (defensive against bad data)
-            connection_ids = session.active_connection_ids
-            if isinstance(connection_ids, int):
-                connection_ids = [connection_ids]
-            elif not isinstance(connection_ids, list):
-                connection_ids = list(connection_ids) if connection_ids else []
+        # Get connection and file source details
+        connections = await _build_connection_infos(session, db)
+        file_sources = await _get_session_file_sources(session, db)
 
-            conn_result = await db.execute(
-                select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(connection_ids)
-                )
-            )
-            connections = [
-                ConnectionInfo(
-                    id=conn.id,
-                    name=conn.name,
-                    database_type=conn.database_type,
-                    database_name=conn.database_name,
-                )
-                for conn in conn_result.scalars().all()
-            ]
-
-        # Count messages
+        # Count messages efficiently
         msg_count_result = await db.execute(
-            select(ChatMessage).where(ChatMessage.chat_session_id == session.id)
+            select(func.count()).select_from(ChatMessage).where(ChatMessage.chat_session_id == session.id)
         )
-        message_count = len(msg_count_result.scalars().all())
+        message_count = msg_count_result.scalar() or 0
 
         # Ensure active_connection_ids in response is always a list
         active_conn_ids = session.active_connection_ids
@@ -417,6 +390,8 @@ async def update_chat_session(
             user_id=session.user_id,
             active_connection_ids=active_conn_ids,
             connections=connections,
+            active_file_source_ids=session.active_file_source_ids or [],
+            file_sources=file_sources,
             created_at=session.created_at.isoformat(),
             updated_at=session.updated_at.isoformat(),
             last_active_at=session.last_active_at.isoformat(),
@@ -557,7 +532,7 @@ async def create_chat_message(
         db.add(new_message)
 
         # Update session last_active_at
-        session.last_active_at = datetime.utcnow()
+        session.last_active_at = datetime.now(timezone.utc)
 
         await db.commit()
         await db.refresh(new_message)
@@ -671,3 +646,264 @@ async def clear_conversation_context(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to clear conversation context: {str(e)}"
         )
+
+
+# =============================================================================
+# Phase 13: File Source Management Endpoints
+# =============================================================================
+
+class SessionFilesResponse(BaseModel):
+    """Response for session file operations"""
+    success: bool
+    session_id: str
+    active_file_source_ids: List[int]
+    file_sources: List[FileSourceInfo]
+
+
+@router.post("/sessions/{session_id}/files/{file_id}", response_model=SessionFilesResponse)
+async def add_file_to_session(
+    session_id: str,
+    file_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Add a file source to a chat session (Phase 13).
+
+    The file must exist and be in 'ready' status to be added.
+    """
+    try:
+        # Verify session exists
+        session_result = await db.execute(
+            select(ChatSession).where(ChatSession.id == session_id)
+        )
+        session = session_result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat session {session_id} not found"
+            )
+
+        # Verify file source exists and is ready
+        file_result = await db.execute(
+            select(FileSource).where(
+                FileSource.id == file_id,
+                FileSource.processing_status == 'ready',
+            )
+        )
+        file_source = file_result.scalar_one_or_none()
+
+        if not file_source:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File source {file_id} not found or not ready"
+            )
+
+        # Add file to session's active files
+        current_files = session.active_file_source_ids or []
+        if file_id not in current_files:
+            session.active_file_source_ids = current_files + [file_id]
+            session.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+            await db.refresh(session)
+
+            logger.info(f"Added file source {file_id} to session {session_id}")
+
+        # Get all active file sources for response
+        file_sources = await _get_session_file_sources(session, db)
+
+        return SessionFilesResponse(
+            success=True,
+            session_id=session_id,
+            active_file_source_ids=session.active_file_source_ids or [],
+            file_sources=file_sources,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to add file to session: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add file to session: {str(e)}"
+        )
+
+
+@router.delete("/sessions/{session_id}/files/{file_id}", response_model=SessionFilesResponse)
+async def remove_file_from_session(
+    session_id: str,
+    file_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Remove a file source from a chat session (Phase 13).
+
+    This only removes the file from the session's active sources.
+    The file itself is not deleted.
+    """
+    try:
+        # Verify session exists
+        session_result = await db.execute(
+            select(ChatSession).where(ChatSession.id == session_id)
+        )
+        session = session_result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat session {session_id} not found"
+            )
+
+        # Remove file from session's active files
+        current_files = session.active_file_source_ids or []
+        if file_id in current_files:
+            session.active_file_source_ids = [f for f in current_files if f != file_id]
+            session.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+            await db.refresh(session)
+
+            logger.info(f"Removed file source {file_id} from session {session_id}")
+
+        # Get remaining active file sources for response
+        file_sources = await _get_session_file_sources(session, db)
+
+        return SessionFilesResponse(
+            success=True,
+            session_id=session_id,
+            active_file_source_ids=session.active_file_source_ids or [],
+            file_sources=file_sources,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to remove file from session: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to remove file from session: {str(e)}"
+        )
+
+
+@router.get("/sessions/{session_id}/files", response_model=SessionFilesResponse)
+async def get_session_files(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all active file sources for a chat session (Phase 13).
+    """
+    try:
+        # Verify session exists
+        session_result = await db.execute(
+            select(ChatSession).where(ChatSession.id == session_id)
+        )
+        session = session_result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat session {session_id} not found"
+            )
+
+        # Get active file sources
+        file_sources = await _get_session_file_sources(session, db)
+
+        return SessionFilesResponse(
+            success=True,
+            session_id=session_id,
+            active_file_source_ids=session.active_file_source_ids or [],
+            file_sources=file_sources,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get session files: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get session files: {str(e)}"
+        )
+
+
+async def _build_connection_infos(
+    session: ChatSession,
+    db: AsyncSession,
+) -> List[ConnectionInfo]:
+    """Helper to build ConnectionInfo list for a session.
+
+    Includes deleted connections (is_deleted=True) so chat history
+    can show them as 'removed' instead of silently dropping them.
+    """
+    connection_ids = session.active_connection_ids
+    if not connection_ids:
+        return []
+
+    if isinstance(connection_ids, int):
+        connection_ids = [connection_ids]
+    elif not isinstance(connection_ids, list):
+        connection_ids = list(connection_ids) if connection_ids else []
+
+    conn_result = await db.execute(
+        select(DatabaseConnection).where(
+            DatabaseConnection.id.in_(connection_ids)
+        )
+    )
+    return [
+        ConnectionInfo(
+            id=conn.id,
+            name=conn.name,
+            database_type=conn.database_type,
+            database_name=conn.database_name,
+            is_deleted=getattr(conn, 'is_deleted', False) or False,
+        )
+        for conn in conn_result.scalars().all()
+    ]
+
+
+async def _get_session_file_sources(
+    session: ChatSession,
+    db: AsyncSession,
+) -> List[FileSourceInfo]:
+    """Helper to get file source info for a session.
+
+    Only returns ready files. Deleted file IDs are removed from the
+    session's active_file_source_ids as a defensive cleanup (handles
+    stale references from before the delete-endpoint cleanup was added).
+    """
+    file_sources = []
+    file_ids = session.active_file_source_ids or []
+
+    if not file_ids:
+        return file_sources
+
+    result = await db.execute(
+        select(FileSource).where(
+            FileSource.id.in_(file_ids),
+        )
+    )
+    all_files = list(result.scalars().all())
+
+    # Separate ready files from stale/deleted references
+    ready_ids = []
+    for fs in all_files:
+        if fs.processing_status == 'ready':
+            ready_ids.append(fs.id)
+            file_sources.append(FileSourceInfo(
+                id=fs.id,
+                name=fs.name,
+                file_type=fs.file_type,
+                original_filename=fs.original_filename,
+                row_count=fs.row_count,
+                processing_status=fs.processing_status,
+            ))
+
+    # Defensive cleanup: mark stale IDs on the session object so the next
+    # explicit write (update/message) persists the fix.  We intentionally
+    # do NOT commit here -- this helper is called from GET endpoints and
+    # an implicit commit could flush unrelated pending changes.
+    if set(ready_ids) != set(file_ids):
+        stale = set(file_ids) - set(ready_ids)
+        logger.debug(f"Session {session.id}: pruning stale file source IDs {stale}")
+        session.active_file_source_ids = ready_ids
+
+    return file_sources

@@ -38,8 +38,8 @@ class SQLValidator:
         "INSERT", "UPDATE", "EXEC", "EXECUTE", "GRANT", "REVOKE"
     ]
 
-    # Allowed SELECT-only patterns
-    READ_ONLY_PATTERN = re.compile(r"^\s*SELECT\s+", re.IGNORECASE)
+    # Allowed read-only patterns (SELECT and WITH/CTE queries)
+    READ_ONLY_PATTERN = re.compile(r"^\s*(SELECT|WITH)\s+", re.IGNORECASE)
 
     @staticmethod
     def is_read_only(sql: str) -> bool:

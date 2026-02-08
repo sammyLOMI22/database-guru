@@ -19,6 +19,14 @@ Welcome to the Database Guru documentation. This directory contains all document
 * **Testing**: [Testing Guide](./guides/testing/TESTING_GUIDE.md)
 * **Architecture**: See [CLAUDE.md](../CLAUDE.md) for complete architecture overview
 
+## Feature Guides
+
+* **File Data Sources**: [User Guide](./guides/FILE_DATA_SOURCE_USER_GUIDE.md), [Testing Guide](./guides/testing/FILE_DATA_SOURCE_TESTING.md)
+* **Data Lineage**: [User Guide](./guides/DATA_LINEAGE_GUIDE.md), [Lineage Intelligence](./guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md)
+* **Multi-Database**: [Multi-DB Guide](./guides/MULTI_DATABASE_GUIDE.md), [Validation Guide](./guides/MULTI_DB_VALIDATION_GUIDE.md)
+* **Caching**: [Semantic Caching](./technical/SEMANTIC_CACHING.md), [Connection Pooling](./guides/CONNECTION_POOLING_GUIDE.md)
+* **Visualization**: [Advanced Visualization Guide](./guides/ADVANCED_VISUALIZATION_GUIDE.md)
+
 ## Contributing to Documentation
 
 When adding new documentation, please place it in the appropriate subdirectory.
