@@ -392,7 +392,11 @@ class QueryPlanningAgent:
         database_type: str = "postgresql",
         model: Optional[str] = None,
         validate_schema: bool = True,
-        schema_dict: Optional[Dict] = None
+        schema_dict: Optional[Dict] = None,
+        db: Optional[AsyncSession] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> QueryPlan:
         """
         Create a structured query execution plan
@@ -446,6 +450,11 @@ class QueryPlanningAgent:
                 messages=messages,
                 model=model_to_use,
                 temperature=0.1,  # Low temperature for structured output
+                db=db or self.db_session,
+                agent_type="query_planner",
+                query_history_id=query_history_id,
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
             )
 
             # Parse JSON response
@@ -463,7 +472,13 @@ class QueryPlanningAgent:
 
             # Validate plan against schema if enabled
             if validate_schema:
-                plan = await self._validate_and_correct_plan(plan, schema, question, model_to_use)
+                plan = await self._validate_and_correct_plan(
+                    plan, schema, question, model_to_use,
+                    db=db,
+                    query_history_id=query_history_id,
+                    chat_session_id=chat_session_id,
+                    chat_message_id=chat_message_id,
+                )
 
             # Normalize location values in filters (if schema_dict available)
             if schema_dict:
@@ -546,6 +561,10 @@ class QueryPlanningAgent:
         schema_dict: Optional[Dict] = None,
         connection_name: Optional[str] = None,
         quality_profile: Optional["QualityProfile"] = None,
+        db: Optional[AsyncSession] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Create query plan and generate SQL from the plan
@@ -586,7 +605,11 @@ class QueryPlanningAgent:
             schema=schema,
             database_type=database_type,
             model=model,
-            schema_dict=schema_dict
+            schema_dict=schema_dict,
+            db=db,
+            query_history_id=query_history_id,
+            chat_session_id=chat_session_id,
+            chat_message_id=chat_message_id,
         )
 
         # Generate SQL from plan
@@ -601,7 +624,11 @@ class QueryPlanningAgent:
                 sql_generator=sql_generator,
                 model=model,
                 schema_dict=schema_dict,
-                connection_name=connection_name
+                connection_name=connection_name,
+                db=db,
+                query_history_id=query_history_id,
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
             )
             sql = sql_result.get("sql")
             mappings_applied = sql_result.get("mappings_applied")
@@ -627,7 +654,11 @@ class QueryPlanningAgent:
         sql_generator,
         model: Optional[str] = None,
         schema_dict: Optional[Dict] = None,
-        connection_name: Optional[str] = None
+        connection_name: Optional[str] = None,
+        db: Optional[AsyncSession] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Generate SQL query from structured plan
@@ -691,6 +722,10 @@ Reasoning:
             database_type=database_type,
             model=model,
             schema_dict=schema_dict,  # Pass for WHERE column validation
+            db=db,
+            query_history_id=query_history_id,
+            chat_session_id=chat_session_id,
+            chat_message_id=chat_message_id,
         )
 
         # Apply learned mappings to generated SQL (if db_session and connection_name available)
@@ -740,7 +775,11 @@ Reasoning:
         plan: QueryPlan,
         schema: str,
         question: str,
-        model: str
+        model: str,
+        db: Optional[AsyncSession] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> QueryPlan:
         """
         Validate query plan against schema and attempt correction if needed
@@ -808,7 +847,11 @@ Reasoning:
                 validator=validator,
                 schema=schema,
                 question=question,
-                model=model
+                model=model,
+                db=db,
+                query_history_id=query_history_id,
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
             )
 
             return corrected_plan
@@ -825,7 +868,11 @@ Reasoning:
         validator: SchemaValidator,
         schema: str,
         question: str,
-        model: str
+        model: str,
+        db: Optional[AsyncSession] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> QueryPlan:
         """
         Attempt to correct a query plan using validation errors and suggestions
@@ -880,6 +927,11 @@ Please provide a corrected query plan as valid JSON."""
                 messages=messages,
                 model=model,
                 temperature=0.1,
+                db=db or self.db_session,
+                agent_type="query_plan_corrector",
+                query_history_id=query_history_id,
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
             )
 
             # Parse corrected plan

@@ -149,6 +149,10 @@ class LineageNarrator:
         question: Optional[str] = None,
         schema_context: Optional[Dict] = None,
         timeout: Optional[float] = None,
+        db: Optional[Any] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> LineageNarrative:
         """
         Generate narrative explanation of lineage.
@@ -192,6 +196,11 @@ class LineageNarrator:
                         prompt=prompt,
                         temperature=0.2,  # Low temperature for analytical task
                         model=model_to_use,
+                        db=db,
+                        agent_type="lineage_narrator",
+                        query_history_id=query_history_id,
+                        chat_session_id=chat_session_id,
+                        chat_message_id=chat_message_id,
                     ),
                     timeout=effective_timeout
                 )

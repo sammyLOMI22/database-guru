@@ -278,6 +278,8 @@ class ImpactAdvisor:
         new_value: Optional[str] = None,
         include_patches: bool = True,
         timeout: Optional[float] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> ImpactAdvice:
         """
         Perform complete impact analysis with LLM-generated recommendations.
@@ -317,10 +319,12 @@ class ImpactAdvisor:
         try:
             tasks = [
                 self._generate_risk_explanation(
-                    impact, change_type, target_object, new_value, effective_timeout
+                    impact, change_type, target_object, new_value, effective_timeout,
+                    db=db, chat_session_id=chat_session_id, chat_message_id=chat_message_id
                 ),
                 self._generate_migration_plan(
-                    impact, change_type, target_object, new_value, effective_timeout
+                    impact, change_type, target_object, new_value, effective_timeout,
+                    db=db, chat_session_id=chat_session_id, chat_message_id=chat_message_id
                 ),
             ]
 
@@ -332,6 +336,7 @@ class ImpactAdvisor:
                         target_object,
                         new_value,
                         effective_timeout,
+                        db=db, chat_session_id=chat_session_id, chat_message_id=chat_message_id
                     )
                 )
 
@@ -424,6 +429,9 @@ class ImpactAdvisor:
         target_object: str,
         new_value: Optional[str],
         timeout: float,
+        db: Optional[Any] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> RiskExplanation:
         """Generate risk explanation using LLM."""
         # Format sample queries
@@ -441,7 +449,15 @@ class ImpactAdvisor:
 
         model = self._get_model()
         response = await asyncio.wait_for(
-            self.client.generate(prompt=prompt, model=model, temperature=0.2),
+            self.client.generate(
+                prompt=prompt,
+                model=model,
+                temperature=0.2,
+                db=db,
+                agent_type="impact_advisor_risk",
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
+            ),
             timeout=timeout,
         )
 
@@ -468,6 +484,9 @@ class ImpactAdvisor:
         new_value: Optional[str],
         timeout: float,
         db_type: str = "postgresql",
+        db: Optional[Any] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> MigrationPlan:
         """Generate migration plan using LLM."""
         sample_queries = self._format_sample_queries(impact.impacted_queries[:5])
@@ -484,7 +503,15 @@ class ImpactAdvisor:
 
         model = self._get_model()
         response = await asyncio.wait_for(
-            self.client.generate(prompt=prompt, model=model, temperature=0.2),
+            self.client.generate(
+                prompt=prompt,
+                model=model,
+                temperature=0.2,
+                db=db,
+                agent_type="impact_advisor_migration",
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
+            ),
             timeout=timeout,
         )
 
@@ -531,6 +558,9 @@ class ImpactAdvisor:
         old_value: str,
         new_value: str,
         timeout: float,
+        db: Optional[Any] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> List[SQLPatch]:
         """Generate SQL patches for affected queries."""
         # Format queries for prompt
@@ -550,7 +580,15 @@ class ImpactAdvisor:
 
         model = self._get_model()
         response = await asyncio.wait_for(
-            self.client.generate(prompt=prompt, model=model, temperature=0.2),
+            self.client.generate(
+                prompt=prompt,
+                model=model,
+                temperature=0.2,
+                db=db,
+                agent_type="impact_advisor_patches",
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
+            ),
             timeout=timeout,
         )
 

@@ -2,7 +2,9 @@
 import logging
 from typing import Optional, Dict, Any, List
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.config.settings import Settings
+from src.services.llm_usage_tracker import llm_usage_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +60,7 @@ class OllamaClient:
             logger.error(f"Failed to list models: {e}")
             return []
 
-    async def generate(
+    async def _generate_internal(
         self,
         prompt: str,
         model: Optional[str] = None,
@@ -66,50 +68,85 @@ class OllamaClient:
         temperature: float = 0.1,
         stream: bool = False,
         **kwargs,
-    ) -> str:
+    ) -> Dict[str, Any]:
+        """Internal generate implementation that always returns full response"""
+        if not self.client:
+            await self.connect()
+
+        model = model or self.model
+
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": stream,
+            "options": {
+                "temperature": temperature,
+                **kwargs,
+            },
+        }
+
+        if system:
+            payload["system"] = system
+
+        logger.debug(f"Generating with {model}: {prompt[:100]}...")
+
+        response = await self.client.post("/api/generate", json=payload)
+        response.raise_for_status()
+
+        return response.json()
+
+    async def generate(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        system: Optional[str] = None,
+        temperature: float = 0.1,
+        stream: bool = False,
+        return_full_response: bool = False,
+        db: Optional[AsyncSession] = None,
+        agent_type: str = "unknown",
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
+        agent_name: Optional[str] = None,
+        **kwargs,
+    ) -> Any:
         """
-        Generate text completion from Ollama
-
-        Args:
-            prompt: User prompt
-            model: Model name (uses default if not specified)
-            system: System prompt
-            temperature: Temperature for generation (0.0-1.0)
-            stream: Whether to stream response
-            **kwargs: Additional generation parameters
-
-        Returns:
-            Generated text
+        Generate text completion from Ollama (with optional tracking)
         """
         try:
-            if not self.client:
-                await self.connect()
+            if db:
+                model_name = model or self.model
+                async with llm_usage_tracker.track_call(
+                    db=db,
+                    agent_type=agent_type,
+                    model_name=model_name,
+                    llm_method="generate",
+                    prompt=prompt,
+                    provider="ollama",
+                    query_history_id=query_history_id,
+                    chat_session_id=chat_session_id,
+                    chat_message_id=chat_message_id,
+                    agent_name=agent_name,
+                ) as tracking:
+                    result_dict = await self._generate_internal(
+                        prompt=prompt, model=model, system=system,
+                        temperature=temperature, stream=stream, **kwargs
+                    )
+                    generated_text = result_dict.get("response", "")
+                    tracking.set_response(generated_text, result_dict)
 
-            model = model or self.model
-
-            payload = {
-                "model": model,
-                "prompt": prompt,
-                "stream": stream,
-                "options": {
-                    "temperature": temperature,
-                    **kwargs,
-                },
-            }
-
-            if system:
-                payload["system"] = system
-
-            logger.debug(f"Generating with {model}: {prompt[:100]}...")
-
-            response = await self.client.post("/api/generate", json=payload)
-            response.raise_for_status()
-
-            result = response.json()
-            generated_text = result.get("response", "")
-
-            logger.debug(f"Generated {len(generated_text)} characters")
-            return generated_text
+                    if return_full_response:
+                        return result_dict
+                    return generated_text
+            else:
+                result_dict = await self._generate_internal(
+                    prompt=prompt, model=model, system=system,
+                    temperature=temperature, stream=stream, **kwargs
+                )
+                if return_full_response:
+                    return result_dict
+                return result_dict.get("response", "")
 
         except httpx.HTTPStatusError as e:
             logger.error(f"Ollama HTTP error: {e.response.status_code} - {e.response.text}")
@@ -118,50 +155,93 @@ class OllamaClient:
             logger.error(f"Ollama generation error: {e}")
             raise
 
-    async def chat(
+    async def generate_tracked(self, *args, **kwargs) -> str:
+        """Deprecated: use generate() with db parameter"""
+        return await self.generate(*args, **kwargs)
+
+    async def _chat_internal(
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
         temperature: float = 0.1,
         **kwargs,
-    ) -> str:
+    ) -> Dict[str, Any]:
+        """Internal chat implementation that always returns full response"""
+        if not self.client:
+            await self.connect()
+
+        model = model or self.model
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                **kwargs,
+            },
+        }
+
+        logger.debug(f"Chat with {model}: {len(messages)} messages")
+
+        response = await self.client.post("/api/chat", json=payload)
+        response.raise_for_status()
+
+        return response.json()
+
+    async def chat(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        temperature: float = 0.1,
+        return_full_response: bool = False,
+        db: Optional[AsyncSession] = None,
+        agent_type: str = "unknown",
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
+        agent_name: Optional[str] = None,
+        **kwargs,
+    ) -> Any:
         """
-        Chat completion with conversation history
-
-        Args:
-            messages: List of message dicts with "role" and "content"
-            model: Model name
-            temperature: Temperature for generation
-            **kwargs: Additional options
-
-        Returns:
-            Assistant's response
+        Chat completion with conversation history (with optional tracking)
         """
         try:
-            if not self.client:
-                await self.connect()
+            if db:
+                model_name = model or self.model
+                # Convert messages to prompt string for token estimation
+                prompt_text = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
 
-            model = model or self.model
+                async with llm_usage_tracker.track_call(
+                    db=db,
+                    agent_type=agent_type,
+                    model_name=model_name,
+                    llm_method="chat",
+                    prompt=prompt_text,
+                    provider="ollama",
+                    query_history_id=query_history_id,
+                    chat_session_id=chat_session_id,
+                    chat_message_id=chat_message_id,
+                    agent_name=agent_name,
+                ) as tracking:
+                    result_dict = await self._chat_internal(
+                        messages=messages, model=model,
+                        temperature=temperature, **kwargs
+                    )
+                    assistant_message = result_dict.get("message", {}).get("content", "")
+                    tracking.set_response(assistant_message, result_dict)
 
-            payload = {
-                "model": model,
-                "messages": messages,
-                "stream": False,
-                "options": {
-                    "temperature": temperature,
-                    **kwargs,
-                },
-            }
-
-            logger.debug(f"Chat with {model}: {len(messages)} messages")
-
-            response = await self.client.post("/api/chat", json=payload)
-            response.raise_for_status()
-
-            result = response.json()
-            assistant_message = result.get("message", {}).get("content", "")
-
-            return assistant_message
+                    if return_full_response:
+                        return result_dict
+                    return assistant_message
+            else:
+                result_dict = await self._chat_internal(
+                    messages=messages, model=model,
+                    temperature=temperature, **kwargs
+                )
+                if return_full_response:
+                    return result_dict
+                return result_dict.get("message", {}).get("content", "")
 
         except httpx.HTTPStatusError as e:
             logger.error(f"Ollama chat error: {e.response.status_code} - {e.response.text}")
@@ -169,6 +249,10 @@ class OllamaClient:
         except Exception as e:
             logger.error(f"Ollama chat error: {e}")
             raise
+
+    async def chat_tracked(self, *args, **kwargs) -> str:
+        """Deprecated: use chat() with db parameter"""
+        return await self.chat(*args, **kwargs)
 
     async def pull_model(self, model: str) -> bool:
         """

@@ -216,6 +216,17 @@ async def process_query(
         database_type = active_connection.database_type
         logger.info(f"Using active connection '{active_connection.name}' ({database_type})")
 
+        # Create initial query history record to get an ID for tracking
+        query_record = QueryHistory(
+            natural_language_query=request.question,
+            database_type=database_type,
+            connection_id=active_connection.id,
+            status="processing"
+        )
+        db.add(query_record)
+        await db.commit()
+        await db.refresh(query_record)
+
         # Connect to user's database for schema and query execution
         async with UserDatabaseConnector.get_user_db_session(active_connection) as user_db:
             # Initialize schema inspector (needed for tool-using agent)
@@ -278,6 +289,9 @@ async def process_query(
                 schema_inspector=schema_inspector,  # Pass for tool-using agent
                 connection_id=active_connection.id,  # Pass for tool-using agent
                 row_limit=request.row_limit,  # Pass row limit from request
+                db=db,
+                query_history_id=query_record.id,
+                chat_session_id=request.session_id,
             )
 
             # Extract results from agent
@@ -338,22 +352,17 @@ async def process_query(
         elif execution_result and not execution_result.get("success"):
             error_msg = execution_result.get("error")
 
-        # Save to query history
-        query_record = QueryHistory(
-            natural_language_query=request.question,  # Save original question, not enhanced
-            generated_sql=sql,
-            sql_validated=is_valid,
-            executed=execution_result is not None and execution_result.get("success", False),
-            execution_time_ms=execution_result.get("execution_time_ms") if execution_result else None,
-            result_count=execution_result.get("row_count") if execution_result else None,
-            error_message=error_msg,
-            database_type=database_type,  # Use detected database type from active connection
-            model_used=model_used,  # Use actual model that was used
-            connection_id=active_connection.id,
-        )
-        db.add(query_record)
+        # Update query history record with results
+        query_record.generated_sql = sql
+        query_record.sql_validated = is_valid
+        query_record.executed = execution_result is not None and execution_result.get("success", False)
+        query_record.execution_time_ms = execution_result.get("execution_time_ms") if execution_result else None
+        query_record.result_count = execution_result.get("row_count") if execution_result else None
+        query_record.error_message = error_msg
+        query_record.model_used = model_used
+        query_record.status = "completed" if is_valid else "failed"
+
         await db.commit()
-        await db.refresh(query_record)
 
         # Save chat messages if session_id provided
         if request.session_id:
@@ -425,6 +434,9 @@ async def process_query(
                     row_count=execution_result.get("row_count", 0),
                     execution_time_ms=execution_result.get("execution_time_ms", 0),
                     database_type=database_type,
+                    db=db,
+                    query_history_id=query_record.id,
+                    chat_session_id=request.session_id,
                 )
 
                 # Convert to response format
@@ -640,13 +652,16 @@ async def stream_query_results(
                     schema = schema_inspector.format_schema_for_llm(schema_data)
 
                 # Generate SQL (without execution yet)
-                sql = await sql_generator.generate_sql(
+                sql_result = await sql_generator.generate_sql(
                     question=enhanced_question,
                     schema=schema,
                     database_type=database_type,
                     model=request.model or settings.OLLAMA_MODEL,
                     schema_dict=schema_data,  # Pass for WHERE column validation
+                    db=db,
+                    chat_session_id=request.session_id,
                 )
+                sql = sql_result["sql"]
 
                 logger.info(f"[Stream] Generated SQL: {sql[:100]}...")
 

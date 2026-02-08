@@ -73,6 +73,10 @@ class ResultNarrator:
         database_type: str = "postgresql",
         databases: Optional[List[str]] = None,
         multi_database: bool = False,
+        db: Optional[Any] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> NarrativeResult:
         """
         Generate natural language narrative from query results
@@ -156,7 +160,12 @@ class ResultNarrator:
                     self.ollama.generate(
                         prompt=prompt,
                         temperature=0.3,
-                        model=self.model  # Use per-task model if configured
+                        model=self.model,  # Use per-task model if configured
+                        db=db or self.db_session,
+                        agent_type="result_narrator",
+                        query_history_id=query_history_id,
+                        chat_session_id=chat_session_id,
+                        chat_message_id=chat_message_id,
                     ),
                     timeout=self.timeout_seconds
                 )

@@ -484,6 +484,10 @@ class SelfCorrectingSQLAgent:
         schema_cache=None,  # SchemaCache for tool-using agent
         connection_id: Optional[int] = None,  # Connection ID for tool-using agent
         schema_dict: Optional[Dict] = None,  # For WHERE column validation
+        db: Optional[AsyncSession] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Try multiple fix strategies in parallel and return the first successful one
@@ -584,6 +588,10 @@ class SelfCorrectingSQLAgent:
                     database_type=database_type,
                     correction_hints=hints,  # Explicit hints forwarding
                     schema_dict=schema_dict,  # Pass for WHERE column validation
+                    db=db,
+                    query_history_id=query_history_id,
+                    chat_session_id=chat_session_id,
+                    chat_message_id=chat_message_id,
                 )
                 return {
                     "sql": fix_result["sql"],
@@ -683,6 +691,10 @@ class SelfCorrectingSQLAgent:
                 database_type=database_type,
                 correction_hints=hints,  # Explicit hints forwarding (addresses PR review)
                 schema_dict=schema_dict,  # Pass for WHERE column validation
+                db=db,
+                query_history_id=query_history_id,
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
             )
 
             metrics["winning_strategy"] = "llm_fallback_timeout"
@@ -762,6 +774,10 @@ class SelfCorrectingSQLAgent:
                 database_type=database_type,
                 correction_hints=hints,  # Explicit hints forwarding (addresses PR review)
                 schema_dict=schema_dict,  # Pass for WHERE column validation
+                db=db,
+                query_history_id=query_history_id,
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
             )
             return {
                 "sql": fix_result["sql"],
@@ -786,6 +802,10 @@ class SelfCorrectingSQLAgent:
         schema_cache=None,  # NEW: SchemaCache for tool-using agent
         connection_id: Optional[int] = None,  # NEW: Connection ID for tool-using agent
         row_limit: int = 100,  # NEW: Maximum rows to return
+        db: Optional[AsyncSession] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Generate SQL with automatic error correction and retry
@@ -950,6 +970,10 @@ class SelfCorrectingSQLAgent:
                     schema_dict=schema_dict,
                     connection_name=connection_name,
                     quality_profile=self.quality_profile,
+                    db=db,
+                    query_history_id=query_history_id,
+                    chat_session_id=chat_session_id,
+                    chat_message_id=chat_message_id,
                 )
 
                 if planning_result.get("used_planning"):
@@ -1160,6 +1184,10 @@ class SelfCorrectingSQLAgent:
                             schema_dict=schema_dict,  # Pass for LocationMapper
                             row_limit=row_limit,  # Pass row limit to LLM
                             intent_result=intent_result,  # Phase 1: Intent-driven prompting
+                            db=db,
+                            query_history_id=query_history_id,
+                            chat_session_id=chat_session_id,
+                            chat_message_id=chat_message_id,
                         )
 
                         # Check if LLM says query cannot be answered
@@ -1270,6 +1298,10 @@ class SelfCorrectingSQLAgent:
                             schema_cache=schema_cache,
                             connection_id=connection_id,
                             schema_dict=schema_dict,  # Pass for WHERE column validation
+                            db=db,
+                            query_history_id=query_history_id,
+                            chat_session_id=chat_session_id,
+                            chat_message_id=chat_message_id,
                         )
                         sql = fix_result["sql"]
                         self.fix_methods[attempt_num] = fix_result["fix_method"]

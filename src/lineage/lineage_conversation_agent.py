@@ -332,7 +332,7 @@ class LineageConversationAgent:
 
         # Generate answer with LLM
         answer_text = await self._generate_lineage_answer(
-            question, tables, lineage_info, context, queries
+            question, tables, lineage_info, context, queries, db
         )
 
         return LineageAnswer(
@@ -392,7 +392,7 @@ class LineageConversationAgent:
 
         # Generate answer
         answer_text = await self._generate_impact_answer(
-            question, tables, columns, impact_info, queries, context
+            question, tables, columns, impact_info, queries, context, db
         )
 
         return LineageAnswer(
@@ -418,7 +418,7 @@ class LineageConversationAgent:
         stats = await self._get_query_stats(connection_id, db)
 
         # Generate answer
-        answer_text = await self._generate_pattern_answer(question, stats, context)
+        answer_text = await self._generate_pattern_answer(question, stats, context, db)
 
         return LineageAnswer(
             question=question,
@@ -466,7 +466,7 @@ class LineageConversationAgent:
             )
 
         # Generate answer
-        answer_text = await self._generate_schema_answer(question, schema_info, context)
+        answer_text = await self._generate_schema_answer(question, schema_info, context, db)
 
         return LineageAnswer(
             question=question,
@@ -490,7 +490,7 @@ class LineageConversationAgent:
         stats = await self._get_query_stats(connection_id, db)
 
         # Generate recommendations
-        answer_text = await self._generate_recommendation_answer(question, stats, context)
+        answer_text = await self._generate_recommendation_answer(question, stats, context, db)
 
         return LineageAnswer(
             question=question,
@@ -518,7 +518,7 @@ class LineageConversationAgent:
         db_info = await self._get_database_info(connection_id, db)
 
         # Generate answer
-        answer_text = await self._generate_general_answer(question, db_info, context)
+        answer_text = await self._generate_general_answer(question, db_info, context, db)
 
         return LineageAnswer(
             question=question,
@@ -748,6 +748,7 @@ class LineageConversationAgent:
         lineage_info: Dict[str, Any],
         context: ConversationContext,
         queries: List[QueryHistory],
+        db: Optional[AsyncSession] = None,
     ) -> str:
         """Generate an answer about lineage using LLM."""
         prompt = f"""You are a database lineage expert. Answer the user's question about data lineage clearly and concisely.
@@ -769,7 +770,10 @@ Provide a clear, concise answer about the data lineage. Explain:
 
 Keep your response under 200 words and focus on directly answering the question."""
 
-        return await self._call_llm(prompt, self._fallback_lineage_answer(tables, lineage_info))
+        return await self._call_llm(
+            prompt, self._fallback_lineage_answer(tables, lineage_info),
+            db=db, agent_type="lineage_conversation"
+        )
 
     async def _generate_impact_answer(
         self,
@@ -779,6 +783,7 @@ Keep your response under 200 words and focus on directly answering the question.
         impact_info: Dict[str, Any],
         queries: List[QueryHistory],
         context: ConversationContext,
+        db: Optional[AsyncSession] = None,
     ) -> str:
         """Generate an answer about impact analysis."""
         prompt = f"""You are a database change impact analyst. Answer the user's question about the potential impact of schema changes.
@@ -812,13 +817,14 @@ Keep your response under 200 words."""
             f"I recommend reviewing these queries before making changes."
         )
 
-        return await self._call_llm(prompt, fallback)
+        return await self._call_llm(prompt, fallback, db=db, agent_type="impact_advisor")
 
     async def _generate_pattern_answer(
         self,
         question: str,
         stats: Dict[str, Any],
         context: ConversationContext,
+        db: Optional[AsyncSession] = None,
     ) -> str:
         """Generate an answer about query patterns."""
         prompt = f"""You are a database usage analyst. Answer the user's question about query patterns and database usage.
@@ -849,13 +855,14 @@ Keep your response under 200 words."""
             f"The most frequently used tables are: {', '.join(stats.get('top_tables', [])[:5])}."
         )
 
-        return await self._call_llm(prompt, fallback)
+        return await self._call_llm(prompt, fallback, db=db, agent_type="pattern_analyzer")
 
     async def _generate_schema_answer(
         self,
         question: str,
         schema_info: Dict[str, Any],
         context: ConversationContext,
+        db: Optional[AsyncSession] = None,
     ) -> str:
         """Generate an answer about schema."""
         tables_desc = []
@@ -882,13 +889,14 @@ Keep your response under 200 words."""
 
         fallback = f"Schema information: {self._format_dict(schema_info)}"
 
-        return await self._call_llm(prompt, fallback)
+        return await self._call_llm(prompt, fallback, db=db, agent_type="schema_explorer")
 
     async def _generate_recommendation_answer(
         self,
         question: str,
         stats: Dict[str, Any],
         context: ConversationContext,
+        db: Optional[AsyncSession] = None,
     ) -> str:
         """Generate recommendations."""
         prompt = f"""You are a database optimization expert. Answer the user's question with specific, actionable recommendations.
@@ -916,13 +924,14 @@ Keep your response under 250 words."""
             "3. Consider caching for frequently repeated queries"
         )
 
-        return await self._call_llm(prompt, fallback)
+        return await self._call_llm(prompt, fallback, db=db, agent_type="recommendation_agent")
 
     async def _generate_general_answer(
         self,
         question: str,
         db_info: Dict[str, Any],
         context: ConversationContext,
+        db: Optional[AsyncSession] = None,
     ) -> str:
         """Generate a general answer about the database."""
         prompt = f"""You are a helpful database assistant. Answer the user's general question about their database.
@@ -954,9 +963,15 @@ Keep your response under 200 words."""
             "- Schema information (what columns does table X have?)"
         )
 
-        return await self._call_llm(prompt, fallback)
+        return await self._call_llm(prompt, fallback, db=db, agent_type="lineage_conversation")
 
-    async def _call_llm(self, prompt: str, fallback: str) -> str:
+    async def _call_llm(
+        self,
+        prompt: str,
+        fallback: str,
+        db: Optional[AsyncSession] = None,
+        agent_type: str = "lineage_conversation"
+    ) -> str:
         """Call LLM with timeout and fallback."""
         try:
             response = await asyncio.wait_for(
@@ -964,6 +979,8 @@ Keep your response under 200 words."""
                     prompt=prompt,
                     model=self.model,  # Use configured model from settings
                     temperature=0.3,
+                    db=db,
+                    agent_type=agent_type,
                 ),
                 timeout=self.timeout_seconds
             )
