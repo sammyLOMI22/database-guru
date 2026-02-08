@@ -77,9 +77,9 @@ class SQLExecutor:
         execution_params = params
         final_sql = sql
 
-        # Only attempt compilation for SELECT queries without explicit params
+        # Only attempt compilation for SELECT/CTE queries without explicit params
         # (explicit params mean the caller is already handling parameterization)
-        if params is None and sql.strip().upper().startswith("SELECT"):
+        if params is None and sql.strip().upper().startswith(("SELECT", "WITH")):
             compiled_query, extracted_params = self.compiler.get_compiled_query(sql)
 
             if compiled_query:

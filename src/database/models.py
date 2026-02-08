@@ -1,5 +1,5 @@
 """Database models for Database Guru"""
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey, Index, Date, UniqueConstraint
 from sqlalchemy.orm import relationship
@@ -146,7 +146,7 @@ class QueryHistory(Base):
     connection_id = Column(Integer, ForeignKey("database_connections.id"), nullable=True, index=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
     feedbacks = relationship("UserFeedback", back_populates="query", cascade="all, delete-orphan")
@@ -183,11 +183,12 @@ class DatabaseConnection(Base):
 
     # Status
     is_active = Column(Boolean, default=True)
+    is_deleted = Column(Boolean, default=False, index=True)
     last_tested_at = Column(DateTime, nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class QueryCache(Base):
@@ -206,11 +207,11 @@ class QueryCache(Base):
 
     # Cache metadata
     hit_count = Column(Integer, default=0)
-    last_accessed_at = Column(DateTime, default=datetime.utcnow)
+    last_accessed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Expiration
     expires_at = Column(DateTime, nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class UserFeedback(Base):
@@ -253,7 +254,7 @@ class UserFeedback(Base):
 
     # Metadata
     user_notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     applied_at = Column(DateTime, nullable=True)
 
     # Relationships
@@ -275,10 +276,13 @@ class ChatSession(Base):
     # Multi-database support - stores array of connection IDs
     active_connection_ids = Column(JSON, nullable=False, default=list)  # [1, 2, 3]
 
+    # File sources support - stores array of file source IDs (Phase 13)
+    active_file_source_ids = Column(JSON, nullable=False, default=list)  # [1, 2, 3]
+
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    last_active_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    last_active_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
     messages = relationship("ChatMessage", back_populates="chat_session", cascade="all, delete-orphan")
@@ -305,12 +309,72 @@ class ChatMessage(Base):
     query_history_id = Column(Integer, ForeignKey("query_history.id"), nullable=True)
     databases_used = Column(JSON, nullable=True)  # [{"conn_id": 1, "name": "ecommerce", "tables": ["products"]}]
 
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
     chat_session = relationship("ChatSession", back_populates="messages")
     query_history = relationship("QueryHistory", back_populates="chat_messages")
     llm_usage_records = relationship("LLMUsage", back_populates="chat_message", cascade="all, delete-orphan")
+
+
+class FileSource(Base):
+    """Store uploaded file data sources (CSV, Excel) for querying via DuckDB
+
+    Phase 13: CSV & Excel File Support
+    Files are uploaded, schema is inferred via DuckDB, and they become
+    queryable data sources alongside traditional database connections.
+    """
+    __tablename__ = "file_sources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)  # Display name
+
+    # File metadata
+    original_filename = Column(String(255), nullable=False)
+    file_type = Column(String(20), nullable=False)  # 'csv', 'xlsx', 'xls'
+    file_size_bytes = Column(Integer, nullable=False)
+    file_path = Column(String(512), nullable=False)
+    file_hash = Column(String(64), nullable=True)  # SHA-256 for deduplication
+
+    # Excel sheet handling
+    sheet_name = Column(String(255), nullable=True)
+
+    # Schema information (cached from DuckDB inference)
+    schema_cache = Column(JSON, nullable=True)  # {columns: [...], row_count: N, sample_values: {...}}
+    schema_updated_at = Column(DateTime, nullable=True)
+    row_count = Column(Integer, nullable=True)
+
+    # DuckDB integration
+    duckdb_table_name = Column(String(255), nullable=False, unique=True)  # e.g., "file_1_q4_sales"
+
+    # Ownership and scope
+    user_id = Column(String(255), index=True, nullable=True)
+    chat_session_id = Column(String(36), ForeignKey("chat_sessions.id", ondelete="SET NULL"), nullable=True)
+    is_global = Column(Boolean, default=False)  # Available across all sessions
+
+    # Status
+    is_active = Column(Boolean, default=True)
+    processing_status = Column(String(20), default='pending')  # pending, processing, ready, error
+    processing_error = Column(Text, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    expires_at = Column(DateTime, nullable=True, index=True)  # Auto-cleanup after N days
+
+    # Relationships
+    chat_session = relationship("ChatSession", backref="file_sources")
+
+    # Indexes for common queries
+    __table_args__ = (
+        Index('idx_file_user_session', 'user_id', 'chat_session_id'),
+        Index('idx_file_hash', 'file_hash'),
+        Index('idx_file_status', 'processing_status'),
+        Index('idx_file_global', 'is_global', 'is_active'),
+    )
+
+    def __repr__(self):
+        return f"<FileSource(id={self.id}, name='{self.name}', type='{self.file_type}', status='{self.processing_status}')>"
 
 
 class LearnedCorrection(Base):
@@ -342,7 +406,7 @@ class LearnedCorrection(Base):
     confidence_score = Column(Float, default=1.0)  # Confidence in this correction (0-1)
 
     # Timestamps
-    learned_at = Column(DateTime, default=datetime.utcnow, index=True)
+    learned_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     last_applied_at = Column(DateTime, nullable=True)
 
     # Indexes for efficient lookups
@@ -432,8 +496,8 @@ class SystemSettings(Base):
     multi_db_validation_threshold = Column(Float, default=0.6, nullable=False)  # Fuzzy match threshold for alternatives
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     def __repr__(self):
         return (

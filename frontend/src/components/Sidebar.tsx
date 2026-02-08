@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Database } from 'lucide-react';
 import SchemaExplorer from './SchemaExplorer';
 import HistoryPanel from './HistoryPanel';
-import ConnectionsPanel from './ConnectionsPanel';
+import DataSourcesPanel from './DataSourcesPanel';
 import { connectionsAPI } from '../services/api';
 import type { DatabaseConnection } from '../types/api';
 
@@ -10,11 +10,14 @@ interface SidebarProps {
   onClose: () => void;
   onSelectQuery?: (question: string) => void;
   onConnectionSelect?: (connectionId: number) => void;
+  sessionId?: string;
+  onFileSelect?: (fileId: number) => void;
+  onFileDeleted?: () => void;
 }
 
 type Tab = 'connections' | 'schema' | 'history';
 
-export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: SidebarProps) {
+export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect, sessionId, onFileSelect, onFileDeleted }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<Tab>('connections');
   const [connections, setConnections] = useState<DatabaseConnection[]>([]);
   const [selectedConnId, setSelectedConnId] = useState<number | null>(null);
@@ -57,7 +60,7 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
         {/* Tabs - Premium Segmented Control */}
         <div className="flex p-1.5 glass-panel rounded-2xl border-white/10 bg-black/5 dark:bg-white/5 shadow-inner">
           {[
-            { id: 'connections', label: 'DBs' },
+            { id: 'connections', label: 'Sources' },
             { id: 'schema', label: 'Schema' },
             { id: 'history', label: 'History' },
           ].map((tab) => (
@@ -99,11 +102,14 @@ export default function Sidebar({ onClose, onSelectQuery, onConnectionSelect }: 
 
         <div className="flex-1 overflow-y-auto px-2 py-4 custom-scrollbar">
           {activeTab === 'connections' && (
-            <ConnectionsPanel
+            <DataSourcesPanel
               onConnectionSelect={(id) => {
                 setSelectedConnId(id);
                 onConnectionSelect?.(id);
               }}
+              onFileSelect={onFileSelect}
+              onFileDeleted={onFileDeleted}
+              sessionId={sessionId}
             />
           )}
           {activeTab === 'schema' && (

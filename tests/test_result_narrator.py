@@ -4,6 +4,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 
+from src.lineage.llm_utils import extract_json_object
 from src.llm.result_narrator import ResultNarrator, NarrativeResult
 
 
@@ -764,44 +765,44 @@ class TestJsonExtraction:
             timeout_seconds=5
         )
 
-    def test_extract_json_object_simple(self, narrator):
+    def test_extract_json_object_simple(self):
         """Test extraction of a simple JSON object"""
         text = 'Here is the result: {"summary": "Test", "key_insights": ["A", "B"]}'
-        result = narrator._extract_json_object(text)
+        result = extract_json_object(text)
         assert result is not None
         data = json.loads(result)
         assert data["summary"] == "Test"
         assert data["key_insights"] == ["A", "B"]
 
-    def test_extract_json_object_nested(self, narrator):
+    def test_extract_json_object_nested(self):
         """Test extraction with nested JSON objects"""
         text = '''{"summary": "Test", "statistics": {"min": 1, "max": 100}}'''
-        result = narrator._extract_json_object(text)
+        result = extract_json_object(text)
         assert result is not None
         data = json.loads(result)
         assert data["summary"] == "Test"
         assert data["statistics"]["min"] == 1
 
-    def test_extract_json_object_with_surrounding_text(self, narrator):
+    def test_extract_json_object_with_surrounding_text(self):
         """Test extraction when JSON is surrounded by text"""
         text = '''Here is the analysis:
         {"summary": "Found 10 products", "key_insights": ["Insight 1"]}
         Hope this helps!'''
-        result = narrator._extract_json_object(text)
+        result = extract_json_object(text)
         assert result is not None
         data = json.loads(result)
         assert data["summary"] == "Found 10 products"
 
-    def test_extract_json_object_no_json(self, narrator):
+    def test_extract_json_object_no_json(self):
         """Test when no JSON is present"""
         text = "This is just plain text without any JSON"
-        result = narrator._extract_json_object(text)
+        result = extract_json_object(text)
         assert result is None
 
-    def test_extract_json_object_with_escaped_quotes(self, narrator):
+    def test_extract_json_object_with_escaped_quotes(self):
         """Test extraction with escaped quotes in strings"""
         text = r'{"summary": "He said \"hello\"", "key_insights": []}'
-        result = narrator._extract_json_object(text)
+        result = extract_json_object(text)
         assert result is not None
         data = json.loads(result)
         assert 'hello' in data["summary"]

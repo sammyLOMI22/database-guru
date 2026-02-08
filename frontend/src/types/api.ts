@@ -301,6 +301,16 @@ export interface ConnectionInfo {
   name: string;
   database_type: string;
   database_name: string;
+  is_deleted?: boolean;
+}
+
+export interface FileSourceInfo {
+  id: number;
+  name: string;
+  file_type: string;
+  original_filename: string;
+  row_count?: number;
+  processing_status?: string;
 }
 
 export interface ChatSession {
@@ -309,6 +319,8 @@ export interface ChatSession {
   user_id?: string;
   active_connection_ids: number[];
   connections: ConnectionInfo[];
+  active_file_source_ids: number[];
+  file_sources: FileSourceInfo[];
   created_at: string;
   updated_at: string;
   last_active_at: string;
@@ -332,6 +344,7 @@ export interface ChatMessage {
 export interface CreateChatSessionRequest {
   name: string;
   connection_ids: number[];
+  file_source_ids?: number[];
   user_id?: string;
 }
 
@@ -362,6 +375,7 @@ export interface DatabaseQueryResult {
   database_type: string;
   sql: string;
   success: boolean;
+  source_type?: 'database' | 'file';  // Disambiguates connection_id for file sources
   results?: Record<string, any>[];
   row_count?: number;
   execution_time_ms?: number;
@@ -624,4 +638,67 @@ export interface SchemaCompareResponse {
     missing_from: string[];
     suggestion: string;
   }>;
+}
+
+// File Source Types (Phase 13: CSV & Excel Support)
+export interface FileColumnInfo {
+  name: string;
+  type: string;
+  nullable: boolean;
+  sample_values?: unknown[];
+}
+
+export interface FileSchemaResponse {
+  columns: FileColumnInfo[];
+  row_count: number;
+  sample_values: Record<string, unknown[]>;
+  inferred_at: string;
+}
+
+export interface FileSource {
+  id: number;
+  name: string;
+  original_filename: string;
+  file_type: 'csv' | 'xlsx' | 'xls';
+  file_size_bytes: number;
+  file_path: string;
+  file_hash?: string;
+  sheet_name?: string;
+  schema_cache?: FileSchemaResponse;
+  row_count?: number;
+  duckdb_table_name: string;
+  user_id?: string;
+  chat_session_id?: string;
+  is_global: boolean;
+  is_active: boolean;
+  processing_status: 'pending' | 'processing' | 'ready' | 'error' | 'deleted';
+  processing_error?: string;
+  created_at: string;
+  updated_at?: string;
+  expires_at?: string;
+}
+
+export interface FilePreviewResponse {
+  columns: string[];
+  data: Record<string, unknown>[];
+  row_count: number;
+  total_rows: number;
+  truncated: boolean;
+}
+
+export interface ExcelSheetsResponse {
+  sheets: string[];
+  filename: string;
+}
+
+export interface FileUploadOptions {
+  name?: string;
+  sheet_name?: string;
+  session_id?: string;
+  is_global?: boolean;
+}
+
+export interface FileSourceListResponse {
+  files: FileSource[];
+  total: number;
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { chatAPI, connectionsAPI } from '../services/api';
-import type { ChatSession, DatabaseConnection, ConnectionInfo } from '../types/api';
+import { chatAPI, connectionsAPI, filesAPI } from '../services/api';
+import type { ChatSession, DatabaseConnection, ConnectionInfo, FileSource } from '../types/api';
 
 interface ChatSessionSelectorProps {
   currentSession: ChatSession | null;
@@ -138,9 +138,18 @@ export default function ChatSessionSelector({ currentSession, onSessionChange }:
                     <div className="flex items-center gap-2 opacity-60 overflow-hidden whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
                         <div className="flex items-center gap-1 bg-white/10 dark:bg-black/20 px-1.5 py-0.5 rounded-md border border-white/5">
-                          <span className="text-blue-500">{session.connections.length}</span>
+                          <span className="text-blue-500">{session.connections.filter(c => !c.is_deleted).length}</span>
                           <span>DBs</span>
                         </div>
+                        {(() => {
+                          const readyFiles = session.file_sources?.filter(f => f.processing_status !== 'deleted') || [];
+                          return readyFiles.length > 0 ? (
+                            <div className="flex items-center gap-1 bg-white/10 dark:bg-black/20 px-1.5 py-0.5 rounded-md border border-white/5">
+                              <span className="text-green-500">{readyFiles.length}</span>
+                              <span>Files</span>
+                            </div>
+                          ) : null;
+                        })()}
                         <div className="flex items-center gap-1 bg-white/10 dark:bg-black/20 px-1.5 py-0.5 rounded-md border border-white/5">
                           <span className="text-indigo-500">{session.message_count || 0}</span>
                           <span>MSGs</span>
@@ -190,11 +199,14 @@ interface CreateSessionModalProps {
 function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
   const [name, setName] = useState('');
   const [connections, setConnections] = useState<DatabaseConnection[]>([]);
+  const [fileSources, setFileSources] = useState<FileSource[]>([]);
   const [selectedConnections, setSelectedConnections] = useState<number[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadConnections();
+    loadFiles();
   }, []);
 
   const loadConnections = async () => {
@@ -206,15 +218,25 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
     }
   };
 
+  const loadFiles = async () => {
+    try {
+      const data = await filesAPI.listFiles();
+      setFileSources((data.files || []).filter((f: FileSource) => f.processing_status === 'ready'));
+    } catch (error) {
+      console.error('Failed to load file sources:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || selectedConnections.length === 0) return;
+    if (!name.trim() || (selectedConnections.length === 0 && selectedFiles.length === 0)) return;
 
     setLoading(true);
     try {
       const session = await chatAPI.createSession({
         name: name.trim(),
         connection_ids: selectedConnections,
+        file_source_ids: selectedFiles.length > 0 ? selectedFiles : undefined,
       });
       onCreated(session);
     } catch (error) {
@@ -228,6 +250,12 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
   const toggleConnection = (id: number) => {
     setSelectedConnections((prev) =>
       prev.includes(id) ? prev.filter((cid) => cid !== id) : [...prev, id]
+    );
+  };
+
+  const toggleFile = (id: number) => {
+    setSelectedFiles((prev) =>
+      prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]
     );
   };
 
@@ -304,6 +332,46 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
             </div>
           </div>
 
+          {/* File Sources */}
+          {fileSources.length > 0 && (
+            <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 ml-1">
+                Attach Files ({selectedFiles.length})
+              </label>
+              <div className="glass-panel bg-white/5 dark:bg-black/20 border-white/10 rounded-xl max-h-36 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                {fileSources.map((file) => (
+                  <label
+                    key={file.id}
+                    className={`flex items-center p-3 rounded-lg cursor-pointer transition-all ${selectedFiles.includes(file.id)
+                      ? 'bg-green-600/10 border border-green-500/30'
+                      : 'hover:bg-white/5 border border-transparent'
+                      }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedFiles.includes(file.id)}
+                      onChange={() => toggleFile(file.id)}
+                      className="hidden"
+                    />
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center mr-3 transition-all ${selectedFiles.includes(file.id) ? 'bg-green-600 border-green-600' : 'border-white/20'}`}>
+                      {selectedFiles.includes(file.id) && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">{file.name}</p>
+                      <p className="text-xs text-gray-500 font-bold uppercase opacity-60">
+                        {file.file_type} • {file.row_count?.toLocaleString() || '?'} rows
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
@@ -314,7 +382,7 @@ function CreateSessionModal({ onClose, onCreated }: CreateSessionModalProps) {
             </button>
             <button
               type="submit"
-              disabled={loading || !name.trim() || selectedConnections.length === 0}
+              disabled={loading || !name.trim() || (selectedConnections.length === 0 && selectedFiles.length === 0)}
               className="px-6 py-3 text-xs font-black uppercase tracking-widest bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/20 disabled:opacity-30 disabled:hover:scale-100"
             >
               {loading ? 'Creating...' : 'Launch Session'}

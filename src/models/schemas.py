@@ -1112,3 +1112,126 @@ class LineageAnswerSchema(BaseModel):
     )
     generated_at: Optional[str] = None
     llm_used: bool = False
+
+
+# =============================================================================
+# Phase 13: File Source Schemas (CSV & Excel Support)
+# =============================================================================
+
+class FileSourceCreate(BaseModel):
+    """Request model for file upload metadata."""
+    name: Optional[str] = Field(
+        default=None,
+        description="Display name for the file source (defaults to filename)",
+        max_length=255,
+    )
+    sheet_name: Optional[str] = Field(
+        default=None,
+        description="For Excel files, the sheet to use (defaults to first sheet)",
+        max_length=255,
+    )
+    chat_session_id: Optional[str] = Field(
+        default=None,
+        description="Chat session to associate file with (optional)",
+    )
+    is_global: bool = Field(
+        default=False,
+        description="Make file available across all sessions",
+    )
+
+
+class FileColumnInfo(BaseModel):
+    """Column information from file schema inference."""
+    name: str = Field(..., description="Column name")
+    type: str = Field(..., description="Inferred SQL type (e.g., VARCHAR, INTEGER, DOUBLE, DATE)")
+    nullable: bool = Field(default=True, description="Whether the column allows NULL values")
+    sample_values: List[Any] = Field(
+        default_factory=list,
+        description="Sample values from this column (up to 5)",
+    )
+
+
+class FileSchemaResponse(BaseModel):
+    """Response with inferred file schema."""
+    columns: List[FileColumnInfo] = Field(
+        default_factory=list,
+        description="Column definitions inferred from file",
+    )
+    row_count: int = Field(
+        default=0,
+        description="Total number of rows in the file",
+    )
+    sample_values: Dict[str, List[Any]] = Field(
+        default_factory=dict,
+        description="Sample values per column",
+    )
+
+
+class FileSourceResponse(BaseModel):
+    """Response model for file source details."""
+    id: int
+    name: str
+    original_filename: str
+    file_type: str  # 'csv', 'xlsx', 'xls'
+    file_size_bytes: int
+    processing_status: str  # 'pending', 'processing', 'ready', 'error'
+    processing_error: Optional[str] = None
+    schema: Optional[FileSchemaResponse] = None
+    row_count: Optional[int] = None
+    sheet_name: Optional[str] = None
+    duckdb_table_name: Optional[str] = None
+    is_global: bool = False
+    chat_session_id: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class FilePreviewResponse(BaseModel):
+    """Response for file data preview."""
+    file_id: int
+    file_name: str
+    columns: List[str] = Field(
+        default_factory=list,
+        description="Column names in order",
+    )
+    data: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Preview rows as list of dicts",
+    )
+    row_count: int = Field(
+        default=0,
+        description="Number of rows in preview",
+    )
+    total_rows: int = Field(
+        default=0,
+        description="Total rows in file",
+    )
+    truncated: bool = Field(
+        default=False,
+        description="Whether preview was truncated",
+    )
+
+
+class ExcelSheetsResponse(BaseModel):
+    """Response for Excel sheet listing."""
+    file_name: str
+    sheets: List[str] = Field(
+        default_factory=list,
+        description="List of sheet names in the Excel file",
+    )
+
+
+class FileSourceListResponse(BaseModel):
+    """Response for listing file sources."""
+    files: List[FileSourceResponse] = Field(
+        default_factory=list,
+        description="List of file sources",
+    )
+    total: int = Field(
+        default=0,
+        description="Total number of files",
+    )

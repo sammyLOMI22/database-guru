@@ -54,9 +54,11 @@ class TestConnectionResponse(BaseModel):
 
 @router.get("/", response_model=ConnectionListResponse)
 async def list_connections(db: AsyncSession = Depends(get_db)):
-    """List all database connections"""
+    """List all database connections (excludes soft-deleted)"""
     result = await db.execute(
-        select(DatabaseConnection).order_by(DatabaseConnection.created_at.desc())
+        select(DatabaseConnection)
+        .where(DatabaseConnection.is_deleted.isnot(True))
+        .order_by(DatabaseConnection.created_at.desc())
     )
     connections = result.scalars().all()
 
@@ -178,6 +180,12 @@ async def activate_connection(
             detail=f"Connection with id {connection_id} not found",
         )
 
+    if getattr(connection, 'is_deleted', False):
+        raise HTTPException(
+            status_code=410,
+            detail=f"Connection '{connection.name}' has been removed",
+        )
+
     connection.is_active = True
     await db.commit()
     await db.refresh(connection)
@@ -200,7 +208,12 @@ async def delete_connection(
     connection_id: int,
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a database connection"""
+    """Soft-delete a database connection.
+
+    The record is preserved so chat sessions referencing it can show
+    'removed' instead of silently losing the connection. Idempotent:
+    returns 204 if already deleted.
+    """
     result = await db.execute(
         select(DatabaseConnection).where(DatabaseConnection.id == connection_id)
     )
@@ -212,7 +225,12 @@ async def delete_connection(
             detail=f"Connection with id {connection_id} not found",
         )
 
-    await db.delete(connection)
+    # Idempotent: already deleted
+    if getattr(connection, 'is_deleted', False):
+        return
+
+    connection.is_deleted = True
+    connection.is_active = False
     await db.commit()
 
     # Invalidate schema cache for this connection

@@ -356,6 +356,57 @@ Natural language Q&A about schema and lineage:
 
 **Output**: `LineageAnswer` with answer, supporting data, and follow-up suggestions
 
+## File Data Source System (Phase 13)
+**Location**: `src/core/`, `src/api/endpoints/`
+**Added**: January 2026
+
+### 24. File Source Handler
+**File**: `src/core/file_source_handler.py`
+
+Manages CSV/Excel file uploads and processing:
+- **File Validation**: Extension, size limits (100MB), content validation via magic bytes
+- **Schema Inference**: Uses DuckDB's `read_csv_auto()` and `read_excel()` functions
+- **Type Normalization**: Maps DuckDB types to standard types (VARCHAR, INTEGER, DOUBLE, etc.)
+- **Content Deduplication**: SHA-256 hashing prevents duplicate storage
+- **Filename Sanitization**: Path traversal protection, special character removal
+- **Async File I/O**: Uses `aiofiles` for non-blocking operations
+
+**Key methods**: `validate_file()`, `save_file()`, `infer_schema()`, `get_file_preview()`
+
+### 25. File Source DuckDB Session
+**File**: `src/core/file_source_session.py`
+
+Singleton in-memory DuckDB session manager for file queries:
+- **Lazy Table Loading**: Tables only created when first queried
+- **Thread Safety**: AsyncIO locks for concurrent access protection
+- **Memory Management**: Configurable memory limit (1GB default), thread count (4)
+- **Excel Support**: Automatic Excel extension loading
+- **Table Metadata**: Tracks loaded tables with timestamps
+
+**Key methods**: `ensure_table_loaded()`, `execute_query()`, `get_table_schema()`, `unload_table()`, `reset_session()`
+
+### File Source API Endpoints
+**File**: `src/api/endpoints/files.py`
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/files/upload` | POST | Upload CSV/XLSX/XLS file |
+| `/api/files/` | GET | List file sources with filtering |
+| `/api/files/{id}` | GET | Get file source details |
+| `/api/files/{id}` | DELETE | Delete file and metadata |
+| `/api/files/{id}/schema` | GET | Get inferred schema |
+| `/api/files/{id}/preview` | GET | Preview data (default 20 rows) |
+| `/api/files/{id}/refresh` | POST | Re-infer schema |
+| `/api/files/excel-sheets` | POST | Inspect Excel sheets before upload |
+
+### Frontend Components
+**Location**: `frontend/src/components/`
+
+- **FileUploadModal** (`FileUploadModal.tsx`): Drag-and-drop upload with react-dropzone, sheet selection for Excel, progress indicator
+- **FilePreviewPanel** (`FilePreviewPanel.tsx`): Two-tab interface (Schema/Preview), type badges, sample values display
+
+---
+
 ## Tool System
 **Location**: `src/tools/`
 
