@@ -544,16 +544,27 @@ class SQLGenerator:
             has_join_hints = bool(join_instructions)
             logger.info(f"Generating SQL for: {question[:80]}... (model: {model_to_use}, join_hints: {has_join_hints})")
 
-            raw_output = await self.ollama.chat(
+            llm_response = await self.ollama.chat(
                 messages=messages,
                 model=model_to_use,
                 temperature=temperature,
+                return_full_response=True,
                 db=db,
                 agent_type="sql_generator",
                 query_history_id=query_history_id,
                 chat_session_id=chat_session_id,
                 chat_message_id=chat_message_id,
             )
+            if isinstance(llm_response, dict):
+                raw_output = llm_response.get("message", {}).get("content", "")
+                _token_info = {
+                    "input_tokens": llm_response.get("prompt_eval_count"),
+                    "output_tokens": llm_response.get("eval_count"),
+                    "model": model_to_use,
+                }
+            else:
+                raw_output = str(llm_response)
+                _token_info = {}
 
             # Check for CANNOT_ANSWER response (query impossible with schema)
             if raw_output.strip().upper().startswith("CANNOT_ANSWER"):
@@ -629,6 +640,7 @@ class SQLGenerator:
                 "question": question,
                 "model_used": model_to_use,
                 "llm_cache_hit": False,
+                "token_info": _token_info,
             }
 
             # Add validation hints for regeneration if WHERE validation failed
@@ -779,17 +791,28 @@ IMPORTANT:
 
 Provide the corrected SQL query ONLY."""
 
-            raw_output = await self.ollama.generate(
+            llm_response = await self.ollama.generate(
                 prompt=prompt,
                 system=SYSTEM_PROMPT,
                 temperature=0.1,
                 model=model,
+                return_full_response=True,
                 db=db,
                 agent_type="error_correction",
                 query_history_id=query_history_id,
                 chat_session_id=chat_session_id,
                 chat_message_id=chat_message_id,
             )
+            if isinstance(llm_response, dict):
+                raw_output = llm_response.get("response", "")
+                _token_info = {
+                    "input_tokens": llm_response.get("prompt_eval_count"),
+                    "output_tokens": llm_response.get("eval_count"),
+                    "model": model or self.settings.OLLAMA_MODEL,
+                }
+            else:
+                raw_output = str(llm_response)
+                _token_info = {}
 
             corrected_sql = self.validator.clean_sql_output(raw_output)
             is_valid, validation_error = self.validator.validate_sql_syntax(corrected_sql)
@@ -820,6 +843,7 @@ Provide the corrected SQL query ONLY."""
                 "is_valid": is_valid,
                 "warnings": warnings,
                 "raw_output": raw_output,
+                "token_info": _token_info,
             }
             if where_validation_hints:
                 result["where_validation_hints"] = where_validation_hints

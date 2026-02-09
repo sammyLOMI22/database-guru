@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  LineChart, Line, AreaChart, Area, Cell, PieChart, Pie
+  AreaChart, Area, Cell, PieChart, Pie
 } from 'recharts';
 import {
-  Activity, Zap, MessageSquare, Clock, Shield, Database, ChevronDown, Filter,
-  BarChart2, PieChart as PieChartIcon, TrendingUp, Calendar, Search, ArrowUpRight, ArrowDownRight
+  Activity, Zap, MessageSquare, Clock, Shield, Database,
+  BarChart2, PieChart as PieChartIcon, TrendingUp, Calendar
 } from 'lucide-react';
 import { llmUsageApi, LLMUsageStats, LLMUsageByAgent, LLMUsageTimeSeries, LLMUsageRecord } from '../../services/llmUsageApi';
 
@@ -193,7 +193,7 @@ export const LLMUsageDashboard: React.FC = () => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={byAgent}
+                  data={byAgent as any[]}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -202,7 +202,7 @@ export const LLMUsageDashboard: React.FC = () => {
                   dataKey="total_tokens"
                   nameKey="agent_type"
                 >
-                  {byAgent.map((entry, index) => (
+                  {byAgent.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -352,7 +352,7 @@ export const LLMUsageDashboard: React.FC = () => {
               ))}
               {recentCalls.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500 italic">
+                  <td colSpan={8} className="px-6 py-8 text-center text-slate-500 italic">
                     No recent LLM transactions found.
                   </td>
                 </tr>

@@ -114,6 +114,7 @@ The demo showcases:
 - 🧠 **Lineage Intelligence (NEW!)** - LLM-powered explanations, schema health analysis, conversational Q&A
 - 🔀 **Table Sorting (NEW!)** - Click any column header to sort results (numbers, dates, strings auto-detected)
 - 📁 **CSV/Excel File Data Sources (NEW!)** - Upload CSV/Excel files as queryable data sources with DuckDB
+- 📊 **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance across all agents
 
 All with mock data - no database connection needed!
 
@@ -223,6 +224,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Table Sorting (NEW!)** - Click column headers to sort results, with smart type detection for numbers, dates, and strings
 - ✅ **Small Model Optimization (NEW!)** - Per-task model routing, query templates, location preprocessing, and dialect-aware SQL generation for faster responses with smaller models
 - ✅ **CSV/Excel File Data Sources (NEW!)** - Upload and query CSV/Excel files as DuckDB tables
+- ✅ **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance per session and globally with full dashboard
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
@@ -664,6 +666,83 @@ curl -X DELETE http://localhost:8000/api/cache/connection/1
 
 ---
 
+## 📊 LLM Usage Monitoring (NEW!)
+
+Database Guru now includes **comprehensive LLM usage monitoring** that tracks every LLM API call across all agents, providing full visibility into token consumption, costs, and performance.
+
+### Key Features:
+
+**1. Centralized Token Tracking**
+Every LLM call is automatically instrumented using a context manager:
+- **Token counting**: tiktoken encoder with native Ollama/OpenAI/Anthropic extraction
+- **Cost estimation**: Configurable per-model pricing (per 1M tokens)
+- **Response timing**: Millisecond-precision latency tracking
+- **Error logging**: Failed calls recorded with error details
+
+**2. Usage Dashboard**
+Navigate to the **Usage** tab for a full monitoring dashboard:
+
+| View | What It Shows |
+|------|---------------|
+| **Stats Overview** | Total calls, tokens, avg latency, estimated cost |
+| **By Agent** | Token consumption per agent (SQL Generator, Query Planner, etc.) |
+| **By Model** | Usage breakdown by LLM model |
+| **By Provider** | Usage breakdown by provider (Ollama, OpenAI, etc.) |
+| **Time Series** | Usage trends over time (hourly/daily) |
+| **Recent Calls** | Searchable log of recent LLM calls |
+
+**3. Per-Session Tracking**
+Each chat session displays inline usage metrics:
+- **Session Usage Badge** - Compact token count and cost in the header
+- **Usage Summary** - Expandable panel with agent-level breakdown
+
+**4. Pre-Computed Aggregates**
+Background aggregation rolls up hourly/daily statistics by agent, provider, and model for fast dashboard queries.
+
+### Tracked Agents:
+All LLM-calling agents are instrumented:
+- SQL Generator, Self-Correcting Agent, Query Planning Agent
+- Result Narrator, Lineage Narrator, Impact Advisor
+- Schema Health Analyzer, Pattern Intelligence, Lineage Conversation
+
+### API Endpoints:
+
+```bash
+# Get usage statistics (last 7 days)
+curl http://localhost:8000/api/llm/usage/stats?days=7
+
+# Get usage by agent type
+curl http://localhost:8000/api/llm/usage/by-agent?days=30
+
+# Get usage by model
+curl http://localhost:8000/api/llm/usage/by-model?days=7
+
+# Get time series data
+curl http://localhost:8000/api/llm/usage/timeseries?days=7&granularity=day
+
+# Get session-specific usage
+curl http://localhost:8000/api/llm/usage/session/{session_id}
+
+# Get recent calls with filtering
+curl "http://localhost:8000/api/llm/usage/recent?limit=50&agent_type=sql_generator"
+
+# Trigger aggregation
+curl -X POST http://localhost:8000/api/llm/usage/aggregate?days=1
+
+# Seed default model configs
+curl -X POST http://localhost:8000/api/llm/usage/configs/seed
+```
+
+### Database Tables:
+
+| Table | Purpose |
+|-------|---------|
+| `llm_usage` | Individual LLM call records (tokens, cost, timing, agent, model) |
+| `llm_usage_aggregate` | Pre-computed hourly/daily statistics |
+| `llm_model_config` | Model metadata and cost rates |
+
+---
+
 ## 🏗️ Architecture
 
 **Backend:**
@@ -693,13 +772,19 @@ database-guru/
 │   ├── database/          # Database layer
 │   ├── llm/               # LLM integration
 │   ├── lineage/           # Data lineage system
+│   ├── services/          # Business services
+│   │   ├── llm_usage_tracker.py   # LLM call tracking (NEW!)
+│   │   ├── llm_cost_service.py    # Cost calculation (NEW!)
+│   │   └── llm_usage_aggregator.py # Usage rollups (NEW!)
 │   └── main.py            # Entry point
 ├── frontend/              # React frontend
 │   ├── src/
 │   │   ├── components/    # React components
 │   │   │   ├── lineage/   # Lineage visualization
 │   │   │   ├── FileUploadModal.tsx   # File upload UI (NEW!)
-│   │   │   └── FilePreviewPanel.tsx  # File preview UI (NEW!)
+│   │   │   ├── FilePreviewPanel.tsx  # File preview UI (NEW!)
+│   │   │   └── dashboard/
+│   │   │       └── LLMUsageDashboard.tsx  # Usage monitoring (NEW!)
 │   │   ├── hooks/         # Custom hooks
 │   │   ├── services/      # API client
 │   │   └── types/         # TypeScript types
@@ -2128,6 +2213,10 @@ open htmlcov/index.html
   - DuckDB session management tests
   - File preview and API endpoint tests
   - Content validation and deduplication tests
+- ✅ **LLM Usage Monitoring**: Unit + integration tests - NEW!
+  - Token estimation and native extraction
+  - Cost calculation and model config
+  - Usage aggregation and API endpoints
 - ✅ Confidence Scoring: 31/31 tests (100% coverage)
 - ✅ Result Verification Agent: 14/14 tests (89% coverage)
 - ✅ Correction Learner: 13/13 tests (87% coverage)

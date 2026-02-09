@@ -144,6 +144,7 @@ class QueryHistory(Base):
     database_type = Column(String(50))  # postgres, mysql, sqlite, etc.
     model_used = Column(String(100))  # llama3, gpt-4, etc.
     connection_id = Column(Integer, ForeignKey("database_connections.id"), nullable=True, index=True)
+    status = Column(String(20), default="pending")  # pending, processing, completed, failed
 
     # Timestamps
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)

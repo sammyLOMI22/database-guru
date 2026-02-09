@@ -836,15 +836,17 @@ class LLMUsageResponse(BaseModel):
     llm_method: str
     input_tokens: int
     output_tokens: int
+    total_tokens: int = 0
     token_estimation_method: str
     response_time_ms: Optional[float] = None
+    estimated_cost_usd: Optional[float] = None
     success: bool
     error_message: Optional[str] = None
     created_at: datetime
 
-    @property
-    def total_tokens(self) -> int:
-        return self.input_tokens + self.output_tokens
+    def model_post_init(self, __context: Any) -> None:
+        if not self.total_tokens:
+            self.total_tokens = self.input_tokens + self.output_tokens
 
     class Config:
         from_attributes = True

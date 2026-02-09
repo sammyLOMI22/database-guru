@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 import Message from './Message';
 import ConversationContextPanel from './ConversationContextPanel';
 import SchemaGlance from './SchemaGlance';
+import { SessionUsageBadge } from './SessionUsageBadge';
 import { useMultiQuery } from '../hooks/useMultiQuery';
 import { useModels } from '../hooks/useModels';
 import { connectionsAPI, settingsAPI, filesAPI, chatAPI } from '../services/api';
@@ -275,6 +276,11 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
                       </div>
                     )}
                   </div>
+
+                  {/* LLM Usage Badge */}
+                  {currentSession && (
+                    <SessionUsageBadge sessionId={currentSession.id} />
+                  )}
                 </div>
 
                 <div className="flex items-center space-x-4">

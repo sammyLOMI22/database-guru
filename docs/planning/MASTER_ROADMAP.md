@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: February 1, 2026
+**Last Updated**: February 8, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -45,12 +45,21 @@
     │   ✅ COMPLETE        │  │   ✅ COMPLETE        │  │   ✅ COMPLETE        │
     └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
 
-    ┌──────────────────────┐  ┌──────────────────────┐
-    │   Data Lineage       │  │ Lineage Intelligence │
-    │   (Phase 11)         │  │   (Phase 12)         │
-    │   185 tests passing  │  │   151 tests passing  │
-    │   ✅ COMPLETE        │  │   ✅ COMPLETE        │
-    └──────────────────────┘  └──────────────────────┘
+    ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
+    │   Data Lineage       │  │ Lineage Intelligence │  │  CSV/Excel Files     │
+    │   (Phase 11)         │  │   (Phase 12)         │  │   (Phase 13)         │
+    │   185 tests passing  │  │   151 tests passing  │  │   50+ tests passing  │
+    │   ✅ COMPLETE        │  │   ✅ COMPLETE        │  │   ✅ COMPLETE        │
+    └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
+
+    ┌──────────────────────┐
+    │  LLM Usage Monitor   │
+    │   (Phase 16)         │
+    │   Token/cost tracking│
+    │   9 API endpoints    │
+    │   Full dashboard UI  │
+    │   ✅ COMPLETE        │
+    └──────────────────────┘
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐

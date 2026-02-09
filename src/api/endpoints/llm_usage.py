@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
 from src.database.connection import get_db_manager
@@ -28,7 +28,7 @@ async def get_usage_stats(
     db: AsyncSession = Depends(get_session),
 ):
     """Get overall LLM usage statistics for the past N days."""
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
 
     result = await db.execute(
         select(
@@ -64,7 +64,7 @@ async def get_usage_by_agent(
     db: AsyncSession = Depends(get_session),
 ):
     """Get LLM usage breakdown by agent type."""
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
 
     result = await db.execute(
         select(
@@ -97,7 +97,7 @@ async def get_usage_by_model(
     db: AsyncSession = Depends(get_session),
 ):
     """Get LLM usage breakdown by model."""
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
 
     result = await db.execute(
         select(
@@ -130,7 +130,7 @@ async def get_usage_by_provider(
     db: AsyncSession = Depends(get_session),
 ):
     """Get LLM usage breakdown by provider."""
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
 
     result = await db.execute(
         select(
@@ -164,7 +164,7 @@ async def get_usage_timeseries(
     db: AsyncSession = Depends(get_session),
 ):
     """Get LLM usage over time for charting."""
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
 
     if granularity == "day":
         result = await db.execute(

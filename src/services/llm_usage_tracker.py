@@ -1,7 +1,7 @@
 """Centralized LLM usage tracking service"""
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
 import tiktoken
@@ -190,7 +190,7 @@ class _TrackingContext:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             token_estimation_method=token_method,
-            request_timestamp=datetime.utcnow(),
+            request_timestamp=datetime.now(timezone.utc),
             response_time_ms=response_time_ms,
             prompt_summary=self.prompt[:500] if self.prompt else None,
             response_summary=self.response_text[:500] if self.response_text else None,
@@ -200,12 +200,12 @@ class _TrackingContext:
             metadata_json=self.metadata,
         )
 
-        self.db.add(usage_record)
         try:
-            await self.db.commit()
+            async with self.db.begin_nested():
+                self.db.add(usage_record)
+                await self.db.flush()
         except Exception as e:
             logger.error(f"Failed to save LLM usage record: {e}")
-            await self.db.rollback()
 
         return usage_record
 

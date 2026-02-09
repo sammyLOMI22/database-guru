@@ -1,4 +1,5 @@
 import pytest
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock
 from src.services.llm_usage_tracker import LLMUsageTracker
 
@@ -38,6 +39,12 @@ async def test_llm_usage_tracker_track_call(monkeypatch):
     tracker = LLMUsageTracker()
     db = AsyncMock()
 
+    # Mock begin_nested() to return a proper async context manager
+    @asynccontextmanager
+    async def mock_begin_nested():
+        yield
+    db.begin_nested = mock_begin_nested
+
     # Mock LLMCostService.calculate_cost to avoid DB calls in unit test
     async def mock_calculate_cost(*args, **kwargs):
         return 0.0123
@@ -55,7 +62,7 @@ async def test_llm_usage_tracker_track_call(monkeypatch):
         tracking.set_response("Test response", {"prompt_eval_count": 5, "eval_count": 5})
 
     assert db.add.called
-    assert db.commit.called
+    assert db.flush.called
 
     record = db.add.call_args[0][0]
     assert record.agent_type == "test_agent"

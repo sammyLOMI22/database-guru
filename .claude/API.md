@@ -206,3 +206,36 @@ GET /api/files/?session_id=xxx&include_global=true&status=ready
 - **Content Deduplication**: SHA-256 hashing prevents duplicate storage
 - **Lazy Table Loading**: Tables loaded to DuckDB only when queried
 - **Session Isolation**: Files scoped to chat sessions or global
+
+## LLM Usage API (Phase 16 - February 2026)
+**File**: `llm_usage.py`
+
+Track and monitor LLM token usage, costs, and performance across all agents.
+
+### Usage Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/llm/usage/stats` | Overall usage statistics (calls, tokens, cost) |
+| GET | `/api/llm/usage/by-agent` | Usage breakdown by agent type |
+| GET | `/api/llm/usage/by-model` | Usage breakdown by model |
+| GET | `/api/llm/usage/by-provider` | Usage breakdown by provider |
+| GET | `/api/llm/usage/timeseries` | Usage over time for charting (hour/day granularity) |
+| GET | `/api/llm/usage/session/{session_id}` | Per-session usage with agent breakdown |
+| GET | `/api/llm/usage/recent` | Recent LLM call records with filtering |
+| POST | `/api/llm/usage/aggregate` | Manually trigger usage aggregation |
+| POST | `/api/llm/usage/configs/seed` | Seed default model cost configurations |
+
+### Query Parameters
+```
+GET /api/llm/usage/stats?days=7          # 1-90 day window
+GET /api/llm/usage/by-agent?days=30      # Agent breakdown
+GET /api/llm/usage/timeseries?days=7&granularity=hour  # hour or day
+GET /api/llm/usage/recent?limit=50&agent_type=sql_generator&model_name=qwen2.5-coder
+```
+
+### Response Models
+- **LLMUsageStatsResponse**: total_calls, total_tokens, avg_response_time_ms, total_cost_usd
+- **LLMUsageByAgentResponse**: Per-agent token and call counts
+- **LLMUsageTimeSeriesResponse**: Period-based totals for charting
+- **SessionUsageSummaryResponse**: Per-session breakdown with by_agent map
+- **LLMUsageResponse**: Individual call records with full details

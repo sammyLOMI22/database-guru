@@ -155,10 +155,6 @@ class OllamaClient:
             logger.error(f"Ollama generation error: {e}")
             raise
 
-    async def generate_tracked(self, *args, **kwargs) -> str:
-        """Deprecated: use generate() with db parameter"""
-        return await self.generate(*args, **kwargs)
-
     async def _chat_internal(
         self,
         messages: List[Dict[str, str]],
@@ -249,10 +245,6 @@ class OllamaClient:
         except Exception as e:
             logger.error(f"Ollama chat error: {e}")
             raise
-
-    async def chat_tracked(self, *args, **kwargs) -> str:
-        """Deprecated: use chat() with db parameter"""
-        return await self.chat(*args, **kwargs)
 
     async def pull_model(self, model: str) -> bool:
         """

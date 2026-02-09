@@ -356,6 +356,42 @@ Natural language Q&A about schema and lineage:
 
 **Output**: `LineageAnswer` with answer, supporting data, and follow-up suggestions
 
+## LLM Usage Monitoring System (Phase 16)
+**Location**: `src/services/`, `src/api/endpoints/`
+**Added**: February 2026
+
+### 26. LLM Usage Tracker
+**File**: `src/services/llm_usage_tracker.py`
+
+Centralized service for tracking all LLM API calls across every agent:
+- **Context Manager API**: `async with tracker.track_call(...)` wraps any LLM call
+- **Token Estimation**: tiktoken (cl100k_base) with char-count fallback
+- **Native Token Extraction**: Reads token counts from Ollama, OpenAI, Anthropic, Azure responses
+- **Automatic Cost Calculation**: Uses `LLMCostService` for per-model cost estimation
+- **Error Tracking**: Captures failures and error messages
+
+**Key methods**: `track_call()` (async context manager), `estimate_tokens()`, `extract_tokens()`
+
+### 27. LLM Cost Service
+**File**: `src/services/llm_cost_service.py`
+
+Manages model configurations and calculates costs:
+- **Model Config Lookup**: Exact match then fuzzy match (e.g., "llama3:latest" → "llama3")
+- **Cost Calculation**: Per-1M-token pricing for input and output
+- **Default Configs**: Seeds Ollama ($0), GPT-4o ($5/$15), GPT-3.5 ($0.50/$1.50), Claude 3.5 ($3/$15)
+
+**Key methods**: `calculate_cost()`, `get_model_config()`, `ensure_default_configs()`
+
+### 28. LLM Usage Aggregator
+**File**: `src/services/llm_usage_aggregator.py`
+
+Pre-computes daily/hourly statistics for dashboard performance:
+- **Hourly Bucketing**: Aggregates by hour, agent_type, provider, model_name
+- **Upsert Logic**: Updates existing aggregates or creates new ones
+- **Background Task**: Typically run as a scheduled background job
+
+**Key methods**: `aggregate_usage()`, `aggregate_date()`
+
 ## File Data Source System (Phase 13)
 **Location**: `src/core/`, `src/api/endpoints/`
 **Added**: January 2026

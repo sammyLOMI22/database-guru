@@ -10,6 +10,7 @@ from src.llm.sql_generator import SQLGenerator
 # Avoid circular import
 if TYPE_CHECKING:
     from src.llm.quality_profile import QualityProfile
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.executor import SQLExecutor
 from src.database.models import DatabaseConnection
 from src.config.settings import Settings
@@ -1209,7 +1210,8 @@ class SelfCorrectingSQLAgent:
                             }
 
                         sql = gen_result["sql"]
-                        trace.add_step("generation", f"Generated SQL: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql})
+                        gen_token_info = gen_result.get("token_info", {})
+                        trace.add_step("generation", f"Generated SQL: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql, **gen_token_info})
 
                         # Validate that all tables in SQL exist in schema
                         if schema_dict and 'tables' in schema_dict:
@@ -1381,7 +1383,8 @@ class SelfCorrectingSQLAgent:
                                 schema_dict=schema_dict,  # Pass for WHERE column validation
                             )
                             sql = fix_result["sql"]
-                            trace.add_step("llm_fix", f"LLM generated fix: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql})
+                            fix_token_info = fix_result.get("token_info", {})
+                            trace.add_step("llm_fix", f"LLM generated fix: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql, **fix_token_info})
 
                             logger.info(f"Generated corrected SQL: {sql[:100]}...")
 

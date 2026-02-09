@@ -4,12 +4,10 @@ import { llmUsageApi } from '../services/llmUsageApi';
 
 interface UsageSummaryProps {
   sessionId: string;
-  queryId?: number;
 }
 
 export const UsageSummary: React.FC<UsageSummaryProps> = ({
   sessionId,
-  queryId,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [usage, setUsage] = useState<any>(null);

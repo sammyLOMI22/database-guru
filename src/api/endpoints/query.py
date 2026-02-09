@@ -219,12 +219,13 @@ async def process_query(
         # Create initial query history record to get an ID for tracking
         query_record = QueryHistory(
             natural_language_query=request.question,
+            generated_sql="",
             database_type=database_type,
             connection_id=active_connection.id,
-            status="processing"
+            status="processing",
         )
         db.add(query_record)
-        await db.commit()
+        await db.flush()
         await db.refresh(query_record)
 
         # Connect to user's database for schema and query execution
@@ -451,16 +452,19 @@ async def process_query(
 
                 # Add to agent trace for observability
                 if isinstance(agent_trace_dict, dict) and "steps" in agent_trace_dict:
+                    narrative_meta = {
+                        "confidence": narrative.confidence,
+                        "insight_count": len(narrative.key_insights),
+                        "has_direct_answer": narrative.direct_answer is not None,
+                    }
+                    if narrative.token_info:
+                        narrative_meta.update(narrative.token_info)
                     agent_trace_dict["steps"].append({
                         "timestamp": datetime.utcnow().isoformat(),
                         "elapsed_ms": 0,
                         "type": "narrative_generation",
                         "message": f"Generated narrative with {len(narrative.key_insights)} insights",
-                        "metadata": {
-                            "confidence": narrative.confidence,
-                            "insight_count": len(narrative.key_insights),
-                            "has_direct_answer": narrative.direct_answer is not None,
-                        },
+                        "metadata": narrative_meta,
                         "icon": "📊"
                     })
 

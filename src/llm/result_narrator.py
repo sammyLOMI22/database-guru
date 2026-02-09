@@ -21,6 +21,7 @@ class NarrativeResult:
     confidence: float = 0.5  # 0.0-1.0 confidence in interpretation
     statistics: Dict[str, Any] = field(default_factory=dict)  # Extracted statistics
     generated_at: Optional[str] = None  # ISO timestamp
+    token_info: Dict[str, Any] = field(default_factory=dict)  # Token usage from LLM call
 
     def __post_init__(self):
         if self.generated_at is None:
@@ -158,11 +159,12 @@ class ResultNarrator:
 
             # Call LLM with timeout
             try:
-                response_text = await asyncio.wait_for(
+                llm_response = await asyncio.wait_for(
                     self.ollama.generate(
                         prompt=prompt,
                         temperature=0.3,
                         model=self.model,  # Use per-task model if configured
+                        return_full_response=True,
                         db=db or self.db_session,
                         agent_type="result_narrator",
                         query_history_id=query_history_id,
@@ -171,6 +173,16 @@ class ResultNarrator:
                     ),
                     timeout=self.timeout_seconds
                 )
+                if isinstance(llm_response, dict):
+                    response_text = llm_response.get("response", "")
+                    narrator_token_info = {
+                        "input_tokens": llm_response.get("prompt_eval_count"),
+                        "output_tokens": llm_response.get("eval_count"),
+                        "model": self.model,
+                    }
+                else:
+                    response_text = str(llm_response)
+                    narrator_token_info = {}
             except asyncio.TimeoutError:
                 logger.warning(f"Narrative generation timeout after {self.timeout_seconds}s")
                 return self._fallback_narrative(row_count, statistics)
@@ -181,6 +193,7 @@ class ResultNarrator:
             # Parse response
             narrative = self._parse_response(response_text)
             narrative.statistics = statistics
+            narrative.token_info = narrator_token_info
 
             # Add advanced analysis findings to statistics for UI display
             if anomalies.get("anomalies_found"):

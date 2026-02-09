@@ -46,37 +46,37 @@ export interface LLMUsageRecord {
 
 export const llmUsageApi = {
   getStats: async (days: number = 7): Promise<LLMUsageStats> => {
-    const response = await api.get(`/llm/usage/stats?days=${days}`);
+    const response = await api.get(`/api/llm/usage/stats?days=${days}`);
     return response.data;
   },
 
   getByAgent: async (days: number = 7): Promise<LLMUsageByAgent[]> => {
-    const response = await api.get(`/llm/usage/by-agent?days=${days}`);
+    const response = await api.get(`/api/llm/usage/by-agent?days=${days}`);
     return response.data;
   },
 
   getByModel: async (days: number = 7): Promise<any[]> => {
-    const response = await api.get(`/llm/usage/by-model?days=${days}`);
+    const response = await api.get(`/api/llm/usage/by-model?days=${days}`);
     return response.data;
   },
 
   getByProvider: async (days: number = 7): Promise<any[]> => {
-    const response = await api.get(`/llm/usage/by-provider?days=${days}`);
+    const response = await api.get(`/api/llm/usage/by-provider?days=${days}`);
     return response.data;
   },
 
   getTimeSeries: async (days: number = 7, granularity: string = 'hour'): Promise<LLMUsageTimeSeries[]> => {
-    const response = await api.get(`/llm/usage/timeseries?days=${days}&granularity=${granularity}`);
+    const response = await api.get(`/api/llm/usage/timeseries?days=${days}&granularity=${granularity}`);
     return response.data;
   },
 
   getRecent: async (limit: number = 50): Promise<LLMUsageRecord[]> => {
-    const response = await api.get(`/llm/usage/recent?limit=${limit}`);
+    const response = await api.get(`/api/llm/usage/recent?limit=${limit}`);
     return response.data;
   },
 
   getSessionUsage: async (sessionId: string): Promise<any> => {
-    const response = await api.get(`/llm/usage/session/${sessionId}`);
+    const response = await api.get(`/api/llm/usage/session/${sessionId}`);
     return response.data;
   }
 };
