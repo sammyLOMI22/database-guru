@@ -1037,7 +1037,10 @@ async def process_multi_database_query(
                                 sql=db_result.sql,
                                 results=db_result.results,
                                 row_count=db_result.row_count or 0,
-                                execution_time_ms=db_result.execution_time_ms or 0
+                                execution_time_ms=db_result.execution_time_ms or 0,
+                                db=db,
+                                query_history_id=query_record.id,
+                                chat_session_id=request.chat_session_id,
                             )
                             # Store per-database narrative
                             response_data["database_results"][i]["result_analysis"] = {
@@ -1048,6 +1051,24 @@ async def process_multi_database_query(
                                 "statistics": db_narrative.statistics,
                                 "generated_at": db_narrative.generated_at,
                             }
+                            # Add narrative step to agent trace for this database
+                            db_trace = response_data["database_results"][i].get("agent_trace")
+                            if isinstance(db_trace, dict) and "steps" in db_trace:
+                                narrative_meta = {
+                                    "confidence": db_narrative.confidence,
+                                    "insight_count": len(db_narrative.key_insights),
+                                    "has_direct_answer": db_narrative.direct_answer is not None,
+                                }
+                                if db_narrative.token_info:
+                                    narrative_meta.update(db_narrative.token_info)
+                                db_trace["steps"].append({
+                                    "timestamp": datetime.utcnow().isoformat(),
+                                    "elapsed_ms": 0,
+                                    "type": "narrative_generation",
+                                    "message": f"Generated narrative with {len(db_narrative.key_insights)} insights",
+                                    "metadata": narrative_meta,
+                                    "icon": "📊"
+                                })
                             logger.info(f"✓ Generated narrative for {db_result.connection_name}: confidence={db_narrative.confidence}")
                         except Exception as e:
                             logger.error(f"Failed to generate narrative for {db_result.connection_name}: {e}", exc_info=True)
@@ -1078,7 +1099,10 @@ async def process_multi_database_query(
                                 row_count=len(combined_results),
                                 execution_time_ms=total_execution_time,
                                 databases=[r.connection_name for r in database_results],
-                                multi_database=True
+                                multi_database=True,
+                                db=db,
+                                query_history_id=query_record.id,
+                                chat_session_id=request.chat_session_id,
                             )
 
                             response_data["combined_analysis"] = {

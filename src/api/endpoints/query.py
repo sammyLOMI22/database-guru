@@ -459,9 +459,17 @@ async def process_query(
                     }
                     if narrative.token_info:
                         narrative_meta.update(narrative.token_info)
+                    # Compute elapsed_ms relative to trace start
+                    narrative_elapsed_ms = 0
+                    if agent_trace_dict.get("start_time"):
+                        try:
+                            trace_start = datetime.fromisoformat(agent_trace_dict["start_time"])
+                            narrative_elapsed_ms = round((datetime.utcnow() - trace_start).total_seconds() * 1000, 2)
+                        except (ValueError, TypeError):
+                            pass
                     agent_trace_dict["steps"].append({
                         "timestamp": datetime.utcnow().isoformat(),
-                        "elapsed_ms": 0,
+                        "elapsed_ms": narrative_elapsed_ms,
                         "type": "narrative_generation",
                         "message": f"Generated narrative with {len(narrative.key_insights)} insights",
                         "metadata": narrative_meta,

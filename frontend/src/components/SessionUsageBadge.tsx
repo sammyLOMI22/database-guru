@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Zap, MessageSquare } from 'lucide-react';
 import { llmUsageApi } from '../services/llmUsageApi';
+import { formatNumber, formatCurrency } from '../utils/formatUtils';
 
 interface SessionUsageBadgeProps {
   sessionId: string;
@@ -11,7 +12,7 @@ export const SessionUsageBadge: React.FC<SessionUsageBadgeProps> = ({
 }) => {
   const [usage, setUsage] = useState<any>(null);
 
-  const fetchUsage = async () => {
+  const fetchUsage = useCallback(async () => {
     if (!sessionId) return;
     try {
       const data = await llmUsageApi.getSessionUsage(sessionId);
@@ -19,26 +20,20 @@ export const SessionUsageBadge: React.FC<SessionUsageBadgeProps> = ({
     } catch (error) {
       console.error('Error fetching session usage:', error);
     }
-  };
+  }, [sessionId]);
 
   useEffect(() => {
     fetchUsage();
 
-    const interval = setInterval(fetchUsage, 30000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchUsage();
+      }
+    }, 30000);
     return () => clearInterval(interval);
-  }, [sessionId]);
+  }, [fetchUsage]);
 
   if (!usage || usage.total_calls === 0) return null;
-
-  const formatNumber = (num: number) => {
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
-    return num.toString();
-  };
-
-  const formatCurrency = (num: number) => {
-    if (!num || num < 0.01) return '<$0.01';
-    return `$${num.toFixed(2)}`;
-  };
 
   return (
     <div className="flex items-center gap-4 px-4 py-1.5 glass-panel rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 animate-fadeIn">

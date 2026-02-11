@@ -30,7 +30,7 @@ class LLMUsage(Base):
     token_estimation_method = Column(String(20), default='estimated')
 
     # Timing
-    request_timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    request_timestamp = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     response_time_ms = Column(Float)
     time_to_first_token_ms = Column(Float)
 
@@ -47,7 +47,7 @@ class LLMUsage(Base):
 
     # Metadata
     metadata_json = Column(JSON, name="metadata")  # Avoid collision with Base.metadata
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     query_history = relationship("QueryHistory", back_populates="llm_usage_records")
@@ -85,8 +85,8 @@ class LLMUsageAggregate(Base):
 
     total_estimated_cost_usd = Column(Float)
 
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         UniqueConstraint('date', 'hour', 'agent_type', 'provider', 'model_name', name='uq_llm_agg_dimensions'),
@@ -116,8 +116,8 @@ class LLMModelConfig(Base):
     is_default = Column(Boolean, default=False)
 
     notes = Column(Text)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class QueryHistory(Base):

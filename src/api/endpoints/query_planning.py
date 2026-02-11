@@ -213,7 +213,7 @@ async def create_query_plan(
         )
 
         # Generate plan
-        plan = await planning_agent.create_query_plan(
+        plan, _planning_token_info = await planning_agent.create_query_plan(
             question=request.question,
             schema=schema,
             database_type=database_type,

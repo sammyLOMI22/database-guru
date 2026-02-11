@@ -1,6 +1,6 @@
 """Service for aggregating LLM usage data into daily/hourly statistics"""
 import logging
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from sqlalchemy import select, func, and_, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.models import LLMUsage, LLMUsageAggregate
@@ -16,7 +16,7 @@ class LLMUsageAggregator:
         Aggregate usage for the last N days.
         Typically run as a background task.
         """
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         for i in range(days_back + 1):
             target_date = today - timedelta(days=i)
             await LLMUsageAggregator.aggregate_date(db, target_date)

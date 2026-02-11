@@ -397,7 +397,7 @@ class QueryPlanningAgent:
         query_history_id: Optional[int] = None,
         chat_session_id: Optional[str] = None,
         chat_message_id: Optional[int] = None,
-    ) -> QueryPlan:
+    ) -> tuple:
         """
         Create a structured query execution plan
 
@@ -410,7 +410,7 @@ class QueryPlanningAgent:
             schema_dict: Optional parsed schema dictionary (avoids parsing)
 
         Returns:
-            QueryPlan object with structured plan
+            Tuple of (QueryPlan, token_info dict)
         """
         try:
             model_to_use = model or self.settings.OLLAMA_MODEL
@@ -446,16 +446,29 @@ class QueryPlanningAgent:
 
             # Generate plan using LLM
             logger.info(f"Creating query plan for: {question} (model: {model_to_use})")
-            raw_output = await self.ollama.chat(
+            llm_response = await self.ollama.chat(
                 messages=messages,
                 model=model_to_use,
                 temperature=0.1,  # Low temperature for structured output
+                return_full_response=True,
                 db=db or self.db_session,
                 agent_type="query_planner",
                 query_history_id=query_history_id,
                 chat_session_id=chat_session_id,
                 chat_message_id=chat_message_id,
             )
+
+            # Extract token info and message content from full response
+            if isinstance(llm_response, dict):
+                raw_output = llm_response.get("message", {}).get("content", "")
+                planning_token_info = {
+                    "input_tokens": llm_response.get("prompt_eval_count"),
+                    "output_tokens": llm_response.get("eval_count"),
+                    "model": model_to_use,
+                }
+            else:
+                raw_output = str(llm_response)
+                planning_token_info = {}
 
             # Parse JSON response
             plan_dict = self._parse_plan_output(raw_output)
@@ -472,6 +485,7 @@ class QueryPlanningAgent:
 
             # Validate plan against schema if enabled
             if validate_schema:
+                self._last_correction_token_info = {}
                 plan = await self._validate_and_correct_plan(
                     plan, schema, question, model_to_use,
                     db=db,
@@ -479,12 +493,17 @@ class QueryPlanningAgent:
                     chat_session_id=chat_session_id,
                     chat_message_id=chat_message_id,
                 )
+                # Aggregate correction tokens if a correction LLM call was made
+                correction_tokens = getattr(self, '_last_correction_token_info', {})
+                if correction_tokens:
+                    planning_token_info["input_tokens"] = (planning_token_info.get("input_tokens") or 0) + (correction_tokens.get("input_tokens") or 0)
+                    planning_token_info["output_tokens"] = (planning_token_info.get("output_tokens") or 0) + (correction_tokens.get("output_tokens") or 0)
 
             # Normalize location values in filters (if schema_dict available)
             if schema_dict:
                 plan = self._normalize_location_values(plan, schema_dict)
 
-            return plan
+            return plan, planning_token_info
 
         except Exception as e:
             logger.error(f"Query planning failed: {e}")
@@ -502,7 +521,7 @@ class QueryPlanningAgent:
                 limit=None,
                 reasoning=f"Planning failed: {str(e)}. Will use direct SQL generation.",
                 confidence=0.3
-            )
+            ), {}
 
     def _parse_plan_output(self, raw_output: str) -> Dict[str, Any]:
         """
@@ -600,7 +619,7 @@ class QueryPlanningAgent:
             }
 
         # Create query plan
-        plan = await self.create_query_plan(
+        plan, planning_token_info = await self.create_query_plan(
             question=question,
             schema=schema,
             database_type=database_type,
@@ -637,7 +656,8 @@ class QueryPlanningAgent:
             "plan": plan,
             "sql": sql,
             "used_planning": True,
-            "confidence": plan.confidence
+            "confidence": plan.confidence,
+            "token_info": planning_token_info
         }
 
         # Include mappings_applied if present
@@ -923,16 +943,29 @@ Please provide a corrected query plan as valid JSON."""
 
         try:
             # Generate corrected plan
-            raw_output = await self.ollama.chat(
+            llm_response = await self.ollama.chat(
                 messages=messages,
                 model=model,
                 temperature=0.1,
+                return_full_response=True,
                 db=db or self.db_session,
                 agent_type="query_plan_corrector",
                 query_history_id=query_history_id,
                 chat_session_id=chat_session_id,
                 chat_message_id=chat_message_id,
             )
+
+            # Extract content and token info
+            if isinstance(llm_response, dict):
+                raw_output = llm_response.get("message", {}).get("content", "")
+                self._last_correction_token_info = {
+                    "input_tokens": llm_response.get("prompt_eval_count"),
+                    "output_tokens": llm_response.get("eval_count"),
+                    "model": model,
+                }
+            else:
+                raw_output = str(llm_response)
+                self._last_correction_token_info = {}
 
             # Parse corrected plan
             plan_dict = self._parse_plan_output(raw_output)

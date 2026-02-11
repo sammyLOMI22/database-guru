@@ -1,5 +1,5 @@
 import pytest
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from src.database.models import Base, LLMUsage, LLMUsageAggregate, LLMModelConfig
@@ -34,7 +34,7 @@ async def test_llm_cost_calculation(db_session):
 @pytest.mark.asyncio
 async def test_llm_usage_aggregation(db_session):
     # 1. Create some usage records
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     usage1 = LLMUsage(
         agent_type="test_agent",
         model_name="gpt-4o",

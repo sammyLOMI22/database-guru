@@ -1,7 +1,7 @@
 """Service for managing LLM model configurations and costs"""
 import logging
 from typing import Optional, Dict, Any, List
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.models import LLMModelConfig
 
@@ -20,10 +20,15 @@ class LLMCostService:
 
         if not config:
             # Try fuzzy match (e.g. "llama3:latest" -> "llama3")
+            # Order by name length to prefer exact prefix matches over longer ones
             base_name = model_name.split(":")[0]
-            stmt = select(LLMModelConfig).where(LLMModelConfig.model_name.like(f"{base_name}%"))
+            stmt = (
+                select(LLMModelConfig)
+                .where(LLMModelConfig.model_name.like(f"{base_name}%"))
+                .order_by(func.length(LLMModelConfig.model_name))
+            )
             result = await db.execute(stmt)
-            config = result.scalar_one_or_none()
+            config = result.scalars().first()
 
         return config
 

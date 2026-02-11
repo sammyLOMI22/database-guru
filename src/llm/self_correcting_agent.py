@@ -979,13 +979,15 @@ class SelfCorrectingSQLAgent:
 
                 if planning_result.get("used_planning"):
                     query_plan = planning_result["plan"]
+                    planning_token_info = planning_result.get("token_info", {})
                     trace.add_step(
                         "planning",
                         f"Query plan created (complexity: {query_plan.complexity.value}, confidence: {query_plan.confidence:.2f})",
                         metadata={
                             "complexity": query_plan.complexity.value,
                             "confidence": query_plan.confidence,
-                            "estimated_tables": len(query_plan.tables)
+                            "estimated_tables": len(query_plan.tables),
+                            **planning_token_info,
                         }
                     )
                     logger.info(
@@ -1381,6 +1383,10 @@ class SelfCorrectingSQLAgent:
                                 database_type=database_type,
                                 correction_hints=hints,  # Explicit hints forwarding (addresses PR review)
                                 schema_dict=schema_dict,  # Pass for WHERE column validation
+                                db=db,
+                                query_history_id=query_history_id,
+                                chat_session_id=chat_session_id,
+                                chat_message_id=chat_message_id,
                             )
                             sql = fix_result["sql"]
                             fix_token_info = fix_result.get("token_info", {})

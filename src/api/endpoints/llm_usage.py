@@ -159,7 +159,7 @@ async def get_usage_by_provider(
 
 @router.get("/timeseries", response_model=List[LLMUsageTimeSeriesResponse])
 async def get_usage_timeseries(
-    days: int = Query(default=7, ge=1, le=30),
+    days: int = Query(default=7, ge=1, le=90),
     granularity: str = Query(default="hour", enum=["hour", "day"]),
     db: AsyncSession = Depends(get_session),
 ):

@@ -8,6 +8,7 @@ import {
   BarChart2, PieChart as PieChartIcon, TrendingUp, Calendar
 } from 'lucide-react';
 import { llmUsageApi, LLMUsageStats, LLMUsageByAgent, LLMUsageTimeSeries, LLMUsageRecord } from '../../services/llmUsageApi';
+import { formatNumber, formatCurrency } from '../../utils/formatUtils';
 
 export const LLMUsageDashboard: React.FC = () => {
   const [timeRange, setTimeRange] = useState<number>(7);
@@ -47,18 +48,6 @@ export const LLMUsageDashboard: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [timeRange]);
-
-  const formatNumber = (num: number | undefined | null) => {
-    if (num === undefined || num === null) return '0';
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
-    return num.toString();
-  };
-
-  const formatCurrency = (num: number | undefined | null) => {
-    if (num === undefined || num === null) return '$0.00';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(num);
-  };
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 

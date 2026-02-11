@@ -85,7 +85,7 @@ class LLMUsageTracker:
         Usage:
             async with tracker.track_call(db, "sql_generator", model, "generate", prompt, provider="ollama") as tracking:
                 response = await ollama.generate(...)
-                tracking.set_response(response_text, ollama_response_dict)
+                tracking.set_response(response_text, provider_response_dict)
         """
         start_time = time.time()
         tracking = _TrackingContext(
@@ -134,14 +134,14 @@ class _TrackingContext:
         self.start_time = start_time
 
         self.response_text: Optional[str] = None
-        self.ollama_response: Optional[dict] = None
+        self.provider_response: Optional[dict] = None
         self.error_message: Optional[str] = None
         self.success = True
 
-    def set_response(self, response_text: str, ollama_response: Optional[dict] = None):
+    def set_response(self, response_text: str, provider_response: Optional[dict] = None):
         """Set the response from the LLM call."""
         self.response_text = response_text
-        self.ollama_response = ollama_response
+        self.provider_response = provider_response
 
     def set_error(self, error_message: str):
         """Mark the call as failed."""
@@ -162,8 +162,8 @@ class _TrackingContext:
             output_tokens, output_method = self.tracker.estimate_tokens(self.response_text)
 
         # Try to get native token counts
-        if self.ollama_response:
-            native_input, native_output = self.tracker.extract_tokens(self.ollama_response, self.provider)
+        if self.provider_response:
+            native_input, native_output = self.tracker.extract_tokens(self.provider_response, self.provider)
             if native_input is not None:
                 input_tokens = native_input
                 token_method = f"{self.provider}_native"

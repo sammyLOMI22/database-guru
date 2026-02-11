@@ -256,7 +256,7 @@ class TestQueryPlanningAgent:
 
         mock_ollama_client.chat.return_value = json.dumps(mock_plan_json)
 
-        plan = await agent.create_query_plan(
+        plan, token_info = await agent.create_query_plan(
             question="Compare revenue between Q1 and Q2, grouped by category",
             schema=sample_schema,
             database_type="postgresql"
@@ -282,7 +282,7 @@ class TestQueryPlanningAgent:
         # Mock LLM failure
         mock_ollama_client.chat.side_effect = Exception("LLM error")
 
-        plan = await agent.create_query_plan(
+        plan, token_info = await agent.create_query_plan(
             question="Test question",
             schema=sample_schema,
             database_type="postgresql"
