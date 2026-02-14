@@ -309,6 +309,7 @@ class ChatMessage(Base):
     # Query metadata (for assistant messages)
     query_history_id = Column(Integer, ForeignKey("query_history.id"), nullable=True)
     databases_used = Column(JSON, nullable=True)  # [{"conn_id": 1, "name": "ecommerce", "tables": ["products"]}]
+    response_data = Column(JSON, nullable=True)  # Full API response for history replay (capped rows, no traces)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 

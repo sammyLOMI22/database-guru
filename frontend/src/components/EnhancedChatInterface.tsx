@@ -9,7 +9,7 @@ import { SessionUsageBadge } from './SessionUsageBadge';
 import { useMultiQuery } from '../hooks/useMultiQuery';
 import { useModels } from '../hooks/useModels';
 import { connectionsAPI, settingsAPI, filesAPI, chatAPI } from '../services/api';
-import type { ChatSession, MultiDatabaseQueryResponse, DatabaseConnection } from '../types/api';
+import type { ChatSession, MultiDatabaseQueryResponse, DatabaseConnection, ChatMessage as APIChatMessage } from '../types/api';
 
 interface ChatMessage {
   id: string;
@@ -50,6 +50,7 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
   const [showContextPanel, setShowContextPanel] = useState(true);
   const [hasContext, setHasContext] = useState(false);
   const [forceSchemaRefresh, setForceSchemaRefresh] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [perTaskModels, setPerTaskModels] = useState<PerTaskModelSettings | null>(null);
   const [activeConnection, setActiveConnection] = useState<DatabaseConnection | null>(null);
   const [enableNarratives, setEnableNarratives] = useState<boolean>(() => {
@@ -59,8 +60,37 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const [restoringSession, setRestoringSession] = useState(() => !!sessionStorage.getItem('currentSessionId'));
   const { loading, executeQuery } = useMultiQuery();
   const { data: modelsData } = useModels();
+
+  // Keep session ID ref in sync for guarding in-flight queries
+  useEffect(() => {
+    sessionIdRef.current = currentSession?.id ?? null;
+  }, [currentSession?.id]);
+
+  // Persist current session ID in sessionStorage for page-reload recovery
+  useEffect(() => {
+    if (currentSession?.id) {
+      sessionStorage.setItem('currentSessionId', currentSession.id);
+    } else if (!restoringSession) {
+      sessionStorage.removeItem('currentSessionId');
+    }
+  }, [currentSession?.id, restoringSession]);
+
+  // Restore session from sessionStorage on mount
+  useEffect(() => {
+    const savedSessionId = sessionStorage.getItem('currentSessionId');
+    if (savedSessionId) {
+      chatAPI.getSession(savedSessionId)
+        .then(session => setCurrentSession(session))
+        .catch(() => sessionStorage.removeItem('currentSessionId'))
+        .finally(() => setRestoringSession(false));
+    } else {
+      setRestoringSession(false);
+    }
+  }, []);
 
   // Set default model when models load
   useEffect(() => {
@@ -136,7 +166,120 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Load chat history when session changes
+  useEffect(() => {
+    const welcomeMessage: ChatMessage = {
+      id: '1',
+      type: 'assistant',
+      content: "Hello! I'm your Database Guru! Ask me to help you fetch some data!",
+    };
+
+    // Don't load anything while we're restoring the saved session
+    if (restoringSession) return;
+
+    if (!currentSession) {
+      setMessages([welcomeMessage]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadMessages = async () => {
+      setLoadingHistory(true);
+      try {
+        const apiMessages: APIChatMessage[] = await chatAPI.getMessages(currentSession.id);
+        if (cancelled) return;
+
+        if (apiMessages.length === 0) {
+          setMessages([welcomeMessage]);
+        } else {
+          setMessages(
+            apiMessages
+              .filter((msg) => msg.role !== 'system')
+              .map((msg) => {
+                const base: ChatMessage = {
+                  id: String(msg.id),
+                  type: msg.role as 'user' | 'assistant',
+                  content: msg.content,
+                };
+
+                if (msg.role === 'assistant' && msg.response_data) {
+                  // Use persisted response_data directly
+                  const rd = msg.response_data;
+                  if (rd.database_results) {
+                    // Multi-database response shape
+                    base.multiQueryResponse = rd as MultiDatabaseQueryResponse;
+                  } else if (rd.sql !== undefined) {
+                    // Single-database QueryResponse — convert to multi-db format
+                    base.multiQueryResponse = {
+                      query_id: rd.query_id || 0,
+                      question: rd.question || '',
+                      database_results: [{
+                        connection_id: 0,
+                        connection_name: msg.databases_used?.[0]?.name || 'Database',
+                        database_type: '',
+                        success: rd.is_valid,
+                        sql: rd.sql || '',
+                        results: rd.results || [],
+                        row_count: rd.row_count || 0,
+                        execution_time_ms: rd.execution_time_ms || 0,
+                        error: rd.warnings?.join(', ') || undefined,
+                        result_analysis: rd.result_analysis,
+                      }],
+                      total_databases_queried: 1,
+                      total_rows: rd.row_count || 0,
+                      total_execution_time_ms: rd.execution_time_ms || 0,
+                      warnings: rd.warnings || [],
+                      cached: rd.cached || false,
+                      timestamp: rd.timestamp || msg.created_at,
+                    };
+                  }
+                } else if (msg.role === 'assistant' && msg.databases_used?.length) {
+                  // Fallback for old messages without response_data
+                  base.multiQueryResponse = {
+                    query_id: msg.query_history_id || 0,
+                    question: '',
+                    database_results: msg.databases_used.map((db) => ({
+                      connection_id: db.conn_id,
+                      connection_name: db.name,
+                      database_type: '',
+                      sql: msg.query_sql || '',
+                      success: true,
+                      row_count: db.rows,
+                      results: [],
+                      execution_time_ms: 0,
+                    })),
+                    total_databases_queried: msg.databases_used.length,
+                    total_rows: msg.databases_used.reduce((sum, db) => sum + (db.rows || 0), 0),
+                    total_execution_time_ms: 0,
+                    warnings: [],
+                    cached: false,
+                    timestamp: msg.created_at,
+                  };
+                }
+
+                return base;
+              })
+          );
+        }
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      } finally {
+        if (!cancelled) setLoadingHistory(false);
+      }
+    };
+
+    loadMessages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSession?.id, restoringSession]);
+
   const handleSubmit = async (question: string, rowLimit: number = 100) => {
+    // Capture session ID at submission time to guard against session switches
+    const submissionSessionId = currentSession?.id ?? null;
+
     // Add user message
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -153,6 +296,10 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
         enable_narratives: enableNarratives,
         row_limit: rowLimit,
       });
+
+      // If user switched sessions while query was running, don't append here.
+      // The result is already saved server-side and will load when they switch back.
+      if (sessionIdRef.current !== submissionSessionId) return;
 
       // Reset force refresh after query
       setForceSchemaRefresh(false);
@@ -176,6 +323,9 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
         onLastSqlChange?.(firstSuccessful.sql);
       }
     } catch (error: any) {
+      // If user switched sessions, don't show error in wrong session
+      if (sessionIdRef.current !== submissionSessionId) return;
+
       // Add error message
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -434,16 +584,25 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
             </div>
           )}
 
-          {messages.map((message) => (
-            <div key={message.id} className="flex items-start gap-4 animate-fadeIn">
-              <Message
-                type={message.type}
-                content={message.content}
-                multiQueryResponse={message.multiQueryResponse}
-                onViewLineage={onViewLineage}
-              />
+          {(loadingHistory || restoringSession) ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center space-x-3">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Loading conversation history...</span>
+              </div>
             </div>
-          ))}
+          ) : (
+            messages.map((message) => (
+              <div key={message.id} className="flex items-start gap-4 animate-fadeIn">
+                <Message
+                  type={message.type}
+                  content={message.content}
+                  multiQueryResponse={message.multiQueryResponse}
+                  onViewLineage={onViewLineage}
+                />
+              </div>
+            ))
+          )}
 
           {/* Loading indicator */}
           {loading && (

@@ -19,6 +19,7 @@ from src.models.schemas import (
 )
 from src.api.dependencies import get_db, get_cache, get_semantic_cache_dep, get_sql_generator, get_settings
 from src.database.models import QueryHistory, ChatSession, ChatMessage
+from src.api.endpoints.chat import prepare_response_for_storage
 from src.llm.sql_generator import SQLGenerator
 from src.llm.self_correcting_agent import SelfCorrectingSQLAgent, AgentTrace
 from src.llm.conversational_memory_agent import get_memory_agent
@@ -364,9 +365,25 @@ async def process_query(
         query_record.status = "completed" if is_valid else "failed"
 
         await db.commit()
+        query_record_id = query_record.id  # Capture before it can expire
 
         # Save chat messages if session_id provided
         if request.session_id:
+            # Build a preliminary response_data so we can persist it inline
+            preliminary_response_data = prepare_response_for_storage({
+                "query_id": query_record.id,
+                "question": request.question,
+                "sql": sql,
+                "is_valid": is_valid,
+                "is_read_only": is_read_only,
+                "warnings": warnings,
+                "results": execution_result.get("data") if execution_result and execution_result.get("success") else None,
+                "row_count": execution_result.get("row_count") if execution_result else None,
+                "execution_time_ms": execution_result.get("execution_time_ms") if execution_result else None,
+                "cached": False,
+                "timestamp": datetime.utcnow().isoformat(),
+            })
+
             # Save user message
             user_message = ChatMessage(
                 chat_session_id=request.session_id,
@@ -381,7 +398,7 @@ async def process_query(
             )
             db.add(user_message)
 
-            # Save assistant message with SQL
+            # Save assistant message with SQL and response_data
             assistant_content = f"```sql\n{sql}\n```"
             if execution_result and execution_result.get("success"):
                 assistant_content += f"\n\nReturned {execution_result.get('row_count', 0)} rows"
@@ -397,7 +414,8 @@ async def process_query(
                     "conn_id": active_connection.id,
                     "name": active_connection.name,
                     "database_type": database_type
-                }]
+                }],
+                response_data=preliminary_response_data,
             )
             db.add(assistant_message)
             await db.commit()

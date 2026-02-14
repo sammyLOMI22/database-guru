@@ -338,6 +338,9 @@ export interface ChatMessage {
     name: string;
     rows: number;
   }>;
+  query_sql?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  response_data?: any;
   created_at: string;
 }
 
