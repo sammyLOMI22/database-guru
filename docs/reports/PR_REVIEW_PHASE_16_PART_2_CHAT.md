@@ -201,3 +201,36 @@ PR Review: Phase 16 — LLM Usage Monitoring
   4. Switch to shared get_db dependency (#4) — one-line fix
   5. Seed model configs in lifespan (#6) — cost tracking is DOA without this
   6. Add estimated_cost_usd to LLMUsageRecord TypeScript interface (#13) — runtime bug
+  Fixes Applied                                                                                                                                       
+  #: 1                                                                                                                                                
+  Issue: agent_trace_dict NameError                                                                                                                   
+  File: src/api/endpoints/query.py                                                                                                                    
+  Change: Moved agent_trace_dict = agent_result.get("agent_trace") before the narrative block (line ~425) so it's defined when the narrative code     
+    references it at line ~473                                                                                                                        
+  ────────────────────────────────────────                                                                                                            
+  #: 2
+  Issue: ORM cascade destroys usage records
+  File: src/database/models.py
+  Change: Changed cascade="all, delete-orphan" to cascade="save-update, merge" with passive_deletes=True on all 3 parent relationships (QueryHistory,
+    ChatSession, ChatMessage). Now DB-level ondelete="SET NULL" works as intended.
+  ────────────────────────────────────────
+  #: 3
+  Issue: Missing created_at index
+  File: src/database/models.py
+  Change: Added index=True to LLMUsage.created_at so dashboard queries don't full-table-scan
+  ────────────────────────────────────────
+  #: 4
+  Issue: Duplicate session dependency
+  File: src/api/endpoints/llm_usage.py
+  Change: Removed local get_session(), switched all endpoints to use the shared get_db from src/api/dependencies
+  ────────────────────────────────────────
+  #: 5
+  Issue: Model configs not seeded on startup
+  File: src/main.py
+  Change: Added LLMCostService.ensure_default_configs() call in the lifespan startup, so cost tracking works without running init_database()
+  separately
+  ────────────────────────────────────────
+  #: 6
+  Issue: Missing estimated_cost_usd in TS
+  File: frontend/src/services/llmUsageApi.ts + LLMUsageDashboard.tsx
+  Change: Added `estimated_cost_usd: number

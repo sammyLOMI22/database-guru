@@ -47,7 +47,7 @@ class LLMUsage(Base):
 
     # Metadata
     metadata_json = Column(JSON, name="metadata")  # Avoid collision with Base.metadata
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
     query_history = relationship("QueryHistory", back_populates="llm_usage_records")
@@ -151,7 +151,7 @@ class QueryHistory(Base):
 
     # Relationships
     feedbacks = relationship("UserFeedback", back_populates="query", cascade="all, delete-orphan")
-    llm_usage_records = relationship("LLMUsage", back_populates="query_history", cascade="all, delete-orphan")
+    llm_usage_records = relationship("LLMUsage", back_populates="query_history", cascade="save-update, merge", passive_deletes=True)
     chat_messages = relationship("ChatMessage", back_populates="query_history")
 
     # Indexes for common queries
@@ -287,7 +287,7 @@ class ChatSession(Base):
 
     # Relationships
     messages = relationship("ChatMessage", back_populates="chat_session", cascade="all, delete-orphan")
-    llm_usage_records = relationship("LLMUsage", back_populates="chat_session", cascade="all, delete-orphan")
+    llm_usage_records = relationship("LLMUsage", back_populates="chat_session", cascade="save-update, merge", passive_deletes=True)
 
     # Indexes
     __table_args__ = (
@@ -316,7 +316,7 @@ class ChatMessage(Base):
     # Relationships
     chat_session = relationship("ChatSession", back_populates="messages")
     query_history = relationship("QueryHistory", back_populates="chat_messages")
-    llm_usage_records = relationship("LLMUsage", back_populates="chat_message", cascade="all, delete-orphan")
+    llm_usage_records = relationship("LLMUsage", back_populates="chat_message", cascade="save-update, merge", passive_deletes=True)
 
 
 class FileSource(Base):

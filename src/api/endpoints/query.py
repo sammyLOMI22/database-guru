@@ -421,6 +421,9 @@ async def process_query(
             await db.commit()
             logger.info(f"Saved conversation to session {request.session_id}")
 
+        # Extract agent trace early so narrative generation can append to it
+        agent_trace_dict = agent_result.get("agent_trace")
+
         # Generate natural language narrative of results (Intelligent Data Narratives feature)
         result_analysis = None
         if (
@@ -502,7 +505,6 @@ async def process_query(
                 result_analysis = None
 
         # Merge cache trace steps with agent trace (prepend cache steps)
-        agent_trace_dict = agent_result.get("agent_trace")
         if agent_trace_dict and cache_trace.steps:
             # Prepend cache trace steps to agent trace
             cache_steps = cache_trace.to_dict().get("steps", [])

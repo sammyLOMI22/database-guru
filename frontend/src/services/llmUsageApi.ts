@@ -41,6 +41,7 @@ export interface LLMUsageRecord {
   response_time_ms: number | null;
   success: boolean;
   error_message: string | null;
+  estimated_cost_usd: number | null;
   created_at: string;
 }
 

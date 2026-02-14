@@ -61,6 +61,16 @@ async def lifespan(app: FastAPI):
 
     await db_manager.initialize_async()
     await db_manager.create_tables_async()
+
+    # Seed default LLM model configs for cost tracking (Phase 16)
+    try:
+        from src.services.llm_cost_service import LLMCostService
+        async with db_manager.get_async_session() as db:
+            await LLMCostService.ensure_default_configs(db)
+        logger.info("✅ LLM model configs seeded")
+    except Exception as e:
+        logger.warning(f"Failed to seed LLM model configs: {e}")
+
     logger.info("✅ Database ready")
 
     # Initialize cache

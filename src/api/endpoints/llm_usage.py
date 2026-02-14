@@ -4,7 +4,7 @@ from sqlalchemy import select, func, desc
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
-from src.database.connection import get_db_manager
+from src.api.dependencies import get_db
 from src.database.models import LLMUsage
 from src.models.schemas import (
     LLMUsageResponse,
@@ -16,16 +16,10 @@ from src.models.schemas import (
 
 router = APIRouter(prefix="/llm/usage", tags=["LLM Usage"])
 
-async def get_session():
-    """Dependency to get database session"""
-    db_manager = get_db_manager()
-    async with db_manager.get_async_session() as session:
-        yield session
-
 @router.get("/stats", response_model=LLMUsageStatsResponse)
 async def get_usage_stats(
     days: int = Query(default=7, ge=1, le=90),
-    db: AsyncSession = Depends(get_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get overall LLM usage statistics for the past N days."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
@@ -61,7 +55,7 @@ async def get_usage_stats(
 @router.get("/by-agent", response_model=List[LLMUsageByAgentResponse])
 async def get_usage_by_agent(
     days: int = Query(default=7, ge=1, le=90),
-    db: AsyncSession = Depends(get_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get LLM usage breakdown by agent type."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
@@ -94,7 +88,7 @@ async def get_usage_by_agent(
 @router.get("/by-model", response_model=List[dict])
 async def get_usage_by_model(
     days: int = Query(default=7, ge=1, le=90),
-    db: AsyncSession = Depends(get_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get LLM usage breakdown by model."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
@@ -127,7 +121,7 @@ async def get_usage_by_model(
 @router.get("/by-provider", response_model=List[dict])
 async def get_usage_by_provider(
     days: int = Query(default=7, ge=1, le=90),
-    db: AsyncSession = Depends(get_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get LLM usage breakdown by provider."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
@@ -161,7 +155,7 @@ async def get_usage_by_provider(
 async def get_usage_timeseries(
     days: int = Query(default=7, ge=1, le=90),
     granularity: str = Query(default="hour", enum=["hour", "day"]),
-    db: AsyncSession = Depends(get_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get LLM usage over time for charting."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
@@ -204,7 +198,7 @@ async def get_usage_timeseries(
 @router.get("/session/{session_id}", response_model=SessionUsageSummaryResponse)
 async def get_session_usage(
     session_id: str,
-    db: AsyncSession = Depends(get_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get LLM usage for a specific chat session."""
     result = await db.execute(
@@ -263,7 +257,7 @@ async def get_recent_usage(
     agent_type: Optional[str] = None,
     model_name: Optional[str] = None,
     provider: Optional[str] = None,
-    db: AsyncSession = Depends(get_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get recent LLM usage records for debugging/monitoring."""
     query = select(LLMUsage).order_by(LLMUsage.created_at.desc()).limit(limit)
@@ -281,7 +275,7 @@ async def get_recent_usage(
 @router.post("/aggregate")
 async def trigger_aggregation(
     days: int = Query(default=1, ge=0, le=30),
-    db: AsyncSession = Depends(get_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Manually trigger usage aggregation."""
     from src.services.llm_usage_aggregator import LLMUsageAggregator
@@ -290,7 +284,7 @@ async def trigger_aggregation(
 
 @router.post("/configs/seed")
 async def seed_model_configs(
-    db: AsyncSession = Depends(get_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Seed default model configurations."""
     from src.services.llm_cost_service import LLMCostService

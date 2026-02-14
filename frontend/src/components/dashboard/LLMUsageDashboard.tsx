@@ -299,7 +299,7 @@ export const LLMUsageDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {recentCalls.map((call: any) => (
+              {recentCalls.map((call) => (
                 <tr key={call.id} className="hover:bg-slate-700/30 transition-colors text-sm">
                   <td className="px-6 py-4 text-slate-400 whitespace-nowrap">
                     {new Date(call.created_at).toLocaleTimeString()}
@@ -319,7 +319,7 @@ export const LLMUsageDashboard: React.FC = () => {
                     {formatNumber(call.input_tokens + call.output_tokens)}
                   </td>
                   <td className="px-6 py-4 text-right text-amber-400/80 font-mono">
-                    {call.estimated_cost_usd > 0 ? `$${call.estimated_cost_usd.toFixed(4)}` : '-'}
+                    {call.estimated_cost_usd != null && call.estimated_cost_usd > 0 ? `$${call.estimated_cost_usd.toFixed(4)}` : '-'}
                   </td>
                   <td className="px-6 py-4 text-right text-slate-300">
                     {call.response_time_ms?.toFixed(0)}ms
