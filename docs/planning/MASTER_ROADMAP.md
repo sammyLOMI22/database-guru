@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: February 8, 2026
+**Last Updated**: February 14, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -52,14 +52,14 @@
     │   ✅ COMPLETE        │  │   ✅ COMPLETE        │  │   ✅ COMPLETE        │
     └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
 
-    ┌──────────────────────┐
-    │  LLM Usage Monitor   │
-    │   (Phase 16)         │
-    │   Token/cost tracking│
-    │   9 API endpoints    │
-    │   Full dashboard UI  │
-    │   ✅ COMPLETE        │
-    └──────────────────────┘
+    ┌──────────────────────┐  ┌──────────────────────┐
+    │  CSV/Excel Files     │  │  LLM Usage Monitor   │
+    │   (Phase 13)         │  │   (Phase 16)         │
+    │   50+ tests passing  │  │   Token/cost tracking│
+    │   ✅ COMPLETE        │  │   9 API endpoints    │
+    │                      │  │   Full dashboard UI  │
+    │                      │  │   ✅ COMPLETE        │
+    └──────────────────────┘  └──────────────────────┘
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
@@ -75,36 +75,11 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                          DATA SOURCE EXPANSION (Phase 13) - NEW                         │
-    └─────────────────────────────────────────────────────────────────────────────────────────┘
-
-    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                      CSV & EXCEL FILE SUPPORT (Phase 13) - HIGH PRIORITY                 │
-    │                                                                                           │
-    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
-    │  │ 13.1 Core   │   │ 13.2 DuckDB │   │ 13.3 Cross- │   │ 13.4 Frontend│                  │
-    │  │ Backend     │──▶│ Integration │──▶│ Source      │──▶│ UI          │                   │
-    │  │             │   │             │   │ Queries     │   │             │                   │
-    │  │ • File      │   │ • Virtual   │   │             │   │ • Upload    │                   │
-    │  │   upload    │   │   tables    │   │ • DB + File │   │   modal     │                   │
-    │  │ • Schema    │   │ • CSV/Excel │   │   JOINs     │   │ • Data      │                   │
-    │  │   inference │   │   parsing   │   │ • Result    │   │   sources   │                   │
-    │  │ • Storage   │   │ • Query     │   │   merging   │   │   panel     │                   │
-    │  │             │   │   execution │   │             │   │ • Preview   │                   │
-    │  │ ~5 days     │   │ ~5 days     │   │ ~5 days     │   │ ~5 days     │                   │
-    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
-    │                                                                                           │
-    │  Prereq: None (Independent) | Priority: HIGH | Est: 3-4 weeks | ~2,500 lines            │
-    │  Plan: CSV_EXCEL_SUPPORT_PLAN.md                                                         │
-    └───────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                         NOSQL EXPANSION (Phase 14) - DATA SOURCES                       │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    NOSQL DATABASE SUPPORT (Phase 14) - MEDIUM PRIORITY                   │
+    │                    NOSQL DATABASE SUPPORT (Phase 14) - LOW PRIORITY (Deprioritized)      │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐ │
     │  │ 14.1        │   │ 14.2        │   │ 14.3        │   │ 14.4        │   │ 14.5        │ │
@@ -118,8 +93,9 @@
     │  │ ~1,500 lines│   │ ~1,000 lines│   │ ~1,000 lines│   │ ~1,200 lines│   │ ~1,300 lines│ │
     │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘ │
     │                                                                                           │
-    │  Prereq: None (Independent) | Priority: MEDIUM | Est: 6-8 weeks | ~6,000 lines          │
+    │  Prereq: None (Independent) | Priority: LOW (per PM review) | Est: 6-8 weeks | ~6,000 ln │
     │  Plan: NOSQL_EXPANSION_PLAN.md                                                           │
+    │  NOTE: SQL + Files (Phase 13) covers ~90% of analytic use cases. NoSQL is niche.         │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -228,6 +204,165 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    SECURITY & AUTH FOUNDATION (Phase 21) - CRITICAL                     │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │              SECURITY & AUTH FOUNDATION (Phase 21) - CRITICAL PRIORITY                    │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
+    │  │ 21.1 User   │   │ 21.2 Session│   │ 21.3 Rate   │   │ 21.4 Audit  │                   │
+    │  │ Auth (JWT)  │──▶│ Ownership   │──▶│ Limiting    │──▶│ Logging     │                   │
+    │  │             │   │             │   │             │   │             │                   │
+    │  │ • JWT auth  │   │ • user_id   │   │ • Per-user  │   │ • Action    │                   │
+    │  │ • Login/    │   │   on all    │   │   limits    │   │   trail     │                   │
+    │  │   register  │   │   resources │   │ • Endpoint- │   │ • DML audit │                   │
+    │  │ • Middleware│   │ • 403 on    │   │   specific  │   │ • LLM cost  │                   │
+    │  │ • CSRF      │   │   unauth'd  │   │ • Cost      │   │   controls  │                   │
+    │  │             │   │   access    │   │   controls  │   │             │                   │
+    │  │ ~800 lines  │   │ ~500 lines  │   │ ~400 lines  │   │ ~500 lines  │                   │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │                                                                                           │
+    │  Prereq: None | Priority: CRITICAL | Est: 2-3 weeks | ~2,200 lines                      │
+    │  BLOCKS: Phase 18 (Edit Mode), Phase 15 (Enterprise LLMs need cost controls)             │
+    │  Source: PM Review (ROADMAP_FEEDBACK.md) - "Cannot release DML without Auth"             │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    MIGRATION TOOLKIT (Phase 20) - HIGH PRIORITY                         │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │                   DATABASE MIGRATION TOOLKIT (Phase 20) - HIGH PRIORITY                   │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
+    │  │ 20.1 Schema │   │ 20.2 Migr.  │   │ 20.3 Script │   │ 20.4 Data   │                   │
+    │  │ Diff Engine │──▶│ Planner     │──▶│ Generator   │──▶│ Migration   │                   │
+    │  │             │   │             │   │             │   │ Assistant   │                   │
+    │  │ • Visual    │   │ • Dependency│   │ • up.sql    │   │             │                   │
+    │  │   diff      │   │   ordering  │   │ • down.sql  │   │ • INSERT    │                   │
+    │  │ • Drift     │   │ • Data loss │   │ • verify.sql│   │   SELECT    │                   │
+    │  │   analysis  │   │   detection │   │ • Multi-    │   │ • Batching  │                   │
+    │  │ • DB vs DB  │   │ • Lock      │   │   dialect   │   │ • Validate  │                   │
+    │  │ • DB vs file│   │   awareness │   │             │   │   queries   │                   │
+    │  │             │   │ • LLM intent│   │             │   │             │                   │
+    │  │ ~800 lines  │   │ ~700 lines  │   │ ~600 lines  │   │ ~500 lines  │                   │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │                                                                                           │
+    │  Prereq: Phase 11 (Lineage) + Phase 12 (Intelligence) | Priority: HIGH                  │
+    │  Est: 3-4 weeks | ~2,600 lines                                                          │
+    │  Plan: MIGRATION_TOOLKIT_PROPOSAL.md                                                     │
+    │  Relates: Phase 18 (Edit Mode - DML execution), Security (DDL permissions)               │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    PERFORMANCE GURU (Phase 22) - MEDIUM PRIORITY                        │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    DEEP EXPLAIN ANALYSIS (Phase 22) - MEDIUM PRIORITY                    │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                                     │
+    │  │ 22.1 Explain│   │ 22.2 LLM    │   │ 22.3 Action │                                     │
+    │  │ Analyzer    │──▶│ Interpreter │──▶│ Advisor     │                                     │
+    │  │             │   │             │   │             │                                     │
+    │  │ • EXPLAIN   │   │ • Parse JSON│   │ • Index     │                                     │
+    │  │   ANALYZE   │   │   plans     │   │   suggest   │                                     │
+    │  │ • Multi-    │   │ • Identify  │   │ • Rewrite   │                                     │
+    │  │   dialect   │   │   bottleneck│   │   advice    │                                     │
+    │  │ • Cost model│   │ • Disk spill│   │ • Before/   │                                     │
+    │  │             │   │   detection │   │   after est │                                     │
+    │  │ ~500 lines  │   │ ~400 lines  │   │ ~400 lines  │                                     │
+    │  └─────────────┘   └─────────────┘   └─────────────┘                                     │
+    │                                                                                           │
+    │  Prereq: None (Independent) | Priority: MEDIUM | Est: 2-3 weeks | ~1,300 lines          │
+    │  Source: FEATURE_SUGGESTIONS_BRAINSTORM.md                                               │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    DOCKER CONTAINERIZATION (Phase 23) - HIGH PRIORITY                   │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │              DOCKER / "RUN ANYWHERE" (Phase 23) - HIGH PRIORITY                          │
+    │                                                                                           │
+    │  `docker compose up` → app on localhost:3000 — BYO LLM, files, data sources              │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
+    │  │ Backend     │   │ Frontend    │   │ Compose     │   │ Profiles    │                   │
+    │  │ Dockerfile  │   │ Dockerfile  │   │ Orchestr.   │   │             │                   │
+    │  │             │   │             │   │             │   │ • ollama    │                   │
+    │  │ • Multi-    │   │ • Node build│   │ • backend + │   │   (bundled  │                   │
+    │  │   stage     │   │ • Nginx     │   │   frontend  │   │   w/ GPU)   │                   │
+    │  │ • Alembic   │   │   reverse   │   │ • Volumes:  │   │ • full      │                   │
+    │  │   auto-     │   │   proxy     │   │   data, up- │   │   (Postgres │                   │
+    │  │   migrate   │   │ • SPA route │   │   loads,logs│   │   + Redis)  │                   │
+    │  │ • curl      │   │ • /api proxy│   │ • Healthchk │   │             │                   │
+    │  │   health    │   │ • Asset     │   │             │   │ Combinable: │                   │
+    │  │             │   │   caching   │   │             │   │ --profile   │                   │
+    │  │             │   │             │   │             │   │ ollama full │                   │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │                                                                                           │
+    │  Prereq: None (Independent) | Priority: HIGH | Est: 1 week | ~200 lines config          │
+    │  Plan: DOCKER_CONTAINERIZATION_PLAN.md                                                   │
+    │                                                                                           │
+    │  Run Modes:                                                                              │
+    │  • docker compose up                           → SQLite + BYO LLM (minimal)              │
+    │  • docker compose --profile ollama up           → + bundled Ollama w/ GPU                 │
+    │  • docker compose --profile full up             → + PostgreSQL + Redis                    │
+    │  • docker compose --profile full --profile ollama up → Everything                        │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                              INNOVATION PIPELINE (Future)                                │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
+    │   Synthetic Data     │  │   API-ify            │  │   Auto-Documentation │
+    │   Generator          │  │   (Query→Endpoint)   │  │   Site               │
+    │                      │  │                      │  │                      │
+    │  • Schema-aware      │  │  • One-click API     │  │  • Static site gen   │
+    │  • FK-ordered inserts│  │  • FastAPI route gen  │  │  • AI column descs   │
+    │  • faker integration │  │  • Swagger/OpenAPI   │  │  • Embed ER + lineage│
+    │  • Distribution match│  │  • Parameterized     │  │  • Sample queries    │
+    │                      │  │                      │  │                      │
+    │  Priority: MEDIUM    │  │  Priority: MEDIUM    │  │  Priority: LOW       │
+    │  Source: Brainstorm  │  │  Source: Brainstorm   │  │  Source: Brainstorm  │
+    └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
+
+    ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
+    │   Watchdog Agents    │  │   Business Glossary  │  │   Guru API           │
+    │   (Scheduled Queries)│  │   (Term Definitions) │  │   (External Access)  │
+    │                      │  │                      │  │                      │
+    │  • Cron-style runs   │  │  • Define "Churn",   │  │  • REST/Webhook API  │
+    │  • Anomaly alerting  │  │    "Active User" etc │  │  • Slack bot integr. │
+    │  • Threshold triggers│  │  • Consistent LLM    │  │  • JSON/Markdown     │
+    │  • Shifts from       │  │    definitions       │  │    responses         │
+    │    "Tool" to "Mate"  │  │  • Cross-query reuse │  │  • Dashboard embed   │
+    │                      │  │                      │  │                      │
+    │  Priority: MEDIUM    │  │  Priority: MEDIUM    │  │  Priority: MEDIUM    │
+    │  Source: PM Feedback  │  │  Source: PM Feedback  │  │  Source: PM+Brainstm │
+    └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
+
+    ┌──────────────────────┐  ┌──────────────────────┐
+    │   Webhook Sources    │  │   Metric Trees       │
+    │   (JSON URL→Table)   │  │   (Auto-Breakdown)   │
+    │                      │  │                      │
+    │  • DuckDB http scan  │  │  • Revenue→Region→   │
+    │  • REST endpoint as  │  │    Product drill-down│
+    │    virtual table     │  │  • Auto-decompose    │
+    │  • Refresh on query  │  │    metrics           │
+    │                      │  │                      │
+    │  Priority: LOW       │  │  Priority: MEDIUM    │
+    │  Source: PM Feedback  │  │  Source: PM Feedback  │
+    └──────────────────────┘  └──────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                              INSIGHT QUALITY IMPROVEMENTS                                │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -322,15 +457,15 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                              SECURITY & INFRASTRUCTURE                                   │
-    │                                  (Lower Priority)                                        │
+    │                    SECURITY & INFRASTRUCTURE - PROMOTED TO CRITICAL                      │
+    │               (Per PM Review: Required before Phase 18 Edit Mode & Phase 15)             │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
     │   Authorization      │  │   Session Expiration │  │   Rate Limiting      │
     │   System             │  │   (TTL, cleanup)     │  │   (Per-user)         │
-    │   CRITICAL but       │  │   Est: 2 days        │  │   Est: 2-3 days      │
-    │   user deferred      │  │   MEDIUM priority    │  │   LOW priority       │
+    │   🔴 CRITICAL        │  │   Est: 2 days        │  │   Est: 2-3 days      │
+    │   Blocks Phase 18+15 │  │   MEDIUM priority    │  │   HIGH priority      │
     └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
 ```
 
@@ -367,25 +502,32 @@
     └─────────────────────────────────────────────────────────────────┘
 
 
+    COMPLETED:
+    =========
+
+    ┌───────────────────────────────────────────────────────────────────┐
+    │        CSV & EXCEL FILE SUPPORT (Phase 13) ✅ COMPLETE            │
+    │  • 50+ tests passing | Plan: CSV_EXCEL_SUPPORT_PLAN.md           │
+    └───────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────┐
+    │        LLM USAGE MONITORING (Phase 16) ✅ COMPLETE                │
+    │  • 9 API endpoints, full dashboard | Plan: LLM_USAGE_MONITORING  │
+    └───────────────────────────────────────────────────────────────────┘
+
+
     INDEPENDENT FEATURES (Can Start Anytime):
     =========================================
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │        CSV & EXCEL FILE SUPPORT (Phase 13) ◀── HIGH PRIORITY      │
+    │   SECURITY & AUTH FOUNDATION (Phase 21) ◀── CRITICAL             │
     │                                                                   │
-    │  • Upload CSV/Excel as data sources                               │
-    │  • Query files alongside databases                                │
-    │  • Cross-source JOINs (file + DB)                                 │
-    │  • Est: 3-4 weeks | Plan: CSV_EXCEL_SUPPORT_PLAN.md               │
-    └───────────────────────────────────────────────────────────────────┘
-
-    ┌───────────────────────────────────────────────────────────────────┐
-    │        NOSQL DATABASE EXPANSION (Phase 14) ◀── MEDIUM PRIORITY    │
+    │  BLOCKS: Phase 18 (Edit Mode) + Phase 15 (Enterprise LLMs)       │
     │                                                                   │
-    │  • MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch             │
-    │  • Schema inference for schema-less databases                     │
-    │  • Natural language to native query languages                     │
-    │  • Est: 6-8 weeks | Plan: NOSQL_EXPANSION_PLAN.md                 │
+    │  • JWT authentication + session ownership                         │
+    │  • Per-user rate limiting + cost controls                         │
+    │  • Audit logging (merges Phase 18 audit needs)                    │
+    │  • Est: 2-3 weeks | ~2,200 lines                                 │
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
@@ -395,15 +537,24 @@
     │  • Local alternatives: LM Studio, vLLM                            │
     │  • Multi-provider routing with automatic fallback                 │
     │  • Est: 3-4 weeks | Plan: LLM_PROVIDER_EXPANSION_PLAN.md          │
+    │  • NOTE: Ideally after Phase 21 (Auth) for cost controls          │
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │        LLM USAGE MONITORING (Phase 16) ◀── MEDIUM PRIORITY        │
+    │        PERFORMANCE GURU (Phase 22) ◀── MEDIUM PRIORITY            │
     │                                                                   │
-    │  • Track token usage across all 23+ agents                        │
-    │  • Dashboard with charts and per-agent analytics                  │
-    │  • Inline chat usage display per message/session                  │
-    │  • Est: 2 weeks | Plan: LLM_USAGE_MONITORING_PLAN.md              │
+    │  • EXPLAIN ANALYZE interpretation via LLM                         │
+    │  • Actionable index/rewrite suggestions                           │
+    │  • Multi-dialect support (PG, MySQL, SQLite)                      │
+    │  • Est: 2-3 weeks | ~1,300 lines                                  │
+    └───────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────┐
+    │        NOSQL DATABASE EXPANSION (Phase 14) ◀── LOW (Deprioritized)│
+    │                                                                   │
+    │  • MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch             │
+    │  • SQL + Files covers ~90% of analytic use cases                  │
+    │  • Est: 6-8 weeks | Plan: NOSQL_EXPANSION_PLAN.md                 │
     └───────────────────────────────────────────────────────────────────┘
 
 
@@ -411,9 +562,20 @@
     ============================================
 
     ┌───────────────────────────────────────────────────────────────────┐
+    │   EDIT MODE & DML (Phase 18) ◀── HIGH PRIORITY                    │
+    │                                                                   │
+    │   REQUIRES: Phase 21 (Security & Auth)                            │
+    │                                                                   │
+    │  • Inline editing, INSERT/UPDATE/DELETE, NL DML                   │
+    │  • Simulation Mode: dry-run in transaction, show diff, rollback   │
+    │  • Undo Button: time-travel rollback for Guru actions             │
+    │  • Est: 4-5 weeks | Plan: EDIT_MODE_DML_PLAN.md                   │
+    └───────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────┐
     │   MULTI-PROVIDER MONITORING (Phase 17) ◀── MEDIUM PRIORITY        │
     │                                                                   │
-    │   REQUIRES: Phase 15 (Providers) + Phase 16 (Monitoring)          │
+    │   REQUIRES: Phase 15 (Providers) + Phase 16 ✅ (Monitoring)       │
     │                                                                   │
     │  • Native token counts from OpenAI, Anthropic, Google, etc.       │
     │  • Accurate cost tracking per provider/model                      │
@@ -421,8 +583,20 @@
     │  • Est: 1-2 weeks | Plan: MULTI_PROVIDER_MONITORING_INTEGRATION.md│
     └───────────────────────────────────────────────────────────────────┘
 
+    ┌───────────────────────────────────────────────────────────────────┐
+    │   MIGRATION TOOLKIT (Phase 20) ◀── HIGH PRIORITY                  │
+    │                                                                   │
+    │   REQUIRES: Phase 11 ✅ (Lineage) + Phase 12 ✅ (Intelligence)    │
+    │                                                                   │
+    │  • Schema Diff (visual DB-to-DB comparison)                       │
+    │  • Migration Planner (dependency-aware, data-loss detection)      │
+    │  • Script Generator (up.sql / down.sql / verify.sql)              │
+    │  • Data Migration Assistant (batching, validation)                │
+    │  • Est: 3-4 weeks | Plan: MIGRATION_TOOLKIT_PROPOSAL.md           │
+    └───────────────────────────────────────────────────────────────────┘
+
             ┌─────────────────┐          ┌─────────────────┐
-            │   Phase 15      │          │   Phase 16      │
+            │   Phase 15      │          │   Phase 16 ✅   │
             │   Provider      │          │   Usage         │
             │   Expansion     │          │   Monitoring    │
             └────────┬────────┘          └────────┬────────┘
@@ -435,6 +609,33 @@
                      │   Multi-Provider    │
                      │     Monitoring      │
                      └─────────────────────┘
+
+            ┌─────────────────┐
+            │   Phase 21      │
+            │   Security &    │
+            │   Auth (CRIT)   │
+            └────────┬────────┘
+                     │
+              ┌──────┴──────┐
+              ▼             ▼
+    ┌─────────────┐  ┌─────────────┐
+    │  Phase 18   │  │  Phase 15   │
+    │  Edit Mode  │  │  LLM Provs  │
+    │  & DML      │  │  (cost ctrl)│
+    └─────────────┘  └─────────────┘
+
+    ┌─────────────────┐   ┌─────────────────┐
+    │ Phase 11 ✅     │   │ Phase 12 ✅     │
+    │ Lineage         │   │ Intelligence    │
+    └────────┬────────┘   └────────┬────────┘
+             │                     │
+             └──────────┬──────────┘
+                        ▼
+              ┌─────────────────┐
+              │   Phase 20      │
+              │   Migration     │
+              │   Toolkit       │
+              └─────────────────┘
 
 
     OTHER INDEPENDENT FEATURES:
@@ -449,109 +650,115 @@
     └───────────────────┘  │  Preprocessing    │  │  (Phase 2.6)      │
                            │  (Phase 2.3)      │  └───────────────────┘
                            └───────────────────┘
+
+
+    INNOVATION PIPELINE (Ideas for Evaluation):
+    ============================================
+
+    ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐
+    │  Synthetic Data   │  │  API-ify          │  │  Auto-Docs Site   │
+    │  Generator        │  │  (Query→Endpoint) │  │  (MkDocs/Docusaur)│
+    └───────────────────┘  └───────────────────┘  └───────────────────┘
+
+    ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐
+    │  Watchdog Agents  │  │  Business Glossary│  │  Guru API         │
+    │  (Scheduled Runs) │  │  (Term Defs)      │  │  (Slack/Ext API)  │
+    └───────────────────┘  └───────────────────┘  └───────────────────┘
+
+    ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐
+    │  Webhook Sources  │  │  Metric Trees     │  │  Shared Workspaces│
+    │  (JSON URL→Table) │  │  (Auto-Breakdown) │  │  (Read-only share)│
+    └───────────────────┘  └───────────────────┘  └───────────────────┘
 ```
 
 ---
 
-## Recommended Next Steps
+## Recommended Next Steps (Updated Feb 14, 2026)
 
-### Priority 1: Lineage Intelligence Phase 12 ✅ COMPLETE
-**Status**: All 5 sub-phases implemented (151 tests passing, ~11,266 lines)
-- **12.1 Lineage Narrator** ✅: Natural language explanations of data lineage graphs
-- **12.2 Impact Advisor** ✅: Migration plans, SQL patches, risk explanations
-- **12.3 Schema Health Analyzer** ✅: Database design quality scoring with index suggestions
-- **12.4 Pattern Intelligence** ✅: Query anti-pattern detection and optimization suggestions
-- **12.5 Lineage Conversation Agent** ✅: Multi-turn Q&A about schema/lineage
-- New shared utility: `src/lineage/llm_utils.py` for JSON extraction
-- See: [LINEAGE_INTELLIGENCE_USER_GUIDE.md](../guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md)
+> **Strategic Direction** (per PM Review): Focus on "depth and safety" before "width expansion".
+> Stabilize the foundation (Security/Auth) to support powerful features (Edit Mode, Enterprise LLMs).
 
-### Priority 2: Table Sorting ✅ COMPLETE
-**Status**: Implemented with reusable hook and accessible component
-- Click column header to sort (asc/desc toggle)
-- Smart type detection (numbers, dates, strings)
-- Keyboard accessible (Enter/Space to sort)
-- Visual indicators with Lucide icons
-- Integrated into QueryResults, MultiDatabaseResults, StreamingQueryResults
+### Priority 1: Security & Auth Foundation (Phase 21) - CRITICAL
+**Why**: Prerequisite for Edit Mode (DML) and Enterprise LLM cost controls. Cannot release DELETE/UPDATE without Auth.
+- **21.1 User Auth (JWT)**: Login/register, middleware, CSRF protection
+- **21.2 Session Ownership**: `user_id` on all resources, 403 on unauthorized access
+- **21.3 Rate Limiting**: Per-user limits, endpoint-specific, cost controls
+- **21.4 Audit Logging**: Action trail, DML audit (merged from Phase 18), LLM cost controls
+- Est: 2-3 weeks | ~2,200 lines
+- **Blocks**: Phase 18 (Edit Mode), Phase 15 (Enterprise LLMs need cost controls)
 
-### Priority 4: CSV & Excel File Support (Phase 13) - NEW
-**Why**: Major capability expansion - users can analyze spreadsheets alongside databases
-- **13.1 Core Backend**: File upload, storage, schema inference
-- **13.2 DuckDB Integration**: Virtual tables, CSV/Excel parsing, query execution
-- **13.3 Cross-Source Queries**: Database + File JOINs, result merging
-- **13.4 Frontend UI**: Upload modal, unified data sources panel, file preview
-- See: [CSV_EXCEL_SUPPORT_PLAN.md](CSV_EXCEL_SUPPORT_PLAN.md) for full implementation details
-
-**Key Use Cases**:
-- Upload sales.csv and query it with natural language
-- JOIN uploaded prospects.xlsx with production CRM database
-- Combine multiple spreadsheets into a single analysis
-
-**Technical Approach**: Leverages existing DuckDB integration for file queries
-
-### Priority 5: NoSQL Database Expansion (Phase 14) - NEW
-**Why**: Extend natural language querying to document, key-value, wide-column, and search databases
-- **14.1 MongoDB**: MQL generation, aggregation pipelines, schema inference
-- **14.2 Redis**: Command generation for all data types, RediSearch
-- **14.3 Cassandra**: CQL generation with partition-key awareness
-- **14.4 DynamoDB**: PartiQL and boto3 API, GSI optimization
-- **14.5 Elasticsearch**: Query DSL with aggregations and highlighting
-- See: [NOSQL_EXPANSION_PLAN.md](NOSQL_EXPANSION_PLAN.md) for full implementation details
-
-**Key Use Cases**:
-- Natural language queries for MongoDB collections
-- Unified interface across all NoSQL database types
-- Schema inference for schema-less databases
-
-**Technical Approach**: Database-specific query generators with unified interface
-
-### Priority 6: LLM Provider Expansion (Phase 15) - NEW
+### Priority 2: LLM Provider Expansion (Phase 15) - HIGH
 **Why**: Enterprise integration and model flexibility - users can leverage cloud LLMs
 - **15.1 Provider Abstraction**: Unified interface, registry, refactor Ollama
 - **15.2 Azure OpenAI**: Enterprise-first cloud provider with deployment support
 - **15.3-15.6 Additional Providers**: OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM
 - **15.7-15.9 Enhanced Routing**: Multi-provider routing, fallback chains, frontend config UI
-- See: [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) for full implementation details
+- See: [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md)
+- Unlocks Phase 17 (Multi-Provider Monitoring) since Phase 16 is now complete
 
-**Key Use Cases**:
-- Connect to existing Azure OpenAI infrastructure
-- Use GPT-4 or Claude for complex queries, Ollama for simple ones
-- Automatic fallback when primary provider is unavailable
-- Cost optimization by routing cheaper tasks to cheaper providers
+### Priority 3: Migration Toolkit (Phase 20) - HIGH
+**Why**: Moves Database Guru from "Read-Only" analysis to "DevOps Companion" for database engineering
+- **20.1 Schema Diff**: Visual comparison between databases or schema files, drift analysis
+- **20.2 Migration Planner**: AI-agent that plans safe steps (dependency ordering, data-loss detection, lock awareness)
+- **20.3 Script Generator**: Auto-generate `up.sql`, `down.sql`, `verify.sql` (multi-dialect)
+- **20.4 Data Migration Assistant**: INSERT INTO SELECT, batching, validation queries
+- See: [MIGRATION_TOOLKIT_PROPOSAL.md](MIGRATION_TOOLKIT_PROPOSAL.md)
+- Dependencies met: Phase 11 ✅ + Phase 12 ✅
 
-**Technical Approach**: Abstract provider interface with pluggable implementations
+### Priority 4: Edit Mode & DML (Phase 18) - HIGH (blocked by Phase 21)
+**Why**: High user value - inline editing, natural language DML
+- Inline cell editing, add/delete rows, generate & preview scripts
+- **Simulation Mode** (PM idea): Dry-run in transaction, show diff, rollback before commit
+- **Undo Button** (PM idea): Time-travel rollback for actions taken by Guru
+- Transaction support, natural language DML, audit trail
+- See: [EDIT_MODE_DML_PLAN.md](EDIT_MODE_DML_PLAN.md)
 
-### Priority 7: LLM Usage Monitoring (Phase 16) - NEW
-**Why**: Visibility into LLM resource consumption across all agents
-- **16.1 Core Infrastructure**: LLMUsage table, tracker service, API endpoints
-- **16.2 Agent Integration**: Update SQL Generator, Result Narrator, Query Planning, Lineage agents
-- **16.3 Dashboard Frontend**: Stats cards, time series charts, agent breakdown, recent calls table
-- **16.4 Inline Chat Stats**: Per-message token display, session totals, collapsible detail view
-- See: [LLM_USAGE_MONITORING_PLAN.md](LLM_USAGE_MONITORING_PLAN.md) for full implementation details
+### Priority 5: Performance Guru (Phase 22) - MEDIUM
+**Why**: Reading raw EXPLAIN plans is hard; LLM is perfect for this translation layer
+- Run `EXPLAIN ANALYZE` for slow queries, parse JSON execution plans
+- LLM interprets: seq scans, disk spills, join costs
+- Actionable advice: "Create INDEX ON users(email) to change Seq Scan to Index Scan"
+- Multi-dialect support (PostgreSQL, MySQL, SQLite)
+- Source: [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md)
 
-**Key Use Cases**:
-- Track which agents consume the most tokens
-- View usage per chat session
-- Dashboard showing usage trends over time
-- Debug and optimize LLM calls
-
-**Technical Approach**: Centralized tracker service with database persistence
-
-### Priority 8: Multi-Provider Monitoring Integration (Phase 17) - NEW
+### Priority 6: Multi-Provider Monitoring (Phase 17) - MEDIUM
 **Why**: Extend monitoring to all LLM providers with accurate cost tracking
-- **Prerequisite**: Requires BOTH Phase 15 (Provider Expansion) AND Phase 16 (Usage Monitoring)
-- **17.1 Token Extractors**: Provider-specific token extraction (OpenAI, Anthropic, Google formats)
-- **17.2 Provider Updates**: Enrich responses with native token counts and costs
-- **17.3 API & Schema**: Add provider column, cost endpoints, comparison APIs
-- **17.4 Dashboard Widgets**: Cost by provider chart, provider comparison table, cost trends
-- See: [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md) for full details
+- **Prerequisite**: Phase 15 (Providers) + Phase 16 ✅ (Monitoring)
+- Native token extraction from OpenAI, Anthropic, Google formats
+- Accurate cost tracking per provider/model, comparison dashboard
+- See: [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md)
 
-**Key Use Cases**:
-- Compare costs across providers (OpenAI vs Anthropic vs Ollama)
-- Track actual spend with real provider pricing
-- Optimize routing based on cost/performance data
-- Provider performance comparison by task type
+### Priority 7: Data Insights Enhancement (Phase 19) - MEDIUM
+**Why**: Multi-source insights, analytics caching, parallel analysis
+- Small model optimization, analytics caching, multi-source insights
+- **Metric Trees** (PM idea): Auto-decompose metrics (Revenue -> Region -> Product)
+- **Business Glossary** (PM idea): Define "Churn", "Active User" for consistent LLM definitions
+- See: [DATA_INSIGHTS_ENHANCEMENT_PLAN.md](DATA_INSIGHTS_ENHANCEMENT_PLAN.md)
 
-**Technical Approach**: Provider-specific token extractors feeding unified monitoring system
+### Innovation Pipeline (Future evaluation)
+Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md) and [ROADMAP_FEEDBACK.md](ROADMAP_FEEDBACK.md):
+
+| Idea | Source | Description |
+|------|--------|-------------|
+| **Synthetic Data Generator** | Brainstorm | Schema-aware test data generation with faker |
+| **API-ify (Query→Endpoint)** | Brainstorm | One-click deploy query results as a REST API |
+| **Auto-Documentation Site** | Brainstorm | Generate MkDocs/Docusaurus site from schema + lineage |
+| **Watchdog Agents** | PM Feedback | Scheduled queries with anomaly alerting ("Tool→Teammate") |
+| **Business Glossary** | PM Feedback | Consistent term definitions across all LLM queries |
+| **Guru API** | PM+Brainstorm | Expose agent as REST API for Slack bots, dashboards |
+| **Webhook Sources** | PM Feedback | Query JSON URLs as virtual tables (DuckDB http scan) |
+| **Metric Trees** | PM Feedback | Auto-decompose metrics into breakdown dimensions |
+| **Shared Workspaces** | PM Feedback | Read-only session sharing with URL |
+
+### Completed Phases (for reference)
+- **Phase 12** ✅: Lineage Intelligence (5 agents, 151 tests, ~11,266 lines)
+- **Phase 13** ✅: CSV & Excel File Support (50+ tests)
+- **Phase 16** ✅: LLM Usage Monitoring (9 endpoints, full dashboard)
+- **Table Sorting** ✅: Click-to-sort with smart type detection
+- Plus 10+ earlier phases (see Quick Reference below)
+
+### Deprioritized
+- **NoSQL Expansion (Phase 14)**: Moved to LOW. SQL + Files covers ~90% of analytic use cases per PM review.
 
 ---
 
@@ -561,16 +768,21 @@
 |----------|----------|--------|--------------|
 | **Visualization** | ER Diagrams, Data Lineage | Phase 7 ✅, Phase 11 ✅ | COMPLETE |
 | **LLM Intelligence** | Lineage Narrator, Impact Advisor, Schema Health, Pattern Intel, Lineage Chat | **Phase 12 ✅ COMPLETE** | ~11,266 lines |
-| **Data Sources** | CSV & Excel File Support | **Phase 13 - PLANNED** | ~2,500 lines |
-| **NoSQL Expansion** | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch | **Phase 14 - PLANNED** | ~6,000 lines |
-| **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 15 - PLANNED** | ~3,000 lines |
-| **LLM Monitoring** | Token usage tracking, dashboard, inline stats (Ollama) | **Phase 16 - PLANNED** | ~1,500 lines |
-| **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 17 - PLANNED** (needs 15+16) | ~1,200 lines |
-| **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, natural language DML | **Phase 18 - PLANNED** | ~4,000 lines |
-| **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
+| **Data Sources** | CSV & Excel File Support | **Phase 13 ✅ COMPLETE** | ~2,500 lines |
+| **LLM Monitoring** | Token usage tracking, dashboard, inline stats | **Phase 16 ✅ COMPLETE** | ~1,500 lines |
+| **Security & Auth** | JWT auth, session ownership, rate limiting, audit logging | **Phase 21 - CRITICAL** | ~2,200 lines |
+| **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 15 - HIGH** | ~3,000 lines |
+| **Migration Toolkit** | Schema diff, migration planner, script gen, data migration | **Phase 20 - HIGH** (deps met) | ~2,600 lines |
+| **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, simulation mode, undo | **Phase 18 - HIGH** (needs 21) | ~4,000 lines |
+| **Performance Guru** | EXPLAIN analysis, LLM interpretation, index suggestions | **Phase 22 - MEDIUM** | ~1,300 lines |
+| **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 17 - MEDIUM** (needs 15+16✅) | ~1,200 lines |
+| **Data Insights** | Multi-source insights, metric trees, business glossary | **Phase 19 - MEDIUM** | ~1,800 lines |
+| **NoSQL Expansion** | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch | **Phase 14 - LOW** (deprioritized) | ~6,000 lines |
 | **Table UX** | Sorting ✅, Resizing, Export | Sorting complete | ~400 lines remaining |
+| **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
-| **Security** | Auth, Rate Limiting | Deferred | ~2,000 lines |
+| **Docker Containerization** | Docker Compose, Nginx proxy, BYO LLM, profiles (ollama/full) | **Phase 23 - HIGH** | ~200 lines config |
+| **Innovation Pipeline** | Synthetic Data, API-ify, Auto-Docs, Watchdog, Guru API, etc. | Ideas stage | TBD |
 
 ---
 
@@ -594,9 +806,11 @@
 | ER Diagrams (Phase 7) | Schema visualization | React Flow + Dagre |
 | Data Lineage (Phase 11) | Column-level lineage, impact analysis, query patterns | 185 tests (116 BE + 69 FE) |
 | Lineage Intelligence (Phase 12) | LLM-powered lineage explanations, schema health, impact advisor | 151 tests |
+| CSV & Excel Files (Phase 13) | File upload, DuckDB queries, cross-source JOINs | 50+ tests |
+| LLM Usage Monitoring (Phase 16) | Token/cost tracking, dashboard, per-session stats | 9 API endpoints |
 | Table Sorting | Click-to-sort columns, smart type detection | 24 tests |
 
-**Total Tests**: 950+ passing
+**Total Tests**: 1000+ passing
 
 ---
 
@@ -604,13 +818,15 @@
 
 | Phase | Feature | Dependencies | Est. Effort | Priority |
 |-------|---------|--------------|-------------|----------|
-| **Phase 13** | CSV & Excel File Support | None | ~2,500 lines | HIGH |
-| **Phase 14** | NoSQL Database Expansion | None | ~6,000 lines | MEDIUM |
-| **Phase 15** | LLM Provider Expansion | None | ~3,000 lines | HIGH |
-| **Phase 16** | LLM Usage Monitoring | None | ~1,500 lines | MEDIUM |
-| **Phase 17** | Multi-Provider Monitoring | Phase 15 + 16 | ~1,200 lines | MEDIUM |
-| **Phase 18** | Edit Mode & DML Operations | None | ~4,000 lines | MEDIUM |
+| **Phase 21** | Security & Auth Foundation | None | ~2,200 lines | **CRITICAL** |
+| **Phase 15** | LLM Provider Expansion | Ideally after 21 | ~3,000 lines | HIGH |
+| **Phase 20** | Migration Toolkit | Phase 11✅ + 12✅ | ~2,600 lines | HIGH |
+| **Phase 18** | Edit Mode & DML Operations | Phase 21 | ~4,000 lines | HIGH |
+| **Phase 22** | Performance Guru (EXPLAIN) | None | ~1,300 lines | MEDIUM |
+| **Phase 17** | Multi-Provider Monitoring | Phase 15 + 16✅ | ~1,200 lines | MEDIUM |
 | **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | MEDIUM |
+| **Phase 23** | Docker Containerization | None | ~200 lines config | HIGH |
+| **Phase 14** | NoSQL Database Expansion | None | ~6,000 lines | LOW |
 
 ---
 
@@ -621,14 +837,25 @@
 - [SMALL_MODEL_OPTIMIZATION_PHASE2.md](SMALL_MODEL_OPTIMIZATION_PHASE2.md) - LLM optimization features
 - [DATA_LINGEAGE_PLAN.md](DATA_LINGEAGE_PLAN.md) - Data Lineage & Impact Analysis plan (Phase 11)
 - [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) - LLM-Powered Lineage Intelligence (Phase 12)
-- [CSV_EXCEL_SUPPORT_PLAN.md](CSV_EXCEL_SUPPORT_PLAN.md) - CSV & Excel File Support (Phase 13)
+- [CSV_EXCEL_SUPPORT_PLAN.md](CSV_EXCEL_SUPPORT_PLAN.md) - CSV & Excel File Support (Phase 13) ✅
 - [NOSQL_EXPANSION_PLAN.md](NOSQL_EXPANSION_PLAN.md) - NoSQL Database Expansion (Phase 14)
 - [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) - LLM Provider Expansion (Phase 15)
-- [LLM_USAGE_MONITORING_PLAN.md](LLM_USAGE_MONITORING_PLAN.md) - LLM Usage Monitoring (Phase 16)
+- [LLM_USAGE_MONITORING_PLAN.md](LLM_USAGE_MONITORING_PLAN.md) - LLM Usage Monitoring (Phase 16) ✅
 - [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md) - Multi-Provider Monitoring (Phase 17)
 - [EDIT_MODE_DML_PLAN.md](EDIT_MODE_DML_PLAN.md) - Edit Mode & DML Operations (Phase 18)
 - [DATA_INSIGHTS_ENHANCEMENT_PLAN.md](DATA_INSIGHTS_ENHANCEMENT_PLAN.md) - Data Insights Enhancement (Phase 19)
+- [MIGRATION_TOOLKIT_PROPOSAL.md](MIGRATION_TOOLKIT_PROPOSAL.md) - Database Migration Toolkit (Phase 20)
+- [DOCKER_CONTAINERIZATION_PLAN.md](DOCKER_CONTAINERIZATION_PLAN.md) - Docker Containerization (Phase 23)
+- [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md) - Innovation pipeline ideas
+- [ROADMAP_FEEDBACK.md](ROADMAP_FEEDBACK.md) - PM review & strategic recommendations
 
 ---
 
-**Updated**: February 1, 2026 (Added Phase 19: Data Insights Enhancement for multi-source insights and charts)
+**Updated**: February 14, 2026
+- Added Phase 20 (Migration Toolkit), Phase 21 (Security & Auth), Phase 22 (Performance Guru)
+- Added Innovation Pipeline section (9 ideas from brainstorm + PM feedback)
+- Promoted Security to CRITICAL (per PM review - prerequisite for Phase 18 + 15)
+- Deprioritized NoSQL (Phase 14) from MEDIUM to LOW
+- Updated Phase 13 and Phase 16 to COMPLETE
+- Added dependency: Phase 18 now blocked by Phase 21 (Auth)
+- Incorporated PM feedback: Simulation Mode, Undo Button, Metric Trees, Business Glossary, Watchdog Agents
