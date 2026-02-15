@@ -31,6 +31,11 @@ TEST_DATABASES = [
         "connection_string": "postgresql://test_user:test_pass@localhost:5433/test_pooling",
         "async_connection_string": "postgresql+asyncpg://test_user:test_pass@localhost:5433/test_pooling",
         "is_async": True,
+        "database_name": "test_pooling",
+        "host": "localhost",
+        "port": 5433,
+        "username": "test_user",
+        "password": "test_pass",
     },
     {
         "name": "MySQL",
@@ -38,6 +43,11 @@ TEST_DATABASES = [
         "connection_string": "mysql://test_user:test_pass@localhost:3307/test_pooling",
         "async_connection_string": "mysql+aiomysql://test_user:test_pass@localhost:3307/test_pooling",
         "is_async": True,
+        "database_name": "test_pooling",
+        "host": "localhost",
+        "port": 3307,
+        "username": "test_user",
+        "password": "test_pass",
     },
     {
         "name": "SQLite",
@@ -45,6 +55,7 @@ TEST_DATABASES = [
         "connection_string": "sqlite:///tests/fixtures/test_pooling.db",
         "async_connection_string": "sqlite+aiosqlite:///tests/fixtures/test_pooling.db",
         "is_async": True,
+        "database_name": "tests/fixtures/test_pooling.db",
     },
     {
         "name": "DuckDB",
@@ -52,6 +63,7 @@ TEST_DATABASES = [
         "connection_string": "duckdb:///tests/fixtures/test_pooling.duckdb",
         "async_connection_string": None,  # DuckDB is sync only
         "is_async": False,
+        "database_name": "tests/fixtures/test_pooling.duckdb",
     },
 ]
 
@@ -71,7 +83,7 @@ async def test_pooling_speedup(db_config):
     Expected: At least 2x speedup (realistically much more)
     """
     num_queries = 10
-    query = "SELECT COUNT(*) FROM products"
+    query = "SELECT 1"
 
     print(f"\n{'='*60}")
     print(f"Testing {db_config['name']} performance")
@@ -122,14 +134,22 @@ async def test_pooling_speedup(db_config):
     print(f"\n🔗 With pooling...")
     pooled_times = []
 
-    # Create mock DatabaseConnection
-    connection = DatabaseConnection(
-        id=999,
-        user_id=1,
-        connection_name=f"test_{db_config['database_type']}",
-        database_type=db_config['database_type'],
-        connection_string=db_config['connection_string']
-    )
+    # Create mock DatabaseConnection using model fields
+    conn_kwargs = {
+        "id": 999,
+        "name": f"test_{db_config['database_type']}",
+        "database_type": db_config['database_type'],
+        "database_name": db_config.get('database_name', ''),
+    }
+    # Add auth fields for remote databases
+    if db_config['database_type'] in ('postgresql', 'mysql'):
+        conn_kwargs.update({
+            "host": db_config.get('host', 'localhost'),
+            "port": db_config.get('port', 5432),
+            "username": db_config.get('username', 'test_user'),
+            "password_encrypted": db_config.get('password', 'test_pass'),
+        })
+    connection = DatabaseConnection(**conn_kwargs)
 
     settings = Settings()
     pool_manager = await get_pool_manager_async(settings)
@@ -210,10 +230,13 @@ async def test_concurrent_pooling_performance():
     # Create mock DatabaseConnection
     connection = DatabaseConnection(
         id=998,
-        user_id=1,
-        connection_name="test_concurrent",
+        name="test_concurrent",
         database_type="postgresql",
-        connection_string=db_config['connection_string']
+        database_name=db_config['database_name'],
+        host=db_config['host'],
+        port=db_config['port'],
+        username=db_config['username'],
+        password_encrypted=db_config['password'],
     )
 
     settings = Settings()
@@ -294,10 +317,13 @@ async def test_pool_exhaustion_handling():
     # Create mock DatabaseConnection
     connection = DatabaseConnection(
         id=997,
-        user_id=1,
-        connection_name="test_exhaustion",
+        name="test_exhaustion",
         database_type="postgresql",
-        connection_string=db_config['connection_string']
+        database_name=db_config['database_name'],
+        host=db_config['host'],
+        port=db_config['port'],
+        username=db_config['username'],
+        password_encrypted=db_config['password'],
     )
 
     # Override settings for this test

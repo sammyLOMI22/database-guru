@@ -132,6 +132,7 @@ curl http://localhost:3000/health
 # Shell into backend
 docker compose exec backend bash
 
+
 # Run Alembic migration manually
 docker compose exec backend alembic upgrade head
 

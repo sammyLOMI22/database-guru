@@ -327,23 +327,44 @@ class TestMappingCacheIntegration:
         # 4. Verify cache is hit on subsequent calls
         pass
 
-    def test_cache_logging(self, caplog):
+    def test_cache_logging(self):
         """Test that cache operations are logged appropriately"""
         import logging
-        caplog.set_level(logging.DEBUG)
+
+        target_logger = logging.getLogger("src.llm.mapping_cache")
+        old_level = target_logger.level
+        old_disabled = target_logger.disabled
+        target_logger.disabled = False
+        target_logger.setLevel(logging.DEBUG)
+
+        # Use a dedicated handler to capture log records reliably
+        records = []
+
+        class CaptureHandler(logging.Handler):
+            def emit(self, record):
+                records.append(record)
+
+        handler = CaptureHandler()
+        handler.setLevel(logging.DEBUG)
+        target_logger.addHandler(handler)
 
         cache = MappingCache()
 
-        cache.set("test_key", "test_value")
-        cache.get("test_key")  # Hit
-        cache.get("missing_key")  # Miss
-        cache.invalidate_pattern("test_*")
+        try:
+            cache.set("test_key", "test_value")
+            cache.get("test_key")  # Hit
+            cache.get("missing_key")  # Miss
+            cache.invalidate_pattern("test_*")
 
-        # Check that appropriate log messages were created
-        assert any("Cache HIT" in record.message for record in caplog.records)
-        assert any("Cache MISS" in record.message for record in caplog.records)
-        assert any("Cache SET" in record.message for record in caplog.records)
-        assert any("INVALIDATE PATTERN" in record.message for record in caplog.records)
+            messages = [r.getMessage() for r in records]
+            assert any("Cache HIT" in m for m in messages), f"Expected 'Cache HIT' in {messages}"
+            assert any("Cache MISS" in m for m in messages), f"Expected 'Cache MISS' in {messages}"
+            assert any("Cache SET" in m for m in messages), f"Expected 'Cache SET' in {messages}"
+            assert any("INVALIDATE PATTERN" in m for m in messages), f"Expected 'INVALIDATE PATTERN' in {messages}"
+        finally:
+            target_logger.removeHandler(handler)
+            target_logger.setLevel(old_level)
+            target_logger.disabled = old_disabled
 
 
 if __name__ == "__main__":
