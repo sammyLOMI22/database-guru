@@ -9,6 +9,7 @@ import { ToolsPanel } from './components/ToolsPanel';
 import { SemanticCachePanel } from './components/SemanticCachePanel';
 import { ConnectionPoolMetrics } from './components/ConnectionPoolMetrics';
 import { LineagePanel } from './components/lineage/LineagePanel';
+import { LLMUsageDashboard } from './components/dashboard/LLMUsageDashboard';
 import SchemaPanel from './components/SchemaPanel';
 import { healthAPI } from './services/api';
 import { useDarkMode } from './hooks/useDarkMode';
@@ -26,7 +27,7 @@ function App() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [isHealthy, setIsHealthy] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'settings'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'settings'>('chat');
 
   // Cross-component lineage navigation state
   const [lineageNav, setLineageNav] = useState<{ sql?: string; tab?: 'explore' | 'history' | 'impact'; impactTable?: string } | null>(null);
@@ -117,6 +118,13 @@ function App() {
             {/* Pools */}
             <div className={`flex-1 overflow-auto p-6 pb-32 ${activeTab === 'pools' ? '' : 'hidden'}`}>
               <ConnectionPoolMetrics />
+            </div>
+
+            {/* LLM Usage */}
+            <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'usage' ? '' : 'hidden'}`}>
+              <div className="flex-1 overflow-auto">
+                <LLMUsageDashboard />
+              </div>
             </div>
 
             {/* Settings */}

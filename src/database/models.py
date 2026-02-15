@@ -1,9 +1,123 @@
 """Database models for Database Guru"""
 from datetime import datetime, timezone
 import uuid
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey, Index, Date, UniqueConstraint
 from sqlalchemy.orm import relationship
 from src.database.connection import Base
+
+
+class LLMUsage(Base):
+    """Track individual LLM API calls across all agents."""
+    __tablename__ = "llm_usage"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Linking
+    query_history_id = Column(Integer, ForeignKey("query_history.id", ondelete="SET NULL"), nullable=True)
+    chat_session_id = Column(String(36), ForeignKey("chat_sessions.id", ondelete="SET NULL"), nullable=True, index=True)
+    chat_message_id = Column(Integer, ForeignKey("chat_messages.id", ondelete="SET NULL"), nullable=True)
+
+    # Agent & Model Info
+    agent_type = Column(String(50), nullable=False, index=True)
+    agent_name = Column(String(100))
+    provider = Column(String(50), default="ollama", index=True)
+    model_name = Column(String(100), nullable=False, index=True)
+    llm_method = Column(String(20), nullable=False)  # 'generate', 'chat', 'embeddings'
+
+    # Token Counts
+    input_tokens = Column(Integer, nullable=False, default=0)
+    output_tokens = Column(Integer, nullable=False, default=0)
+    token_estimation_method = Column(String(20), default='estimated')
+
+    # Timing
+    request_timestamp = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    response_time_ms = Column(Float)
+    time_to_first_token_ms = Column(Float)
+
+    # Context (for debugging)
+    prompt_summary = Column(String(500))
+    response_summary = Column(String(500))
+
+    # Status
+    success = Column(Boolean, nullable=False, default=True)
+    error_message = Column(Text)
+
+    # Cost
+    estimated_cost_usd = Column(Float)
+
+    # Metadata
+    metadata_json = Column(JSON, name="metadata")  # Avoid collision with Base.metadata
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+
+    # Relationships
+    query_history = relationship("QueryHistory", back_populates="llm_usage_records")
+    chat_session = relationship("ChatSession", back_populates="llm_usage_records")
+    chat_message = relationship("ChatMessage", back_populates="llm_usage_records")
+
+    @property
+    def total_tokens(self):
+        return self.input_tokens + self.output_tokens
+
+
+class LLMUsageAggregate(Base):
+    """Pre-computed daily/hourly statistics for dashboard performance."""
+    __tablename__ = "llm_usage_aggregate"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    date = Column(Date, nullable=False, index=True)
+    hour = Column(Integer)  # 0-23, NULL for daily
+    agent_type = Column(String(50), index=True)
+    provider = Column(String(50), index=True)
+    model_name = Column(String(100))
+
+    total_calls = Column(Integer, nullable=False, default=0)
+    successful_calls = Column(Integer, nullable=False, default=0)
+    failed_calls = Column(Integer, nullable=False, default=0)
+
+    total_input_tokens = Column(Integer, nullable=False, default=0)
+    total_output_tokens = Column(Integer, nullable=False, default=0)
+    total_tokens = Column(Integer, nullable=False, default=0)
+
+    avg_response_time_ms = Column(Float)
+    max_response_time_ms = Column(Float)
+    min_response_time_ms = Column(Float)
+
+    total_estimated_cost_usd = Column(Float)
+
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint('date', 'hour', 'agent_type', 'provider', 'model_name', name='uq_llm_agg_dimensions'),
+    )
+
+
+class LLMModelConfig(Base):
+    """Model metadata and configuration."""
+    __tablename__ = "llm_model_config"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    model_name = Column(String(100), nullable=False, unique=True)
+    display_name = Column(String(100))
+    provider = Column(String(50), default="ollama")
+
+    # Capabilities
+    context_window_size = Column(Integer, default=4096)
+    max_output_tokens = Column(Integer, default=2048)
+    supports_streaming = Column(Boolean, default=True)
+
+    # Cost (per 1M tokens, for reference)
+    cost_per_1m_input_tokens = Column(Float)
+    cost_per_1m_output_tokens = Column(Float)
+    token_calibration_factor = Column(Float, default=1.0)
+
+    is_active = Column(Boolean, default=True)
+    is_default = Column(Boolean, default=False)
+
+    notes = Column(Text)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class QueryHistory(Base):
@@ -30,12 +144,15 @@ class QueryHistory(Base):
     database_type = Column(String(50))  # postgres, mysql, sqlite, etc.
     model_used = Column(String(100))  # llama3, gpt-4, etc.
     connection_id = Column(Integer, ForeignKey("database_connections.id"), nullable=True, index=True)
+    status = Column(String(20), default="pending")  # pending, processing, completed, failed
 
     # Timestamps
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
     feedbacks = relationship("UserFeedback", back_populates="query", cascade="all, delete-orphan")
+    llm_usage_records = relationship("LLMUsage", back_populates="query_history", cascade="save-update, merge", passive_deletes=True)
+    chat_messages = relationship("ChatMessage", back_populates="query_history")
 
     # Indexes for common queries
     __table_args__ = (
@@ -168,6 +285,10 @@ class ChatSession(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     last_active_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
+    # Relationships
+    messages = relationship("ChatMessage", back_populates="chat_session", cascade="all, delete-orphan")
+    llm_usage_records = relationship("LLMUsage", back_populates="chat_session", cascade="save-update, merge", passive_deletes=True)
+
     # Indexes
     __table_args__ = (
         Index('idx_user_last_active', 'user_id', 'last_active_at'),
@@ -188,12 +309,14 @@ class ChatMessage(Base):
     # Query metadata (for assistant messages)
     query_history_id = Column(Integer, ForeignKey("query_history.id"), nullable=True)
     databases_used = Column(JSON, nullable=True)  # [{"conn_id": 1, "name": "ecommerce", "tables": ["products"]}]
+    response_data = Column(JSON, nullable=True)  # Full API response for history replay (capped rows, no traces)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
-    chat_session = relationship("ChatSession", backref="messages")
-    query_history = relationship("QueryHistory", backref="chat_messages")
+    chat_session = relationship("ChatSession", back_populates="messages")
+    query_history = relationship("QueryHistory", back_populates="chat_messages")
+    llm_usage_records = relationship("LLMUsage", back_populates="chat_message", cascade="save-update, merge", passive_deletes=True)
 
 
 class FileSource(Base):

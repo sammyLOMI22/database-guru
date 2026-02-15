@@ -116,6 +116,8 @@ async def parse_sql_lineage(
                 narrative = await narrator.generate_narrative(
                     lineage_graph=graph,
                     question=request.question,
+                    db=db,
+                    # We don't have a query_id yet as this is an on-the-fly parse
                 )
 
                 # Convert to schema
@@ -244,6 +246,7 @@ async def get_impact_advice(
             column_name=request.column_name,
             new_value=request.new_value,
             include_patches=request.include_patches,
+            # No chat session for this endpoint usually, but we could pass one if added to request
         )
 
         # Convert to response schema
@@ -441,6 +444,7 @@ async def get_schema_health(
             db=db,
             connection_id=connection_id,
             include_patterns=include_patterns,
+            # Pass db for tracking
         )
 
         # Convert to response schema
@@ -568,6 +572,7 @@ async def analyze_patterns(
             connection_id=connection_id,
             time_range_days=time_range,
             include_trends=include_trends,
+            # Could pass chat session if needed
         )
 
         logger.info(
@@ -676,7 +681,10 @@ async def analyze_bottleneck(
         if not bottleneck:
             raise HTTPException(status_code=404, detail=f"Table '{table_name}' not found in query patterns")
 
-        analysis = await agent.analyze_bottleneck(bottleneck, db, connection_id)
+        analysis = await agent.analyze_bottleneck(
+            bottleneck, db, connection_id,
+            # Pass db for tracking
+        )
 
         logger.info(f"Bottleneck analysis complete for {table_name}: {len(analysis.root_causes)} causes identified")
 

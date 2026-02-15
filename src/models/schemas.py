@@ -823,6 +823,88 @@ class ImpactAdviceResponse(BaseModel):
 
 
 # ============================================================================
+# LLM Usage Monitoring Schemas (Phase 16)
+# ============================================================================
+
+class LLMUsageResponse(BaseModel):
+    """Single LLM usage record."""
+    id: int
+    agent_type: str
+    agent_name: Optional[str] = None
+    provider: str = "ollama"
+    model_name: str
+    llm_method: str
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int = 0
+    token_estimation_method: str
+    response_time_ms: Optional[float] = None
+    estimated_cost_usd: Optional[float] = None
+    success: bool
+    error_message: Optional[str] = None
+    created_at: datetime
+
+    def model_post_init(self, __context: Any) -> None:
+        if not self.total_tokens:
+            self.total_tokens = self.input_tokens + self.output_tokens
+
+    class Config:
+        from_attributes = True
+
+
+class LLMUsageStatsResponse(BaseModel):
+    """Overall usage statistics."""
+    period_days: int
+    total_calls: int
+    total_input_tokens: int
+    total_output_tokens: int
+    total_tokens: int
+    avg_response_time_ms: Optional[float] = None
+    unique_sessions: int
+    models_used: int
+    total_cost_usd: float = 0.0
+
+
+class LLMUsageByAgentResponse(BaseModel):
+    """Usage breakdown by agent type."""
+    agent_type: str
+    total_calls: int
+    total_input_tokens: int
+    total_output_tokens: int
+    total_tokens: int
+    avg_response_time_ms: Optional[float] = None
+
+
+class LLMUsageTimeSeriesResponse(BaseModel):
+    """Time series data point."""
+    period: str
+    total_calls: int
+    total_tokens: int
+
+
+class SessionUsageSummaryResponse(BaseModel):
+    """Usage summary for a chat session."""
+    session_id: str
+    total_calls: int
+    total_input_tokens: int
+    total_output_tokens: int
+    total_tokens: int
+    avg_response_time_ms: Optional[float] = None
+    first_call: Optional[str] = None
+    last_call: Optional[str] = None
+    total_cost_usd: float = 0.0
+    by_agent: Dict[str, int] = Field(default_factory=dict)
+
+
+class InlineUsageStats(BaseModel):
+    """Lightweight stats for inline display in chat."""
+    tokens_used: int
+    llm_calls: int
+    response_time_ms: float
+    agents_involved: List[str]
+
+
+# ============================================================================
 # Schema Health Analyzer Schemas (Phase 12.3)
 # ============================================================================
 

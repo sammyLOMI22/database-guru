@@ -5,6 +5,11 @@ interface AgentTraceProps {
   trace: AgentTraceType;
 }
 
+const formatTokenCount = (count: number): string => {
+  if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+  return String(count);
+};
+
 export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -16,6 +21,10 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
   if (!trace || !Array.isArray(steps)) {
     return null;
   }
+
+  // Compute total tokens across all steps
+  const totalTokens = steps.reduce((sum, s) =>
+    sum + (s.metadata?.input_tokens || 0) + (s.metadata?.output_tokens || 0), 0);
 
   const getStepColor = (type: string): string => {
     if (type.includes('success')) return 'text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/40';
@@ -46,10 +55,10 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
   };
 
   const getStepIcon = (type: string): string => {
-    if (type.includes('cache_hit') || type.includes('semantic_cache_hit')) return '⚡';  // Lightning for cache hit
-    if (type.includes('cache_miss')) return '🔍';  // Search for cache miss
-    if (type.includes('cache_store')) return '💾';  // Disk for cache store
-    if (type.includes('cache_lookup') || type.includes('cache_summary')) return '🗄️';  // File cabinet for cache lookup
+    if (type.includes('cache_hit') || type.includes('semantic_cache_hit')) return '\u26A1';  // Lightning for cache hit
+    if (type.includes('cache_miss')) return '\uD83D\uDD0D';  // Search for cache miss
+    if (type.includes('cache_store')) return '\uD83D\uDCBE';  // Disk for cache store
+    if (type.includes('cache_lookup') || type.includes('cache_summary')) return '\uD83D\uDDC4\uFE0F';  // File cabinet for cache lookup
     return '';
   };
 
@@ -63,14 +72,17 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
       >
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-            <span className="text-xl" role="img" aria-label="Trace">📊</span>
+            <span className="text-xl" role="img" aria-label="Trace">{'\uD83D\uDCCA'}</span>
           </div>
           <div>
             <h3 className="font-bold text-gray-900 dark:text-gray-100 text-base">
               Agent Execution Trace
             </h3>
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-              {steps.length} steps • <span className="font-mono">{totalElapsedMs.toFixed(0)}ms</span>
+              {steps.length} steps {'\u2022'} <span className="font-mono">{totalElapsedMs.toFixed(0)}ms</span>
+              {totalTokens > 0 && (
+                <> {'\u2022'} <span className="font-mono">{formatTokenCount(totalTokens)} tokens</span></>
+              )}
             </p>
           </div>
         </div>
@@ -104,7 +116,8 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
               const stepMessage = step?.message || 'No message';
               const stepElapsedMs = step?.elapsed_ms ?? 0;
               const stepMetadata = step?.metadata || {};
-              const stepIcon = step?.icon || getStepIcon(stepType) || '•';
+              const stepIcon = step?.icon || getStepIcon(stepType) || '\u2022';
+              const stepTokens = (stepMetadata.input_tokens || 0) + (stepMetadata.output_tokens || 0);
 
               const staggerClass = idx < 8 ? `delay-${idx * 100}` : 'delay-700';
 
@@ -122,20 +135,32 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
 
                   {/* Content Card */}
                   <div className="flex-1 min-w-0 glass-card p-3.5 rounded-xl border-white/5 hover:border-white/20 transition-all group/step">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start justify-between gap-2">
                       <p className="font-semibold text-sm text-gray-800 dark:text-gray-200 leading-snug">
                         {stepMessage}
                       </p>
-                      <span className="text-xs font-bold font-mono text-gray-400 dark:text-gray-500 tracking-tighter bg-gray-100 dark:bg-gray-800/50 px-1.5 py-0.5 rounded">
-                        +{stepElapsedMs.toFixed(0)}ms
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {stepTokens > 0 && (
+                          <span className="text-xs font-bold font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
+                            {formatTokenCount(stepTokens)} tok
+                          </span>
+                        )}
+                        <span className="text-xs font-bold font-mono text-gray-400 dark:text-gray-500 tracking-tighter bg-gray-100 dark:bg-gray-800/50 px-1.5 py-0.5 rounded">
+                          +{stepElapsedMs.toFixed(0)}ms
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Step Type Badge */}
+                    {/* Step Type Badge + Model */}
                     <div className="mt-2 flex items-center gap-2">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold tracking-wider uppercase ${getStepColor(stepType)} bg-opacity-10 dark:bg-opacity-20`}>
                         {stepType.replace('_', ' ')}
                       </span>
+                      {stepMetadata.model && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30">
+                          {stepMetadata.model}
+                        </span>
+                      )}
                     </div>
 
                     {/* Metadata (expandable) */}
@@ -166,9 +191,16 @@ export const AgentTrace: React.FC<AgentTraceProps> = ({ trace }) => {
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
               Process completed successfully
             </div>
-            <p className="text-xs font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg">
-              Total Time: <span className="font-mono text-blue-500">{totalElapsedMs.toFixed(2)}ms</span>
-            </p>
+            <div className="flex items-center gap-2">
+              {totalTokens > 0 && (
+                <span className="text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 px-3 py-1.5 rounded-lg font-mono">
+                  {formatTokenCount(totalTokens)} tokens
+                </span>
+              )}
+              <p className="text-xs font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg">
+                Total Time: <span className="font-mono text-blue-500">{totalElapsedMs.toFixed(2)}ms</span>
+              </p>
+            </div>
           </div>
         </div>
       )}

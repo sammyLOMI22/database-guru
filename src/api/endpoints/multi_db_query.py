@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from src.models.schemas import QueryRequest, QueryResponse
 from src.api.dependencies import get_db, get_cache, get_sql_generator, get_settings, get_semantic_cache_dep
 from src.database.models import QueryHistory, DatabaseConnection, ChatSession, ChatMessage, FileSource
+from src.api.endpoints.chat import prepare_response_for_storage
 from src.llm.sql_generator import SQLGenerator
 from src.llm.conversational_memory_agent import get_memory_agent
 from src.cache.redis_client import RedisCache
@@ -934,8 +935,33 @@ async def process_multi_database_query(
         db.add(query_record)
         await db.commit()
         await db.refresh(query_record)
+        query_record_id = query_record.id  # Capture before it can expire
 
-        # If part of a chat session, save messages
+        # Build cache info summary and response_data BEFORE saving messages
+        # so we can persist response_data inline with the assistant message
+        cache_info_data = CacheInfo(
+            semantic_hits=len(semantic_cache_hits),
+            semantic_misses=len(connections) - len(semantic_cache_hits),
+            hit_databases=[c.name for c in connections if c.id in semantic_cache_hits],
+            miss_databases=[c.name for c in connections if c.id not in semantic_cache_hits],
+        )
+
+        response_data = {
+            "query_id": query_record.id,
+            "question": request.question,
+            "database_results": [r.model_dump(mode='json') for r in database_results],
+            "total_databases_queried": len(database_results),
+            "total_rows": total_rows,
+            "total_execution_time_ms": total_execution_time,
+            "warnings": warnings,
+            "cached": False,
+            "timestamp": datetime.utcnow().isoformat(),
+            "cache_info": cache_info_data.model_dump(mode='json'),
+            # Chart Intent (Phase 8: Chart Intelligence)
+            "preferred_chart_type": request.preferred_chart_type,
+        }
+
+        # If part of a chat session, save messages with response_data inline
         if request.chat_session_id:
             # Save user message
             user_message = ChatMessage(
@@ -945,7 +971,7 @@ async def process_multi_database_query(
             )
             db.add(user_message)
 
-            # Save assistant message with results summary
+            # Save assistant message with results summary AND response_data
             source_parts = []
             if connections:
                 source_parts.append(f"{len(connections)} database(s)")
@@ -965,6 +991,7 @@ async def process_multi_database_query(
                     }
                     for r in database_results
                 ],
+                response_data=prepare_response_for_storage(response_data),
             )
             db.add(assistant_message)
 
@@ -977,30 +1004,6 @@ async def process_multi_database_query(
                 session.last_active_at = datetime.utcnow()
 
             await db.commit()
-
-        # Build cache info summary
-        cache_info_data = CacheInfo(
-            semantic_hits=len(semantic_cache_hits),
-            semantic_misses=len(connections) - len(semantic_cache_hits),
-            hit_databases=[c.name for c in connections if c.id in semantic_cache_hits],
-            miss_databases=[c.name for c in connections if c.id not in semantic_cache_hits],
-        )
-
-        # Build response
-        response_data = {
-            "query_id": query_record.id,
-            "question": request.question,
-            "database_results": [r.model_dump() for r in database_results],
-            "total_databases_queried": len(database_results),
-            "total_rows": total_rows,
-            "total_execution_time_ms": total_execution_time,
-            "warnings": warnings,
-            "cached": False,
-            "timestamp": datetime.utcnow().isoformat(),
-            "cache_info": cache_info_data.model_dump(),
-            # Chart Intent (Phase 8: Chart Intelligence)
-            "preferred_chart_type": request.preferred_chart_type,
-        }
 
         # NEW: Generate narratives if enabled
         if request.enable_narratives and len(database_results) > 0:
@@ -1037,7 +1040,10 @@ async def process_multi_database_query(
                                 sql=db_result.sql,
                                 results=db_result.results,
                                 row_count=db_result.row_count or 0,
-                                execution_time_ms=db_result.execution_time_ms or 0
+                                execution_time_ms=db_result.execution_time_ms or 0,
+                                db=db,
+                                query_history_id=query_record.id,
+                                chat_session_id=request.chat_session_id,
                             )
                             # Store per-database narrative
                             response_data["database_results"][i]["result_analysis"] = {
@@ -1048,6 +1054,24 @@ async def process_multi_database_query(
                                 "statistics": db_narrative.statistics,
                                 "generated_at": db_narrative.generated_at,
                             }
+                            # Add narrative step to agent trace for this database
+                            db_trace = response_data["database_results"][i].get("agent_trace")
+                            if isinstance(db_trace, dict) and "steps" in db_trace:
+                                narrative_meta = {
+                                    "confidence": db_narrative.confidence,
+                                    "insight_count": len(db_narrative.key_insights),
+                                    "has_direct_answer": db_narrative.direct_answer is not None,
+                                }
+                                if db_narrative.token_info:
+                                    narrative_meta.update(db_narrative.token_info)
+                                db_trace["steps"].append({
+                                    "timestamp": datetime.utcnow().isoformat(),
+                                    "elapsed_ms": 0,
+                                    "type": "narrative_generation",
+                                    "message": f"Generated narrative with {len(db_narrative.key_insights)} insights",
+                                    "metadata": narrative_meta,
+                                    "icon": "📊"
+                                })
                             logger.info(f"✓ Generated narrative for {db_result.connection_name}: confidence={db_narrative.confidence}")
                         except Exception as e:
                             logger.error(f"Failed to generate narrative for {db_result.connection_name}: {e}", exc_info=True)
@@ -1078,7 +1102,10 @@ async def process_multi_database_query(
                                 row_count=len(combined_results),
                                 execution_time_ms=total_execution_time,
                                 databases=[r.connection_name for r in database_results],
-                                multi_database=True
+                                multi_database=True,
+                                db=db,
+                                query_history_id=query_record.id,
+                                chat_session_id=request.chat_session_id,
                             )
 
                             response_data["combined_analysis"] = {
@@ -1554,12 +1581,39 @@ async def stream_multi_database_query(
                 db.add(user_message)
 
                 result_summary = f"Queried {len(connections)} database(s), returned {total_rows} rows"
+
+                # Build partial response_data for streaming path
+                streaming_response_data = {
+                    "query_id": query_record.id,
+                    "question": request.question,
+                    "database_results": [
+                        {
+                            "connection_id": db_info.get("connection_id", db_info.get("conn_id", 0)),
+                            "connection_name": db_info.get("connection_name", db_info.get("name", "")),
+                            "database_type": db_info.get("database_type", ""),
+                            "sql": db_info.get("sql", ""),
+                            "success": True,
+                            "row_count": db_info.get("rows", 0),
+                            "results": [],
+                            "execution_time_ms": db_info.get("execution_time_ms", 0),
+                        }
+                        for db_info in completed_databases
+                    ],
+                    "total_databases_queried": len(connections),
+                    "total_rows": total_rows,
+                    "total_execution_time_ms": round(total_time_ms, 2),
+                    "warnings": [],
+                    "cached": False,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+
                 assistant_message = ChatMessage(
                     chat_session_id=request.chat_session_id,
                     role="assistant",
                     content=result_summary,
                     query_history_id=query_record.id,
                     databases_used=completed_databases,
+                    response_data=streaming_response_data,
                 )
                 db.add(assistant_message)
                 await db.commit()

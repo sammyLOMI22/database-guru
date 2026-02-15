@@ -213,6 +213,45 @@ frontend/src/
 - `ExcelSheetsResponse`: Available sheets
 - `FileUploadOptions`: Upload configuration
 
+### LLM Usage Monitoring UI Components (Phase 16 - February 2026)
+| Component | Lines | Purpose |
+|-----------|-------|---------|
+| `dashboard/LLMUsageDashboard.tsx` | ~384 | Full usage monitoring dashboard |
+| `UsageSummary.tsx` | ~133 | Per-session expandable usage summary |
+| `SessionUsageBadge.tsx` | ~64 | Inline token/cost badge in chat header |
+| `services/llmUsageApi.ts` | ~82 | API service layer (7 methods) |
+| **Total** | **~663** | |
+
+**LLMUsageDashboard Features**:
+- Time range selector (1-90 days)
+- 4 stat cards: Total Calls, Total Tokens, Avg Response Time, Est. Cost
+- Usage by Agent breakdown (bar chart)
+- Usage by Model breakdown (pie chart)
+- Usage by Provider breakdown
+- Time series chart (hourly/daily granularity)
+- Recent LLM Calls table with filtering
+
+**UsageSummary Features**:
+- Expandable panel showing session-level stats
+- Total Tokens, LLM Calls, Avg Latency, Est. Cost
+- Agent breakdown with proportional progress bars
+
+**SessionUsageBadge Features**:
+- Compact inline display (tokens + calls + cost)
+- Auto-refreshes every 30 seconds
+- Hover tooltips for each metric
+
+**API Service** (`services/llmUsageApi.ts`):
+| Method | Purpose |
+|--------|---------|
+| `getStats(days)` | Fetch overall usage statistics |
+| `getByAgent(days)` | Fetch agent breakdown |
+| `getByModel(days)` | Fetch model breakdown |
+| `getByProvider(days)` | Fetch provider breakdown |
+| `getTimeSeries(days, granularity)` | Fetch time series data |
+| `getRecent(limit)` | Fetch recent call records |
+| `getSessionUsage(sessionId)` | Fetch per-session usage |
+
 ## App.tsx Tab Structure
 
 | Tab | Color | Purpose |
@@ -222,4 +261,5 @@ frontend/src/
 | Lineage | Purple | Data lineage visualization |
 | Tools | Orange | Tool-Using Agent management |
 | Cache | Amber | Semantic cache monitoring |
+| Usage | Default | LLM usage monitoring dashboard |
 | Settings | Default | System configuration |

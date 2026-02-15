@@ -221,6 +221,42 @@ Quick reference for finding important code in the Database Guru codebase.
 | API service | `frontend/src/services/lineageApi.ts` (165 lines) |
 | Type definitions | `frontend/src/types/lineage.ts` (264 lines) |
 
+## LLM Usage Monitoring (Phase 16 - February 2026)
+| Component | Location |
+|-----------|----------|
+| **Backend Services** | |
+| Usage tracker | `src/services/llm_usage_tracker.py` |
+| Track call context mgr | `src/services/llm_usage_tracker.py:track_call()` |
+| Token estimation | `src/services/llm_usage_tracker.py:estimate_tokens()` |
+| Cost service | `src/services/llm_cost_service.py` |
+| Cost calculation | `src/services/llm_cost_service.py:calculate_cost()` |
+| Usage aggregator | `src/services/llm_usage_aggregator.py` |
+| **API Endpoints** | |
+| Usage API | `src/api/endpoints/llm_usage.py` (9 endpoints) |
+| Stats endpoint | `src/api/endpoints/llm_usage.py:get_usage_stats()` |
+| Session endpoint | `src/api/endpoints/llm_usage.py:get_session_usage()` |
+| **Database Models** | |
+| LLMUsage model | `src/database/models.py:LLMUsage` |
+| LLMUsageAggregate | `src/database/models.py:LLMUsageAggregate` |
+| LLMModelConfig | `src/database/models.py:LLMModelConfig` |
+| Migration | `alembic/versions/f451a46c49e1_add_llm_usage_tables.py` |
+| **Schemas** | |
+| Response schemas | `src/models/schemas.py` (LLMUsageResponse, LLMUsageStatsResponse, etc.) |
+| **Frontend Components** | |
+| Usage dashboard | `frontend/src/components/dashboard/LLMUsageDashboard.tsx` |
+| Session usage summary | `frontend/src/components/UsageSummary.tsx` |
+| Session usage badge | `frontend/src/components/SessionUsageBadge.tsx` |
+| API service | `frontend/src/services/llmUsageApi.ts` |
+| **Agent Integration** | |
+| Ollama client tracking | `src/llm/ollama_client.py` |
+| Self-correcting agent | `src/llm/self_correcting_agent.py` |
+| Query planning agent | `src/llm/query_planning_agent.py` |
+| Result narrator | `src/llm/result_narrator.py` |
+| **Tests** | |
+| Unit tests | `tests/unit/test_llm_usage_tracker.py` |
+| Extended tests | `tests/test_llm_usage_extended.py` |
+| Integration tests | `tests/integration/test_usage_tracking_integration.py` |
+
 ## File Data Source System (Phase 13 - January 2026)
 | Component | Location |
 |-----------|----------|

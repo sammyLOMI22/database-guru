@@ -19,6 +19,7 @@ from src.models.schemas import (
 )
 from src.api.dependencies import get_db, get_cache, get_semantic_cache_dep, get_sql_generator, get_settings
 from src.database.models import QueryHistory, ChatSession, ChatMessage
+from src.api.endpoints.chat import prepare_response_for_storage
 from src.llm.sql_generator import SQLGenerator
 from src.llm.self_correcting_agent import SelfCorrectingSQLAgent, AgentTrace
 from src.llm.conversational_memory_agent import get_memory_agent
@@ -216,6 +217,18 @@ async def process_query(
         database_type = active_connection.database_type
         logger.info(f"Using active connection '{active_connection.name}' ({database_type})")
 
+        # Create initial query history record to get an ID for tracking
+        query_record = QueryHistory(
+            natural_language_query=request.question,
+            generated_sql="",
+            database_type=database_type,
+            connection_id=active_connection.id,
+            status="processing",
+        )
+        db.add(query_record)
+        await db.flush()
+        await db.refresh(query_record)
+
         # Connect to user's database for schema and query execution
         async with UserDatabaseConnector.get_user_db_session(active_connection) as user_db:
             # Initialize schema inspector (needed for tool-using agent)
@@ -278,6 +291,9 @@ async def process_query(
                 schema_inspector=schema_inspector,  # Pass for tool-using agent
                 connection_id=active_connection.id,  # Pass for tool-using agent
                 row_limit=request.row_limit,  # Pass row limit from request
+                db=db,
+                query_history_id=query_record.id,
+                chat_session_id=request.session_id,
             )
 
             # Extract results from agent
@@ -338,25 +354,36 @@ async def process_query(
         elif execution_result and not execution_result.get("success"):
             error_msg = execution_result.get("error")
 
-        # Save to query history
-        query_record = QueryHistory(
-            natural_language_query=request.question,  # Save original question, not enhanced
-            generated_sql=sql,
-            sql_validated=is_valid,
-            executed=execution_result is not None and execution_result.get("success", False),
-            execution_time_ms=execution_result.get("execution_time_ms") if execution_result else None,
-            result_count=execution_result.get("row_count") if execution_result else None,
-            error_message=error_msg,
-            database_type=database_type,  # Use detected database type from active connection
-            model_used=model_used,  # Use actual model that was used
-            connection_id=active_connection.id,
-        )
-        db.add(query_record)
+        # Update query history record with results
+        query_record.generated_sql = sql
+        query_record.sql_validated = is_valid
+        query_record.executed = execution_result is not None and execution_result.get("success", False)
+        query_record.execution_time_ms = execution_result.get("execution_time_ms") if execution_result else None
+        query_record.result_count = execution_result.get("row_count") if execution_result else None
+        query_record.error_message = error_msg
+        query_record.model_used = model_used
+        query_record.status = "completed" if is_valid else "failed"
+
         await db.commit()
-        await db.refresh(query_record)
+        query_record_id = query_record.id  # Capture before it can expire
 
         # Save chat messages if session_id provided
         if request.session_id:
+            # Build a preliminary response_data so we can persist it inline
+            preliminary_response_data = prepare_response_for_storage({
+                "query_id": query_record.id,
+                "question": request.question,
+                "sql": sql,
+                "is_valid": is_valid,
+                "is_read_only": is_read_only,
+                "warnings": warnings,
+                "results": execution_result.get("data") if execution_result and execution_result.get("success") else None,
+                "row_count": execution_result.get("row_count") if execution_result else None,
+                "execution_time_ms": execution_result.get("execution_time_ms") if execution_result else None,
+                "cached": False,
+                "timestamp": datetime.utcnow().isoformat(),
+            })
+
             # Save user message
             user_message = ChatMessage(
                 chat_session_id=request.session_id,
@@ -371,7 +398,7 @@ async def process_query(
             )
             db.add(user_message)
 
-            # Save assistant message with SQL
+            # Save assistant message with SQL and response_data
             assistant_content = f"```sql\n{sql}\n```"
             if execution_result and execution_result.get("success"):
                 assistant_content += f"\n\nReturned {execution_result.get('row_count', 0)} rows"
@@ -387,11 +414,15 @@ async def process_query(
                     "conn_id": active_connection.id,
                     "name": active_connection.name,
                     "database_type": database_type
-                }]
+                }],
+                response_data=preliminary_response_data,
             )
             db.add(assistant_message)
             await db.commit()
             logger.info(f"Saved conversation to session {request.session_id}")
+
+        # Extract agent trace early so narrative generation can append to it
+        agent_trace_dict = agent_result.get("agent_trace")
 
         # Generate natural language narrative of results (Intelligent Data Narratives feature)
         result_analysis = None
@@ -425,6 +456,9 @@ async def process_query(
                     row_count=execution_result.get("row_count", 0),
                     execution_time_ms=execution_result.get("execution_time_ms", 0),
                     database_type=database_type,
+                    db=db,
+                    query_history_id=query_record.id,
+                    chat_session_id=request.session_id,
                 )
 
                 # Convert to response format
@@ -439,16 +473,27 @@ async def process_query(
 
                 # Add to agent trace for observability
                 if isinstance(agent_trace_dict, dict) and "steps" in agent_trace_dict:
+                    narrative_meta = {
+                        "confidence": narrative.confidence,
+                        "insight_count": len(narrative.key_insights),
+                        "has_direct_answer": narrative.direct_answer is not None,
+                    }
+                    if narrative.token_info:
+                        narrative_meta.update(narrative.token_info)
+                    # Compute elapsed_ms relative to trace start
+                    narrative_elapsed_ms = 0
+                    if agent_trace_dict.get("start_time"):
+                        try:
+                            trace_start = datetime.fromisoformat(agent_trace_dict["start_time"])
+                            narrative_elapsed_ms = round((datetime.utcnow() - trace_start).total_seconds() * 1000, 2)
+                        except (ValueError, TypeError):
+                            pass
                     agent_trace_dict["steps"].append({
                         "timestamp": datetime.utcnow().isoformat(),
-                        "elapsed_ms": 0,
+                        "elapsed_ms": narrative_elapsed_ms,
                         "type": "narrative_generation",
                         "message": f"Generated narrative with {len(narrative.key_insights)} insights",
-                        "metadata": {
-                            "confidence": narrative.confidence,
-                            "insight_count": len(narrative.key_insights),
-                            "has_direct_answer": narrative.direct_answer is not None,
-                        },
+                        "metadata": narrative_meta,
                         "icon": "📊"
                     })
 
@@ -460,7 +505,6 @@ async def process_query(
                 result_analysis = None
 
         # Merge cache trace steps with agent trace (prepend cache steps)
-        agent_trace_dict = agent_result.get("agent_trace")
         if agent_trace_dict and cache_trace.steps:
             # Prepend cache trace steps to agent trace
             cache_steps = cache_trace.to_dict().get("steps", [])
@@ -640,13 +684,16 @@ async def stream_query_results(
                     schema = schema_inspector.format_schema_for_llm(schema_data)
 
                 # Generate SQL (without execution yet)
-                sql = await sql_generator.generate_sql(
+                sql_result = await sql_generator.generate_sql(
                     question=enhanced_question,
                     schema=schema,
                     database_type=database_type,
                     model=request.model or settings.OLLAMA_MODEL,
                     schema_dict=schema_data,  # Pass for WHERE column validation
+                    db=db,
+                    chat_session_id=request.session_id,
                 )
+                sql = sql_result["sql"]
 
                 logger.info(f"[Stream] Generated SQL: {sql[:100]}...")
 

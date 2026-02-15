@@ -37,6 +37,7 @@ class ToolUsingResult:
     enriched_context: str = ""
     confidence: float = 0.0
     error: Optional[str] = None
+    token_info: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -48,6 +49,7 @@ class ToolUsingResult:
             "enriched_context": self.enriched_context,
             "confidence": self.confidence,
             "error": self.error,
+            "token_info": self.token_info,
         }
 
 
@@ -108,6 +110,10 @@ class ToolUsingAgent:
         use_tools: bool = True,
         trace=None,  # Optional AgentTrace for UI visibility
         schema_dict: Optional[Dict[str, Any]] = None,  # For WHERE column validation
+        db=None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> ToolUsingResult:
         """
         Process a question using tools to gather context.
@@ -201,6 +207,7 @@ class ToolUsingAgent:
             # Step 4: Generate SQL if generator is available
             sql = None
             explanation = ""
+            token_info = None
 
             if self.generator:
                 # Combine original schema with enriched context
@@ -213,10 +220,15 @@ class ToolUsingAgent:
                     schema=enhanced_schema,
                     database_type=database_type,
                     schema_dict=schema_dict,  # Pass for WHERE column validation
+                    db=db,
+                    query_history_id=query_history_id,
+                    chat_session_id=chat_session_id,
+                    chat_message_id=chat_message_id,
                 )
 
                 sql = sql_result.get("sql")
                 explanation = sql_result.get("explanation", "")
+                token_info = sql_result.get("token_info")
 
             # Calculate confidence based on tool usage
             confidence = self._calculate_confidence(tools_used, tool_results)
@@ -229,6 +241,7 @@ class ToolUsingAgent:
                 tool_results=tool_results,
                 enriched_context=enriched_context,
                 confidence=confidence,
+                token_info=token_info,
             )
 
         except Exception as e:

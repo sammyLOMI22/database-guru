@@ -10,6 +10,7 @@ from src.llm.sql_generator import SQLGenerator
 # Avoid circular import
 if TYPE_CHECKING:
     from src.llm.quality_profile import QualityProfile
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.executor import SQLExecutor
 from src.database.models import DatabaseConnection
 from src.config.settings import Settings
@@ -484,6 +485,10 @@ class SelfCorrectingSQLAgent:
         schema_cache=None,  # SchemaCache for tool-using agent
         connection_id: Optional[int] = None,  # Connection ID for tool-using agent
         schema_dict: Optional[Dict] = None,  # For WHERE column validation
+        db: Optional[AsyncSession] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Try multiple fix strategies in parallel and return the first successful one
@@ -584,12 +589,18 @@ class SelfCorrectingSQLAgent:
                     database_type=database_type,
                     correction_hints=hints,  # Explicit hints forwarding
                     schema_dict=schema_dict,  # Pass for WHERE column validation
+                    db=db,
+                    query_history_id=query_history_id,
+                    chat_session_id=chat_session_id,
+                    chat_message_id=chat_message_id,
                 )
+                fix_token_info = fix_result.get("token_info", {})
                 return {
                     "sql": fix_result["sql"],
                     "fix_method": "llm",
                     "confidence": 0.6,  # Default confidence for LLM fixes
                     "explanation": "LLM-generated correction",
+                    "token_info": fix_token_info,
                 }
             except Exception as e:
                 logger.warning(f"LLM fix failed: {e}")
@@ -624,6 +635,7 @@ class SelfCorrectingSQLAgent:
                         "explanation": f"Tool-assisted fix using {len(tool_result.tools_used)} tools: {', '.join(tool_result.tools_used[:3])}",
                         "tools_used": tool_result.tools_used,
                         "enriched_context": tool_result.enriched_context[:200] if tool_result.enriched_context else None,
+                        "token_info": tool_result.token_info or {},
                     }
                 return None
             except Exception as e:
@@ -683,6 +695,10 @@ class SelfCorrectingSQLAgent:
                 database_type=database_type,
                 correction_hints=hints,  # Explicit hints forwarding (addresses PR review)
                 schema_dict=schema_dict,  # Pass for WHERE column validation
+                db=db,
+                query_history_id=query_history_id,
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
             )
 
             metrics["winning_strategy"] = "llm_fallback_timeout"
@@ -719,10 +735,13 @@ class SelfCorrectingSQLAgent:
                     "llm": "llm_fix",
                     "tool_using": "tool_fix",
                 }
+                step_metadata = {"confidence": conf, "elapsed_ms": metrics["elapsed_ms"]}
+                if result.get("token_info"):
+                    step_metadata.update(result["token_info"])
                 trace.add_step(
                     step_type_map.get(method, "fix_attempt"),
                     f"{method.replace('_', ' ').title()} succeeded: {result['explanation']}",
-                    metadata={"confidence": conf, "elapsed_ms": metrics["elapsed_ms"]}
+                    metadata=step_metadata
                 )
             else:
                 metrics["strategies_failed"] += 1
@@ -762,6 +781,10 @@ class SelfCorrectingSQLAgent:
                 database_type=database_type,
                 correction_hints=hints,  # Explicit hints forwarding (addresses PR review)
                 schema_dict=schema_dict,  # Pass for WHERE column validation
+                db=db,
+                query_history_id=query_history_id,
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
             )
             return {
                 "sql": fix_result["sql"],
@@ -769,6 +792,7 @@ class SelfCorrectingSQLAgent:
                 "confidence": 0.5,
                 "explanation": "Fallback LLM correction (parallel strategies failed)",
                 "metrics": metrics,
+                "token_info": fix_result.get("token_info", {}),
             }
 
     async def generate_and_execute_with_retry(
@@ -786,6 +810,10 @@ class SelfCorrectingSQLAgent:
         schema_cache=None,  # NEW: SchemaCache for tool-using agent
         connection_id: Optional[int] = None,  # NEW: Connection ID for tool-using agent
         row_limit: int = 100,  # NEW: Maximum rows to return
+        db: Optional[AsyncSession] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Generate SQL with automatic error correction and retry
@@ -950,17 +978,23 @@ class SelfCorrectingSQLAgent:
                     schema_dict=schema_dict,
                     connection_name=connection_name,
                     quality_profile=self.quality_profile,
+                    db=db,
+                    query_history_id=query_history_id,
+                    chat_session_id=chat_session_id,
+                    chat_message_id=chat_message_id,
                 )
 
                 if planning_result.get("used_planning"):
                     query_plan = planning_result["plan"]
+                    planning_token_info = planning_result.get("token_info", {})
                     trace.add_step(
                         "planning",
                         f"Query plan created (complexity: {query_plan.complexity.value}, confidence: {query_plan.confidence:.2f})",
                         metadata={
                             "complexity": query_plan.complexity.value,
                             "confidence": query_plan.confidence,
-                            "estimated_tables": len(query_plan.tables)
+                            "estimated_tables": len(query_plan.tables),
+                            **planning_token_info,
                         }
                     )
                     logger.info(
@@ -1130,14 +1164,17 @@ class SelfCorrectingSQLAgent:
                                 )
                                 if tool_result.success and tool_result.enriched_context:
                                     enhanced_schema = f"{schema}\n\n{tool_result.enriched_context}"
+                                    tool_ctx_meta = {
+                                        "tools_used": tool_result.tools_used,
+                                        "context_length": len(tool_result.enriched_context),
+                                        "confidence": tool_result.confidence,
+                                    }
+                                    if tool_result.token_info:
+                                        tool_ctx_meta.update(tool_result.token_info)
                                     trace.add_step(
                                         "tool_context",
                                         f"Gathered context using {len(tool_result.tools_used)} tools: {', '.join(tool_result.tools_used[:5])}",
-                                        metadata={
-                                            "tools_used": tool_result.tools_used,
-                                            "context_length": len(tool_result.enriched_context),
-                                            "confidence": tool_result.confidence,
-                                        }
+                                        metadata=tool_ctx_meta
                                     )
                                     logger.info(f"✅ Tool exploration complete: {len(tool_result.tools_used)} tools used")
                             except Exception as e:
@@ -1160,6 +1197,10 @@ class SelfCorrectingSQLAgent:
                             schema_dict=schema_dict,  # Pass for LocationMapper
                             row_limit=row_limit,  # Pass row limit to LLM
                             intent_result=intent_result,  # Phase 1: Intent-driven prompting
+                            db=db,
+                            query_history_id=query_history_id,
+                            chat_session_id=chat_session_id,
+                            chat_message_id=chat_message_id,
                         )
 
                         # Check if LLM says query cannot be answered
@@ -1181,7 +1222,8 @@ class SelfCorrectingSQLAgent:
                             }
 
                         sql = gen_result["sql"]
-                        trace.add_step("generation", f"Generated SQL: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql})
+                        gen_token_info = gen_result.get("token_info", {})
+                        trace.add_step("generation", f"Generated SQL: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql, **gen_token_info})
 
                         # Validate that all tables in SQL exist in schema
                         if schema_dict and 'tables' in schema_dict:
@@ -1270,6 +1312,10 @@ class SelfCorrectingSQLAgent:
                             schema_cache=schema_cache,
                             connection_id=connection_id,
                             schema_dict=schema_dict,  # Pass for WHERE column validation
+                            db=db,
+                            query_history_id=query_history_id,
+                            chat_session_id=chat_session_id,
+                            chat_message_id=chat_message_id,
                         )
                         sql = fix_result["sql"]
                         self.fix_methods[attempt_num] = fix_result["fix_method"]
@@ -1347,9 +1393,14 @@ class SelfCorrectingSQLAgent:
                                 database_type=database_type,
                                 correction_hints=hints,  # Explicit hints forwarding (addresses PR review)
                                 schema_dict=schema_dict,  # Pass for WHERE column validation
+                                db=db,
+                                query_history_id=query_history_id,
+                                chat_session_id=chat_session_id,
+                                chat_message_id=chat_message_id,
                             )
                             sql = fix_result["sql"]
-                            trace.add_step("llm_fix", f"LLM generated fix: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql})
+                            fix_token_info = fix_result.get("token_info", {})
+                            trace.add_step("llm_fix", f"LLM generated fix: {sql[:100]}{'...' if len(sql) > 100 else ''}", metadata={"sql": sql, **fix_token_info})
 
                             logger.info(f"Generated corrected SQL: {sql[:100]}...")
 

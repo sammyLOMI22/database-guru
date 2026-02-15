@@ -71,8 +71,10 @@ export default function Message({ type, content, queryResponse, multiQueryRespon
             </p>
           </div>
 
-          {/* Query results (only for assistant messages) */}
-          {!isUser && effectiveMultiResponse && (
+          {/* Query results (only for assistant messages with actual data) */}
+          {!isUser && effectiveMultiResponse && effectiveMultiResponse.database_results?.some(
+            (r) => (r.results && r.results.length > 0) || r.sql || r.error
+          ) && (
             <div className="mt-4 animate-scaleUp fill-mode-forwards opacity-0">
               <MultiDatabaseResults
                 results={effectiveMultiResponse.database_results}

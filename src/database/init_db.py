@@ -30,6 +30,12 @@ async def init_database():
     # Create tables
     await db_manager.create_tables_async()
 
+    # Seed default model configurations for cost tracking
+    from src.services.llm_cost_service import LLMCostService
+    async with db_manager.get_async_session() as session:
+        await LLMCostService.ensure_default_configs(session)
+    logger.info("✅ Default model configurations seeded.")
+
     # Health check
     is_healthy = await db_manager.health_check()
     if is_healthy:

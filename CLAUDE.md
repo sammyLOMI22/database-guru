@@ -63,6 +63,7 @@ The system uses a multi-agent architecture with 23+ specialized agents. See [.cl
 | Schema Health Analyzer | `src/lineage/schema_health_analyzer.py` | Database design quality (Phase 12.3) |
 | Pattern Intelligence | `src/lineage/pattern_intelligence.py` | Query pattern insights (Phase 12.4) |
 | Lineage Conversation | `src/lineage/lineage_conversation_agent.py` | Natural language Q&A (Phase 12.5) |
+| LLM Usage Tracker | `src/services/llm_usage_tracker.py` | Token & cost tracking (Phase 16) |
 
 ### Data Flow
 ```
@@ -129,3 +130,4 @@ Key docs in `docs/`:
 | **Modules** | `modules/QUERY_PLANNING_AGENT.md`, `modules/TOOL_USING_AGENT.md` |
 | **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
 | **Planning** | `planning/FUTURE_PLANS.md`, `planning/MASTER_ROADMAP.md` |
+| **LLM Usage** | `guides/LLM_USAGE_MONITORING_GUIDE.md` |

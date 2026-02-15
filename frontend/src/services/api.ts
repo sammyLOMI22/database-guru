@@ -343,9 +343,9 @@ export const chatAPI = {
   },
 
   // Get chat messages
-  async getMessages(sessionId: string, limit = 100, offset = 0): Promise<ChatMessage[]> {
+  async getMessages(sessionId: string, limit = 100, offset = 0, order: 'asc' | 'desc' = 'asc'): Promise<ChatMessage[]> {
     const { data } = await api.get<ChatMessage[]>(`/api/chat/sessions/${sessionId}/messages`, {
-      params: { limit, offset },
+      params: { limit, offset, order },
     });
     return data;
   },

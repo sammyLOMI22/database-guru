@@ -11,7 +11,7 @@ from src.database.connection import get_db_manager, run_alembic_migrations
 from src.cache.redis_client import get_redis_cache
 from src.core.connection_pool_manager import get_pool_manager_async
 from src.middleware.rate_limit import RateLimitMiddleware
-from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files
+from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files, llm_usage
 from src.core.file_source_session import FileSourceDuckDBSession
 from src.core.file_source_handler import cleanup_expired_files
 
@@ -61,6 +61,16 @@ async def lifespan(app: FastAPI):
 
     await db_manager.initialize_async()
     await db_manager.create_tables_async()
+
+    # Seed default LLM model configs for cost tracking (Phase 16)
+    try:
+        from src.services.llm_cost_service import LLMCostService
+        async with db_manager.get_async_session() as db:
+            await LLMCostService.ensure_default_configs(db)
+        logger.info("✅ LLM model configs seeded")
+    except Exception as e:
+        logger.warning(f"Failed to seed LLM model configs: {e}")
+
     logger.info("✅ Database ready")
 
     # Initialize cache
@@ -169,6 +179,7 @@ app.include_router(cache.router, prefix="/api")
 app.include_router(pools.router, prefix="/api")
 app.include_router(lineage.router, prefix="/api")
 app.include_router(files.router, prefix="/api")  # Phase 13: CSV & Excel file support
+app.include_router(llm_usage.router, prefix="/api")  # Phase 16: LLM usage monitoring
 
 if __name__ == "__main__":
     import uvicorn

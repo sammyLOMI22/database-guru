@@ -5,10 +5,11 @@ import Sidebar from './Sidebar';
 import Message from './Message';
 import ConversationContextPanel from './ConversationContextPanel';
 import SchemaGlance from './SchemaGlance';
+import { SessionUsageBadge } from './SessionUsageBadge';
 import { useMultiQuery } from '../hooks/useMultiQuery';
 import { useModels } from '../hooks/useModels';
 import { connectionsAPI, settingsAPI, filesAPI, chatAPI } from '../services/api';
-import type { ChatSession, MultiDatabaseQueryResponse, DatabaseConnection } from '../types/api';
+import type { ChatSession, MultiDatabaseQueryResponse, DatabaseConnection, ChatMessage as APIChatMessage } from '../types/api';
 
 interface ChatMessage {
   id: string;
@@ -49,8 +50,13 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
   const [showContextPanel, setShowContextPanel] = useState(true);
   const [hasContext, setHasContext] = useState(false);
   const [forceSchemaRefresh, setForceSchemaRefresh] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [messageOffset, setMessageOffset] = useState(0);
   const [perTaskModels, setPerTaskModels] = useState<PerTaskModelSettings | null>(null);
   const [activeConnection, setActiveConnection] = useState<DatabaseConnection | null>(null);
+  const [sessionRefreshKey, setSessionRefreshKey] = useState(0);
   const [enableNarratives, setEnableNarratives] = useState<boolean>(() => {
     // Load from localStorage, default to true
     const stored = localStorage.getItem('enableNarratives');
@@ -58,8 +64,37 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const [restoringSession, setRestoringSession] = useState(() => !!sessionStorage.getItem('currentSessionId'));
   const { loading, executeQuery } = useMultiQuery();
   const { data: modelsData } = useModels();
+
+  // Keep session ID ref in sync for guarding in-flight queries
+  useEffect(() => {
+    sessionIdRef.current = currentSession?.id ?? null;
+  }, [currentSession?.id]);
+
+  // Persist current session ID in sessionStorage for page-reload recovery
+  useEffect(() => {
+    if (currentSession?.id) {
+      sessionStorage.setItem('currentSessionId', currentSession.id);
+    } else if (!restoringSession) {
+      sessionStorage.removeItem('currentSessionId');
+    }
+  }, [currentSession?.id, restoringSession]);
+
+  // Restore session from sessionStorage on mount
+  useEffect(() => {
+    const savedSessionId = sessionStorage.getItem('currentSessionId');
+    if (savedSessionId) {
+      chatAPI.getSession(savedSessionId)
+        .then(session => setCurrentSession(session))
+        .catch(() => sessionStorage.removeItem('currentSessionId'))
+        .finally(() => setRestoringSession(false));
+    } else {
+      setRestoringSession(false);
+    }
+  }, []);
 
   // Set default model when models load
   useEffect(() => {
@@ -135,7 +170,135 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const MESSAGES_PER_PAGE = 20;
+
+  // Convert API messages to local ChatMessage format
+  const convertApiMessages = (apiMessages: APIChatMessage[]): ChatMessage[] => {
+    return apiMessages
+      .filter((msg) => msg.role !== 'system')
+      .map((msg) => {
+        const base: ChatMessage = {
+          id: String(msg.id),
+          type: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        };
+
+        if (msg.role === 'assistant' && msg.response_data) {
+          const rd = msg.response_data;
+          if (rd.database_results) {
+            base.multiQueryResponse = rd as MultiDatabaseQueryResponse;
+          } else if (rd.sql !== undefined) {
+            base.multiQueryResponse = {
+              query_id: rd.query_id || 0,
+              question: rd.question || '',
+              database_results: [{
+                connection_id: 0,
+                connection_name: msg.databases_used?.[0]?.name || 'Database',
+                database_type: '',
+                success: rd.is_valid,
+                sql: rd.sql || '',
+                results: rd.results || [],
+                row_count: rd.row_count || 0,
+                execution_time_ms: rd.execution_time_ms || 0,
+                error: rd.warnings?.join(', ') || undefined,
+                result_analysis: rd.result_analysis,
+              }],
+              total_databases_queried: 1,
+              total_rows: rd.row_count || 0,
+              total_execution_time_ms: rd.execution_time_ms || 0,
+              warnings: rd.warnings || [],
+              cached: rd.cached || false,
+              timestamp: rd.timestamp || msg.created_at,
+            };
+          }
+        }
+        // Old messages without response_data render as text-only
+
+        return base;
+      });
+  };
+
+  // Load earlier messages
+  const loadMoreMessages = useCallback(async () => {
+    if (!currentSession || loadingMore || !hasMoreMessages) return;
+    setLoadingMore(true);
+    try {
+      const newOffset = messageOffset + MESSAGES_PER_PAGE;
+      const apiMessages: APIChatMessage[] = await chatAPI.getMessages(
+        currentSession.id, MESSAGES_PER_PAGE, newOffset, 'desc'
+      );
+      if (apiMessages.length > 0) {
+        // Reverse to chronological order and prepend
+        const older = convertApiMessages(apiMessages.reverse());
+        setMessages((prev) => [...older, ...prev]);
+        setMessageOffset(newOffset);
+        setHasMoreMessages(apiMessages.length === MESSAGES_PER_PAGE);
+      } else {
+        setHasMoreMessages(false);
+      }
+    } catch (error) {
+      console.error('Failed to load more messages:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [currentSession, loadingMore, hasMoreMessages, messageOffset]);
+
+  // Load chat history when session changes
+  useEffect(() => {
+    const welcomeMessage: ChatMessage = {
+      id: '1',
+      type: 'assistant',
+      content: "Hello! I'm your Database Guru! Ask me to help you fetch some data!",
+    };
+
+    // Don't load anything while we're restoring the saved session
+    if (restoringSession) return;
+
+    if (!currentSession) {
+      setMessages([welcomeMessage]);
+      setHasMoreMessages(false);
+      setMessageOffset(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadMessages = async () => {
+      setLoadingHistory(true);
+      setMessageOffset(0);
+      try {
+        // Fetch the most recent messages (newest first), then reverse for display
+        const apiMessages: APIChatMessage[] = await chatAPI.getMessages(
+          currentSession.id, MESSAGES_PER_PAGE, 0, 'desc'
+        );
+        if (cancelled) return;
+
+        if (apiMessages.length === 0) {
+          setMessages([welcomeMessage]);
+          setHasMoreMessages(false);
+        } else {
+          // Reverse back to chronological order
+          setMessages(convertApiMessages(apiMessages.reverse()));
+          setHasMoreMessages(apiMessages.length === MESSAGES_PER_PAGE);
+        }
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      } finally {
+        if (!cancelled) setLoadingHistory(false);
+      }
+    };
+
+    loadMessages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSession?.id, restoringSession]);
+
   const handleSubmit = async (question: string, rowLimit: number = 100) => {
+    // Capture session ID at submission time to guard against session switches
+    const submissionSessionId = currentSession?.id ?? null;
+
     // Add user message
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -153,6 +316,10 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
         row_limit: rowLimit,
       });
 
+      // If user switched sessions while query was running, don't append here.
+      // The result is already saved server-side and will load when they switch back.
+      if (sessionIdRef.current !== submissionSessionId) return;
+
       // Reset force refresh after query
       setForceSchemaRefresh(false);
 
@@ -168,6 +335,7 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
         multiQueryResponse: response,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+      setSessionRefreshKey((k) => k + 1);
 
       // Track last executed SQL for ER diagram query path overlay
       const firstSuccessful = response.database_results.find((r) => r.success && r.sql);
@@ -175,6 +343,9 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
         onLastSqlChange?.(firstSuccessful.sql);
       }
     } catch (error: any) {
+      // If user switched sessions, don't show error in wrong session
+      if (sessionIdRef.current !== submissionSessionId) return;
+
       // Add error message
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -213,6 +384,7 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
           <ChatSessionSelector
             currentSession={currentSession}
             onSessionChange={setCurrentSession}
+            refreshKey={sessionRefreshKey}
           />
         </div>
       )}
@@ -275,6 +447,11 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
                       </div>
                     )}
                   </div>
+
+                  {/* LLM Usage Badge */}
+                  {currentSession && (
+                    <SessionUsageBadge sessionId={currentSession.id} />
+                  )}
                 </div>
 
                 <div className="flex items-center space-x-4">
@@ -331,9 +508,12 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
                     </span>
                   </label>
 
-                  {/* Query count */}
+                  {/* Query count — count only user messages */}
                   <div className="text-xs text-gray-500">
-                    {messages.length - 1} {messages.length === 2 ? 'query' : 'queries'}
+                    {(() => {
+                      const queryCount = messages.filter(m => m.type === 'user').length;
+                      return `${queryCount} ${queryCount === 1 ? 'query' : 'queries'}`;
+                    })()}
                   </div>
                 </div>
               </div>
@@ -428,16 +608,45 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
             </div>
           )}
 
-          {messages.map((message) => (
-            <div key={message.id} className="flex items-start gap-4 animate-fadeIn">
-              <Message
-                type={message.type}
-                content={message.content}
-                multiQueryResponse={message.multiQueryResponse}
-                onViewLineage={onViewLineage}
-              />
+          {(loadingHistory || restoringSession) ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center space-x-3">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Loading conversation history...</span>
+              </div>
             </div>
-          ))}
+          ) : (
+            <>
+              {hasMoreMessages && (
+                <div className="flex justify-center py-3">
+                  <button
+                    onClick={loadMoreMessages}
+                    disabled={loadingMore}
+                    className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 glass-panel rounded-xl hover:bg-blue-500/10 transition-all border border-blue-500/20 disabled:opacity-50"
+                  >
+                    {loadingMore ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></span>
+                        Loading...
+                      </span>
+                    ) : (
+                      'Load earlier messages'
+                    )}
+                  </button>
+                </div>
+              )}
+              {messages.map((message) => (
+                <div key={message.id} className="flex items-start gap-4 animate-fadeIn">
+                  <Message
+                    type={message.type}
+                    content={message.content}
+                    multiQueryResponse={message.multiQueryResponse}
+                    onViewLineage={onViewLineage}
+                  />
+                </div>
+              ))}
+            </>
+          )}
 
           {/* Loading indicator */}
           {loading && (

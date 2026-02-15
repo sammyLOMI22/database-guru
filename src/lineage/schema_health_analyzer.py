@@ -704,7 +704,7 @@ class SchemaHealthAnalyzer:
         if self.client:
             try:
                 llm_result = await self._generate_llm_insights(
-                    schema, pattern_data, report, effective_timeout
+                    schema, pattern_data, report, effective_timeout, db=db
                 )
                 if llm_result:
                     report.summary = llm_result.get("summary", report.summary)
@@ -972,6 +972,7 @@ class SchemaHealthAnalyzer:
         pattern_data: Dict[str, Any],
         report: SchemaHealthReport,
         timeout: float,
+        db: Optional[AsyncSession] = None,
     ) -> Optional[Dict]:
         """Generate LLM-enhanced insights."""
         if not self.client:
@@ -1007,7 +1008,13 @@ class SchemaHealthAnalyzer:
         try:
             model = self._get_model()
             response = await asyncio.wait_for(
-                self.client.generate(prompt=prompt, model=model, temperature=0.2),
+                self.client.generate(
+                    prompt=prompt,
+                    model=model,
+                    temperature=0.2,
+                    db=db,
+                    agent_type="schema_health_analyzer"
+                ),
                 timeout=timeout,
             )
 

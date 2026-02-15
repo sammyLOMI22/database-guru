@@ -151,6 +151,36 @@ uploads/
 - Query planning considers both database and file sources
 - DuckDB session ensures all file tables are loaded before query execution
 
+## LLM Usage Monitoring (Phase 16 - February 2026)
+**Status**: PRODUCTION-READY
+
+### Components
+- `LLMUsageTracker` (`src/services/llm_usage_tracker.py`) - Centralized tracking service
+- `LLMCostService` (`src/services/llm_cost_service.py`) - Model config and cost calculation
+- `LLMUsageAggregator` (`src/services/llm_usage_aggregator.py`) - Pre-computed statistics
+
+### Features
+- **Context Manager API** - `async with tracker.track_call(...)` wraps any LLM call transparently
+- **Token Estimation** - tiktoken (cl100k_base) encoder with character-count fallback
+- **Native Token Counts** - Extracts actual counts from Ollama, OpenAI, Anthropic, Azure responses
+- **Cost Calculation** - Per-model pricing with configurable rates per 1M tokens
+- **Pre-computed Aggregates** - Hourly/daily rollups by agent, provider, and model
+- **Per-Session Tracking** - Links usage to chat sessions and query history
+- **Error Tracking** - Records failed calls with error messages
+- **9 REST API Endpoints** - Stats, breakdowns by agent/model/provider, timeseries, session usage
+- **Frontend Dashboard** - Full monitoring UI with charts, stat cards, and recent call log
+- **Session Usage Badge** - Inline token/cost display in chat header
+- **Session Usage Summary** - Expandable agent breakdown per chat session
+
+### Tracked Agents
+All LLM-calling agents are instrumented:
+- SQL Generator (via `ollama_client.py`)
+- Self-Correcting Agent
+- Query Planning Agent
+- Result Narrator
+- Lineage Narrator, Impact Advisor, Schema Health Analyzer
+- Pattern Intelligence, Lineage Conversation Agent
+
 ## Database Schema
 
 The system maintains its own metadata database (`database_guru.db`):
@@ -169,3 +199,6 @@ The system maintains its own metadata database (`database_guru.db`):
 | `column_mappings` | Learned column name corrections |
 | `table_mappings` | Learned table name corrections |
 | `result_validation_patterns` | Learned result validation patterns |
+| `llm_usage` | Individual LLM API call records with tokens, cost, timing (Phase 16) |
+| `llm_usage_aggregate` | Pre-computed hourly/daily usage statistics (Phase 16) |
+| `llm_model_config` | Model metadata, capabilities, and cost rates (Phase 16) |

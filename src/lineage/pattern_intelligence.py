@@ -579,6 +579,8 @@ class PatternIntelligenceAgent:
         connection_id: int,
         time_range_days: Optional[int] = 30,
         include_trends: bool = True,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> PatternIntelligenceReport:
         """
         Perform complete pattern intelligence analysis.
@@ -608,13 +610,15 @@ class PatternIntelligenceAgent:
         # Step 4: Analyze bottlenecks with LLM
         for bottleneck in heatmap_data.bottlenecks[:5]:  # Top 5
             analysis = await self.analyze_bottleneck(
-                bottleneck, db, connection_id, queries
+                bottleneck, db, connection_id, queries,
+                chat_session_id=chat_session_id, chat_message_id=chat_message_id
             )
             report.bottleneck_analyses.append(analysis)
 
         # Step 5: Generate optimization suggestions
         report.optimization_suggestions = await self._generate_optimizations(
-            heatmap_data, report.anti_patterns, db, connection_id
+            heatmap_data, report.anti_patterns, db, connection_id,
+            chat_session_id=chat_session_id, chat_message_id=chat_message_id
         )
 
         # Step 6: Trend analysis
@@ -635,6 +639,8 @@ class PatternIntelligenceAgent:
         db: AsyncSession,
         connection_id: int,
         queries: Optional[List[QueryHistory]] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> BottleneckAnalysis:
         """Analyze a single bottleneck with LLM enhancement."""
         # Get sample slow queries for this table
@@ -675,7 +681,10 @@ class PatternIntelligenceAgent:
         # LLM enhancement
         if self.client and slow_queries:
             try:
-                llm_analysis = await self._llm_analyze_bottleneck(bottleneck, slow_queries)
+                llm_analysis = await self._llm_analyze_bottleneck(
+                    bottleneck, slow_queries, db=db,
+                    chat_session_id=chat_session_id, chat_message_id=chat_message_id
+                )
                 if llm_analysis:
                     analysis.root_causes = self._normalize_string_list(
                         llm_analysis.get("root_causes", analysis.root_causes)
@@ -697,6 +706,9 @@ class PatternIntelligenceAgent:
         self,
         bottleneck: PerformanceBottleneck,
         slow_queries: List[str],
+        db: Optional[AsyncSession] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> Optional[Dict]:
         """Get LLM analysis for a bottleneck."""
         prompt = BOTTLENECK_ANALYSIS_PROMPT.format(
@@ -712,7 +724,15 @@ class PatternIntelligenceAgent:
         try:
             model = self._get_model()
             response = await asyncio.wait_for(
-                self.client.generate(prompt=prompt, model=model, temperature=0.2),
+                self.client.generate(
+                    prompt=prompt,
+                    model=model,
+                    temperature=0.2,
+                    db=db,
+                    agent_type="pattern_intelligence_bottleneck",
+                    chat_session_id=chat_session_id,
+                    chat_message_id=chat_message_id,
+                ),
                 timeout=self.timeout_seconds,
             )
             return parse_json_response(response)
@@ -726,6 +746,8 @@ class PatternIntelligenceAgent:
         anti_patterns: List[QueryAntiPattern],
         db: AsyncSession,
         connection_id: int,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
     ) -> List[OptimizationSuggestion]:
         """Generate optimization suggestions."""
         suggestions = []

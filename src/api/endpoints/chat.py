@@ -8,13 +8,37 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_db
-from src.database.models import ChatSession, ChatMessage, DatabaseConnection, FileSource
+from src.database.models import ChatSession, ChatMessage, DatabaseConnection, FileSource, QueryHistory
 
 from src.llm.conversational_memory_agent import get_memory_agent
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+
+def prepare_response_for_storage(response_data: dict, max_rows: int = 100) -> dict:
+    """Cap result rows and strip verbose trace data for storage."""
+    data = {**response_data}
+    if "database_results" in data:
+        capped = []
+        for r in data["database_results"]:
+            r = {**r}
+            r.pop("agent_trace", None)
+            r.pop("query_plan", None)
+            r.pop("attempts", None)
+            if r.get("results") and len(r["results"]) > max_rows:
+                r["results"] = r["results"][:max_rows]
+            capped.append(r)
+        data["database_results"] = capped
+    else:
+        # Single-db QueryResponse shape
+        data.pop("agent_trace", None)
+        data.pop("query_plan", None)
+        data.pop("attempts", None)
+        if data.get("results") and len(data["results"]) > max_rows:
+            data["results"] = data["results"][:max_rows]
+    return data
 
 
 # Request/Response Models
@@ -86,6 +110,8 @@ class ChatMessageResponse(BaseModel):
     content: str
     query_history_id: Optional[int]
     databases_used: Optional[List[dict]]
+    query_sql: Optional[str] = None
+    response_data: Optional[dict] = None
     created_at: str
 
     class Config:
@@ -453,9 +479,14 @@ async def get_chat_messages(
     session_id: str,
     limit: int = 100,
     offset: int = 0,
+    order: str = "asc",
     db: AsyncSession = Depends(get_db),
 ):
-    """Get messages for a chat session"""
+    """Get messages for a chat session.
+
+    Args:
+        order: 'asc' (oldest first) or 'desc' (newest first)
+    """
     try:
         # Verify session exists
         session_result = await db.execute(
@@ -467,15 +498,17 @@ async def get_chat_messages(
                 detail=f"Chat session {session_id} not found"
             )
 
-        # Get messages
+        # Get messages with query history SQL via outer join
+        order_clause = ChatMessage.created_at.desc() if order == "desc" else ChatMessage.created_at
         result = await db.execute(
-            select(ChatMessage)
+            select(ChatMessage, QueryHistory.generated_sql)
+            .outerjoin(QueryHistory, ChatMessage.query_history_id == QueryHistory.id)
             .where(ChatMessage.chat_session_id == session_id)
-            .order_by(ChatMessage.created_at)
+            .order_by(order_clause)
             .limit(limit)
             .offset(offset)
         )
-        messages = result.scalars().all()
+        rows = result.all()
 
         return [
             ChatMessageResponse(
@@ -485,9 +518,11 @@ async def get_chat_messages(
                 content=msg.content,
                 query_history_id=msg.query_history_id,
                 databases_used=msg.databases_used,
+                query_sql=sql,
+                response_data=msg.response_data,
                 created_at=msg.created_at.isoformat(),
             )
-            for msg in messages
+            for msg, sql in rows
         ]
 
     except HTTPException:
@@ -544,6 +579,7 @@ async def create_chat_message(
             content=new_message.content,
             query_history_id=new_message.query_history_id,
             databases_used=new_message.databases_used,
+            response_data=new_message.response_data,
             created_at=new_message.created_at.isoformat(),
         )
 
