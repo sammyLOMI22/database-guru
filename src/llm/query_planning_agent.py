@@ -651,6 +651,11 @@ class QueryPlanningAgent:
             )
             sql = sql_result.get("sql")
             mappings_applied = sql_result.get("mappings_applied")
+            # Aggregate SQL generation tokens into planning token_info
+            gen_token_info = sql_result.get("token_info", {})
+            if gen_token_info:
+                planning_token_info["input_tokens"] = (planning_token_info.get("input_tokens") or 0) + (gen_token_info.get("input_tokens") or 0)
+                planning_token_info["output_tokens"] = (planning_token_info.get("output_tokens") or 0) + (gen_token_info.get("output_tokens") or 0)
 
         result = {
             "plan": plan,

@@ -178,7 +178,7 @@ class ResultNarrator:
                     narrator_token_info = {
                         "input_tokens": llm_response.get("prompt_eval_count"),
                         "output_tokens": llm_response.get("eval_count"),
-                        "model": self.model,
+                        "model": self.model or llm_response.get("model") or getattr(self.ollama, "model", None),
                     }
                 else:
                     response_text = str(llm_response)

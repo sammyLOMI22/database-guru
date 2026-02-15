@@ -594,11 +594,13 @@ class SelfCorrectingSQLAgent:
                     chat_session_id=chat_session_id,
                     chat_message_id=chat_message_id,
                 )
+                fix_token_info = fix_result.get("token_info", {})
                 return {
                     "sql": fix_result["sql"],
                     "fix_method": "llm",
                     "confidence": 0.6,  # Default confidence for LLM fixes
                     "explanation": "LLM-generated correction",
+                    "token_info": fix_token_info,
                 }
             except Exception as e:
                 logger.warning(f"LLM fix failed: {e}")
@@ -633,6 +635,7 @@ class SelfCorrectingSQLAgent:
                         "explanation": f"Tool-assisted fix using {len(tool_result.tools_used)} tools: {', '.join(tool_result.tools_used[:3])}",
                         "tools_used": tool_result.tools_used,
                         "enriched_context": tool_result.enriched_context[:200] if tool_result.enriched_context else None,
+                        "token_info": tool_result.token_info or {},
                     }
                 return None
             except Exception as e:
@@ -732,10 +735,13 @@ class SelfCorrectingSQLAgent:
                     "llm": "llm_fix",
                     "tool_using": "tool_fix",
                 }
+                step_metadata = {"confidence": conf, "elapsed_ms": metrics["elapsed_ms"]}
+                if result.get("token_info"):
+                    step_metadata.update(result["token_info"])
                 trace.add_step(
                     step_type_map.get(method, "fix_attempt"),
                     f"{method.replace('_', ' ').title()} succeeded: {result['explanation']}",
-                    metadata={"confidence": conf, "elapsed_ms": metrics["elapsed_ms"]}
+                    metadata=step_metadata
                 )
             else:
                 metrics["strategies_failed"] += 1
@@ -786,6 +792,7 @@ class SelfCorrectingSQLAgent:
                 "confidence": 0.5,
                 "explanation": "Fallback LLM correction (parallel strategies failed)",
                 "metrics": metrics,
+                "token_info": fix_result.get("token_info", {}),
             }
 
     async def generate_and_execute_with_retry(
@@ -1157,14 +1164,17 @@ class SelfCorrectingSQLAgent:
                                 )
                                 if tool_result.success and tool_result.enriched_context:
                                     enhanced_schema = f"{schema}\n\n{tool_result.enriched_context}"
+                                    tool_ctx_meta = {
+                                        "tools_used": tool_result.tools_used,
+                                        "context_length": len(tool_result.enriched_context),
+                                        "confidence": tool_result.confidence,
+                                    }
+                                    if tool_result.token_info:
+                                        tool_ctx_meta.update(tool_result.token_info)
                                     trace.add_step(
                                         "tool_context",
                                         f"Gathered context using {len(tool_result.tools_used)} tools: {', '.join(tool_result.tools_used[:5])}",
-                                        metadata={
-                                            "tools_used": tool_result.tools_used,
-                                            "context_length": len(tool_result.enriched_context),
-                                            "confidence": tool_result.confidence,
-                                        }
+                                        metadata=tool_ctx_meta
                                     )
                                     logger.info(f"✅ Tool exploration complete: {len(tool_result.tools_used)} tools used")
                             except Exception as e:
