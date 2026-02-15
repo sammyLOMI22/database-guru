@@ -1,83 +1,49 @@
 # Phase 23: Action Plan
-**Branch:** `docker-containerization`
 
-This action plan outlines critical fixes and recommended next steps based on the technical audit. These are suggestions for immediate implementation to ensure production readiness.
+**Date:** 2026-02-15
+**Status:** Post-Audit
+**Prepared By:** Antigravity Agent
 
-## 1. 🛡️ Security Hardening (High Priority)
-**Issue:** Application connects as `postgres` superuser (or whatever `POSTGRES_USER` is set to, which defaults to `dbguru`).
-**Fix:** Create a dedicated application user with limited privileges.
+## 1. Critical Immediate Fixes (Conf/Code)
 
-**Proposed Changes:**
-- **File:** `docker/init-db.sh` (New file)
-- **Action:** Add an initialization script to Postgres docker entrypoint.
+### A. Docker Compose `DATABASE_URL` Mismatch
+**Issue:** The `backend` service defaults to SQLite even if the `postgres` profile is active.
+**Fix:** Use an environment variable override or a `docker-compose.override.yml` pattern. For the main file, we can use a conditional approach or document the env var requirement clearly.
 
-```bash
-#!/bin/bash
-set -e
-
-# Create a restricted user for the application
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
-    CREATE USER app_runtime_user WITH PASSWORD '$APP_DB_PASSWORD';
-    GRANT CONNECT ON DATABASE $POSTGRES_DB TO app_runtime_user;
-    GRANT USAGE ON SCHEMA public TO app_runtime_user;
-    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_runtime_user;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_runtime_user;
-EOSQL
+**Snippet (`docker-compose.yml` suggestion):**
+```yaml
+  backend:
+    environment:
+      # Allow override, but default to SQLite if not specified. 
+      # Users running profile:full MUST set DATABASE_URL in .env
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/database_guru.db} 
 ```
 
-## 2. 🔄 Reliability Improvements (Medium Priority)
-**Issue:** `OllamaClient` lacks retry logic for transient failures.
-**Fix:** Add `tenacity` retry decorator to generation methods.
+### B. LLM Model Availability Check
+**Issue:** `docker-compose.yml` defaults to `llama3.2:latest`. If the user hasn't pulled this specific tag, the `ollama` container starts empty, and the app might timeout waiting for the *first* generation or pull.
+**Fix:** Add a dedicated `init-ollama` service or detailed check in the `ollama-pull` service to ensure readiness before backend starts.
 
-**Proposed Changes:**
-- **File:** `src/llm/ollama_client.py`
-- **Action:** Decorate `generate` and `embeddings` methods.
-
-```python
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-import httpx
-
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type((httpx.ConnectError, httpx.ReadTimeout))
-)
-async def generate(self, ...):
-    # ... existing code ...
+**Snippet (`docker-compose.yml` suggestion):**
+```yaml
+  ollama-pull:
+    # ... existing config ...
+    entrypoint: ["/bin/sh", "-c", "ollama pull ${OLLAMA_MODEL:-llama3.2:latest} && echo 'Model ready'"]
 ```
 
-## 3. 🏗️ Architectural Refactoring (Low Priority / Tech Debt)
-**Issue:** `src/llm/prompts.py` is a large monolithic file.
-**Fix:** Split into a module structure.
+## 2. Recommended Refactors (Next Iteration)
 
-**Proposed Structure:**
-```text
-src/llm/prompts/
-├── __init__.py
-├── sql_generation.py    # SYSTEM_PROMPT, SQL_GENERATION_TEMPLATE
-├── analysis.py          # NARRATIVE_GENERATION_PROMPT, SCHEMA_ANALYSIS
-└── dialects.py          # DIALECT_RULES
-```
-**Action:** Move constants to respective files and update imports in `ollama_client.py` and agents.
+### A. Lineage Parser - Recursive Common Table Expressions (CTE)
+**Observation:** The current CTE parser handles basic `WITH` clauses but might struggle with recursive CTEs (`WITH RECURSIVE`) which are common in hierarchical data (like org charts).
+**Suggestion:** Add a specific recursion depth check or `RECURSIVE` keyword handler in `_extract_ctes`.
 
-## 4. 🧬 Data Lineage Depth (Medium Priority)
-**Issue:** `sql_lineage_parser.py` may miss Common Table Expressions (CTEs).
-**Fix:** Add CTE extraction logic using `sqlparse`.
+### B. Frontend "Connection Status" Indicator
+**Observation:** The UI doesn't clearly show *which* backend DB is currently active (SQLite vs Postgres) or the status of the Ollama connection.
+**Suggestion:** Add a status pill in the `SettingsPanel` or `Sidebar`.
 
-**Proposed Snippet:**
-```python
-# In SQLLineageParser class
+## 3. Future Innovation (Phase 24+)
 
-def _extract_ctes(self, stmt):
-    """Extract CTE definitions explicitly"""
-    ctes = {}
-    # Iterate through tokens to find WITH clause
-    # Logic to parse CTE name and its definition
-    # This involves finding the 'AS' keyword and the parenthesized query
-    return ctes
-```
+### A. "Smart Caching" based on Lineage
+**Concept:** Use the extracted lineage to invalidate cache intelligently. If the lineage shows a query depends on `sales_table`, and we detect a write to `sales_table`, we invalidate only related queries.
 
-## 5. 🚀 Next Steps (Future Roadmap)
-1.  **Observability:** Implement OpenTelemetry in the Docker stack (Jaeger/Prometheus).
-2.  **Smart Insights:** Use the Lineage Graph to suggest query optimizations to the user automatically (e.g., "You are filtering on a non-indexed column").
-3.  **Visual Lineage:** Add a React Flow component to the frontend to visualize the `LineageGraph` JSON returned by the backend.
+### B. "Explain Plan" Visualization
+**Concept:** Since we parse the SQL, we can run `EXPLAIN (FORMAT JSON)` on Postgres and visualize the query cost alongside the lineage graph.
