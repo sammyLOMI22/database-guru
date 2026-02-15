@@ -51,8 +51,12 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
   const [hasContext, setHasContext] = useState(false);
   const [forceSchemaRefresh, setForceSchemaRefresh] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [messageOffset, setMessageOffset] = useState(0);
   const [perTaskModels, setPerTaskModels] = useState<PerTaskModelSettings | null>(null);
   const [activeConnection, setActiveConnection] = useState<DatabaseConnection | null>(null);
+  const [sessionRefreshKey, setSessionRefreshKey] = useState(0);
   const [enableNarratives, setEnableNarratives] = useState<boolean>(() => {
     // Load from localStorage, default to true
     const stored = localStorage.getItem('enableNarratives');
@@ -166,6 +170,79 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const MESSAGES_PER_PAGE = 20;
+
+  // Convert API messages to local ChatMessage format
+  const convertApiMessages = (apiMessages: APIChatMessage[]): ChatMessage[] => {
+    return apiMessages
+      .filter((msg) => msg.role !== 'system')
+      .map((msg) => {
+        const base: ChatMessage = {
+          id: String(msg.id),
+          type: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        };
+
+        if (msg.role === 'assistant' && msg.response_data) {
+          const rd = msg.response_data;
+          if (rd.database_results) {
+            base.multiQueryResponse = rd as MultiDatabaseQueryResponse;
+          } else if (rd.sql !== undefined) {
+            base.multiQueryResponse = {
+              query_id: rd.query_id || 0,
+              question: rd.question || '',
+              database_results: [{
+                connection_id: 0,
+                connection_name: msg.databases_used?.[0]?.name || 'Database',
+                database_type: '',
+                success: rd.is_valid,
+                sql: rd.sql || '',
+                results: rd.results || [],
+                row_count: rd.row_count || 0,
+                execution_time_ms: rd.execution_time_ms || 0,
+                error: rd.warnings?.join(', ') || undefined,
+                result_analysis: rd.result_analysis,
+              }],
+              total_databases_queried: 1,
+              total_rows: rd.row_count || 0,
+              total_execution_time_ms: rd.execution_time_ms || 0,
+              warnings: rd.warnings || [],
+              cached: rd.cached || false,
+              timestamp: rd.timestamp || msg.created_at,
+            };
+          }
+        }
+        // Old messages without response_data render as text-only
+
+        return base;
+      });
+  };
+
+  // Load earlier messages
+  const loadMoreMessages = useCallback(async () => {
+    if (!currentSession || loadingMore || !hasMoreMessages) return;
+    setLoadingMore(true);
+    try {
+      const newOffset = messageOffset + MESSAGES_PER_PAGE;
+      const apiMessages: APIChatMessage[] = await chatAPI.getMessages(
+        currentSession.id, MESSAGES_PER_PAGE, newOffset, 'desc'
+      );
+      if (apiMessages.length > 0) {
+        // Reverse to chronological order and prepend
+        const older = convertApiMessages(apiMessages.reverse());
+        setMessages((prev) => [...older, ...prev]);
+        setMessageOffset(newOffset);
+        setHasMoreMessages(apiMessages.length === MESSAGES_PER_PAGE);
+      } else {
+        setHasMoreMessages(false);
+      }
+    } catch (error) {
+      console.error('Failed to load more messages:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [currentSession, loadingMore, hasMoreMessages, messageOffset]);
+
   // Load chat history when session changes
   useEffect(() => {
     const welcomeMessage: ChatMessage = {
@@ -179,6 +256,8 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
 
     if (!currentSession) {
       setMessages([welcomeMessage]);
+      setHasMoreMessages(false);
+      setMessageOffset(0);
       return;
     }
 
@@ -186,81 +265,21 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
 
     const loadMessages = async () => {
       setLoadingHistory(true);
+      setMessageOffset(0);
       try {
-        const apiMessages: APIChatMessage[] = await chatAPI.getMessages(currentSession.id);
+        // Fetch the most recent messages (newest first), then reverse for display
+        const apiMessages: APIChatMessage[] = await chatAPI.getMessages(
+          currentSession.id, MESSAGES_PER_PAGE, 0, 'desc'
+        );
         if (cancelled) return;
 
         if (apiMessages.length === 0) {
           setMessages([welcomeMessage]);
+          setHasMoreMessages(false);
         } else {
-          setMessages(
-            apiMessages
-              .filter((msg) => msg.role !== 'system')
-              .map((msg) => {
-                const base: ChatMessage = {
-                  id: String(msg.id),
-                  type: msg.role as 'user' | 'assistant',
-                  content: msg.content,
-                };
-
-                if (msg.role === 'assistant' && msg.response_data) {
-                  // Use persisted response_data directly
-                  const rd = msg.response_data;
-                  if (rd.database_results) {
-                    // Multi-database response shape
-                    base.multiQueryResponse = rd as MultiDatabaseQueryResponse;
-                  } else if (rd.sql !== undefined) {
-                    // Single-database QueryResponse — convert to multi-db format
-                    base.multiQueryResponse = {
-                      query_id: rd.query_id || 0,
-                      question: rd.question || '',
-                      database_results: [{
-                        connection_id: 0,
-                        connection_name: msg.databases_used?.[0]?.name || 'Database',
-                        database_type: '',
-                        success: rd.is_valid,
-                        sql: rd.sql || '',
-                        results: rd.results || [],
-                        row_count: rd.row_count || 0,
-                        execution_time_ms: rd.execution_time_ms || 0,
-                        error: rd.warnings?.join(', ') || undefined,
-                        result_analysis: rd.result_analysis,
-                      }],
-                      total_databases_queried: 1,
-                      total_rows: rd.row_count || 0,
-                      total_execution_time_ms: rd.execution_time_ms || 0,
-                      warnings: rd.warnings || [],
-                      cached: rd.cached || false,
-                      timestamp: rd.timestamp || msg.created_at,
-                    };
-                  }
-                } else if (msg.role === 'assistant' && msg.databases_used?.length) {
-                  // Fallback for old messages without response_data
-                  base.multiQueryResponse = {
-                    query_id: msg.query_history_id || 0,
-                    question: '',
-                    database_results: msg.databases_used.map((db) => ({
-                      connection_id: db.conn_id,
-                      connection_name: db.name,
-                      database_type: '',
-                      sql: msg.query_sql || '',
-                      success: true,
-                      row_count: db.rows,
-                      results: [],
-                      execution_time_ms: 0,
-                    })),
-                    total_databases_queried: msg.databases_used.length,
-                    total_rows: msg.databases_used.reduce((sum, db) => sum + (db.rows || 0), 0),
-                    total_execution_time_ms: 0,
-                    warnings: [],
-                    cached: false,
-                    timestamp: msg.created_at,
-                  };
-                }
-
-                return base;
-              })
-          );
+          // Reverse back to chronological order
+          setMessages(convertApiMessages(apiMessages.reverse()));
+          setHasMoreMessages(apiMessages.length === MESSAGES_PER_PAGE);
         }
       } catch (error) {
         console.error('Failed to load chat history:', error);
@@ -316,6 +335,7 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
         multiQueryResponse: response,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+      setSessionRefreshKey((k) => k + 1);
 
       // Track last executed SQL for ER diagram query path overlay
       const firstSuccessful = response.database_results.find((r) => r.success && r.sql);
@@ -364,6 +384,7 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
           <ChatSessionSelector
             currentSession={currentSession}
             onSessionChange={setCurrentSession}
+            refreshKey={sessionRefreshKey}
           />
         </div>
       )}
@@ -487,9 +508,12 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
                     </span>
                   </label>
 
-                  {/* Query count */}
+                  {/* Query count — count only user messages */}
                   <div className="text-xs text-gray-500">
-                    {messages.length - 1} {messages.length === 2 ? 'query' : 'queries'}
+                    {(() => {
+                      const queryCount = messages.filter(m => m.type === 'user').length;
+                      return `${queryCount} ${queryCount === 1 ? 'query' : 'queries'}`;
+                    })()}
                   </div>
                 </div>
               </div>
@@ -592,16 +616,36 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
               </div>
             </div>
           ) : (
-            messages.map((message) => (
-              <div key={message.id} className="flex items-start gap-4 animate-fadeIn">
-                <Message
-                  type={message.type}
-                  content={message.content}
-                  multiQueryResponse={message.multiQueryResponse}
-                  onViewLineage={onViewLineage}
-                />
-              </div>
-            ))
+            <>
+              {hasMoreMessages && (
+                <div className="flex justify-center py-3">
+                  <button
+                    onClick={loadMoreMessages}
+                    disabled={loadingMore}
+                    className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 glass-panel rounded-xl hover:bg-blue-500/10 transition-all border border-blue-500/20 disabled:opacity-50"
+                  >
+                    {loadingMore ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></span>
+                        Loading...
+                      </span>
+                    ) : (
+                      'Load earlier messages'
+                    )}
+                  </button>
+                </div>
+              )}
+              {messages.map((message) => (
+                <div key={message.id} className="flex items-start gap-4 animate-fadeIn">
+                  <Message
+                    type={message.type}
+                    content={message.content}
+                    multiQueryResponse={message.multiQueryResponse}
+                    onViewLineage={onViewLineage}
+                  />
+                </div>
+              ))}
+            </>
           )}
 
           {/* Loading indicator */}

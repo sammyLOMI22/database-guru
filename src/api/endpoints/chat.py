@@ -479,9 +479,14 @@ async def get_chat_messages(
     session_id: str,
     limit: int = 100,
     offset: int = 0,
+    order: str = "asc",
     db: AsyncSession = Depends(get_db),
 ):
-    """Get messages for a chat session"""
+    """Get messages for a chat session.
+
+    Args:
+        order: 'asc' (oldest first) or 'desc' (newest first)
+    """
     try:
         # Verify session exists
         session_result = await db.execute(
@@ -494,11 +499,12 @@ async def get_chat_messages(
             )
 
         # Get messages with query history SQL via outer join
+        order_clause = ChatMessage.created_at.desc() if order == "desc" else ChatMessage.created_at
         result = await db.execute(
             select(ChatMessage, QueryHistory.generated_sql)
             .outerjoin(QueryHistory, ChatMessage.query_history_id == QueryHistory.id)
             .where(ChatMessage.chat_session_id == session_id)
-            .order_by(ChatMessage.created_at)
+            .order_by(order_clause)
             .limit(limit)
             .offset(offset)
         )

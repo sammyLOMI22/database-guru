@@ -5,6 +5,7 @@ import type { ChatSession, DatabaseConnection, ConnectionInfo, FileSource } from
 interface ChatSessionSelectorProps {
   currentSession: ChatSession | null;
   onSessionChange: (session: ChatSession | null) => void;
+  refreshKey?: number;
 }
 
 // UI rotation interval for cycling through connected databases
@@ -45,13 +46,13 @@ function RotatingConnection({ connections }: { connections: ConnectionInfo[] }) 
   );
 }
 
-export default function ChatSessionSelector({ currentSession, onSessionChange }: ChatSessionSelectorProps) {
+export default function ChatSessionSelector({ currentSession, onSessionChange, refreshKey }: ChatSessionSelectorProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     loadSessions();
-  }, []);
+  }, [refreshKey]);
 
   const loadSessions = async () => {
     try {
