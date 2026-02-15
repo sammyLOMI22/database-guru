@@ -1,49 +1,52 @@
-# Multi-stage build
-FROM python:3.11-slim as builder
+# ---- Builder Stage ----
+FROM python:3.11-slim AS builder
 
-# Install build dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc python3-dev libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Create user
-RUN useradd -m -u 1000 appuser
-
-WORKDIR /app
-
-# Install Python dependencies
+WORKDIR /build
 COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Production stage
+# ---- Production Stage ----
 FROM python:3.11-slim
 
-# Install runtime dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libpq5 && \
+    apt-get install -y --no-install-recommends libpq5 curl && \
     rm -rf /var/lib/apt/lists/* && \
-    useradd -m -u 1000 appuser
+    useradd -m -u 1000 -s /usr/sbin/nologin appuser
 
-# Copy Python packages from builder
-COPY --from=builder /home/appuser/.local /home/appuser/.local
+COPY --from=builder /install /usr/local
 
 WORKDIR /app
 
-# Copy application
+# Copy application code
 COPY --chown=appuser:appuser ./src ./src
+COPY --chown=appuser:appuser ./alembic ./alembic
+COPY --chown=appuser:appuser ./alembic.ini ./alembic.ini
 COPY --chown=appuser:appuser ./configs ./configs
 
-# Set environment
-ENV PATH=/home/appuser/.local/bin:$PATH \
-    PYTHONUNBUFFERED=1 \
+# Copy entrypoint
+COPY --chown=appuser:appuser ./docker/app/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Create data directories
+RUN mkdir -p /app/data /app/uploads /app/logs && \
+    chown -R appuser:appuser /app/data /app/uploads /app/logs
+
+# Remove setuid/setgid binaries to reduce privilege escalation surface
+RUN find / -perm /6000 -type f -exec chmod a-s {} + 2>/dev/null || true
+
+ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 USER appuser
 
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

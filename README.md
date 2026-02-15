@@ -9,13 +9,41 @@ AI-powered natural language to SQL query assistant. Ask questions about your dat
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Docker (Recommended)
+
+The fastest way to get started — no Python, Node.js, or dependency management required:
+
+```bash
+# 1. Copy and edit environment variables
+cp .env.docker.example .env
+
+# 2. Start the app (SQLite + BYO LLM)
+docker compose up -d
+
+# 3. Open http://localhost:3000
+```
+
+Make sure Ollama is running on your host machine (`ollama serve`), or use the bundled Ollama profile:
+
+```bash
+# With bundled Ollama (auto-pulls model)
+docker compose --profile ollama up -d
+
+# Full stack (PostgreSQL + Redis + Ollama)
+docker compose --profile full --profile ollama up -d
+```
+
+See [Docker Deployment Guide](docs/guides/DOCKER_DEPLOYMENT_GUIDE.md) for all options including GPU setup.
+
+### Local Development
+
+#### Prerequisites
 - Python 3.11+
 - Node.js 18+
 - Ollama (for local LLM)
 - Redis (optional, for persistent caching - uses in-memory fallback if not available)
 
-### One-Command Startup
+#### One-Command Startup
 
 **Option 1: Application Only** (assumes Redis/Ollama already running)
 ```bash
