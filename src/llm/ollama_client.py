@@ -64,7 +64,7 @@ class OllamaClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout)),
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout)),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
@@ -166,7 +166,7 @@ class OllamaClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout)),
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout)),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
@@ -294,7 +294,7 @@ class OllamaClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout)),
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout)),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )

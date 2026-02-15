@@ -62,7 +62,8 @@ async def lifespan(app: FastAPI):
         try:
             run_alembic_migrations()
         except Exception as e:
-            logger.warning(f"Alembic migrations failed (non-fatal): {e}")
+            logger.error(f"Alembic migrations failed: {e}")
+            raise
     else:
         logger.info("Migrations already handled by entrypoint, skipping")
 

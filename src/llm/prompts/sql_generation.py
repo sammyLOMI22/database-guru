@@ -352,7 +352,7 @@ Apply these filters in your WHERE clause:
         if columns:
             entity_notes.append(f"Columns mentioned: {', '.join(e.schema_match for e in columns)}")
         if locations:
-            loc_info = [f"{e.original_text}\u2192{e.normalized_value}" for e in locations if e.normalized_value]
+            loc_info = [f"{e.original_text}→{e.normalized_value}" for e in locations if e.normalized_value]
             if loc_info:
                 entity_notes.append(f"Locations: {', '.join(loc_info)}")
 
@@ -365,13 +365,13 @@ Apply these filters in your WHERE clause:
 
     # Wrap in clear delimiters
     return f"""
-\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+═══════════════════════════════════════════════════════════════
 QUERY INTENT ANALYSIS (Confidence: {intent_result.confidence:.0%})
-\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+═══════════════════════════════════════════════════════════════
 
 {chr(10).join(sections)}
 
-\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+═══════════════════════════════════════════════════════════════
 """
 
 

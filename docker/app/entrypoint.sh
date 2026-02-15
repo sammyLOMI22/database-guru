@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# Validate required configuration
+if [ -z "$SECRET_KEY" ]; then
+    echo "ERROR: SECRET_KEY is not set. Generate one with: openssl rand -hex 32" >&2
+    exit 1
+fi
+
 # Ensure data directories exist (volumes may mount over them)
 mkdir -p /app/data /app/uploads /app/logs
 
@@ -20,7 +26,11 @@ from src.database import models  # register models
 from sqlalchemy import create_engine
 
 settings = Settings()
-url = settings.DATABASE_URL.replace('+aiosqlite', '').replace('+asyncpg', '')
+url = settings.DATABASE_URL
+if '+aiosqlite' in url:
+    url = url.replace('+aiosqlite', '')
+elif '+asyncpg' in url:
+    url = url.replace('+asyncpg', '+psycopg2')
 engine = create_engine(url)
 Base.metadata.create_all(engine)
 engine.dispose()
