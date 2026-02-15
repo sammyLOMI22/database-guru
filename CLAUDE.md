@@ -36,9 +36,20 @@ npm run lint     # Lint
 
 ### System
 ```bash
-./start.sh       # Start all services
-./stop.sh        # Stop all services
+./start.sh       # Start all services (local dev)
+./stop.sh        # Stop all services (local dev)
 ollama serve     # Ensure Ollama is running
+```
+
+### Docker
+```bash
+docker compose up -d                           # Default: SQLite + BYO LLM
+docker compose --profile ollama up -d          # + bundled Ollama
+docker compose --profile full up -d            # + PostgreSQL + Redis
+docker compose --profile full --profile ollama up -d  # Everything
+docker compose build                           # Rebuild after code changes
+docker compose down                            # Stop all
+docker compose down -v                         # Stop + remove volumes
 ```
 
 ## Architecture Overview
@@ -131,3 +142,4 @@ Key docs in `docs/`:
 | **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
 | **Planning** | `planning/FUTURE_PLANS.md`, `planning/MASTER_ROADMAP.md` |
 | **LLM Usage** | `guides/LLM_USAGE_MONITORING_GUIDE.md` |
+| **Deployment** | `guides/DOCKER_DEPLOYMENT_GUIDE.md`, `planning/DOCKER_CONTAINERIZATION_PLAN.md` |

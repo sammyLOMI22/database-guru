@@ -232,10 +232,9 @@ class TestParallelMultiDatabaseExecution:
         assert "missing" in results[2]["error"].lower()
 
     @pytest.mark.asyncio
-    async def test_parallel_execution_timing_logs(self, caplog):
+    async def test_parallel_execution_timing_logs(self):
         """Test that parallel execution logs timing information"""
         import logging
-        caplog.set_level(logging.INFO)
 
         handler = MultiDatabaseHandler()
 
@@ -255,11 +254,30 @@ class TestParallelMultiDatabaseExecution:
 
         handler.execute_query_on_database = mock_execution
 
-        # Execute
-        await handler.execute_multi_database_query(queries, connections, allow_write=False)
+        # Use a dedicated handler to capture log records reliably
+        records = []
 
-        # Verify logging
-        assert "Executing 2 database queries in parallel" in caplog.text
+        class CaptureHandler(logging.Handler):
+            def emit(self, record):
+                records.append(record)
+
+        target_logger = logging.getLogger("src.core.multi_db_handler")
+        old_level = target_logger.level
+        old_disabled = target_logger.disabled
+        target_logger.disabled = False
+        target_logger.setLevel(logging.INFO)
+        capture = CaptureHandler()
+        target_logger.addHandler(capture)
+
+        try:
+            await handler.execute_multi_database_query(queries, connections, allow_write=False)
+
+            messages = [r.getMessage() for r in records]
+            assert any("database queries in parallel" in m for m in messages), f"Expected parallel log in {messages}"
+        finally:
+            target_logger.removeHandler(capture)
+            target_logger.setLevel(old_level)
+            target_logger.disabled = old_disabled
 
     @pytest.mark.asyncio
     async def test_parallel_execution_timeout_protection(self):

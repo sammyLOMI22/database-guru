@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 import sqlparse
 from sqlparse.sql import IdentifierList, Identifier, Where, Parenthesis, Function, Case
-from sqlparse.tokens import Keyword, DML, Whitespace, Punctuation, Name
+from sqlparse.tokens import Keyword, DML, Whitespace, Punctuation, Name, CTE
 
 logger = logging.getLogger(__name__)
 
@@ -114,11 +114,81 @@ class SQLLineageParser:
 
     def __init__(self):
         self._node_counter = 0
+        self._cte_definitions: Dict[str, Set[str]] = {}  # cte_name -> source tables
 
     def _generate_id(self, prefix: str) -> str:
         """Generate a unique node ID."""
         self._node_counter += 1
         return f"{prefix}_{self._node_counter}"
+
+    def _extract_ctes(self, stmt: sqlparse.sql.Statement) -> None:
+        """
+        Extract Common Table Expression (CTE) definitions from a WITH clause.
+
+        Populates self._cte_definitions with {cte_name: set_of_source_tables}.
+        CTEs can reference other CTEs defined earlier in the same WITH clause.
+        """
+        with_seen = False
+
+        for token in stmt.tokens:
+            if token.is_whitespace:
+                continue
+
+            # Detect the WITH keyword (sqlparse uses Keyword.CTE token type)
+            if (token.ttype is CTE or
+                    (token.ttype is Keyword and token.value.upper() in ('WITH', 'WITH RECURSIVE'))):
+                with_seen = True
+                continue
+
+            if with_seen:
+                # The CTE definitions appear as an IdentifierList or single Identifier
+                if isinstance(token, IdentifierList):
+                    for identifier in token.get_identifiers():
+                        self._parse_cte_definition(identifier)
+                elif isinstance(token, Identifier):
+                    self._parse_cte_definition(token)
+                elif isinstance(token, Parenthesis):
+                    # Sometimes sqlparse wraps the CTE body in a parenthesis
+                    continue
+
+                # Once we hit the main SELECT, stop looking for CTEs
+                if token.ttype is DML and token.value.upper() == 'SELECT':
+                    break
+                # After processing identifiers, we're done with WITH clause
+                if isinstance(token, (IdentifierList, Identifier)):
+                    break
+
+    def _parse_cte_definition(self, identifier) -> None:
+        """Parse a single CTE definition (e.g., 'cte_name AS (SELECT ...)')."""
+        if not isinstance(identifier, Identifier):
+            return
+
+        cte_name = identifier.get_real_name()
+        if not cte_name:
+            return
+
+        cte_name = cte_name.lower()
+
+        # Find the parenthesized subquery (the AS (...) part)
+        for sub_token in identifier.tokens:
+            if isinstance(sub_token, Parenthesis):
+                inner_sql = sub_token.value.strip('()')
+                stripped = inner_sql.strip()
+                if stripped.upper().startswith('SELECT') or stripped.upper().startswith('WITH'):
+                    # Parse the CTE body to find its source tables
+                    source_tables = self._extract_tables_from_subquery(stripped)
+
+                    # Resolve any CTE-to-CTE references
+                    resolved = set()
+                    for t in source_tables:
+                        if t in self._cte_definitions:
+                            resolved.update(self._cte_definitions[t])
+                        else:
+                            resolved.add(t)
+
+                    self._cte_definitions[cte_name] = resolved
+                    logger.debug(f"CTE '{cte_name}' sources: {resolved}")
+                break
 
     def parse(self, sql: str) -> LineageGraph:
         """
@@ -131,6 +201,7 @@ class SQLLineageParser:
             LineageGraph with nodes and edges representing data flow
         """
         self._node_counter = 0
+        self._cte_definitions = {}
 
         if not sql or not sql.strip():
             return LineageGraph(sql=sql or "")
@@ -144,13 +215,35 @@ class SQLLineageParser:
 
             stmt = parsed[0]
 
-            # Only handle SELECT statements
+            # Only handle SELECT statements (WITH...SELECT also reports as SELECT)
             if stmt.get_type() != 'SELECT':
                 return graph
 
+            # Extract CTEs before processing the main query
+            self._extract_ctes(stmt)
+
             # Extract tables and aliases
             tables, aliases, subquery_tables = self._extract_tables(stmt)
-            all_tables = tables | subquery_tables
+
+            # Resolve CTE references to their underlying source tables
+            resolved_tables = set()
+            for table in tables | subquery_tables:
+                if table in self._cte_definitions:
+                    cte_sources = self._cte_definitions[table]
+                    resolved_tables.update(cte_sources)
+                    # Map the CTE name (and any aliases pointing to it) to the
+                    # first underlying source table so column resolution works
+                    if cte_sources:
+                        first_source = sorted(cte_sources)[0]
+                        aliases[table] = first_source
+                        # Also remap any existing aliases that point to this CTE
+                        for alias_key, alias_val in list(aliases.items()):
+                            if alias_val == table:
+                                aliases[alias_key] = first_source
+                else:
+                    resolved_tables.add(table)
+
+            all_tables = resolved_tables
             graph.tables_used = sorted(all_tables)
 
             # Create source table nodes
@@ -224,10 +317,25 @@ class SQLLineageParser:
 
         from_seen = False
         join_seen = False
+        in_with_clause = False
 
         for token in stmt.tokens:
             if token.is_whitespace:
                 continue
+
+            # Skip the WITH clause entirely (CTEs handled by _extract_ctes)
+            if (token.ttype is CTE or
+                    (token.ttype is Keyword and token.value.upper() in ('WITH', 'WITH RECURSIVE'))):
+                in_with_clause = True
+                continue
+
+            if in_with_clause:
+                # CTE definitions end when we hit the main SELECT
+                if token.ttype is DML and token.value.upper() == 'SELECT':
+                    in_with_clause = False
+                    # Fall through to normal processing
+                else:
+                    continue
 
             if token.ttype is Keyword and token.value.upper() == 'FROM':
                 from_seen = True

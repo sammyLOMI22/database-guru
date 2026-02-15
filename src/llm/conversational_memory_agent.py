@@ -86,7 +86,7 @@ class ConversationalMemoryAgent:
                 )
                 .where(ChatMessage.chat_session_id == session_id)
                 .where(ChatMessage.role == "user")  # Only user messages
-                .order_by(ChatMessage.created_at.desc())
+                .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
                 .limit(self.context_window)
             )
 

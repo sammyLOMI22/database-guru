@@ -28,9 +28,9 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()  # Add missing ollama client
 
         # Mock LLM fix (slow - 1 second)
-        async def mock_fix_sql_error(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
+        async def mock_fix_sql_error(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None, **kwargs):
             await asyncio.sleep(1.0)  # Simulate LLM call
-            return {"sql": "SELECT * FROM products_fixed"}
+            return {"sql": "SELECT * FROM products_fixed", "token_info": {}}
 
         sql_generator.fix_sql_error = mock_fix_sql_error
 
@@ -41,6 +41,9 @@ class TestParallelCorrections:
             enable_schema_fixes=True,
             enable_learning=True,
         )
+        # Disable tool-using agent to avoid mock coroutine leaks
+        agent.enable_tool_using = False
+        agent.tool_using_agent = None
 
         # Mock schema fixer (fast - 0.1 second)
         mock_schema_fixer = Mock()
@@ -115,13 +118,15 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()
 
         # Mock LLM fix (slowest but successful)
-        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
+        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None, **kwargs):
             await asyncio.sleep(1.0)
-            return {"sql": "SELECT * FROM products -- LLM fix"}
+            return {"sql": "SELECT * FROM products -- LLM fix", "token_info": {}}
 
         sql_generator.fix_sql_error = mock_llm_fix
 
         agent = SelfCorrectingSQLAgent(sql_generator=sql_generator, max_retries=3)
+        agent.enable_tool_using = False
+        agent.tool_using_agent = None
 
         # Mock quick fix (fastest and successful)
         mock_schema_fixer = Mock()
@@ -173,12 +178,14 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()
 
         # All strategies fail initially
-        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
-            return {"sql": "SELECT * FROM products -- Fallback LLM"}
+        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None, **kwargs):
+            return {"sql": "SELECT * FROM products -- Fallback LLM", "token_info": {}}
 
         sql_generator.fix_sql_error = mock_llm_fix
 
         agent = SelfCorrectingSQLAgent(sql_generator=sql_generator, max_retries=3)
+        agent.enable_tool_using = False
+        agent.tool_using_agent = None
 
         # Mock quick fix (fails)
         mock_schema_fixer = Mock()
@@ -230,12 +237,14 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()
 
         # LLM fix succeeds
-        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
-            return {"sql": "SELECT * FROM products"}
+        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None, **kwargs):
+            return {"sql": "SELECT * FROM products", "token_info": {}}
 
         sql_generator.fix_sql_error = mock_llm_fix
 
         agent = SelfCorrectingSQLAgent(sql_generator=sql_generator, max_retries=3)
+        agent.enable_tool_using = False
+        agent.tool_using_agent = None
 
         # Quick fix raises exception
         mock_schema_fixer = Mock()
@@ -295,9 +304,9 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()
 
         # Mock LLM fix (takes longer than timeout - will be used as fallback)
-        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
+        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None, **kwargs):
             # This should be called as the fallback after timeout
-            return {"sql": "SELECT * FROM products -- Fallback after timeout"}
+            return {"sql": "SELECT * FROM products -- Fallback after timeout", "token_info": {}}
 
         sql_generator.fix_sql_error = mock_llm_fix
 
@@ -307,6 +316,8 @@ class TestParallelCorrections:
             enable_schema_fixes=True,
             enable_learning=True,
         )
+        agent.enable_tool_using = False
+        agent.tool_using_agent = None
 
         # Mock all strategies to hang indefinitely (simulating slow network/DB)
         mock_schema_fixer = Mock()
@@ -373,7 +384,7 @@ class TestParallelCorrections:
             assert "metrics" in result
             metrics = result["metrics"]
             assert metrics["timed_out"] is True
-            assert metrics["strategies_timed_out"] == 4  # quick, learned, llm, tool_using
+            assert metrics["strategies_timed_out"] == 4  # All tasks timed out (including tool_using which returns None)
             assert metrics["winning_strategy"] == "llm_fallback_timeout"
 
             print(f"\n✓ Timeout protection works: {elapsed:.2f}s (expected ~1s)")
@@ -387,8 +398,8 @@ class TestParallelCorrections:
         sql_generator.ollama = Mock()
 
         # Mock LLM fix
-        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None):
-            return {"sql": "SELECT * FROM products -- LLM"}
+        async def mock_llm_fix(sql, error, schema, database_type, model=None, correction_hints=None, schema_dict=None, **kwargs):
+            return {"sql": "SELECT * FROM products -- LLM", "token_info": {}}
 
         sql_generator.fix_sql_error = mock_llm_fix
 
@@ -398,6 +409,8 @@ class TestParallelCorrections:
             enable_schema_fixes=True,
             enable_learning=True,
         )
+        agent.enable_tool_using = False
+        agent.tool_using_agent = None
 
         # Mock quick fix (succeeds fast)
         mock_schema_fixer = Mock()
@@ -446,7 +459,7 @@ class TestParallelCorrections:
         assert "timed_out" in metrics
 
         # Verify values
-        assert metrics["strategies_attempted"] == 4  # quick, learned, llm, tool_using
+        assert metrics["strategies_attempted"] == 4  # quick, learned, llm, tool_using (always 4 tasks)
         assert metrics["strategies_succeeded"] >= 1  # At least quick fix succeeded
         assert metrics["winning_strategy"] == "quick_fix"  # Quick fix won
         assert metrics["timed_out"] is False  # No timeout

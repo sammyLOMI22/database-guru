@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: February 14, 2026
+**Last Updated**: February 15, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -283,37 +283,59 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    DOCKER CONTAINERIZATION (Phase 23) - HIGH PRIORITY                   │
+    │                    DOCKER CONTAINERIZATION (Phase 23) - ✅ COMPLETE                     │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │              DOCKER / "RUN ANYWHERE" (Phase 23) - HIGH PRIORITY                          │
+    │              DOCKER / "RUN ANYWHERE" (Phase 23) - ✅ COMPLETE                            │
     │                                                                                           │
     │  `docker compose up` → app on localhost:3000 — BYO LLM, files, data sources              │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
     │  │ Backend     │   │ Frontend    │   │ Compose     │   │ Profiles    │                   │
     │  │ Dockerfile  │   │ Dockerfile  │   │ Orchestr.   │   │             │                   │
-    │  │             │   │             │   │             │   │ • ollama    │                   │
-    │  │ • Multi-    │   │ • Node build│   │ • backend + │   │   (bundled  │                   │
-    │  │   stage     │   │ • Nginx     │   │   frontend  │   │   w/ GPU)   │                   │
-    │  │ • Alembic   │   │   reverse   │   │ • Volumes:  │   │ • full      │                   │
-    │  │   auto-     │   │   proxy     │   │   data, up- │   │   (Postgres │                   │
-    │  │   migrate   │   │ • SPA route │   │   loads,logs│   │   + Redis)  │                   │
-    │  │ • curl      │   │ • /api proxy│   │ • Healthchk │   │             │                   │
-    │  │   health    │   │ • Asset     │   │             │   │ Combinable: │                   │
-    │  │             │   │   caching   │   │             │   │ --profile   │                   │
-    │  │             │   │             │   │             │   │ ollama full │                   │
+    │  │ ✅          │   │ ✅          │   │ ✅          │   │ ✅          │                   │
+    │  │ • Multi-    │   │ • Node build│   │ • backend + │   │ • ollama    │                   │
+    │  │   stage     │   │ • Nginx     │   │   frontend  │   │   (bundled  │                   │
+    │  │ • Alembic   │   │   reverse   │   │ • Volumes:  │   │   w/ GPU)   │                   │
+    │  │   auto-     │   │   proxy     │   │   data, up- │   │ • full      │                   │
+    │  │   migrate   │   │ • Non-root  │   │   loads,logs│   │   (Postgres │                   │
+    │  │ • curl      │   │ • CSP hdrs  │   │ • Healthchk │   │   + Redis)  │                   │
+    │  │   health    │   │ • Asset     │   │ • Least-priv│   │             │                   │
+    │  │ • Retry     │   │   caching   │   │   DB user   │   │ Combinable: │                   │
+    │  │   logic     │   │             │   │ • Security  │   │ --profile   │                   │
+    │  │             │   │             │   │   hardened  │   │ ollama full │                   │
     │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
     │                                                                                           │
-    │  Prereq: None (Independent) | Priority: HIGH | Est: 1 week | ~200 lines config          │
-    │  Plan: DOCKER_CONTAINERIZATION_PLAN.md                                                   │
+    │  Also delivered: Ollama retry logic (tenacity), prompts refactoring,                     │
+    │  CTE support in lineage parser, Postgres least-privilege init script                     │
     │                                                                                           │
-    │  Run Modes:                                                                              │
-    │  • docker compose up                           → SQLite + BYO LLM (minimal)              │
-    │  • docker compose --profile ollama up           → + bundled Ollama w/ GPU                 │
-    │  • docker compose --profile full up             → + PostgreSQL + Redis                    │
-    │  • docker compose --profile full --profile ollama up → Everything                        │
+    │  Plan: DOCKER_CONTAINERIZATION_PLAN.md | Guide: DOCKER_DEPLOYMENT_GUIDE.md              │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    OBSERVABILITY & MONITORING (Phase 24) - MEDIUM PRIORITY              │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │              OBSERVABILITY STACK (Phase 24) - MEDIUM PRIORITY                            │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
+    │  │ 24.1 Struct-│   │ 24.2 Open-  │   │ 24.3 Metrics│   │ 24.4 Docker │                   │
+    │  │ ured Logging│──▶│ Telemetry   │──▶│ & Dashboards│──▶│ Integration │                   │
+    │  │             │   │ Tracing     │   │             │   │             │                   │
+    │  │ • JSON logs │   │ • OTEL SDK  │   │ • Prometheus│   │ • Compose   │                   │
+    │  │ • Request   │   │ • Span per  │   │   exporter  │   │   profile   │                   │
+    │  │   context   │   │   agent call│   │ • Grafana   │   │ • Jaeger    │                   │
+    │  │ • Log       │   │ • Jaeger    │   │   dashboards│   │   container │                   │
+    │  │   aggregator│   │   exporter  │   │ • Alerting  │   │ • Grafana   │                   │
+    │  │             │   │ • LLM spans │   │   rules     │   │   container │                   │
+    │  │ ~300 lines  │   │ ~500 lines  │   │ ~400 lines  │   │ ~100 lines  │                   │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │                                                                                           │
+    │  Prereq: Phase 23 ✅ (Docker) | Priority: MEDIUM | Est: 2 weeks | ~1,300 lines          │
+    │  Adds observability profile to Docker Compose                                            │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -513,6 +535,13 @@
     ┌───────────────────────────────────────────────────────────────────┐
     │        LLM USAGE MONITORING (Phase 16) ✅ COMPLETE                │
     │  • 9 API endpoints, full dashboard | Plan: LLM_USAGE_MONITORING  │
+    └───────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────┐
+    │        DOCKER CONTAINERIZATION (Phase 23) ✅ COMPLETE             │
+    │  • Docker Compose profiles, Nginx proxy, security hardened       │
+    │  • Least-privilege Postgres, Ollama retry, CTE lineage support   │
+    │  • Guide: DOCKER_DEPLOYMENT_GUIDE.md                             │
     └───────────────────────────────────────────────────────────────────┘
 
 
@@ -754,6 +783,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - **Phase 12** ✅: Lineage Intelligence (5 agents, 151 tests, ~11,266 lines)
 - **Phase 13** ✅: CSV & Excel File Support (50+ tests)
 - **Phase 16** ✅: LLM Usage Monitoring (9 endpoints, full dashboard)
+- **Phase 23** ✅: Docker Containerization (Compose profiles, security hardened, least-privilege Postgres, Ollama retry, prompts refactor, CTE lineage support)
 - **Table Sorting** ✅: Click-to-sort with smart type detection
 - Plus 10+ earlier phases (see Quick Reference below)
 
@@ -781,7 +811,8 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Table UX** | Sorting ✅, Resizing, Export | Sorting complete | ~400 lines remaining |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
-| **Docker Containerization** | Docker Compose, Nginx proxy, BYO LLM, profiles (ollama/full) | **Phase 23 - HIGH** | ~200 lines config |
+| **Docker Containerization** | Docker Compose, Nginx proxy, BYO LLM, profiles (ollama/full) | **Phase 23 ✅ COMPLETE** | ~200 lines config |
+| **Observability** | Structured logging, OpenTelemetry tracing, Prometheus/Grafana | **Phase 24 - MEDIUM** | ~1,300 lines |
 | **Innovation Pipeline** | Synthetic Data, API-ify, Auto-Docs, Watchdog, Guru API, etc. | Ideas stage | TBD |
 
 ---
@@ -808,6 +839,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | Lineage Intelligence (Phase 12) | LLM-powered lineage explanations, schema health, impact advisor | 151 tests |
 | CSV & Excel Files (Phase 13) | File upload, DuckDB queries, cross-source JOINs | 50+ tests |
 | LLM Usage Monitoring (Phase 16) | Token/cost tracking, dashboard, per-session stats | 9 API endpoints |
+| Docker Containerization (Phase 23) | Compose profiles, Nginx proxy, security hardened, Ollama retry, CTE lineage | Deployment guide |
 | Table Sorting | Click-to-sort columns, smart type detection | 24 tests |
 
 **Total Tests**: 1000+ passing
@@ -825,7 +857,8 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Phase 22** | Performance Guru (EXPLAIN) | None | ~1,300 lines | MEDIUM |
 | **Phase 17** | Multi-Provider Monitoring | Phase 15 + 16✅ | ~1,200 lines | MEDIUM |
 | **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | MEDIUM |
-| **Phase 23** | Docker Containerization | None | ~200 lines config | HIGH |
+| **Phase 23** | Docker Containerization | None | ~200 lines config | ✅ **COMPLETE** |
+| **Phase 24** | Observability (OpenTelemetry) | Phase 23 ✅ | ~1,300 lines | MEDIUM |
 | **Phase 14** | NoSQL Database Expansion | None | ~6,000 lines | LOW |
 
 ---
@@ -851,11 +884,11 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 
 ---
 
-**Updated**: February 14, 2026
-- Added Phase 20 (Migration Toolkit), Phase 21 (Security & Auth), Phase 22 (Performance Guru)
-- Added Innovation Pipeline section (9 ideas from brainstorm + PM feedback)
-- Promoted Security to CRITICAL (per PM review - prerequisite for Phase 18 + 15)
-- Deprioritized NoSQL (Phase 14) from MEDIUM to LOW
-- Updated Phase 13 and Phase 16 to COMPLETE
-- Added dependency: Phase 18 now blocked by Phase 21 (Auth)
-- Incorporated PM feedback: Simulation Mode, Undo Button, Metric Trees, Business Glossary, Watchdog Agents
+**Updated**: February 15, 2026
+- **Phase 23 ✅ COMPLETE**: Docker Containerization with security hardening
+  - Multi-stage Dockerfiles (backend + frontend), Compose profiles (ollama, full)
+  - Nginx reverse proxy with CSP headers, non-root containers, least-privilege Postgres
+  - Ollama retry logic (tenacity), prompts.py refactored into package
+  - CTE support added to SQL lineage parser
+- **Phase 24 NEW**: Observability & Monitoring (OpenTelemetry, Prometheus, Grafana)
+- Previous: Added Phase 20-22, Innovation Pipeline, promoted Security to CRITICAL

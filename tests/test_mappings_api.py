@@ -19,14 +19,20 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 
 from src.main import app
 from src.database.models import Base
-from src.database.connection import get_db
+from src.api.dependencies.common import get_db
 
 
 @pytest_asyncio.fixture(scope="function")
 async def engine():
     """Create a test database engine shared across fixtures."""
     # Use in-memory SQLite with async driver
-    test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    from sqlalchemy.pool import StaticPool
+    test_engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+        echo=False,
+    )
 
     # Create tables
     async with test_engine.begin() as conn:
@@ -62,7 +68,7 @@ async def engine():
                 description TEXT,
                 confidence_score REAL NOT NULL,
                 times_applied INTEGER DEFAULT 0,
-                times_successful INTEGER DEFAULT 0,
+                success_rate REAL DEFAULT 0.0,
                 created_by TEXT DEFAULT 'system',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_applied_at TIMESTAMP
@@ -142,10 +148,10 @@ async def sample_table_mappings(db_session: AsyncSession):
     await db_session.execute(text("""
         INSERT INTO table_mappings
         (source_table, target_table, connection_name, database_type, mapping_type,
-         confidence_score, times_applied, times_successful, created_by)
+         confidence_score, times_applied, success_rate, created_by)
         VALUES
-        ('customer', 'customers', 'test_db', 'postgresql', 'alias', 0.90, 15, 14, 'system'),
-        ('product', 'products', 'test_db', 'postgresql', 'synonym', 0.85, 8, 7, 'system')
+        ('customer', 'customers', 'test_db', 'postgresql', 'alias', 0.90, 15, 0.93, 'system'),
+        ('product', 'products', 'test_db', 'postgresql', 'synonym', 0.85, 8, 0.875, 'system')
     """))
     await db_session.commit()
 
@@ -379,7 +385,8 @@ class TestResultPatternsEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["marked_helpful"] is True
+        assert data["pattern_id"] == pattern_id
+        assert "helpful" in data["message"].lower()
 
         # Verify helpful count increased
         get_response = await client.get("/api/mappings/patterns")
