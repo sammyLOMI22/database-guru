@@ -3,6 +3,7 @@ import logging
 from typing import Optional, Dict, Any, List
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
 from src.config.settings import Settings
 from src.services.llm_usage_tracker import llm_usage_tracker
 
@@ -60,6 +61,13 @@ class OllamaClient:
             logger.error(f"Failed to list models: {e}")
             return []
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout)),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
     async def _generate_internal(
         self,
         prompt: str,
@@ -155,6 +163,13 @@ class OllamaClient:
             logger.error(f"Ollama generation error: {e}")
             raise
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout)),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
     async def _chat_internal(
         self,
         messages: List[Dict[str, str]],
@@ -276,6 +291,32 @@ class OllamaClient:
             logger.error(f"Failed to pull model {model}: {e}")
             return False
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout)),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
+    async def _embeddings_internal(
+        self,
+        text: str,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Internal embeddings implementation with retry"""
+        if not self.client:
+            await self.connect()
+
+        model = model or self.model
+
+        response = await self.client.post(
+            "/api/embeddings",
+            json={"model": model, "prompt": text},
+        )
+        response.raise_for_status()
+
+        return response.json()
+
     async def embeddings(
         self,
         text: str,
@@ -292,18 +333,7 @@ class OllamaClient:
             Embedding vector
         """
         try:
-            if not self.client:
-                await self.connect()
-
-            model = model or self.model
-
-            response = await self.client.post(
-                "/api/embeddings",
-                json={"model": model, "prompt": text},
-            )
-            response.raise_for_status()
-
-            result = response.json()
+            result = await self._embeddings_internal(text=text, model=model)
             return result.get("embedding")
 
         except Exception as e:

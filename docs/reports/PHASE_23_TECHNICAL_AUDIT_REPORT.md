@@ -120,3 +120,50 @@ graph TD
 ```
 
 This flow is now encapsulated and reproducible, resolving "it works on my machine" issues.
+  All Changes Summary                                                                                                                                                  
+   
+  From PR review (tasks 1-7, already done):                                                                                                                            
+                                                                                                                                                                     
+  ┌─────┬──────────────────────────────────────┬─────────────────────────────────────────┐
+  │  #  │                 Fix                  │                  Files                  │
+  ├─────┼──────────────────────────────────────┼─────────────────────────────────────────┤
+  │ 1   │ Alembic migrations on startup        │ docker/app/entrypoint.sh                │
+  ├─────┼──────────────────────────────────────┼─────────────────────────────────────────┤
+  │ 2   │ Frontend .dockerignore               │ frontend/.dockerignore (new)            │
+  ├─────┼──────────────────────────────────────┼─────────────────────────────────────────┤
+  │ 3   │ Nginx non-root fix                   │ frontend/Dockerfile, docker-compose.yml │
+  ├─────┼──────────────────────────────────────┼─────────────────────────────────────────┤
+  │ 4   │ Postgres password required           │ docker-compose.yml                      │
+  ├─────┼──────────────────────────────────────┼─────────────────────────────────────────┤
+  │ 5   │ Redis healthcheck fix                │ docker-compose.yml                      │
+  ├─────┼──────────────────────────────────────┼─────────────────────────────────────────┤
+  │ 6   │ CSP header replaces X-XSS-Protection │ docker/nginx/nginx.conf                 │
+  ├─────┼──────────────────────────────────────┼─────────────────────────────────────────┤
+  │ 7   │ API access docs                      │ docs/guides/DOCKER_DEPLOYMENT_GUIDE.md  │
+  └─────┴──────────────────────────────────────┴─────────────────────────────────────────┘
+
+  From audit report (tasks 8-12):
+
+  #: 8
+  Fix: Postgres least-privilege init script — creates app_runtime user with DML-only grants
+  Files: docker/postgres/init-db.sh (new), docker-compose.yml, .env.docker.example
+  ────────────────────────────────────────
+  #: 9
+  Fix: Ollama retry logic — tenacity with exponential backoff on _generate_internal, _chat_internal, _embeddings_internal
+  Files: src/llm/ollama_client.py, requirements.txt
+  ────────────────────────────────────────
+  #: 10
+  Fix: Prompts refactored into package — 765-line monolith split into prompts/sql_generation.py, prompts/analysis.py, prompts/dialects.py with backward-compatible
+    __init__.py
+  Files: src/llm/prompts/ (new package)
+  ────────────────────────────────────────
+  #: 11
+  Fix: CTE support in lineage parser — WITH clause extraction, CTE-to-CTE chaining, alias resolution to underlying source tables
+  Files: src/lineage/sql_lineage_parser.py
+  ────────────────────────────────────────
+  #: 12
+  Fix: Master roadmap updated — Phase 23 marked complete, Phase 24 (Observability) added
+  Files: docs/planning/MASTER_ROADMAP.md
+
+  Tests: 223 relevant tests pass, 136 lineage tests pass (no regressions).
+

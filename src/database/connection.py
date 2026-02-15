@@ -90,15 +90,16 @@ class DatabaseManager:
         elif database_url.startswith("sqlite://"):
             database_url = database_url.replace("sqlite://", "sqlite+aiosqlite://", 1)
 
-        # Create async engine
-        self.async_engine = create_async_engine(
-            database_url,
-            pool_size=self.settings.DB_POOL_SIZE,
-            max_overflow=20,
-            pool_pre_ping=True,
-            pool_recycle=3600,
-            echo=self.settings.DEBUG,
-        )
+        # Create async engine (SQLite doesn't support pool_size/max_overflow)
+        engine_kwargs = dict(echo=self.settings.DEBUG)
+        if "sqlite" not in database_url:
+            engine_kwargs.update(
+                pool_size=self.settings.DB_POOL_SIZE,
+                max_overflow=20,
+                pool_pre_ping=True,
+                pool_recycle=3600,
+            )
+        self.async_engine = create_async_engine(database_url, **engine_kwargs)
 
         # Create async session factory
         self.async_session_factory = async_sessionmaker(

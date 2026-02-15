@@ -68,7 +68,7 @@ export default function ChatInterface() {
   useEffect(() => {
     const fetchPerTaskModels = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/settings/');
+        const response = await fetch('/api/settings/');
         if (response.ok) {
           const settings = await response.json();
           setPerTaskModels({

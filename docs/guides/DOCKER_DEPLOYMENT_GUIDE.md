@@ -18,7 +18,7 @@ git clone https://github.com/your-org/database-guru.git
 cd database-guru
 
 # 2. Copy and edit environment variables
-cp .env.docker.example .env
+cp .env.docker.example .env.docker
 
 # 3. Start the app
 docker compose up -d
@@ -93,9 +93,9 @@ Update `.env` with both Ollama and PostgreSQL/Redis overrides.
 | `DATABASE_URL` | `sqlite+aiosqlite:///./data/database_guru.db` | Database connection string |
 | `REDIS_URL` | *(empty = disabled)* | Redis URL for caching |
 | `POSTGRES_USER` | `dbguru` | PostgreSQL username (full profile) |
-| `POSTGRES_PASSWORD` | **required** (full profile) | PostgreSQL password |
+| `POSTGRES_PASSWORD` | `changeme_before_production` | PostgreSQL password (**change for production**) |
 | `POSTGRES_DB` | `database_guru` | PostgreSQL database name (full profile) |
-| `REDIS_PASSWORD` | **required** (full profile) | Redis auth password |
+| `REDIS_PASSWORD` | `changeme_before_production` | Redis auth password (**change for production**) |
 
 ## Volume Management
 

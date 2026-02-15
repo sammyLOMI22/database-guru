@@ -32,6 +32,7 @@ frontend/build/
 .env
 .env.local
 .env.*.local
+.env.docker
 configs/*/
 !configs/*/.env.example
 .backend.pid
@@ -85,3 +86,4 @@ scripts/dump.rdb
 # Service PIDs
 .services.pid
 .mcp.json
+docker/nginx/local.env.docker

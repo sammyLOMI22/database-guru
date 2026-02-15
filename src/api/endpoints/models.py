@@ -1,4 +1,5 @@
 """Model management endpoints for Ollama LLMs"""
+import httpx
 import logging
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -69,6 +70,13 @@ async def list_models(
             count=len(generative_models),
         )
 
+    except httpx.ConnectError:
+        logger.warning("Ollama not reachable — returning empty model list")
+        return ModelListResponse(
+            models=[],
+            default_model=settings.OLLAMA_MODEL,
+            count=0,
+        )
     except Exception as e:
         logger.error(f"Error listing models: {e}", exc_info=True)
         raise HTTPException(
@@ -126,6 +134,14 @@ async def get_model_details(
             ollama_url=settings.OLLAMA_BASE_URL,
         )
 
+    except httpx.ConnectError:
+        logger.warning("Ollama not reachable — returning empty model list")
+        return ModelDetailsResponse(
+            models=[],
+            default_model=settings.OLLAMA_MODEL,
+            count=0,
+            ollama_url=settings.OLLAMA_BASE_URL,
+        )
     except Exception as e:
         logger.error(f"Error getting model details: {e}", exc_info=True)
         raise HTTPException(

@@ -2,6 +2,7 @@
 import asyncio
 import contextlib
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -56,8 +57,14 @@ async def lifespan(app: FastAPI):
     logger.info("📊 Initializing database...")
     db_manager = get_db_manager(settings)
 
-    # Run Alembic migrations first (uses sync connection)
-    run_alembic_migrations()
+    # Run Alembic migrations (skip if entrypoint already handled them)
+    if os.environ.get("MIGRATIONS_HANDLED") != "1":
+        try:
+            run_alembic_migrations()
+        except Exception as e:
+            logger.warning(f"Alembic migrations failed (non-fatal): {e}")
+    else:
+        logger.info("Migrations already handled by entrypoint, skipping")
 
     await db_manager.initialize_async()
     await db_manager.create_tables_async()
