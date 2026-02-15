@@ -67,10 +67,12 @@ OLLAMA_BASE_URL=http://ollama:11434
 docker compose --profile full up -d
 ```
 
-Adds PostgreSQL 16 and Redis 7. Update your `.env`:
+Adds PostgreSQL 16 and Redis 7. Set these in your `.env`:
 ```env
-DATABASE_URL=postgresql+asyncpg://dbguru:dbguru_pass@postgres:5432/database_guru
-REDIS_URL=redis://redis:6379
+POSTGRES_PASSWORD=<generate a strong password>
+REDIS_PASSWORD=<generate a strong password>
+DATABASE_URL=postgresql+asyncpg://dbguru:<your_pg_password>@postgres:5432/database_guru
+REDIS_URL=redis://:<your_redis_password>@redis:6379
 ```
 
 ### Everything
@@ -87,12 +89,13 @@ Update `.env` with both Ollama and PostgreSQL/Redis overrides.
 |----------|---------|-------------|
 | `OLLAMA_BASE_URL` | `http://host.docker.internal:11434` | Ollama API endpoint |
 | `OLLAMA_MODEL` | `llama3.2:latest` | Model to use / auto-pull |
-| `SECRET_KEY` | `change-me-in-production` | App secret key |
+| `SECRET_KEY` | **required** | App secret key (`openssl rand -hex 32`) |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./data/database_guru.db` | Database connection string |
 | `REDIS_URL` | *(empty = disabled)* | Redis URL for caching |
 | `POSTGRES_USER` | `dbguru` | PostgreSQL username (full profile) |
-| `POSTGRES_PASSWORD` | `dbguru_pass` | PostgreSQL password (full profile) |
+| `POSTGRES_PASSWORD` | **required** (full profile) | PostgreSQL password |
 | `POSTGRES_DB` | `database_guru` | PostgreSQL database name (full profile) |
+| `REDIS_PASSWORD` | **required** (full profile) | Redis auth password |
 
 ## Volume Management
 
@@ -134,6 +137,21 @@ docker compose exec backend alembic upgrade head
 
 # Stop everything
 docker compose down
+```
+
+## Accessing the API
+
+The backend is **not** exposed directly on port 8000 — all traffic goes through the nginx reverse proxy on port 3000:
+
+- **App**: http://localhost:3000
+- **API**: http://localhost:3000/api/
+- **Swagger UI**: http://localhost:3000/api/docs
+- **Health check**: http://localhost:3000/health
+
+If you need direct backend access for debugging, you can temporarily add a `ports` mapping to the `backend` service in `docker-compose.yml`:
+```yaml
+ports:
+  - "127.0.0.1:8000:8000"
 ```
 
 ## Troubleshooting
