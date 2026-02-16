@@ -59,6 +59,12 @@ class AnalyticsCache:
 
         Uses column names, row count, and first/last row values to create
         a short hash that identifies the result set.
+
+        Note: This is a *probabilistic* fingerprint — two result sets with
+        the same row count and identical first/last rows but different
+        middle rows will collide.  This is acceptable for a cache (stale
+        data is returned, not incorrect data) but callers should NOT use
+        this hash for correctness-critical deduplication.
         """
         if not results:
             return "empty"

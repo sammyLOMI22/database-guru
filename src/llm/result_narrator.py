@@ -194,10 +194,11 @@ class ResultNarrator:
             if results and len(results) >= 10:
                 # Phase A: Run independent analyses in parallel
                 stats_task = self._get_or_compute_statistics(sample_results, database_type)
-                anomalies_task = asyncio.get_event_loop().run_in_executor(
+                loop = asyncio.get_running_loop()
+                anomalies_task = loop.run_in_executor(
                     None, self._detect_anomalies, results
                 )
-                correlations_task = asyncio.get_event_loop().run_in_executor(
+                correlations_task = loop.run_in_executor(
                     None, self._calculate_correlations, results
                 )
                 statistics, anomalies, correlations = await asyncio.gather(
@@ -386,7 +387,8 @@ class ResultNarrator:
 
     def _format_enhanced_stats(self, statistics: Dict[str, Any]) -> str:
         """Enhanced stats for large models: full stats with percentile info."""
-        enhanced = dict(statistics)
+        import copy
+        enhanced = copy.deepcopy(statistics)
         for key, value in enhanced.items():
             if isinstance(value, dict) and value.get("type") == "numeric":
                 # Add range and coefficient of variation
@@ -512,13 +514,14 @@ class ResultNarrator:
     ) -> MultiSourceQualityReport:
         """Get cached quality report or compute fresh."""
         cache = self._get_cache()
-        # Build a combined hash for the multi-DB results
+        # Build a combined hash for the multi-DB results with a
+        # "quality:" prefix to avoid colliding with pattern cache entries.
         if cache:
             from src.services.analytics_cache import AnalyticsCache
             combined = []
             for db_results_list in db_results.values():
                 combined.extend(db_results_list)
-            result_hash = AnalyticsCache.compute_result_hash(combined)
+            result_hash = "quality:" + AnalyticsCache.compute_result_hash(combined)
             cached = await cache.get_patterns(result_hash)
             if cached is not None:
                 logger.debug("Analytics cache hit for quality report")
@@ -546,7 +549,7 @@ class ResultNarrator:
                 combined = []
                 for db_results_list in db_results.values():
                     combined.extend(db_results_list)
-                result_hash = AnalyticsCache.compute_result_hash(combined)
+                result_hash = "quality:" + AnalyticsCache.compute_result_hash(combined)
                 await cache.set_patterns(result_hash, asdict(report))
             except Exception as e:
                 logger.debug(f"Failed to cache quality report: {e}")
@@ -661,7 +664,7 @@ class ResultNarrator:
                     if len(numeric_values) > 2:
                         try:
                             col_stats["stdev"] = round(stdev(numeric_values), 2)
-                        except:
+                        except Exception:
                             pass
                     stats[column] = col_stats
                     continue
@@ -1137,9 +1140,6 @@ class ResultNarrator:
                         )
 
         except Exception as e:
-            # Log error but don't fail
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Error detecting anomalies: {e}")
 
         return anomalies
@@ -1205,8 +1205,6 @@ class ResultNarrator:
             return sorted(similar_queries, key=lambda x: x["similarity"], reverse=True)[:3]
 
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Error retrieving historical context: {e}")
             return []
 
@@ -1249,8 +1247,6 @@ class ResultNarrator:
             }
 
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Error comparing to history: {e}")
             return {"comparisons": [], "has_trend": False}
 
@@ -1290,29 +1286,32 @@ class ResultNarrator:
                 is_temporal = False
 
                 for value in sample_values:
-                    value_str = str(value).lower()
-
-                    # Check for common date patterns
-                    if isinstance(value, str):
-                        if any(pattern in value_str for pattern in [
-                            '-', '/', 'january', 'february', 'march', 'april', 'may', 'june',
-                            'july', 'august', 'september', 'october', 'november', 'december',
-                            'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
-                            '00:00', '23:59', 'time', 'date', 'timestamp'
-                        ]):
-                            is_temporal = True
-                            break
                     # Check if it's a datetime object
-                    elif hasattr(value, 'year') and hasattr(value, 'month'):
+                    if hasattr(value, 'year') and hasattr(value, 'month'):
                         is_temporal = True
                         break
+
+                    # For strings, try parsing as ISO date first
+                    if isinstance(value, str):
+                        value_stripped = value.strip()
+                        # Try ISO format parsing (most reliable)
+                        try:
+                            datetime.fromisoformat(value_stripped.replace('Z', '+00:00'))
+                            is_temporal = True
+                            break
+                        except (ValueError, TypeError):
+                            pass
+                        # Fall back to regex for common date patterns (YYYY-MM-DD, MM/DD/YYYY, etc.)
+                        import re
+                        if re.match(r'^\d{4}-\d{2}-\d{2}', value_stripped) or \
+                           re.match(r'^\d{1,2}/\d{1,2}/\d{2,4}$', value_stripped):
+                            is_temporal = True
+                            break
 
                 if is_temporal:
                     temporal_columns.append(key)
 
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(f"Error detecting temporal columns: {e}")
 
         return temporal_columns
@@ -1417,8 +1416,6 @@ class ResultNarrator:
                                 })
 
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(f"Error detecting trends: {e}")
 
         return trends
@@ -1607,8 +1604,6 @@ class ResultNarrator:
                             })
 
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(f"Error calculating correlations: {e}")
 
         return correlations

@@ -992,8 +992,7 @@ function isProbablyProportional(results: Record<string, unknown>[], column: stri
   // Check if sum is close to 100 (percentages) or 1 (fractions)
   return (
     (sum >= 99 && sum <= 101) ||
-    (sum >= 0.99 && sum <= 1.01) ||
-    values.every(v => v >= 0) // All non-negative values work for pie
+    (sum >= 0.99 && sum <= 1.01)
   );
 }
 

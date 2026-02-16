@@ -9,7 +9,7 @@ Database Guru is an AI-powered natural language to SQL query assistant. Users as
 **Tech Stack:**
 - Backend: FastAPI + SQLAlchemy 2.0 (async) + Python 3.11+
 - Frontend: React 18 + TypeScript + Vite + Tailwind CSS
-- LLM: Ollama (local, primarily qwen2.5-coder:32b)
+- LLM: Ollama (local, primarily llama3.2:latest)
 - Databases: SQLite for metadata, supports PostgreSQL/MySQL/SQLite/MongoDB/DuckDB for user databases
 
 ## Development Commands
