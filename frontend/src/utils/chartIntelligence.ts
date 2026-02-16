@@ -82,12 +82,54 @@ export interface OutlierInfo {
  */
 const OUTLIER_THRESHOLD = 2.0;
 
+// ========== Phase 19.4: Adaptive Scoring Presets ==========
+
+export type ScoringPreset = 'default' | 'business' | 'scientific';
+
+interface ChartWeights {
+  timeSeries: number;
+  categoricalComparison: number;
+  proportional: number;
+  correlation: number;
+  distribution: number;
+  hierarchical: number;
+}
+
+const SCORING_PRESETS: Record<ScoringPreset, ChartWeights> = {
+  default: {
+    timeSeries: 1.0,
+    categoricalComparison: 1.0,
+    proportional: 1.0,
+    correlation: 1.0,
+    distribution: 1.0,
+    hierarchical: 1.0,
+  },
+  business: {
+    timeSeries: 1.2,
+    categoricalComparison: 1.3,
+    proportional: 1.2,
+    correlation: 0.7,
+    distribution: 0.5,
+    hierarchical: 0.8,
+  },
+  scientific: {
+    timeSeries: 1.0,
+    categoricalComparison: 0.7,
+    proportional: 0.6,
+    correlation: 1.5,
+    distribution: 1.5,
+    hierarchical: 1.0,
+  },
+};
+
 /**
  * Main analysis function - orchestrates all detection
  */
 export function analyzeData(
   results: Record<string, unknown>[],
-  statistics: Record<string, unknown> = {}
+  statistics: Record<string, unknown> = {},
+  question: string = '',
+  preset: ScoringPreset = 'default'
 ): IntelligentChartRecommendation {
   // Default response for insufficient data
   if (!results || results.length < 2) {
@@ -103,8 +145,8 @@ export function analyzeData(
   // Detect patterns in parallel conceptually
   const patterns = detectPatterns(results, classification, statistics);
 
-  // Score all chart types
-  const scores = scoreChartTypes(results, classification, patterns, statistics);
+  // Score all chart types (with adaptive preset weights)
+  const scores = scoreChartTypes(results, classification, patterns, statistics, preset);
 
   // Get the best chart type
   const sortedScores = Object.entries(scores)
@@ -114,7 +156,7 @@ export function analyzeData(
   const primaryType = sortedScores[0].type;
   const primaryScore = sortedScores[0].score;
 
-  // Determine columns for the primary chart
+  // Determine columns for the primary chart (with interest scoring)
   const { xColumn, yColumn } = selectColumnsForChart(
     primaryType,
     classification,
@@ -145,8 +187,10 @@ export function analyzeData(
   const outliers = detectOutliers(results, numericColumns);
   const overlays = generateOverlays(patterns, outliers, numericColumns, results);
 
-  // Generate insights
-  const insights = generateInsights(patterns, outliers, classification, results.length);
+  // Generate insights (context-aware if question provided)
+  const insights = question
+    ? generateContextAwareInsights(question, patterns, outliers, classification, results.length)
+    : generateInsights(patterns, outliers, classification, results.length);
 
   return {
     primaryChart: primaryType,
@@ -220,10 +264,12 @@ function scoreChartTypes(
   results: Record<string, unknown>[],
   classification: ReturnType<typeof classifyColumns>,
   patterns: DetectedPatterns,
-  _statistics: Record<string, unknown>
+  _statistics: Record<string, unknown>,
+  preset: ScoringPreset = 'default'
 ): Record<ChartType, number> {
   const { numericColumns, categoricalColumns, temporalColumns } = classification;
   const rowCount = results.length;
+  const w = SCORING_PRESETS[preset];
 
   const scores: Record<ChartType, number> = {
     bar: 0,
@@ -242,12 +288,12 @@ function scoreChartTypes(
 
   // LINE CHART scoring
   if (patterns.timeSeries?.isTimeSeries) {
-    scores.line += 40;
-    if (patterns.hasTrend) scores.line += 20;
-    if (patterns.timeSeries.periodicity) scores.line += 15;
+    scores.line += 40 * w.timeSeries;
+    if (patterns.hasTrend) scores.line += 20 * w.timeSeries;
+    if (patterns.timeSeries.periodicity) scores.line += 15 * w.timeSeries;
   }
   if (temporalColumns.length > 0 && numericColumns.length > 0) {
-    scores.line += 25;
+    scores.line += 25 * w.timeSeries;
   }
   // Penalize line for few data points
   if (rowCount < 5) scores.line -= 20;
@@ -255,32 +301,26 @@ function scoreChartTypes(
   // BAR CHART scoring
   if (categoricalColumns.length > 0 && numericColumns.length > 0) {
     const uniqueCategories = getUniqueCount(categoricalColumns[0], results);
-    // Increased threshold from 15 to 30 for better coverage of diverse datasets
     if (uniqueCategories >= 2 && uniqueCategories <= 30) {
-      scores.bar += 45; // Increased base score
-      // Optimal range for bar charts
+      scores.bar += 45 * w.categoricalComparison;
       if (uniqueCategories >= 3 && uniqueCategories <= 12) {
-        scores.bar += 15;
+        scores.bar += 15 * w.categoricalComparison;
       }
     }
   }
-  // Comparison queries favor bar charts
   if (rowCount >= 2 && rowCount <= 20 && numericColumns.length > 0) {
-    scores.bar += 15;
+    scores.bar += 15 * w.categoricalComparison;
   }
 
   // PIE CHART scoring
   if (categoricalColumns.length > 0 && numericColumns.length > 0) {
     const uniqueCategories = getUniqueCount(categoricalColumns[0], results);
-    // Pie is best for 2-12 categories (increased from 8)
     if (uniqueCategories >= 2 && uniqueCategories <= 12) {
-      scores.pie += 45; // Increased base score
-      // Check if values are proportional (sum to 100 or represent parts)
+      scores.pie += 45 * w.proportional;
       if (isProbablyProportional(results, numericColumns[0])) {
-        scores.pie += 25;
+        scores.pie += 25 * w.proportional;
       }
     }
-    // Penalize pie for too many categories
     if (uniqueCategories > 12) {
       scores.pie -= 30;
     }
@@ -288,22 +328,19 @@ function scoreChartTypes(
 
   // SCATTER PLOT scoring
   if (numericColumns.length >= 2) {
-    scores.scatter += 40; // Increased base score
+    scores.scatter += 40 * w.correlation;
     if (patterns.hasCorrelation) {
-      scores.scatter += 25;
+      scores.scatter += 25 * w.correlation;
     }
-    // Scatter needs more data points
     if (rowCount >= 10) {
-      scores.scatter += 15;
+      scores.scatter += 15 * w.correlation;
     }
-    // Two numeric columns strongly suggests scatter
     if (numericColumns.length === 2 && categoricalColumns.length === 0) {
-      scores.scatter += 25;
+      scores.scatter += 25 * w.correlation;
     }
   }
 
-  // TABLE scoring (fallback)
-  // Increase table score if data is complex
+  // TABLE scoring (fallback, not weighted)
   if (Object.keys(results[0] || {}).length > 5) {
     scores.table += 15;
   }
@@ -315,78 +352,65 @@ function scoreChartTypes(
 
   // AREA CHART scoring (time-series alternative to line)
   if (patterns.timeSeries?.isTimeSeries) {
-    scores.area += 35;
-    if (patterns.hasTrend) scores.area += 15;
-    // Area is better for showing cumulative/filled data
-    if (numericColumns.length === 1) scores.area += 10;
+    scores.area += 35 * w.timeSeries;
+    if (patterns.hasTrend) scores.area += 15 * w.timeSeries;
+    if (numericColumns.length === 1) scores.area += 10 * w.timeSeries;
   }
   if (temporalColumns.length > 0 && numericColumns.length > 0) {
-    scores.area += 20;
+    scores.area += 20 * w.timeSeries;
   }
-  // Penalize area for few data points
   if (rowCount < 5) scores.area -= 20;
 
   // HISTOGRAM scoring (distribution analysis)
   if (numericColumns.length >= 1 && categoricalColumns.length === 0) {
-    scores.histogram += 30;
-    // Histogram needs enough data points for meaningful distribution
-    if (rowCount >= 20) scores.histogram += 25;
-    if (rowCount >= 50) scores.histogram += 10;
-    // Single numeric column is ideal for histogram
-    if (numericColumns.length === 1) scores.histogram += 15;
+    scores.histogram += 30 * w.distribution;
+    if (rowCount >= 20) scores.histogram += 25 * w.distribution;
+    if (rowCount >= 50) scores.histogram += 10 * w.distribution;
+    if (numericColumns.length === 1) scores.histogram += 15 * w.distribution;
   }
-  // Penalize histogram for too few data points
   if (rowCount < 10) scores.histogram -= 30;
 
   // BOXPLOT scoring (statistical distribution by category)
   if (categoricalColumns.length >= 1 && numericColumns.length >= 1) {
     const uniqueCategories = getUniqueCount(categoricalColumns[0], results);
-    // Box plot is good for comparing distributions across categories
     if (uniqueCategories >= 2 && uniqueCategories <= 10) {
-      scores.boxplot += 35;
-      // Need enough data per category for meaningful statistics
-      if (rowCount >= uniqueCategories * 5) scores.boxplot += 20;
+      scores.boxplot += 35 * w.distribution;
+      if (rowCount >= uniqueCategories * 5) scores.boxplot += 20 * w.distribution;
     }
-    // Penalize for too many categories
     if (uniqueCategories > 15) scores.boxplot -= 20;
   }
-  // Penalize boxplot for too few data points
   if (rowCount < 10) scores.boxplot -= 25;
 
   // TREEMAP scoring (hierarchical data)
   if (patterns.hierarchy?.isHierarchical) {
-    scores.treemap += 50;
-    if (patterns.hierarchy.maxDepth >= 2) scores.treemap += 15;
+    scores.treemap += 50 * w.hierarchical;
+    if (patterns.hierarchy.maxDepth >= 2) scores.treemap += 15 * w.hierarchical;
   }
   if (categoricalColumns.length >= 2 && numericColumns.length >= 1) {
-    scores.treemap += 25;
-    // Treemap works well with nested categories
+    scores.treemap += 25 * w.hierarchical;
     const uniqueCat1 = getUniqueCount(categoricalColumns[0], results);
     const uniqueCat2 = getUniqueCount(categoricalColumns[1], results);
-    if (uniqueCat1 >= 2 && uniqueCat2 >= 2) scores.treemap += 15;
+    if (uniqueCat1 >= 2 && uniqueCat2 >= 2) scores.treemap += 15 * w.hierarchical;
   }
 
   // SUNBURST scoring (hierarchical data, radial alternative to treemap)
   if (patterns.hierarchy?.isHierarchical) {
-    scores.sunburst += 45;
-    if (patterns.hierarchy.maxDepth >= 2) scores.sunburst += 20;
+    scores.sunburst += 45 * w.hierarchical;
+    if (patterns.hierarchy.maxDepth >= 2) scores.sunburst += 20 * w.hierarchical;
   }
   if (categoricalColumns.length >= 2 && numericColumns.length >= 1) {
-    scores.sunburst += 20;
-    // Sunburst works well with proportional hierarchical data
+    scores.sunburst += 20 * w.hierarchical;
     const uniqueCat1 = getUniqueCount(categoricalColumns[0], results);
-    if (uniqueCat1 >= 3 && uniqueCat1 <= 8) scores.sunburst += 15;
+    if (uniqueCat1 >= 3 && uniqueCat1 <= 8) scores.sunburst += 15 * w.hierarchical;
   }
 
   // BUBBLE CHART scoring (three-dimensional scatter)
   if (numericColumns.length >= 3) {
-    scores.bubble += 40;
-    if (patterns.hasCorrelation) scores.bubble += 20;
-    // Bubble needs moderate data for visibility
-    if (rowCount >= 5 && rowCount <= 50) scores.bubble += 15;
+    scores.bubble += 40 * w.correlation;
+    if (patterns.hasCorrelation) scores.bubble += 20 * w.correlation;
+    if (rowCount >= 5 && rowCount <= 50) scores.bubble += 15 * w.correlation;
   } else if (numericColumns.length >= 2 && categoricalColumns.length >= 1) {
-    // Can use category for color grouping
-    scores.bubble += 25;
+    scores.bubble += 25 * w.correlation;
   }
 
   // Normalize scores to 0-100
@@ -396,6 +420,56 @@ function scoreChartTypes(
   }
 
   return scores;
+}
+
+// ========== Phase 19.4: Column Interest Scoring ==========
+
+const INTERESTING_KEYWORDS = ['revenue', 'amount', 'total', 'count', 'sales', 'profit', 'rate', 'price', 'cost', 'value'];
+const BORING_KEYWORDS = ['id', 'key', 'uuid', 'guid', 'index', '_id', 'pk'];
+
+export function scoreColumnInterest(
+  column: string,
+  results: Record<string, unknown>[]
+): number {
+  let score = 50; // Base score
+
+  const values = results
+    .map(r => Number(r[column]))
+    .filter(v => !isNaN(v) && isFinite(v));
+
+  if (values.length === 0) return 0;
+
+  // Coefficient of variation: high variance = interesting
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  if (mean !== 0) {
+    const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length;
+    const cv = Math.sqrt(variance) / Math.abs(mean);
+    score += Math.min(cv * 30, 25);
+  }
+
+  // Name heuristics
+  const colLower = column.toLowerCase();
+  if (INTERESTING_KEYWORDS.some(kw => colLower.includes(kw))) score += 20;
+  if (BORING_KEYWORDS.some(kw => colLower === kw || colLower.endsWith('_' + kw))) score -= 40;
+
+  // Null penalty
+  const nullCount = results.filter(r => r[column] == null).length;
+  const nullRate = nullCount / results.length;
+  score -= nullRate * 20;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+function pickBestNumericColumn(
+  numericColumns: string[],
+  results: Record<string, unknown>[]
+): string | null {
+  if (numericColumns.length === 0) return null;
+  if (numericColumns.length === 1) return numericColumns[0];
+
+  return numericColumns
+    .map(col => ({ col, score: scoreColumnInterest(col, results) }))
+    .sort((a, b) => b.score - a.score)[0].col;
 }
 
 /**
@@ -408,67 +482,67 @@ export function selectColumnsForChart(
   results: Record<string, unknown>[]
 ): { xColumn: string | null; yColumn: string | null } {
   const { numericColumns, categoricalColumns, temporalColumns } = classification;
+  const bestNumeric = pickBestNumericColumn(numericColumns, results);
 
   switch (chartType) {
     case 'line':
-      // Prefer temporal for X, numeric for Y
       return {
         xColumn: temporalColumns[0] || categoricalColumns[0] || null,
-        yColumn: numericColumns[0] || null,
+        yColumn: bestNumeric,
       };
 
-    case 'scatter':
-      // Two numeric columns
+    case 'scatter': {
+      // Pick two most interesting numeric columns
+      const ranked = numericColumns
+        .map(col => ({ col, score: scoreColumnInterest(col, results) }))
+        .sort((a, b) => b.score - a.score);
       return {
-        xColumn: numericColumns[0] || null,
-        yColumn: numericColumns[1] || numericColumns[0] || null,
+        xColumn: ranked[0]?.col || null,
+        yColumn: ranked[1]?.col || ranked[0]?.col || null,
       };
+    }
 
     case 'pie':
     case 'bar':
-      // Categorical for X, numeric for Y
       return {
         xColumn: categoricalColumns[0] || Object.keys(results[0] || {})[0] || null,
-        yColumn: numericColumns[0] || null,
+        yColumn: bestNumeric,
       };
 
-    // Phase 10: Advanced Chart Types
     case 'area':
-      // Similar to line - temporal for X, numeric for Y
       return {
         xColumn: temporalColumns[0] || categoricalColumns[0] || null,
-        yColumn: numericColumns[0] || null,
+        yColumn: bestNumeric,
       };
 
     case 'histogram':
-      // Single numeric column for distribution
       return {
-        xColumn: null, // Histogram auto-generates bins
-        yColumn: numericColumns[0] || null,
+        xColumn: null,
+        yColumn: bestNumeric,
       };
 
     case 'boxplot':
-      // Categorical for grouping, numeric for values
       return {
         xColumn: categoricalColumns[0] || null,
-        yColumn: numericColumns[0] || null,
+        yColumn: bestNumeric,
       };
 
     case 'treemap':
     case 'sunburst':
-      // Multiple categorical for hierarchy, numeric for size
       return {
-        xColumn: categoricalColumns[0] || null, // Primary category
-        yColumn: numericColumns[0] || null, // Size/value
+        xColumn: categoricalColumns[0] || null,
+        yColumn: bestNumeric,
       };
 
-    case 'bubble':
-      // Three numeric columns: x, y, size
+    case 'bubble': {
+      const ranked = numericColumns
+        .map(col => ({ col, score: scoreColumnInterest(col, results) }))
+        .sort((a, b) => b.score - a.score);
       return {
-        xColumn: numericColumns[0] || null,
-        yColumn: numericColumns[1] || numericColumns[0] || null,
-        // Note: size column would be numericColumns[2], handled by component
+        xColumn: ranked[0]?.col || null,
+        yColumn: ranked[1]?.col || ranked[0]?.col || null,
       };
+    }
 
     default:
       return { xColumn: null, yColumn: null };
@@ -748,6 +822,82 @@ function generateOverlays(
   }
 
   return overlays;
+}
+
+// ========== Phase 19.4: Context-Aware Insights ==========
+
+function generateContextAwareInsights(
+  question: string,
+  patterns: DetectedPatterns,
+  outliers: OutlierInfo[],
+  classification: ReturnType<typeof classifyColumns>,
+  rowCount: number
+): DataInsight[] {
+  const baseInsights = generateInsights(patterns, outliers, classification, rowCount);
+  if (!question) return baseInsights;
+
+  const q = question.toLowerCase();
+  const reordered = [...baseInsights];
+
+  // Prioritize trend insights for trend-related questions
+  if (/trend|over time|growth|decline|change/.test(q)) {
+    const trendIdx = reordered.findIndex(i => i.type === 'trend');
+    if (trendIdx > 0) {
+      const [trend] = reordered.splice(trendIdx, 1);
+      trend.severity = 'highlight';
+      reordered.unshift(trend);
+    } else if (trendIdx === 0) {
+      reordered[0].severity = 'highlight';
+    } else if (trendIdx === -1 && patterns.hasTrend) {
+      reordered.unshift({
+        type: 'trend',
+        message: 'Trend detected in the data matching your question',
+        severity: 'highlight',
+      });
+    }
+  }
+
+  // Prioritize outlier insights for anomaly-related questions
+  if (/outlier|unusual|anomal|extreme|spike/.test(q)) {
+    const outlierIdx = reordered.findIndex(i => i.type === 'outlier');
+    if (outlierIdx > 0) {
+      const [outlierInsight] = reordered.splice(outlierIdx, 1);
+      outlierInsight.severity = 'highlight';
+      reordered.unshift(outlierInsight);
+    } else if (outlierIdx === 0) {
+      reordered[0].severity = 'highlight';
+    } else if (outlierIdx === -1 && outliers.length > 0) {
+      reordered.unshift({
+        type: 'outlier',
+        message: `${outliers.length} outlier(s) found relevant to your query`,
+        severity: 'highlight',
+      });
+    }
+  }
+
+  // Add distribution insight for comparison questions
+  if (/compar|vs|versus|difference|between/.test(q)) {
+    const hasDistribution = reordered.some(i => i.type === 'distribution');
+    if (!hasDistribution) {
+      reordered.push({
+        type: 'distribution',
+        message: 'Data shows variation across categories relevant for comparison',
+        severity: 'info',
+      });
+    }
+  }
+
+  // Add correlation insight for relationship questions
+  if (/correlat|relat|affect|impact|depend/.test(q)) {
+    const corrIdx = reordered.findIndex(i => i.type === 'correlation');
+    if (corrIdx > 0) {
+      const [corr] = reordered.splice(corrIdx, 1);
+      corr.severity = 'highlight';
+      reordered.unshift(corr);
+    }
+  }
+
+  return reordered;
 }
 
 /**

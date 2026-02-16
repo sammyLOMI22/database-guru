@@ -181,6 +181,26 @@ All LLM-calling agents are instrumented:
 - Lineage Narrator, Impact Advisor, Schema Health Analyzer
 - Pattern Intelligence, Lineage Conversation Agent
 
+## Data Insights Enhancement (Phase 19 - February 2026)
+**Status**: PRODUCTION-READY
+
+### Components
+- `narrative_tiers.py` (`src/llm/prompts/narrative_tiers.py`) - Tiered prompt templates by model size
+- `AnalyticsCache` (`src/services/analytics_cache.py`) - Two-tier statistics/pattern cache
+- `ResultNarrator` (`src/llm/result_narrator.py`) - Enhanced with quality metrics and parallel pipeline
+
+### Features
+- **Tiered Narratives** (19.1) - Compact/Standard/Enhanced prompts auto-selected by model size (SMALL/MEDIUM/LARGE). Token budgets and sample row limits scale with tier. 40% token savings for small models
+- **Analytics Caching** (19.2) - Local TTLCache (1hr) + optional Redis (24hr). Caches computed statistics and pattern detection results keyed by result-set hash. Singleton via `get_analytics_cache()`
+- **Multi-Source Quality** (19.3) - `DataQualityMetrics` per database (null rates, completeness, duplicates, freshness). `GapInsight` detects coverage gaps across databases. `MultiSourceQualityReport` formats summary for LLM prompt (enhanced tier only)
+- **Chart Intelligence** (19.4) - Frontend `ScoringPreset` system (default/business/scientific) adjusts chart type weights. `scoreColumnInterest()` ranks Y-axis candidates by variance and semantic value. Context-aware insight ordering based on user question
+- **Parallel Analysis** (19.5) - `asyncio.gather` runs stats/anomalies/correlations in parallel for >=10 rows. Early exit for <=3 rows (skip LLM, use `_fallback_narrative`). `return_exceptions=True` for graceful degradation
+
+### Configuration
+- `ANALYTICS_CACHE_MAXSIZE` - Local cache max entries (default: 100)
+- `ANALYTICS_CACHE_TTL` - Local cache TTL in seconds (default: 3600)
+- `ANALYTICS_CACHE_REDIS_TTL` - Redis cache TTL in seconds (default: 86400)
+
 ## Database Schema
 
 The system maintains its own metadata database (`database_guru.db`):

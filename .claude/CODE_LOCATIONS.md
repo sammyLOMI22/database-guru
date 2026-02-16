@@ -101,6 +101,41 @@ Quick reference for finding important code in the Database Guru codebase.
 | Multi-DB narratives | `src/api/endpoints/multi_db_query.py:662-740` |
 | Multi-DB tests | `tests/test_multi_db_narratives.py` (10 tests) |
 
+## Data Insights Enhancement (Phase 19 - February 2026)
+| Component | Location |
+|-----------|----------|
+| **19.1 Tiered Narrative Prompts** | |
+| Prompt templates | `src/llm/prompts/narrative_tiers.py` |
+| Prompt selector | `src/llm/prompts/narrative_tiers.py:get_narrative_prompt()` |
+| Token budgets | `src/llm/prompts/narrative_tiers.py:NARRATIVE_TOKEN_BUDGETS` |
+| Model tier detection | `src/llm/result_narrator.py:_get_model_tier()` |
+| Stats compression | `src/llm/result_narrator.py:_compress_statistics()` |
+| Prompts package init | `src/llm/prompts/__init__.py` |
+| Tests | `tests/test_narrative_tiers.py` (31 tests) |
+| **19.2 Analytics Cache** | |
+| Cache service | `src/services/analytics_cache.py` |
+| Result hashing | `src/services/analytics_cache.py:compute_result_hash()` |
+| Singleton getter | `src/services/analytics_cache.py:get_analytics_cache()` |
+| Narrator integration | `src/llm/result_narrator.py:_get_or_compute_statistics()` |
+| Settings | `src/config/settings.py` (ANALYTICS_CACHE_*) |
+| Tests | `tests/test_analytics_cache.py` (21 tests) |
+| **19.3 Multi-Source Quality** | |
+| Quality metrics | `src/llm/result_narrator.py:DataQualityMetrics` |
+| Gap detection | `src/llm/result_narrator.py:GapInsight` |
+| Quality report | `src/llm/result_narrator.py:MultiSourceQualityReport` |
+| Report builder | `src/llm/result_narrator.py:_build_multi_source_quality_report()` |
+| Cached report | `src/llm/result_narrator.py:_get_or_compute_quality_report()` |
+| Tests | `tests/test_multi_source_insights.py` (24 tests) |
+| **19.4 Chart Intelligence** | |
+| Adaptive presets | `frontend/src/utils/chartIntelligence.ts:ScoringPreset` |
+| Column interest | `frontend/src/utils/chartIntelligence.ts:scoreColumnInterest()` |
+| Context insights | `frontend/src/utils/chartIntelligence.ts:analyzeData()` |
+| Tests | `frontend/tests/chartIntelligenceEnhancements.test.ts` (16 tests) |
+| **19.5 Parallel Analysis** | |
+| Parallel pipeline | `src/llm/result_narrator.py:generate_narrative()` (lines 193-227) |
+| Early exit | `src/llm/result_narrator.py:generate_narrative()` (lines 188-190) |
+| Tests | `tests/test_parallel_analysis.py` (16 tests) |
+
 ## Connection Pooling (December 6, 2025)
 | Component | Location |
 |-----------|----------|

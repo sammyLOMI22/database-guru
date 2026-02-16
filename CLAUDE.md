@@ -66,7 +66,7 @@ The system uses a multi-agent architecture with 23+ specialized agents. See [.cl
 | Multi-DB Handler | `src/core/multi_db_handler.py` | Parallel database execution |
 | File Source Handler | `src/core/file_source_handler.py` | CSV/Excel file processing (Phase 13) |
 | File Source Session | `src/core/file_source_session.py` | DuckDB session for file queries |
-| Result Narrator | `src/llm/result_narrator.py` | Human-readable insights |
+| Result Narrator | `src/llm/result_narrator.py` | Human-readable insights, tiered prompts, parallel analysis (Phase 19) |
 | Model Router | `src/llm/model_router.py` | Per-task model selection |
 | SQL Lineage Parser | `src/lineage/sql_lineage_parser.py` | Column-level lineage |
 | Lineage Narrator | `src/lineage/lineage_narrator.py` | LLM-powered lineage explanations (Phase 12.1) |
@@ -75,6 +75,8 @@ The system uses a multi-agent architecture with 23+ specialized agents. See [.cl
 | Pattern Intelligence | `src/lineage/pattern_intelligence.py` | Query pattern insights (Phase 12.4) |
 | Lineage Conversation | `src/lineage/lineage_conversation_agent.py` | Natural language Q&A (Phase 12.5) |
 | LLM Usage Tracker | `src/services/llm_usage_tracker.py` | Token & cost tracking (Phase 16) |
+| Narrative Tiers | `src/llm/prompts/narrative_tiers.py` | Model-size-aware prompt templates (Phase 19) |
+| Analytics Cache | `src/services/analytics_cache.py` | Two-tier stats/pattern cache (Phase 19) |
 
 ### Data Flow
 ```
@@ -82,7 +84,8 @@ Natural Language Query → Input Sanitization → Injection Detection
   → Conversational Memory → Tool-Using Agent → Query Planning
   → SQL Generator → Confidence Scorer → SQL Executor
   → Result Verification → [If Error: Parallel Corrections]
-  → [If Success: Learn Pattern] → Return Results
+  → [If Success: Learn Pattern] → Parallel Analysis (stats/anomalies/correlations)
+  → Tiered Narrative Generation → Return Results
 ```
 
 ### Detailed References
@@ -139,7 +142,8 @@ Key docs in `docs/`:
 | **Guides** | `guides/MULTI_DATABASE_GUIDE.md`, `guides/CONNECTION_POOLING_GUIDE.md`, `guides/DATA_LINEAGE_GUIDE.md`, `guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md`, `guides/FILE_DATA_SOURCE_USER_GUIDE.md` |
 | **Technical** | `technical/PARALLEL_EXECUTION.md`, `technical/SEMANTIC_CACHING.md`, `technical/SQL_GENERATION_PIPELINE.md` |
 | **Modules** | `modules/QUERY_PLANNING_AGENT.md`, `modules/TOOL_USING_AGENT.md` |
-| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
+| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/DATA_INSIGHTS_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
 | **Planning** | `planning/FUTURE_PLANS.md`, `planning/MASTER_ROADMAP.md` |
 | **LLM Usage** | `guides/LLM_USAGE_MONITORING_GUIDE.md` |
+| **Data Insights** | `planning/DATA_INSIGHTS_ENHANCEMENT_PLAN.md` |
 | **Deployment** | `guides/DOCKER_DEPLOYMENT_GUIDE.md`, `planning/DOCKER_CONTAINERIZATION_PLAN.md` |
