@@ -143,6 +143,7 @@ The demo showcases:
 - 🔀 **Table Sorting (NEW!)** - Click any column header to sort results (numbers, dates, strings auto-detected)
 - 📁 **CSV/Excel File Data Sources (NEW!)** - Upload CSV/Excel files as queryable data sources with DuckDB
 - 📊 **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance across all agents
+- 🔬 **Data Insights Enhancement (NEW!)** - Tiered narratives by model size, analytics caching, multi-source quality insights, adaptive chart presets
 
 All with mock data - no database connection needed!
 
@@ -253,6 +254,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Small Model Optimization (NEW!)** - Per-task model routing, query templates, location preprocessing, and dialect-aware SQL generation for faster responses with smaller models
 - ✅ **CSV/Excel File Data Sources (NEW!)** - Upload and query CSV/Excel files as DuckDB tables
 - ✅ **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance per session and globally with full dashboard
+- ✅ **Data Insights Enhancement (NEW!)** - Tiered narrative prompts (compact/standard/enhanced), analytics caching, multi-source data quality analysis, adaptive chart scoring presets, parallel analysis pipeline with early exit optimization
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection

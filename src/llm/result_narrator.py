@@ -8,6 +8,12 @@ from datetime import datetime
 from statistics import mean, median, stdev
 
 from src.lineage.llm_utils import extract_json_object
+from src.llm.prompt_optimizer import ModelSize, get_model_size_for_model
+from src.llm.prompts.narrative_tiers import (
+    get_narrative_prompt,
+    MAX_SAMPLE_ROWS_BY_TIER,
+    MAX_INSIGHTS_BY_TIER,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +34,62 @@ class NarrativeResult:
             self.generated_at = datetime.utcnow().isoformat()
 
 
+@dataclass
+class DataQualityMetrics:
+    """Quality metrics for a single database's results."""
+    database: str
+    row_count: int = 0
+    null_rates: Dict[str, float] = field(default_factory=dict)  # column -> null %
+    duplicate_rate: float = 0.0
+    completeness: float = 1.0  # overall non-NULL %
+    freshness: Optional[str] = None  # max temporal value (most recent)
+
+
+@dataclass
+class GapInsight:
+    """A coverage gap detected across databases."""
+    column: str
+    present_in: List[str] = field(default_factory=list)
+    missing_in: List[str] = field(default_factory=list)
+
+
+@dataclass
+class MultiSourceQualityReport:
+    """Cross-database quality comparison."""
+    databases: List[str] = field(default_factory=list)
+    quality_metrics: List[DataQualityMetrics] = field(default_factory=list)
+    gap_insights: List[GapInsight] = field(default_factory=list)
+    freshest_db: Optional[str] = None
+    most_complete_db: Optional[str] = None
+
+    def format_summary(self) -> str:
+        """Format a text summary for inclusion in LLM prompt."""
+        if not self.quality_metrics:
+            return ""
+        lines = ["DATA QUALITY COMPARISON:"]
+        for m in self.quality_metrics:
+            high_nulls = [f"{c}({r:.0%})" for c, r in m.null_rates.items() if r > 0.1]
+            null_info = f", high-null columns: {', '.join(high_nulls)}" if high_nulls else ""
+            lines.append(
+                f"  - {m.database}: {m.row_count} rows, "
+                f"{m.completeness:.0%} complete, "
+                f"{m.duplicate_rate:.0%} duplicate rate"
+                f"{null_info}"
+            )
+        if self.freshest_db:
+            lines.append(f"  Freshest data: {self.freshest_db}")
+        if self.most_complete_db:
+            lines.append(f"  Most complete: {self.most_complete_db}")
+        if self.gap_insights:
+            lines.append("  Coverage gaps:")
+            for gap in self.gap_insights[:3]:
+                lines.append(
+                    f"    - '{gap.column}': data in {', '.join(gap.present_in)} "
+                    f"but empty in {', '.join(gap.missing_in)}"
+                )
+        return "\n".join(lines)
+
+
 class ResultNarrator:
     """
     Agent that generates human-readable narratives from query results
@@ -46,7 +108,8 @@ class ResultNarrator:
         max_sample_rows: int = 20,
         timeout_seconds: int = 5,
         db_session=None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        analytics_cache=None,
     ):
         """
         Initialize the result narrator agent
@@ -58,6 +121,7 @@ class ResultNarrator:
             timeout_seconds: Timeout for LLM calls
             db_session: Optional database session for historical lookups
             model: Optional model override for narrative generation (per-task routing)
+            analytics_cache: Optional AnalyticsCache instance (Phase 19.2)
         """
         self.ollama = ollama_client
         self.enable_statistics = enable_statistics
@@ -65,6 +129,7 @@ class ResultNarrator:
         self.timeout_seconds = timeout_seconds
         self.db_session = db_session
         self.model = model  # Per-task model routing support
+        self._analytics_cache = analytics_cache
 
     async def generate_narrative(
         self,
@@ -117,30 +182,74 @@ class ResultNarrator:
                     statistics={"row_count": row_count}
                 )
 
-            # Extract statistics from results
             sample_results = results[:self.max_sample_rows] if results else []
-            statistics = self._extract_statistics(sample_results) if self.enable_statistics else {}
 
-            # Detect anomalies in the results
-            anomalies = self._detect_anomalies(results) if results else {}
+            # Early exit for tiny datasets (Phase 19.5): skip LLM, use fallback
+            if row_count <= 3 and not multi_database:
+                statistics = await self._get_or_compute_statistics(sample_results, database_type)
+                return self._fallback_narrative(row_count, statistics)
 
-            # Detect temporal columns for trend analysis
-            temporal_columns = self._detect_temporal_columns(results) if results else []
+            # Phase 19.5: Parallel analysis pipeline
+            # For small datasets (<10 rows), run sequentially (executor overhead > benefit)
+            if results and len(results) >= 10:
+                # Phase A: Run independent analyses in parallel
+                stats_task = self._get_or_compute_statistics(sample_results, database_type)
+                loop = asyncio.get_running_loop()
+                anomalies_task = loop.run_in_executor(
+                    None, self._detect_anomalies, results
+                )
+                correlations_task = loop.run_in_executor(
+                    None, self._calculate_correlations, results
+                )
+                statistics, anomalies, correlations = await asyncio.gather(
+                    stats_task, anomalies_task, correlations_task,
+                    return_exceptions=True,
+                )
+                # Handle any exceptions from parallel tasks
+                if isinstance(statistics, BaseException):
+                    logger.warning(f"Statistics extraction failed: {statistics}")
+                    statistics = {}
+                if isinstance(anomalies, BaseException):
+                    logger.warning(f"Anomaly detection failed: {anomalies}")
+                    anomalies = {}
+                if isinstance(correlations, BaseException):
+                    logger.warning(f"Correlation calculation failed: {correlations}")
+                    correlations = {}
 
-            # Detect trends if temporal data exists
-            trends = self._detect_trends(results, temporal_columns) if results and temporal_columns else {}
-
-            # Calculate correlations between numeric columns
-            correlations = self._calculate_correlations(results) if results else {}
+                # Phase B: Sequential (depends on Phase A or temporal detection)
+                temporal_columns = self._detect_temporal_columns(results)
+                trends = self._detect_trends(results, temporal_columns) if temporal_columns else {}
+            else:
+                # Sequential for small datasets
+                statistics = await self._get_or_compute_statistics(sample_results, database_type)
+                anomalies = self._detect_anomalies(results) if results else {}
+                temporal_columns = self._detect_temporal_columns(results) if results else []
+                trends = self._detect_trends(results, temporal_columns) if results and temporal_columns else {}
+                correlations = self._calculate_correlations(results) if results else {}
 
             # Calculate cross-database comparisons if multi-database
             database_comparisons = self._calculate_database_comparisons(results) if multi_database and results else {}
 
             # Build enriched prompt with all detected insights
             if multi_database and databases:
+                # Compute quality report for enhanced tier (Phase 19.3)
+                quality_summary = ""
+                tier = self._get_model_tier()
+                if tier == ModelSize.LARGE and sample_results:
+                    try:
+                        db_results_grouped: Dict[str, List[Dict[str, Any]]] = {}
+                        for r in sample_results:
+                            db_name = r.get("_source_database", "Unknown")
+                            db_results_grouped.setdefault(db_name, []).append(r)
+                        quality_report = await self._get_or_compute_quality_report(db_results_grouped)
+                        quality_summary = quality_report.format_summary()
+                    except Exception as e:
+                        logger.debug(f"Quality report generation failed: {e}")
+
                 prompt = self._build_multi_database_prompt(
                     question, sql, sample_results, statistics, row_count,
-                    execution_time_ms, databases, database_comparisons
+                    execution_time_ms, databases, database_comparisons,
+                    quality_summary=quality_summary,
                 )
             else:
                 prompt = self._build_prompt(question, sql, sample_results, statistics, row_count, execution_time_ms)
@@ -238,6 +347,252 @@ class ResultNarrator:
                 return True
         return False
 
+    # ========== Phase 19.1: Model-Tier Awareness ==========
+
+    def _get_model_tier(self) -> ModelSize:
+        """Detect model size tier from self.model name."""
+        return get_model_size_for_model(self.model or "")
+
+    def _compress_statistics(self, statistics: Dict[str, Any], tier: ModelSize) -> str:
+        """Compress statistics based on model tier.
+
+        - SMALL: Top 3 numeric columns with count/avg only
+        - MEDIUM: Full JSON (current behavior)
+        - LARGE: Full JSON with extra formatting
+        """
+        if tier == ModelSize.SMALL:
+            return self._format_essential_stats(statistics)
+        elif tier == ModelSize.LARGE:
+            return self._format_enhanced_stats(statistics)
+        return json.dumps(statistics, indent=2, default=str)
+
+    def _format_essential_stats(self, statistics: Dict[str, Any]) -> str:
+        """Compact stats for small models: top 3 numeric columns, count/avg only."""
+        essential = {"row_count": statistics.get("row_count", 0)}
+        numeric_count = 0
+        for key, value in statistics.items():
+            if key == "row_count":
+                continue
+            if isinstance(value, dict) and value.get("type") == "numeric":
+                essential[key] = {
+                    "count": value.get("count", 0),
+                    "avg": value.get("avg"),
+                    "min": value.get("min"),
+                    "max": value.get("max"),
+                }
+                numeric_count += 1
+                if numeric_count >= 3:
+                    break
+        return json.dumps(essential, default=str)
+
+    def _format_enhanced_stats(self, statistics: Dict[str, Any]) -> str:
+        """Enhanced stats for large models: full stats with percentile info."""
+        import copy
+        enhanced = copy.deepcopy(statistics)
+        for key, value in enhanced.items():
+            if isinstance(value, dict) and value.get("type") == "numeric":
+                # Add range and coefficient of variation
+                min_val = value.get("min", 0)
+                max_val = value.get("max", 0)
+                avg_val = value.get("avg", 0)
+                value["range"] = max_val - min_val
+                if avg_val and value.get("stdev"):
+                    value["cv"] = round(value["stdev"] / abs(avg_val), 3)
+        return json.dumps(enhanced, indent=2, default=str)
+
+    # ========== Phase 19.3: Multi-Source Quality Analysis ==========
+
+    def _calculate_quality_metrics(
+        self, results: List[Dict[str, Any]], db_name: str
+    ) -> DataQualityMetrics:
+        """Calculate data quality metrics for one database's results."""
+        if not results:
+            return DataQualityMetrics(database=db_name)
+
+        row_count = len(results)
+        columns = list(results[0].keys())
+        columns = [c for c in columns if c != "_source_database"]
+
+        # NULL rates per column
+        null_rates = {}
+        total_cells = 0
+        total_nulls = 0
+        for col in columns:
+            nulls = sum(1 for r in results if r.get(col) is None)
+            null_rates[col] = nulls / row_count if row_count else 0
+            total_cells += row_count
+            total_nulls += nulls
+
+        completeness = 1 - (total_nulls / total_cells) if total_cells else 1.0
+
+        # Duplicate detection (hash each row)
+        row_hashes = set()
+        duplicates = 0
+        for r in results:
+            row_key = tuple(
+                sorted((k, str(v)) for k, v in r.items() if k != "_source_database")
+            )
+            if row_key in row_hashes:
+                duplicates += 1
+            row_hashes.add(row_key)
+        duplicate_rate = duplicates / row_count if row_count else 0
+
+        # Freshness: find max temporal value
+        freshness = None
+        temporal_cols = self._detect_temporal_columns(results)
+        if temporal_cols:
+            temporal_values = []
+            for r in results:
+                val = r.get(temporal_cols[0])
+                if val is not None:
+                    temporal_values.append(str(val))
+            if temporal_values:
+                freshness = max(temporal_values)
+
+        return DataQualityMetrics(
+            database=db_name,
+            row_count=row_count,
+            null_rates=null_rates,
+            duplicate_rate=round(duplicate_rate, 4),
+            completeness=round(completeness, 4),
+            freshness=freshness,
+        )
+
+    def _build_multi_source_quality_report(
+        self, db_results: Dict[str, List[Dict[str, Any]]]
+    ) -> MultiSourceQualityReport:
+        """Build a cross-database quality comparison report."""
+        databases = list(db_results.keys())
+        quality_metrics = []
+        for db_name, results in db_results.items():
+            quality_metrics.append(self._calculate_quality_metrics(results, db_name))
+
+        # Find freshest and most complete
+        freshest_db = None
+        most_complete_db = None
+        max_freshness = ""
+        max_completeness = -1.0
+        for m in quality_metrics:
+            if m.freshness and m.freshness > max_freshness:
+                max_freshness = m.freshness
+                freshest_db = m.database
+            if m.completeness > max_completeness:
+                max_completeness = m.completeness
+                most_complete_db = m.database
+
+        # Gap detection: columns present in some DBs but 100% NULL in others
+        all_columns: Dict[str, List[str]] = {}  # column -> list of DBs with data
+        all_missing: Dict[str, List[str]] = {}  # column -> list of DBs without data
+        for m in quality_metrics:
+            for col, rate in m.null_rates.items():
+                if col not in all_columns:
+                    all_columns[col] = []
+                    all_missing[col] = []
+                if rate < 1.0:
+                    all_columns[col].append(m.database)
+                else:
+                    all_missing[col].append(m.database)
+
+        gap_insights = []
+        for col, present in all_columns.items():
+            missing = all_missing.get(col, [])
+            if present and missing:
+                gap_insights.append(GapInsight(
+                    column=col, present_in=present, missing_in=missing,
+                ))
+
+        return MultiSourceQualityReport(
+            databases=databases,
+            quality_metrics=quality_metrics,
+            gap_insights=gap_insights,
+            freshest_db=freshest_db,
+            most_complete_db=most_complete_db,
+        )
+
+    async def _get_or_compute_quality_report(
+        self, db_results: Dict[str, List[Dict[str, Any]]]
+    ) -> MultiSourceQualityReport:
+        """Get cached quality report or compute fresh."""
+        cache = self._get_cache()
+        # Build a combined hash for the multi-DB results with a
+        # "quality:" prefix to avoid colliding with pattern cache entries.
+        if cache:
+            from src.services.analytics_cache import AnalyticsCache
+            combined = []
+            for db_results_list in db_results.values():
+                combined.extend(db_results_list)
+            result_hash = "quality:" + AnalyticsCache.compute_result_hash(combined)
+            cached = await cache.get_patterns(result_hash)
+            if cached is not None:
+                logger.debug("Analytics cache hit for quality report")
+                # Reconstruct from cached dict
+                report = MultiSourceQualityReport(
+                    databases=cached.get("databases", []),
+                    freshest_db=cached.get("freshest_db"),
+                    most_complete_db=cached.get("most_complete_db"),
+                )
+                report.quality_metrics = [
+                    DataQualityMetrics(**m) for m in cached.get("quality_metrics", [])
+                ]
+                report.gap_insights = [
+                    GapInsight(**g) for g in cached.get("gap_insights", [])
+                ]
+                return report
+
+        report = self._build_multi_source_quality_report(db_results)
+
+        # Cache the report
+        if cache:
+            try:
+                from src.services.analytics_cache import AnalyticsCache
+                from dataclasses import asdict
+                combined = []
+                for db_results_list in db_results.values():
+                    combined.extend(db_results_list)
+                result_hash = "quality:" + AnalyticsCache.compute_result_hash(combined)
+                await cache.set_patterns(result_hash, asdict(report))
+            except Exception as e:
+                logger.debug(f"Failed to cache quality report: {e}")
+
+        return report
+
+    def _get_cache(self):
+        """Lazily get analytics cache singleton."""
+        if self._analytics_cache is None:
+            try:
+                from src.services.analytics_cache import get_analytics_cache
+                self._analytics_cache = get_analytics_cache()
+            except Exception:
+                pass
+        return self._analytics_cache
+
+    async def _get_or_compute_statistics(
+        self, results: List[Dict[str, Any]], database_type: str = "unknown"
+    ) -> Dict[str, Any]:
+        """Get statistics from cache or compute and cache them."""
+        cache = self._get_cache()
+        if cache and results:
+            from src.services.analytics_cache import AnalyticsCache
+            result_hash = AnalyticsCache.compute_result_hash(results)
+            cached = await cache.get_statistics(result_hash, database_type)
+            if cached is not None:
+                logger.debug("Analytics cache hit for statistics")
+                return cached
+
+        # Compute fresh
+        statistics = self._extract_statistics(results) if self.enable_statistics else {}
+
+        # Store in cache
+        if cache and results and statistics:
+            try:
+                from src.services.analytics_cache import AnalyticsCache
+                result_hash = AnalyticsCache.compute_result_hash(results)
+                await cache.set_statistics(result_hash, database_type, statistics)
+            except Exception as e:
+                logger.debug(f"Failed to cache statistics: {e}")
+
+        return statistics
+
     def _extract_statistics(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Extract statistics from query results
@@ -309,7 +664,7 @@ class ResultNarrator:
                     if len(numeric_values) > 2:
                         try:
                             col_stats["stdev"] = round(stdev(numeric_values), 2)
-                        except:
+                        except Exception:
                             pass
                     stats[column] = col_stats
                     continue
@@ -351,10 +706,15 @@ class ResultNarrator:
         row_count: int,
         execution_time_ms: float,
         databases: List[str],
-        database_comparisons: Dict[str, Any] = None
+        database_comparisons: Dict[str, Any] = None,
+        quality_summary: str = "",
     ) -> str:
-        """Build the LLM prompt for multi-database narratives with comparison focus"""
-        from src.llm.prompts import MULTI_DATABASE_NARRATIVE_PROMPT
+        """Build the LLM prompt for multi-database narratives with comparison focus.
+
+        Uses tiered prompt templates based on model size (Phase 19.1).
+        """
+        tier = self._get_model_tier()
+        prompt_template = get_narrative_prompt(tier, multi_db=True)
 
         if database_comparisons is None:
             database_comparisons = {}
@@ -412,16 +772,19 @@ class ResultNarrator:
 
         database_details = "\n  ".join(database_details_lines) if database_details_lines else "  (no details)"
 
-        # Format statistics
+        # Format statistics with tier-appropriate compression
         meaningful_stats = {}
         for key, value in statistics.items():
             if not self._is_id_column(key):
                 meaningful_stats[key] = value
 
-        stats_text = json.dumps(meaningful_stats, indent=2, default=str) if meaningful_stats else json.dumps({"row_count": row_count})
+        stats_text = self._compress_statistics(
+            meaningful_stats if meaningful_stats else {"row_count": row_count},
+            tier
+        )
 
-        # Build prompt with multi-database template
-        prompt = MULTI_DATABASE_NARRATIVE_PROMPT.format(
+        # Build prompt with tiered multi-database template
+        format_kwargs = dict(
             question=question,
             databases=", ".join(databases),
             database_count=len(databases),
@@ -429,8 +792,13 @@ class ResultNarrator:
             execution_time_ms=execution_time_ms,
             database_breakdown=database_breakdown,
             statistics=stats_text,
-            database_details=database_details
+            database_details=database_details,
         )
+        # Enhanced tier includes quality_summary placeholder
+        if tier == ModelSize.LARGE:
+            format_kwargs["quality_summary"] = quality_summary
+
+        prompt = prompt_template.format(**format_kwargs)
 
         return prompt
 
@@ -443,18 +811,21 @@ class ResultNarrator:
         row_count: int,
         execution_time_ms: float
     ) -> str:
-        """Build the LLM prompt with question, SQL, data, and statistics"""
-        from src.llm.prompts import NARRATIVE_GENERATION_PROMPT
+        """Build the LLM prompt with question, SQL, data, and statistics.
+
+        Uses tiered prompt templates based on model size (Phase 19.1).
+        """
+        tier = self._get_model_tier()
+        prompt_template = get_narrative_prompt(tier, multi_db=False)
+        max_rows = MAX_SAMPLE_ROWS_BY_TIER.get(tier, 5)
 
         # Format sample data with better formatting
         if sample_results:
-            # Pretty print sample data
             sample_lines = []
-            for row in sample_results[:min(5, len(sample_results))]:
-                # Format each row with column names for better readability
+            for row in sample_results[:max_rows]:
                 formatted_row = []
                 for key, value in row.items():
-                    if not self._is_id_column(key):  # Skip ID columns in display
+                    if not self._is_id_column(key):
                         formatted_row.append(f"{key}: {value}")
                 if formatted_row:
                     sample_lines.append("  " + ", ".join(formatted_row))
@@ -472,15 +843,18 @@ class ResultNarrator:
             if not self._is_id_column(key):
                 meaningful_stats[key] = value
 
-        stats_text = json.dumps(meaningful_stats, indent=2, default=str) if meaningful_stats else json.dumps({"row_count": statistics.get("row_count", 0)})
+        stats_text = self._compress_statistics(
+            meaningful_stats if meaningful_stats else {"row_count": statistics.get("row_count", 0)},
+            tier
+        )
 
-        # Build prompt
-        prompt = NARRATIVE_GENERATION_PROMPT.format(
+        # Build prompt with tier-appropriate template
+        prompt = prompt_template.format(
             question=question,
             sql=sql,
             row_count=row_count,
             execution_time_ms=execution_time_ms,
-            sample_size=min(len(sample_results), self.max_sample_rows),
+            sample_size=min(len(sample_results), max_rows),
             sample_data=sample_text,
             statistics=stats_text
         )
@@ -766,9 +1140,6 @@ class ResultNarrator:
                         )
 
         except Exception as e:
-            # Log error but don't fail
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Error detecting anomalies: {e}")
 
         return anomalies
@@ -834,8 +1205,6 @@ class ResultNarrator:
             return sorted(similar_queries, key=lambda x: x["similarity"], reverse=True)[:3]
 
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Error retrieving historical context: {e}")
             return []
 
@@ -878,8 +1247,6 @@ class ResultNarrator:
             }
 
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Error comparing to history: {e}")
             return {"comparisons": [], "has_trend": False}
 
@@ -919,29 +1286,32 @@ class ResultNarrator:
                 is_temporal = False
 
                 for value in sample_values:
-                    value_str = str(value).lower()
-
-                    # Check for common date patterns
-                    if isinstance(value, str):
-                        if any(pattern in value_str for pattern in [
-                            '-', '/', 'january', 'february', 'march', 'april', 'may', 'june',
-                            'july', 'august', 'september', 'october', 'november', 'december',
-                            'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
-                            '00:00', '23:59', 'time', 'date', 'timestamp'
-                        ]):
-                            is_temporal = True
-                            break
                     # Check if it's a datetime object
-                    elif hasattr(value, 'year') and hasattr(value, 'month'):
+                    if hasattr(value, 'year') and hasattr(value, 'month'):
                         is_temporal = True
                         break
+
+                    # For strings, try parsing as ISO date first
+                    if isinstance(value, str):
+                        value_stripped = value.strip()
+                        # Try ISO format parsing (most reliable)
+                        try:
+                            datetime.fromisoformat(value_stripped.replace('Z', '+00:00'))
+                            is_temporal = True
+                            break
+                        except (ValueError, TypeError):
+                            pass
+                        # Fall back to regex for common date patterns (YYYY-MM-DD, MM/DD/YYYY, etc.)
+                        import re
+                        if re.match(r'^\d{4}-\d{2}-\d{2}', value_stripped) or \
+                           re.match(r'^\d{1,2}/\d{1,2}/\d{2,4}$', value_stripped):
+                            is_temporal = True
+                            break
 
                 if is_temporal:
                     temporal_columns.append(key)
 
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(f"Error detecting temporal columns: {e}")
 
         return temporal_columns
@@ -1046,8 +1416,6 @@ class ResultNarrator:
                                 })
 
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(f"Error detecting trends: {e}")
 
         return trends
@@ -1236,8 +1604,6 @@ class ResultNarrator:
                             })
 
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(f"Error calculating correlations: {e}")
 
         return correlations

@@ -12,6 +12,12 @@ from src.llm.prompts.analysis import (
     QUERY_EXPLANATION_TEMPLATE,
     QUERY_OPTIMIZATION_TEMPLATE,
 )
+from src.llm.prompts.narrative_tiers import (
+    get_narrative_prompt,
+    NARRATIVE_TOKEN_BUDGETS,
+    MAX_SAMPLE_ROWS_BY_TIER,
+    MAX_INSIGHTS_BY_TIER,
+)
 from src.llm.prompts.sql_generation import (
     SYSTEM_PROMPT,
     SQL_GENERATION_TEMPLATE,
@@ -45,4 +51,8 @@ __all__ = [
     "build_sql_prompt",
     "build_chat_messages",
     "build_few_shot_examples",
+    "get_narrative_prompt",
+    "NARRATIVE_TOKEN_BUDGETS",
+    "MAX_SAMPLE_ROWS_BY_TIER",
+    "MAX_INSIGHTS_BY_TIER",
 ]

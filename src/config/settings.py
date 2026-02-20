@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     NARRATIVE_TIMEOUT_SECONDS: int = 15  # Max seconds for LLM narrative generation
     NARRATIVE_MAX_SAMPLE_ROWS: int = 20  # Only analyze first N rows for large result sets
 
+    # Analytics Cache (Phase 19.2)
+    ANALYTICS_CACHE_TTL: int = 3600       # Local cache TTL in seconds (1 hour)
+    ANALYTICS_CACHE_REDIS_TTL: int = 86400  # Redis cache TTL in seconds (24 hours)
+    ANALYTICS_CACHE_MAXSIZE: int = 100    # Max local cache entries
+
     # Prompt Optimization (Phase 2.2)
     PROMPT_OPTIMIZATION_ENABLED: bool = False  # OFF by default, user opt-in
     MODEL_SIZE_DETECTION: str = "auto"  # auto, small, medium, large
