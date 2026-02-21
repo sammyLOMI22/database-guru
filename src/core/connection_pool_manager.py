@@ -204,7 +204,7 @@ class ConnectionPoolManager:
             raise NotImplementedError(
                 "Connection pooling not available for MongoDB. "
                 "MongoDB support will be added in a future update. "
-                "Supported databases: PostgreSQL, MySQL, SQLite, DuckDB, SQL Server"
+                "Supported databases: PostgreSQL, MySQL, SQLite, DuckDB, SQL Server, Oracle"
             )
 
         # Pool key: (connection_id, database_type)
@@ -239,8 +239,8 @@ class ConnectionPoolManager:
 
         connection_url = UserDatabaseConnector.build_connection_url(connection)
 
-        # DuckDB and MSSQL (pymssql) use sync engines
-        if connection.database_type in ('duckdb', 'mssql'):
+        # DuckDB, MSSQL (pymssql), and Oracle (oracledb sync) use sync engines
+        if connection.database_type in ('duckdb', 'mssql', 'oracle'):
             engine = create_engine(
                 connection_url,
                 echo=False,

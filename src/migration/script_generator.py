@@ -114,6 +114,16 @@ class ScriptGenerator:
             lines.append("-- Disable FK constraints for migration")
             lines.append("EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL';")
             lines.append("")
+        elif self.dialect == DatabaseDialect.ORACLE:
+            lines.append("-- Disable FK constraints for migration")
+            lines.append("BEGIN")
+            lines.append("  FOR c IN (SELECT owner, constraint_name, table_name FROM all_constraints")
+            lines.append("            WHERE constraint_type = 'R' AND owner = USER) LOOP")
+            lines.append("    EXECUTE IMMEDIATE 'ALTER TABLE \"' || c.table_name || '\" DISABLE CONSTRAINT \"' || c.constraint_name || '\"';")
+            lines.append("  END LOOP;")
+            lines.append("END;")
+            lines.append("/")
+            lines.append("")
 
         # 1. Create new tables (FK dependency order from table_diffs)
         for td in diff.table_diffs:
@@ -140,7 +150,16 @@ class ScriptGenerator:
         removed = self._sort_removed_tables_for_drop(removed, source_schema)
         for td in removed:
             lines.append(f"-- WARNING: Data loss — dropping table '{td.table_name}'")
-            lines.append(f"DROP TABLE IF EXISTS {self._quote(td.table_name)};")
+            if self.dialect == DatabaseDialect.ORACLE:
+                # Oracle < 23c has no DROP TABLE IF EXISTS — use exception block
+                lines.append(f"BEGIN")
+                lines.append(f"  EXECUTE IMMEDIATE 'DROP TABLE {self._quote(td.table_name)} CASCADE CONSTRAINTS';")
+                lines.append(f"EXCEPTION WHEN OTHERS THEN")
+                lines.append(f"  IF SQLCODE != -942 THEN RAISE; END IF; -- ORA-00942: table does not exist")
+                lines.append(f"END;")
+                lines.append(f"/")
+            else:
+                lines.append(f"DROP TABLE IF EXISTS {self._quote(td.table_name)};")
             lines.append("")
             warnings.append(f"DROP TABLE {td.table_name}: all data will be lost")
 
@@ -151,6 +170,17 @@ class ScriptGenerator:
             lines.append("")
             lines.append("-- Re-enable FK constraints")
             lines.append("EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL';")
+            lines.append("")
+        elif self.dialect == DatabaseDialect.ORACLE:
+            lines.append("")
+            lines.append("-- Re-enable FK constraints")
+            lines.append("BEGIN")
+            lines.append("  FOR c IN (SELECT owner, constraint_name, table_name FROM all_constraints")
+            lines.append("            WHERE constraint_type = 'R' AND owner = USER) LOOP")
+            lines.append("    EXECUTE IMMEDIATE 'ALTER TABLE \"' || c.table_name || '\" ENABLE CONSTRAINT \"' || c.constraint_name || '\"';")
+            lines.append("  END LOOP;")
+            lines.append("END;")
+            lines.append("/")
             lines.append("")
 
         return lines
@@ -195,19 +225,33 @@ class ScriptGenerator:
                 col = cd.target_state
                 nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
                 default = f" DEFAULT {self._format_default(col['default'])}" if col.get("default") is not None else ""
-                # MSSQL uses ADD without COLUMN keyword
-                add_keyword = "ADD" if self.dialect == DatabaseDialect.MSSQL else "ADD COLUMN"
-                lines.append(
-                    f"ALTER TABLE {self._quote(td.table_name)} "
-                    f"{add_keyword} {self._quote(cd.column_name)} {col.get('type', 'TEXT')} {nullable}{default};"
-                )
+                if self.dialect == DatabaseDialect.ORACLE:
+                    # Oracle uses ADD (col type) with parentheses
+                    lines.append(
+                        f"ALTER TABLE {self._quote(td.table_name)} "
+                        f"ADD ({self._quote(cd.column_name)} {col.get('type', 'VARCHAR2(255)')} {nullable}{default});"
+                    )
+                else:
+                    # MSSQL uses ADD without COLUMN keyword; others use ADD COLUMN
+                    add_keyword = "ADD" if self.dialect == DatabaseDialect.MSSQL else "ADD COLUMN"
+                    lines.append(
+                        f"ALTER TABLE {self._quote(td.table_name)} "
+                        f"{add_keyword} {self._quote(cd.column_name)} {col.get('type', 'TEXT')} {nullable}{default};"
+                    )
 
             elif cd.diff_type == "removed":
                 lines.append(f"-- WARNING: Data loss — dropping column '{cd.column_name}'")
-                lines.append(
-                    f"ALTER TABLE {self._quote(td.table_name)} "
-                    f"DROP COLUMN {self._quote(cd.column_name)};"
-                )
+                if self.dialect == DatabaseDialect.ORACLE:
+                    # Oracle uses DROP (col) with parentheses
+                    lines.append(
+                        f"ALTER TABLE {self._quote(td.table_name)} "
+                        f"DROP ({self._quote(cd.column_name)});"
+                    )
+                else:
+                    lines.append(
+                        f"ALTER TABLE {self._quote(td.table_name)} "
+                        f"DROP COLUMN {self._quote(cd.column_name)};"
+                    )
                 warnings.append(f"DROP COLUMN {td.table_name}.{cd.column_name}: data will be lost")
 
             elif cd.diff_type == "type_changed" and cd.target_state:
@@ -235,6 +279,13 @@ class ScriptGenerator:
                         f"ALTER TABLE {self._quote(td.table_name)} "
                         f"ALTER COLUMN {self._quote(cd.column_name)} {col.get('type', 'TEXT')} {null_str};"
                     )
+                elif self.dialect == DatabaseDialect.ORACLE:
+                    col = cd.target_state
+                    null_str = "NULL" if nullable else "NOT NULL"
+                    lines.append(
+                        f"ALTER TABLE {self._quote(td.table_name)} "
+                        f"MODIFY ({self._quote(cd.column_name)} {col.get('type', 'VARCHAR2(255)')} {null_str});"
+                    )
 
         # Constraint changes
         for cd in td.constraint_diffs:
@@ -253,6 +304,15 @@ class ScriptGenerator:
                     idx_name = f"idx_{td.table_name}_{'_'.join(cols)}"
                     if self.dialect == DatabaseDialect.MSSQL:
                         lines.append(f"DROP INDEX IF EXISTS {self._quote(idx_name)} ON {self._quote(td.table_name)};")
+                    elif self.dialect == DatabaseDialect.ORACLE:
+                        # Oracle has no DROP INDEX IF EXISTS — use exception block
+                        safe_idx = self._escape_literal(idx_name)
+                        lines.append(f"BEGIN")
+                        lines.append(f"  EXECUTE IMMEDIATE 'DROP INDEX {self._quote(idx_name)}';")
+                        lines.append(f"EXCEPTION WHEN OTHERS THEN")
+                        lines.append(f"  IF SQLCODE != -1418 THEN RAISE; END IF; -- ORA-01418: index does not exist")
+                        lines.append(f"END;")
+                        lines.append(f"/")
                     else:
                         lines.append(f"DROP INDEX IF EXISTS {self._quote(idx_name)};")
 
@@ -282,6 +342,13 @@ class ScriptGenerator:
             return [
                 f"ALTER TABLE {self._quote(table_name)} "
                 f"ALTER COLUMN {self._quote(cd.column_name)} {new_type} {nullable};"
+            ]
+        elif self.dialect == DatabaseDialect.ORACLE:
+            col = cd.target_state or {}
+            nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
+            return [
+                f"ALTER TABLE {self._quote(table_name)} "
+                f"MODIFY ({self._quote(cd.column_name)} {new_type} {nullable});"
             ]
         # SQLite handled by _sqlite_recreate
         return []
@@ -419,6 +486,16 @@ class ScriptGenerator:
             lines.append("-- Disable FK constraints for rollback")
             lines.append("EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL';")
             lines.append("")
+        elif self.dialect == DatabaseDialect.ORACLE:
+            lines.append("-- Disable FK constraints for rollback")
+            lines.append("BEGIN")
+            lines.append("  FOR c IN (SELECT owner, constraint_name, table_name FROM all_constraints")
+            lines.append("            WHERE constraint_type = 'R' AND owner = USER) LOOP")
+            lines.append("    EXECUTE IMMEDIATE 'ALTER TABLE \"' || c.table_name || '\" DISABLE CONSTRAINT \"' || c.constraint_name || '\"';")
+            lines.append("  END LOOP;")
+            lines.append("END;")
+            lines.append("/")
+            lines.append("")
 
         # Reverse: drop tables that were added
         for td in diff.table_diffs:
@@ -454,12 +531,18 @@ class ScriptGenerator:
                         # Reverse: re-add the column that was dropped
                         col = cd.source_state
                         nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
-                        add_keyword = "ADD" if self.dialect == DatabaseDialect.MSSQL else "ADD COLUMN"
-                        lines.append(
-                            f"ALTER TABLE {self._quote(td.table_name)} "
-                            f"{add_keyword} {self._quote(cd.column_name)} "
-                            f"{col.get('type', 'TEXT')} {nullable};"
-                        )
+                        if self.dialect == DatabaseDialect.ORACLE:
+                            lines.append(
+                                f"ALTER TABLE {self._quote(td.table_name)} "
+                                f"ADD ({self._quote(cd.column_name)} {col.get('type', 'VARCHAR2(255)')} {nullable});"
+                            )
+                        else:
+                            add_keyword = "ADD" if self.dialect == DatabaseDialect.MSSQL else "ADD COLUMN"
+                            lines.append(
+                                f"ALTER TABLE {self._quote(td.table_name)} "
+                                f"{add_keyword} {self._quote(cd.column_name)} "
+                                f"{col.get('type', 'TEXT')} {nullable};"
+                            )
                         lines.append(f"-- NOTE: Data for '{cd.column_name}' cannot be restored")
                     elif cd.diff_type == "type_changed" and cd.source_state:
                         if self.dialect == DatabaseDialect.POSTGRESQL:
@@ -485,6 +568,14 @@ class ScriptGenerator:
                                 f"ALTER COLUMN {self._quote(cd.column_name)} "
                                 f"{col.get('type', 'TEXT')} {nullable};"
                             )
+                        elif self.dialect == DatabaseDialect.ORACLE:
+                            col = cd.source_state
+                            nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
+                            lines.append(
+                                f"ALTER TABLE {self._quote(td.table_name)} "
+                                f"MODIFY ({self._quote(cd.column_name)} "
+                                f"{col.get('type', 'VARCHAR2(255)')} {nullable});"
+                            )
 
         if self.dialect == DatabaseDialect.MYSQL:
             lines.append("")
@@ -493,6 +584,16 @@ class ScriptGenerator:
             lines.append("")
             lines.append("-- Re-enable FK constraints")
             lines.append("EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL';")
+        elif self.dialect == DatabaseDialect.ORACLE:
+            lines.append("")
+            lines.append("-- Re-enable FK constraints")
+            lines.append("BEGIN")
+            lines.append("  FOR c IN (SELECT owner, constraint_name, table_name FROM all_constraints")
+            lines.append("            WHERE constraint_type = 'R' AND owner = USER) LOOP")
+            lines.append("    EXECUTE IMMEDIATE 'ALTER TABLE \"' || c.table_name || '\" ENABLE CONSTRAINT \"' || c.constraint_name || '\"';")
+            lines.append("  END LOOP;")
+            lines.append("END;")
+            lines.append("/")
 
         return lines
 
@@ -546,6 +647,11 @@ class ScriptGenerator:
                         f"SELECT CASE WHEN OBJECT_ID(N'{safe_name}', N'U') IS NULL "
                         f"THEN 1 ELSE 0 END AS table_dropped;"
                     )
+                elif self.dialect == DatabaseDialect.ORACLE:
+                    lines.append(
+                        f"SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END AS table_dropped "
+                        f"FROM user_tables WHERE table_name = UPPER('{safe_name}');"
+                    )
                 lines.append("")
 
             elif td.diff_type == "modified":
@@ -575,6 +681,14 @@ class ScriptGenerator:
                                 f"FROM information_schema.columns "
                                 f"WHERE table_name = '{safe_tbl}' "
                                 f"AND column_name = '{safe_col}';"
+                                f"  -- Expected: 1"
+                            )
+                        elif self.dialect == DatabaseDialect.ORACLE:
+                            lines.append(
+                                f"SELECT COUNT(*) AS col_exists "
+                                f"FROM user_tab_columns "
+                                f"WHERE table_name = UPPER('{safe_tbl}') "
+                                f"AND column_name = UPPER('{safe_col}');"
                                 f"  -- Expected: 1"
                             )
                         elif self.dialect == DatabaseDialect.SQLITE:
@@ -724,6 +838,7 @@ class ScriptGenerator:
             return f"`{identifier}`"
         if self.dialect == DatabaseDialect.MSSQL:
             return f"[{identifier}]"
+        # PostgreSQL, SQLite, DuckDB, Oracle all use ANSI double quotes
         return f'"{identifier}"'
 
     @staticmethod

@@ -36,7 +36,16 @@ Auto-generates the actual SQL code for the migration.
     *   `up.sql`: The forward migration.
     *   `down.sql`: The rollback script.
     *   `verify.sql`: A script to assert the migration succeeded.
-*   **Multi-Dialect**: Generates specific SQL for Postgres, MySQL, SQLite, etc.
+*   **Multi-Dialect**: Generates specific SQL for all supported target databases:
+
+| Dialect | Identifier Quoting | ADD Column | Type/Nullability Change | FK Handling | Notes |
+|---------|-------------------|------------|------------------------|-------------|-------|
+| PostgreSQL | `"double"` | `ADD COLUMN` | `ALTER COLUMN ... TYPE ... USING` / `SET/DROP NOT NULL` | none needed | ANSI standard |
+| MySQL | `` `backtick` `` | `ADD COLUMN` | `MODIFY COLUMN` | `SET FOREIGN_KEY_CHECKS` | |
+| SQLite | `"double"` | `ADD COLUMN` | Table recreate pattern | none | No `ALTER COLUMN` support |
+| DuckDB | `"double"` | `ADD COLUMN` | `ALTER COLUMN ... TYPE` | none needed | PostgreSQL-compatible |
+| **SQL Server** | `[bracket]` | `ADD col` | `ALTER COLUMN col type NULL/NOT NULL` | `sp_MSforeachtable` NOCHECK/CHECK | Driver: `pymssql` |
+| **Oracle** | `"double"` | `ADD (col type)` | `MODIFY (col type)` | PL/SQL loop over `all_constraints` | Driver: `oracledb` (thin mode); no `IF EXISTS` — uses exception blocks |
 
 ### 🧪 2.4 Data Migration Assistant
 For changes that require moving data, not just schema.
@@ -96,6 +105,14 @@ When Table A references Table B, and Table B references Table A:
     *   `SET FOREIGN_KEY_CHECKS = 0;`
     *   Perform Migration.
     *   `SET FOREIGN_KEY_CHECKS = 1;` (Triggers immediate validation).
+4.  **Method D: Bulk disable via stored procedure** (SQL Server / MSSQL):
+    *   `EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL';`
+    *   Perform Migration.
+    *   `EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL';`
+5.  **Method E: PL/SQL loop** (Oracle):
+    *   Loop over `all_constraints WHERE constraint_type = 'R'` and `DISABLE` each.
+    *   Perform Migration.
+    *   Loop again and `ENABLE` each constraint.
 
 ### 7.3 "Pre-Flight" Soft Validation
 Before attempting the migration, the Agent runs **ReadOnly** validation queries on the *Source* data to find rows that *will* fail.

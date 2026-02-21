@@ -46,6 +46,13 @@ class UserDatabaseConnector:
             port = connection.port or 1433
             return f"mssql+pymssql://{connection.username}:{password}@{connection.host}:{port}/{connection.database_name}"
 
+        elif connection.database_type == 'oracle':
+            # Oracle - uses python-oracledb in thin mode (no Oracle Client required)
+            # database_name is treated as the service name
+            password = connection.password_encrypted or ""  # TODO: decrypt
+            port = connection.port or 1521
+            return f"oracle+oracledb://{connection.username}:{password}@{connection.host}:{port}/?service_name={connection.database_name}"
+
         elif connection.database_type == 'mongodb':
             # MongoDB is not SQL, would need different handling
             raise NotImplementedError("MongoDB queries not yet supported")
@@ -73,8 +80,8 @@ class UserDatabaseConnector:
         # Get or create pool for this connection (metrics updated in get_pool())
         pool_entry = await pool_manager.get_pool(connection)
 
-        # DuckDB and MSSQL (pymssql) use sync sessions
-        if connection.database_type in ('duckdb', 'mssql'):
+        # DuckDB, MSSQL (pymssql), and Oracle (oracledb sync) use sync sessions
+        if connection.database_type in ('duckdb', 'mssql', 'oracle'):
             # Create sync session from pool
             session = pool_entry.session_factory()
             try:

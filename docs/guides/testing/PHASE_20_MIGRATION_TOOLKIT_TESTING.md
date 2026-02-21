@@ -53,8 +53,10 @@ The following were manually validated in-process:
 - MySQL wraps statements with `SET FOREIGN_KEY_CHECKS = 0/1` and uses backtick identifiers.
 - SQLite table recreate pattern confirmed: `CREATE __new → INSERT INTO SELECT → DROP → RENAME TO`.
 - When full source/target schemas are provided to SQLite recreate, **all columns** (changed and unchanged) appear in the recreated table. This is the correct behaviour — the prior bug where only diff columns were included is resolved.
+- **SQL Server (MSSQL)**: Uses `[bracket]` identifier quoting; `ADD col type` (no `COLUMN` keyword); `ALTER COLUMN col type NULL/NOT NULL` for both type and nullability changes; `DROP INDEX idx ON table` syntax; FK disable/enable via `EXEC sp_MSforeachtable`; `DROP INDEX IF EXISTS idx ON table`.
+- **Oracle**: Uses `"double-quote"` identifiers (ANSI standard, uppercased without quotes); `ADD (col type)` with parentheses; `MODIFY (col type)` for both type and nullability; `DROP (col)` with parentheses; `DROP TABLE ... CASCADE CONSTRAINTS` wrapped in a `BEGIN/EXCEPTION/END` block (ORA-00942 swallowed); `DROP INDEX` wrapped in exception block (ORA-01418 swallowed); FK disable/enable via PL/SQL loop over `all_constraints`; verify queries use `USER_TABLES` and `USER_TAB_COLUMNS` instead of `information_schema`.
 - `down.sql` correctly reverses adds (drops) and drops (re-adds skeleton).
-- `verify.sql` generates `information_schema.tables` check for PG/MySQL and `sqlite_master` check for SQLite.
+- `verify.sql` generates `information_schema.tables` check for PG/MySQL/MSSQL, `sqlite_master` check for SQLite, and `USER_TABLES` / `OBJECT_ID()` checks for Oracle/MSSQL respectively.
 - Data-loss operations (`DROP TABLE`, `DROP COLUMN`) emit both a `-- WARNING:` comment inline and append to the `warnings` list.
 
 **MigrationPlanner**
@@ -127,9 +129,39 @@ The following were manually validated in-process:
 | Fixed | `script_generator.py:_generate_verify()` | `verify.sql` only checked row counts — added columns had no existence check. | Resolved: `information_schema.columns` / `pragma_table_info` checks added |
 | Not a bug | `script_generator.py:_alter_table_ddl()` | `nullability_changed` for SQLite: recreate is triggered by either `type_changed` OR `nullability_changed`, so this is already handled. | Not a bug |
 
+### MSSQL & Oracle Dialect Verification (2026-02-21)
+
+Added post-initial-release. Both dialects verified in-process:
+
+```bash
+source venv/bin/activate && python -c "
+from src.llm.dialect_registry import DatabaseDialect, get_dialect_for_database_type
+from src.migration.script_generator import ScriptGenerator
+from src.migration.schema_comparator import SchemaComparator
+
+gen_mssql = ScriptGenerator(DatabaseDialect.MSSQL)
+gen_oracle = ScriptGenerator(DatabaseDialect.ORACLE)
+
+# Quoting
+assert gen_mssql._quote('t') == '[t]'
+assert gen_oracle._quote('t') == '\"t\"'
+
+# Dialect mapping
+assert get_dialect_for_database_type('mssql') == DatabaseDialect.MSSQL
+assert get_dialect_for_database_type('oracle') == DatabaseDialect.ORACLE
+
+print('MSSQL and Oracle dialect checks passed')
+"
+```
+
+**Confirmed behaviours:**
+- MSSQL: `[bracket]` quoting, `ADD col type` (no COLUMN), `ALTER COLUMN col type NULL/NOT NULL`, `DROP INDEX idx ON table`, `sp_MSforeachtable` FK wrap
+- Oracle: `"double-quote"` quoting, `ADD (col type)`, `MODIFY (col type)`, `DROP (col)`, PL/SQL exception blocks, `USER_TABLES`/`USER_TAB_COLUMNS` verify
+- Type synonyms: `nvarchar→varchar`, `datetime2→timestamp`, `bit→boolean` (MSSQL); `varchar2→varchar`, `clob→text`, `number→numeric` (Oracle)
+
 ### Overall Assessment
 
-**Phase 20 is production-ready for its stated scope** (schema diff, plan generation, script generation, data migration SQL generation). All 98 automated tests pass, critical bugs from the audit have been resolved, and the deterministic-first / LLM-enrichment-second architecture is sound.
+**Phase 20 is production-ready for its stated scope** (schema diff, plan generation, script generation, data migration SQL generation). All 98 automated tests pass, critical bugs from the audit have been resolved, and the deterministic-first / LLM-enrichment-second architecture is sound. Dialect support has been extended to include **SQL Server (MSSQL)** and **Oracle** in addition to the original PostgreSQL, MySQL, SQLite, and DuckDB targets.
 
 The primary gap is in completeness of the `down.sql` rollback for SQLite and the missing batch-loop template in data migration SQL. Both are usability improvements rather than correctness bugs.
 
@@ -167,7 +199,15 @@ cd frontend && npm install && cd ..
 You need **at least two database connections** registered in Database Guru to test schema diffing. These can be:
 - Two SQLite databases with different schemas
 - A PostgreSQL + MySQL pair
-- Any combination of supported database types
+- Any combination of supported database types: PostgreSQL, MySQL, SQLite, DuckDB, SQL Server, Oracle
+
+**Optional drivers for new dialects** (install if testing live connections):
+```bash
+pip install pymssql==2.3.1   # SQL Server
+pip install oracledb==2.3.0  # Oracle (thin mode — no Oracle Client needed)
+```
+
+> **Dialect generation can be tested without a live connection.** Script generation only requires a saved diff snapshot — you can generate and inspect MSSQL/Oracle DDL from any existing project by selecting the dialect in the Scripts tab.
 
 ---
 
@@ -256,7 +296,9 @@ python -m pytest tests/test_script_generator.py::TestScriptGeneratorSQLite::test
 - SQLite: table recreate pattern (`CREATE __new`, `INSERT INTO SELECT`, `DROP`, `RENAME`)
 - SQLite includes unchanged columns when source/target schemas are provided
 - SQLite warns about missing columns when schemas are unavailable
-- `verify.sql` uses `information_schema` (PG/MySQL) or `sqlite_master` (SQLite)
+- **MSSQL**: `[bracket]` quoting; `ADD col` (no COLUMN keyword); `ALTER COLUMN col type NULL/NOT NULL`; `DROP INDEX idx ON table`; FK wrap via `sp_MSforeachtable`
+- **Oracle**: `"double-quote"` quoting; `ADD (col type)` parens; `MODIFY (col type)` parens; `DROP (col)` parens; PL/SQL exception blocks for `DROP TABLE`/`DROP INDEX` (no `IF EXISTS` pre-23c); FK loop via `all_constraints`; `USER_TABLES`/`USER_TAB_COLUMNS` in verify
+- `verify.sql` uses `information_schema` (PG/MySQL/MSSQL), `sqlite_master` (SQLite), `USER_TABLES`/`USER_TAB_COLUMNS` (Oracle)
 
 **Data Migration Assistant:**
 - Only `modified` tables get data migration (not `added`/`removed`)
@@ -358,7 +400,7 @@ curl -X POST http://localhost:8000/api/migration/projects/1/scripts \
   -d '{"target_dialect": "postgresql"}'
 ```
 
-Try with different dialects: `postgresql`, `mysql`, `sqlite`
+Try with all supported dialects: `postgresql`, `mysql`, `sqlite`, `duckdb`, `mssql`, `oracle`
 
 **What to verify:**
 - `up_sql` contains valid DDL for the target dialect
@@ -367,6 +409,8 @@ Try with different dialects: `postgresql`, `mysql`, `sqlite`
 - PostgreSQL: double-quote identifiers, `USING` clause for type casts
 - MySQL: backtick identifiers, `SET FOREIGN_KEY_CHECKS`, `MODIFY COLUMN`
 - SQLite: table recreate pattern for type/nullability changes
+- **MSSQL**: `[bracket]` identifiers; `ALTER TABLE t ADD col type` (no COLUMN keyword); `ALTER TABLE t ALTER COLUMN col type NULL/NOT NULL`; `DROP INDEX idx ON t`; wrapped by `EXEC sp_MSforeachtable` FK disable/enable
+- **Oracle**: `"double-quote"` identifiers; `ALTER TABLE t ADD (col type)`; `ALTER TABLE t MODIFY (col type)`; `ALTER TABLE t DROP (col)`; `DROP TABLE ... CASCADE CONSTRAINTS` and `DROP INDEX` in `BEGIN/EXCEPTION/END` blocks; FK loop via `all_constraints`; verify uses `USER_TABLES`/`USER_TAB_COLUMNS`
 - `warnings` array lists data-loss risks (DROP TABLE, DROP COLUMN)
 - Project `status` updates to `"scripted"`
 
@@ -461,10 +505,12 @@ Open [http://localhost:3000](http://localhost:3000) and navigate to the **Migrat
 
 ### Scripts Tab
 
-1. Select a target dialect (PostgreSQL / MySQL / SQLite)
+1. Select a target dialect (PostgreSQL / MySQL / SQLite / DuckDB / SQL Server / Oracle)
 2. Click **Generate Scripts**
 3. Verify three script panels appear: `up.sql`, `down.sql`, `verify.sql`
-4. Verify syntax highlighting and content correctness
+4. Verify syntax highlighting and content correctness per dialect:
+   - MSSQL: identifiers wrapped in `[brackets]`, FK wrapped by `sp_MSforeachtable`
+   - Oracle: identifiers in `"double quotes"`, `ADD`/`MODIFY`/`DROP` with parentheses, PL/SQL `BEGIN/END` blocks for drop operations
 5. Click download buttons to save individual `.sql` files
 
 ### Data Tab
@@ -526,6 +572,10 @@ Verify `migration_projects` table is dropped and `system_settings` columns are r
 |-----------|--------|
 | **No DDL execution** | Scripts are generated but never executed against target databases. Users must copy/download and run manually. |
 | **SQLite ALTER COLUMN** | SQLite doesn't support `ALTER COLUMN`. The toolkit generates a table recreate pattern (`CREATE __new → INSERT → DROP → RENAME`). Full source/target schemas must be available for unchanged columns to be preserved. |
+| **Oracle DROP TABLE / DROP INDEX** | Oracle pre-23c has no `DROP TABLE IF EXISTS`. Generated scripts wrap drops in `BEGIN/EXCEPTION WHEN OTHERS/END` blocks that swallow ORA-00942 (table) and ORA-01418 (index) errors. Scripts require running with `/` block terminators (SQL*Plus / SQLcl compatible). |
+| **Oracle type defaults** | When Oracle ADD column DDL is generated without explicit source schema type, it defaults to `VARCHAR2(255)` instead of `TEXT`. Users should verify and adjust types for non-string columns. |
+| **MSSQL driver requirement** | SQL Server connections require `pymssql` (`pip install pymssql`). No ODBC drivers needed — pymssql uses native TDS protocol. |
+| **Oracle driver requirement** | Oracle connections require `oracledb` (`pip install oracledb`). Uses thin mode by default — no Oracle Client installation needed. |
 | **Data migration is read-only** | INSERT INTO SELECT queries are generated but not executed. The staging table (`table__new`) must be created separately (by the `up.sql` script). |
 | **LLM enrichment is optional** | If Ollama is unavailable, the planner and scripts still work with deterministic logic only. |
 | **Self-referencing tables** | Data migration uses a staging table pattern to avoid `INSERT INTO X SELECT FROM X` issues, but self-referencing FKs within a table may need manual ordering. |

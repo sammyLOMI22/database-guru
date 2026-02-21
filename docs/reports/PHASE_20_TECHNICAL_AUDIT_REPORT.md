@@ -25,3 +25,23 @@
 - **Automated Execution**: Allow the Database Guru to actually *execute* the generated migration scripts against target connections, rather than just generating them as text files.
 - **Data Integrity Tests**: Expand `verify.sql` to include checksum-based data validation (hashing column concatenations) instead of simple row counts.
 - **Interactive Script Editing**: Provide a frontend code editor to allow users to tweak LLM-generated LLM scripts before downloading them.
+
+---
+
+## 6. Post-Release Additions (2026-02-21)
+
+### SQL Server (MSSQL) and Oracle dialect support
+
+Both dialects were added to the migration toolkit after the initial Phase 20 release. Changes are purely additive — no existing dialect behaviour was modified.
+
+**Files changed:**
+- `requirements.txt`: `pymssql==2.3.1`, `oracledb==2.3.0`
+- `src/llm/dialect_registry.py`: `DatabaseDialect.MSSQL`, `DatabaseDialect.ORACLE` enum values, `DialectRules`, LLM prompt context, `get_dialect_for_database_type()` mapping
+- `src/core/user_db_connector.py`: Connection URL builders; both added to the sync session path alongside DuckDB
+- `src/core/connection_pool_manager.py`: Both added to the sync engine creation path
+- `src/migration/schema_comparator.py`: 14 MSSQL type synonyms (`nvarchar`, `bit`, `datetime2`, `uniqueidentifier`, etc.) and 12 Oracle type synonyms (`varchar2`, `clob`, `number`, `blob`, etc.)
+- `src/migration/script_generator.py`: Full DDL generation for both dialects (see testing guide for specifics)
+- `frontend/src/components/DatabaseConnectionModal.tsx`: `mssql` and `oracle` selectable types with correct default ports (1433, 1521)
+
+**Architecture note — Oracle scripts require SQL*Plus-style block terminators:**
+Oracle's `BEGIN/EXCEPTION/END` blocks generated for `DROP TABLE` and `DROP INDEX` operations use `/` terminators. These are valid for SQL*Plus, SQLcl, and most Oracle GUI tools. Users running scripts via JDBC or other drivers that don't support block terminators will need to strip the `/` lines or execute the `EXECUTE IMMEDIATE` statements individually.
