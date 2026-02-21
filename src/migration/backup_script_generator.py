@@ -75,7 +75,7 @@ class BackupScriptGenerator:
         # Sort tables: parents before children for CREATE (children first for DROP)
         ordered = self._sort_tables_create_order(tables)
 
-        backup_lines = self._generate_backup(ordered, tables, warnings, connection_name)
+        backup_lines = self._generate_backup(ordered, tables, warnings, connection_name, schema=schema)
         restore_lines = self._generate_restore(list(reversed(ordered)), tables, schema)
         verify_lines = self._generate_verify(ordered, tables, schema)
 
@@ -137,6 +137,7 @@ class BackupScriptGenerator:
         tables: Dict[str, Any],
         warnings: List[str],
         connection_name: str,
+        schema: Optional[Dict[str, Any]] = None,
     ) -> List[str]:
         """Generate the full schema DDL backup script."""
         now = datetime.now(timezone.utc).isoformat()
@@ -175,7 +176,8 @@ class BackupScriptGenerator:
                 lines.extend(index_lines)
 
         # Extended objects (after tables)
-        lines.extend(self._generate_extended_backup(schema, warnings))
+        if schema:
+            lines.extend(self._generate_extended_backup(schema, warnings))
 
         if self.dialect == DatabaseDialect.MYSQL:
             lines += ["SET FOREIGN_KEY_CHECKS = 1;", ""]
