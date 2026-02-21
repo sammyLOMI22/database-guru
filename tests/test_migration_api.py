@@ -204,8 +204,8 @@ class TestPlanGeneration:
 class TestScriptsGeneration:
     @pytest.mark.asyncio
     async def test_generate_scripts_no_diff(self, mock_db_session):
-        """generate_scripts raises 400 when project has no diff."""
-        from src.api.endpoints.migration import generate_scripts
+        """create_scripts raises 400 when project has no diff."""
+        from src.api.endpoints.migration import create_scripts
         from src.models.schemas import GenerateScriptsRequest
         from fastapi import HTTPException
 
@@ -219,7 +219,7 @@ class TestScriptsGeneration:
         request = GenerateScriptsRequest(target_dialect="postgresql")
 
         with pytest.raises(HTTPException) as exc_info:
-            await generate_scripts(1, request, mock_db_session)
+            await create_scripts(1, request, mock_db_session)
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio

@@ -54,7 +54,7 @@ docker compose down -v                         # Stop + remove volumes
 
 ## Architecture Overview
 
-The system uses a multi-agent architecture with 23+ specialized agents. See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
+The system uses a multi-agent architecture with 27+ specialized agents. See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
 
 ### Key Agents (Quick Reference)
 | Agent | File | Purpose |
@@ -77,6 +77,10 @@ The system uses a multi-agent architecture with 23+ specialized agents. See [.cl
 | LLM Usage Tracker | `src/services/llm_usage_tracker.py` | Token & cost tracking (Phase 16) |
 | Narrative Tiers | `src/llm/prompts/narrative_tiers.py` | Model-size-aware prompt templates (Phase 19) |
 | Analytics Cache | `src/services/analytics_cache.py` | Two-tier stats/pattern cache (Phase 19) |
+| Schema Comparator | `src/migration/schema_comparator.py` | DB-to-DB schema diff engine (Phase 20) |
+| Migration Planner | `src/migration/migration_planner.py` | Dependency-aware migration planning (Phase 20) |
+| Script Generator | `src/migration/script_generator.py` | up.sql/down.sql/verify.sql generation (Phase 20) |
+| Data Migration Asst. | `src/migration/data_migration_assistant.py` | Batched INSERT SELECT with validation (Phase 20) |
 
 ### Data Flow
 ```
@@ -146,4 +150,5 @@ Key docs in `docs/`:
 | **Planning** | `planning/FUTURE_PLANS.md`, `planning/MASTER_ROADMAP.md` |
 | **LLM Usage** | `guides/LLM_USAGE_MONITORING_GUIDE.md` |
 | **Data Insights** | `planning/DATA_INSIGHTS_ENHANCEMENT_PLAN.md` |
+| **Migration** | `planning/MIGRATION_TOOLKIT_PROPOSAL.md` |
 | **Deployment** | `guides/DOCKER_DEPLOYMENT_GUIDE.md`, `planning/DOCKER_CONTAINERIZATION_PLAN.md` |

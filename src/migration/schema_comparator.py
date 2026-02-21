@@ -228,6 +228,33 @@ class SchemaDiff:
             "compared_at": self.compared_at,
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SchemaDiff":
+        """Reconstruct a SchemaDiff from a serialized dict (e.g. project.diff_snapshot)."""
+        table_diffs = []
+        for td_dict in data.get("table_diffs", []):
+            col_diffs = [ColumnDiff(**cd) for cd in td_dict.get("column_diffs", [])]
+            constraint_diffs = [ConstraintDiff(**cd) for cd in td_dict.get("constraint_diffs", [])]
+            table_diffs.append(TableDiff(
+                table_name=td_dict["table_name"],
+                diff_type=td_dict["diff_type"],
+                column_diffs=col_diffs,
+                constraint_diffs=constraint_diffs,
+            ))
+
+        return cls(
+            source_connection_id=data.get("source_connection_id"),
+            target_connection_id=data.get("target_connection_id"),
+            source_fingerprint=data.get("source_fingerprint", ""),
+            target_fingerprint=data.get("target_fingerprint", ""),
+            table_diffs=table_diffs,
+            total_breaking_changes=data.get("total_breaking_changes", 0),
+            total_safe_changes=data.get("total_safe_changes", 0),
+            overall_risk=data.get("overall_risk", "low"),
+            diff_summary=data.get("diff_summary", ""),
+            compared_at=data.get("compared_at", ""),
+        )
+
 
 class SchemaComparator:
     """Compares two SchemaCache dicts and produces a SchemaDiff.

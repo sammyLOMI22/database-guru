@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: February 20, 2026
+**Last Updated**: February 21, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -230,30 +230,27 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    MIGRATION TOOLKIT (Phase 20) - HIGH PRIORITY                         │
+    │                    MIGRATION TOOLKIT (Phase 20) - ✅ COMPLETE                            │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                   DATABASE MIGRATION TOOLKIT (Phase 20) - HIGH PRIORITY                   │
+    │              DATABASE MIGRATION TOOLKIT (Phase 20) - ✅ COMPLETE                          │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
     │  │ 20.1 Schema │   │ 20.2 Migr.  │   │ 20.3 Script │   │ 20.4 Data   │                   │
     │  │ Diff Engine │──▶│ Planner     │──▶│ Generator   │──▶│ Migration   │                   │
-    │  │             │   │             │   │             │   │ Assistant   │                   │
-    │  │ • Visual    │   │ • Dependency│   │ • up.sql    │   │             │                   │
-    │  │   diff      │   │   ordering  │   │ • down.sql  │   │ • INSERT    │                   │
-    │  │ • Drift     │   │ • Data loss │   │ • verify.sql│   │   SELECT    │                   │
+    │  │ ✅          │   │ ✅          │   │ ✅          │   │ ✅          │                   │
+    │  │ • Visual    │   │ • Dependency│   │ • up.sql    │   │ • Staging   │                   │
+    │  │   diff      │   │   ordering  │   │ • down.sql  │   │   table     │                   │
+    │  │ • Drift     │   │ • Data loss │   │ • verify.sql│   │   pattern   │                   │
     │  │   analysis  │   │   detection │   │ • Multi-    │   │ • Batching  │                   │
     │  │ • DB vs DB  │   │ • Lock      │   │   dialect   │   │ • Validate  │                   │
-    │  │ • DB vs file│   │   awareness │   │             │   │   queries   │                   │
-    │  │             │   │ • LLM intent│   │             │   │             │                   │
-    │  │ ~800 lines  │   │ ~700 lines  │   │ ~600 lines  │   │ ~500 lines  │                   │
+    │  │ • Topo sort │   │   awareness │   │ • SQLite    │   │   queries   │                   │
+    │  │   w/ FKs    │   │ • LLM intent│   │   recreate  │   │             │                   │
     │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
     │                                                                                           │
-    │  Prereq: Phase 11 (Lineage) + Phase 12 (Intelligence) | Priority: HIGH                  │
-    │  Est: 3-4 weeks | ~2,600 lines                                                          │
+    │  98 migration-related tests | ~5,676 lines | 13 API endpoints                            │
     │  Plan: MIGRATION_TOOLKIT_PROPOSAL.md                                                     │
-    │  Relates: Phase 18 (Edit Mode - DML execution), Security (DDL permissions)               │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -551,6 +548,13 @@
     │  • 108 tests (92 backend + 16 frontend)                          │
     └───────────────────────────────────────────────────────────────────┘
 
+    ┌───────────────────────────────────────────────────────────────────┐
+    │        DATABASE MIGRATION TOOLKIT (Phase 20) ✅ COMPLETE         │
+    │  • Schema diff, migration planner, script generator, data migr.  │
+    │  • Topo sort with FKs, SQLite recreate, staging table pattern    │
+    │  • 98 tests | 13 API endpoints | ~5,676 lines                    │
+    └───────────────────────────────────────────────────────────────────┘
+
 
     INDEPENDENT FEATURES (Can Start Anytime):
     =========================================
@@ -620,15 +624,15 @@
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │   MIGRATION TOOLKIT (Phase 20) ◀── HIGH PRIORITY                  │
+    │   MIGRATION TOOLKIT (Phase 20) ✅ COMPLETE                        │
     │                                                                   │
     │   REQUIRES: Phase 11 ✅ (Lineage) + Phase 12 ✅ (Intelligence)    │
     │                                                                   │
     │  • Schema Diff (visual DB-to-DB comparison)                       │
-    │  • Migration Planner (dependency-aware, data-loss detection)      │
-    │  • Script Generator (up.sql / down.sql / verify.sql)              │
-    │  • Data Migration Assistant (batching, validation)                │
-    │  • Est: 3-4 weeks | Plan: MIGRATION_TOOLKIT_PROPOSAL.md           │
+    │  • Migration Planner (dependency-aware, topo sort with FKs)       │
+    │  • Script Generator (up.sql / down.sql / verify.sql, SQLite)      │
+    │  • Data Migration Assistant (staging table pattern, batching)     │
+    │  • 98 tests | 13 API endpoints | ~5,676 lines                    │
     └───────────────────────────────────────────────────────────────────┘
 
             ┌─────────────────┐          ┌─────────────────┐
@@ -668,7 +672,7 @@
              └──────────┬──────────┘
                         ▼
               ┌─────────────────┐
-              │   Phase 20      │
+              │   Phase 20 ✅   │
               │   Migration     │
               │   Toolkit       │
               └─────────────────┘
@@ -732,14 +736,8 @@
 - See: [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md)
 - Unlocks Phase 17 (Multi-Provider Monitoring) since Phase 16 is now complete
 
-### Priority 3: Migration Toolkit (Phase 20) - HIGH
-**Why**: Moves Database Guru from "Read-Only" analysis to "DevOps Companion" for database engineering
-- **20.1 Schema Diff**: Visual comparison between databases or schema files, drift analysis
-- **20.2 Migration Planner**: AI-agent that plans safe steps (dependency ordering, data-loss detection, lock awareness)
-- **20.3 Script Generator**: Auto-generate `up.sql`, `down.sql`, `verify.sql` (multi-dialect)
-- **20.4 Data Migration Assistant**: INSERT INTO SELECT, batching, validation queries
-- See: [MIGRATION_TOOLKIT_PROPOSAL.md](MIGRATION_TOOLKIT_PROPOSAL.md)
-- Dependencies met: Phase 11 ✅ + Phase 12 ✅
+### ~~Priority 3: Migration Toolkit (Phase 20)~~ - ✅ COMPLETE
+Delivered: Schema diff engine, migration planner with topological sort (including existing FKs), script generator (up.sql/down.sql/verify.sql with SQLite recreate support), data migration assistant (staging table pattern, batching). SQL injection protection via `_escape_literal()`. N+1 query fix with `selectinload`. `SchemaDiff.from_dict()` for DRY reconstruction. 98 tests passing, 13 API endpoints, ~5,676 lines.
 
 ### Priority 4: Edit Mode & DML (Phase 18) - HIGH (blocked by Phase 21)
 **Why**: High user value - inline editing, natural language DML
@@ -787,6 +785,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - **Phase 13** ✅: CSV & Excel File Support (50+ tests)
 - **Phase 16** ✅: LLM Usage Monitoring (9 endpoints, full dashboard)
 - **Phase 19** ✅: Data Insights Enhancement (tiered narratives, analytics cache, multi-source quality, chart presets, parallel analysis — 108 tests)
+- **Phase 20** ✅: Database Migration Toolkit (schema diff, planner, script gen, data migration — 98 tests, 13 endpoints, ~5,676 lines)
 - **Phase 23** ✅: Docker Containerization (Compose profiles, security hardened, least-privilege Postgres, Ollama retry, prompts refactor, CTE lineage support)
 - **Table Sorting** ✅: Click-to-sort with smart type detection
 - Plus 10+ earlier phases (see Quick Reference below)
@@ -806,7 +805,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **LLM Monitoring** | Token usage tracking, dashboard, inline stats | **Phase 16 ✅ COMPLETE** | ~1,500 lines |
 | **Security & Auth** | JWT auth, session ownership, rate limiting, audit logging | **Phase 21 - CRITICAL** | ~2,200 lines |
 | **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 15 - HIGH** | ~3,000 lines |
-| **Migration Toolkit** | Schema diff, migration planner, script gen, data migration | **Phase 20 - HIGH** (deps met) | ~2,600 lines |
+| **Migration Toolkit** | Schema diff, migration planner, script gen, data migration | **Phase 20 ✅ COMPLETE** | ~5,676 lines |
 | **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, simulation mode, undo | **Phase 18 - HIGH** (needs 21) | ~4,000 lines |
 | **Performance Guru** | EXPLAIN analysis, LLM interpretation, index suggestions | **Phase 22 - MEDIUM** | ~1,300 lines |
 | **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 17 - MEDIUM** (needs 15+16✅) | ~1,200 lines |
@@ -846,6 +845,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | LLM Usage Monitoring (Phase 16) | Token/cost tracking, dashboard, per-session stats | 9 API endpoints |
 | Docker Containerization (Phase 23) | Compose profiles, Nginx proxy, security hardened, Ollama retry, CTE lineage | Deployment guide |
 | Table Sorting | Click-to-sort columns, smart type detection | 24 tests |
+| Migration Toolkit (Phase 20) | Schema diff, migration planner, script generator, data migration | 98 tests |
 
 **Total Tests**: 1000+ passing
 
@@ -857,7 +857,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 |-------|---------|--------------|-------------|----------|
 | **Phase 21** | Security & Auth Foundation | None | ~2,200 lines | **CRITICAL** |
 | **Phase 15** | LLM Provider Expansion | Ideally after 21 | ~3,000 lines | HIGH |
-| **Phase 20** | Migration Toolkit | Phase 11✅ + 12✅ | ~2,600 lines | HIGH |
+| **Phase 20** | Migration Toolkit | Phase 11✅ + 12✅ | ~5,676 lines | ✅ **COMPLETE** |
 | **Phase 18** | Edit Mode & DML Operations | Phase 21 | ~4,000 lines | HIGH |
 | **Phase 22** | Performance Guru (EXPLAIN) | None | ~1,300 lines | MEDIUM |
 | **Phase 17** | Multi-Provider Monitoring | Phase 15 + 16✅ | ~1,200 lines | MEDIUM |
@@ -889,7 +889,14 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 
 ---
 
-**Updated**: February 20, 2026
+**Updated**: February 21, 2026
+- **Phase 20 ✅ COMPLETE**: Database Migration Toolkit
+  - 20.1: Schema diff engine (visual DB-to-DB comparison, drift analysis, fingerprinting)
+  - 20.2: Migration planner (topological sort with existing FKs, data-loss detection, LLM enrichment)
+  - 20.3: Script generator (up.sql/down.sql/verify.sql, multi-dialect, SQLite recreate with unchanged columns)
+  - 20.4: Data migration assistant (staging table pattern, batched INSERT SELECT, validation queries)
+  - SQL injection protection (`_escape_literal`), N+1 fix (`selectinload`), `SchemaDiff.from_dict()` DRY helper
+  - 98 tests, 13 API endpoints, ~5,676 lines
 - **Phase 19 ✅ COMPLETE**: Data Insights Enhancement
   - 19.1: Tiered narrative prompts (compact/standard/enhanced by model size, 40% token savings)
   - 19.2: Analytics caching (two-tier: local TTLCache + optional Redis, 24hr TTL)

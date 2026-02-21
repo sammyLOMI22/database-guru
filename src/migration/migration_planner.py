@@ -88,12 +88,19 @@ class MigrationPlanner:
         self.timeout_seconds = timeout_seconds
         self.model = model
 
-    async def plan(self, project_id: int, diff: SchemaDiff, db=None) -> MigrationPlan:
+    async def plan(
+        self,
+        project_id: int,
+        diff: SchemaDiff,
+        db=None,
+        source_schema: Optional[Dict[str, Any]] = None,
+        target_schema: Optional[Dict[str, Any]] = None,
+    ) -> MigrationPlan:
         """Generate a migration plan from a schema diff."""
         plan = MigrationPlan(project_id=project_id)
 
         # Step 1: Deterministic analysis
-        plan.execution_order = self._topological_sort_tables(diff)
+        plan.execution_order = self._topological_sort_tables(diff, source_schema, target_schema)
         plan.steps = self._generate_deterministic_steps(diff, plan.execution_order)
         plan.rollback_strategy = self._determine_rollback_strategy(diff)
         plan.overall_complexity = self._assess_complexity_deterministic(diff)
@@ -146,10 +153,17 @@ class MigrationPlanner:
 
         return plan
 
-    def _topological_sort_tables(self, diff: SchemaDiff) -> List[str]:
+    def _topological_sort_tables(
+        self,
+        diff: SchemaDiff,
+        source_schema: Optional[Dict[str, Any]] = None,
+        target_schema: Optional[Dict[str, Any]] = None,
+    ) -> List[str]:
         """Sort tables respecting FK dependencies using Kahn's algorithm.
 
         Parent tables (referenced by FK) come before child tables.
+        Uses both constraint diffs AND existing FK relationships from
+        the full schemas (so unchanged FKs are also respected).
         """
         # Build adjacency: parent -> [children]
         graph: Dict[str, set] = defaultdict(set)
@@ -159,16 +173,27 @@ class MigrationPlanner:
         for td in diff.table_diffs:
             all_tables.add(td.table_name)
 
-            # Process FK constraints to build dependency edges
+            # Process FK constraints from diffs
             for cd in td.constraint_diffs:
                 if cd.constraint_type == "foreign_key":
                     state = cd.target_state or cd.source_state
                     if state and isinstance(state, (list, tuple)) and len(state) >= 2:
-                        # state is (column, referred_table, referred_column)
                         referred_table = state[1]
-                        if referred_table in all_tables or referred_table != td.table_name:
+                        if referred_table != td.table_name:
                             graph[referred_table].add(td.table_name)
                             in_degree[td.table_name] = in_degree.get(td.table_name, 0) + 1
+
+        # Also consider existing FK relationships from the full target schema
+        # (these won't appear in constraint_diffs if they haven't changed)
+        schema_tables = (target_schema or source_schema or {}).get("tables", {})
+        for table_name in all_tables:
+            table_info = schema_tables.get(table_name, {})
+            for fk in table_info.get("foreign_keys", []):
+                referred_table = fk.get("referred_table", "")
+                if referred_table and referred_table != table_name and referred_table in all_tables:
+                    if table_name not in graph.get(referred_table, set()):
+                        graph[referred_table].add(table_name)
+                        in_degree[table_name] = in_degree.get(table_name, 0) + 1
 
         # Initialize nodes with 0 in-degree
         for table in all_tables:
@@ -520,7 +545,12 @@ async def get_migration_planner(db=None, model=None) -> MigrationPlanner:
     )
 
 
-async def plan_migration(project, db=None) -> MigrationPlan:
+async def plan_migration(
+    project,
+    db=None,
+    source_schema: Optional[Dict[str, Any]] = None,
+    target_schema: Optional[Dict[str, Any]] = None,
+) -> MigrationPlan:
     """High-level function to plan migration for a project."""
     planner = await get_migration_planner(db)
 
@@ -528,30 +558,5 @@ async def plan_migration(project, db=None) -> MigrationPlan:
     if not diff_data:
         raise ValueError("Project has no diff snapshot")
 
-    # Reconstruct SchemaDiff from dict
-    from src.migration.schema_comparator import SchemaDiff, TableDiff, ColumnDiff, ConstraintDiff
-
-    table_diffs = []
-    for td_dict in diff_data.get("table_diffs", []):
-        col_diffs = [ColumnDiff(**cd) for cd in td_dict.get("column_diffs", [])]
-        constraint_diffs = [ConstraintDiff(**cd) for cd in td_dict.get("constraint_diffs", [])]
-        table_diffs.append(TableDiff(
-            table_name=td_dict["table_name"],
-            diff_type=td_dict["diff_type"],
-            column_diffs=col_diffs,
-            constraint_diffs=constraint_diffs,
-        ))
-
-    diff = SchemaDiff(
-        source_connection_id=diff_data.get("source_connection_id"),
-        target_connection_id=diff_data.get("target_connection_id"),
-        source_fingerprint=diff_data.get("source_fingerprint", ""),
-        target_fingerprint=diff_data.get("target_fingerprint", ""),
-        table_diffs=table_diffs,
-        total_breaking_changes=diff_data.get("total_breaking_changes", 0),
-        total_safe_changes=diff_data.get("total_safe_changes", 0),
-        overall_risk=diff_data.get("overall_risk", "low"),
-        diff_summary=diff_data.get("diff_summary", ""),
-    )
-
-    return await planner.plan(project.id, diff, db)
+    diff = SchemaDiff.from_dict(diff_data)
+    return await planner.plan(project.id, diff, db, source_schema, target_schema)

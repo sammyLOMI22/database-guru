@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.database.connection import get_db
 from src.database.models import DatabaseConnection, MigrationProject
@@ -149,41 +150,31 @@ async def list_projects(
 ):
     """List all migration projects."""
     result = await db.execute(
-        select(MigrationProject).order_by(MigrationProject.created_at.desc())
+        select(MigrationProject)
+        .options(
+            selectinload(MigrationProject.source_connection),
+            selectinload(MigrationProject.target_connection),
+        )
+        .order_by(MigrationProject.created_at.desc())
     )
     projects = result.scalars().all()
 
-    summaries = []
-    for p in projects:
-        # Get connection names
-        src_name = None
-        tgt_name = None
-        if p.source_connection_id:
-            src = await db.get(DatabaseConnection, p.source_connection_id)
-            src_name = src.name if src else None
-        if p.target_connection_id:
-            tgt = await db.get(DatabaseConnection, p.target_connection_id)
-            tgt_name = tgt.name if tgt else None
-
-        overall_risk = None
-        if p.diff_snapshot:
-            overall_risk = p.diff_snapshot.get("overall_risk")
-
-        summaries.append(MigrationProjectSummary(
+    return [
+        MigrationProjectSummary(
             id=p.id,
             name=p.name,
             source_connection_id=p.source_connection_id,
             target_connection_id=p.target_connection_id,
-            source_connection_name=src_name,
-            target_connection_name=tgt_name,
-            overall_risk=overall_risk,
+            source_connection_name=p.source_connection.name if p.source_connection else None,
+            target_connection_name=p.target_connection.name if p.target_connection else None,
+            overall_risk=p.diff_snapshot.get("overall_risk") if p.diff_snapshot else None,
             status=p.status,
             target_dialect=p.target_dialect,
             created_at=p.created_at.isoformat() if p.created_at else "",
             updated_at=p.updated_at.isoformat() if p.updated_at else "",
-        ))
-
-    return summaries
+        )
+        for p in projects
+    ]
 
 
 @router.get("/projects/{project_id}", response_model=MigrationProjectDetail)
@@ -192,29 +183,26 @@ async def get_project(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a migration project with full details."""
-    p = await _get_project(db, project_id)
-
-    src_name = None
-    tgt_name = None
-    if p.source_connection_id:
-        src = await db.get(DatabaseConnection, p.source_connection_id)
-        src_name = src.name if src else None
-    if p.target_connection_id:
-        tgt = await db.get(DatabaseConnection, p.target_connection_id)
-        tgt_name = tgt.name if tgt else None
-
-    overall_risk = None
-    if p.diff_snapshot:
-        overall_risk = p.diff_snapshot.get("overall_risk")
+    result = await db.execute(
+        select(MigrationProject)
+        .where(MigrationProject.id == project_id)
+        .options(
+            selectinload(MigrationProject.source_connection),
+            selectinload(MigrationProject.target_connection),
+        )
+    )
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(status_code=404, detail=f"Migration project {project_id} not found")
 
     return MigrationProjectDetail(
         id=p.id,
         name=p.name,
         source_connection_id=p.source_connection_id,
         target_connection_id=p.target_connection_id,
-        source_connection_name=src_name,
-        target_connection_name=tgt_name,
-        overall_risk=overall_risk,
+        source_connection_name=p.source_connection.name if p.source_connection else None,
+        target_connection_name=p.target_connection.name if p.target_connection else None,
+        overall_risk=p.diff_snapshot.get("overall_risk") if p.diff_snapshot else None,
         status=p.status,
         target_dialect=p.target_dialect,
         created_at=p.created_at.isoformat() if p.created_at else "",
@@ -255,8 +243,21 @@ async def generate_plan(
         raise HTTPException(status_code=400, detail="Project has no diff snapshot. Run diff first.")
 
     try:
-        from src.migration.migration_planner import get_migration_planner, plan_migration
-        plan = await plan_migration(project, db)
+        from src.migration.migration_planner import plan_migration
+
+        # Fetch schemas so topo sort can consider existing FK relationships
+        source_schema = None
+        target_schema = None
+        if project.source_connection_id and project.target_connection_id:
+            try:
+                source_conn = await _get_connection(db, project.source_connection_id)
+                target_conn = await _get_connection(db, project.target_connection_id)
+                source_schema = await _get_schema_for_connection(source_conn)
+                target_schema = await _get_schema_for_connection(target_conn)
+            except Exception as e:
+                logger.warning(f"Could not fetch schemas for plan generation: {e}")
+
+        plan = await plan_migration(project, db, source_schema, target_schema)
 
         project.migration_plan = plan.to_dict()
         project.status = "planned"
@@ -287,7 +288,7 @@ async def get_plan(
 # ---------------------------------------------------------------------------
 
 @router.post("/projects/{project_id}/scripts", response_model=GeneratedScriptsResponse)
-async def generate_scripts(
+async def create_scripts(
     project_id: int,
     request: GenerateScriptsRequest,
     db: AsyncSession = Depends(get_db),
@@ -298,7 +299,7 @@ async def generate_scripts(
         raise HTTPException(status_code=400, detail="Project has no diff snapshot. Run diff first.")
 
     try:
-        from src.migration.script_generator import generate_scripts as gen_scripts
+        from src.migration.script_generator import generate_scripts
 
         # Fetch source/target schemas so SQLite recreate includes unchanged columns
         source_schema = None
@@ -312,7 +313,7 @@ async def generate_scripts(
             except Exception as e:
                 logger.warning(f"Could not fetch schemas for script generation: {e}")
 
-        result = await gen_scripts(
+        result = await generate_scripts(
             project, request.target_dialect, request.enrich_with_llm, db,
             source_schema=source_schema,
             target_schema=target_schema,

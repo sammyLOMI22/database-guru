@@ -1316,7 +1316,11 @@ class MigrationProjectDetail(MigrationProjectSummary):
     notes: Optional[str] = None
 
 
-class MigrationStepSchema(BaseModel):
+class MigrationToolkitStepSchema(BaseModel):
+    """A single step in a Phase 20 migration toolkit plan.
+
+    Distinct from MigrationStepSchema (used by ImpactAdvisor).
+    """
     step_number: int
     action: str
     description: str
@@ -1332,7 +1336,7 @@ class MigrationStepSchema(BaseModel):
 
 class MigrationPlanResponse(BaseModel):
     project_id: int
-    steps: List[MigrationStepSchema] = Field(default_factory=list)
+    steps: List[MigrationToolkitStepSchema] = Field(default_factory=list)
     execution_order: List[str] = Field(default_factory=list)
     total_estimated_downtime: str = "unknown"
     recommended_maintenance_window: bool = False

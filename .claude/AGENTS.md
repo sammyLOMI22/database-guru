@@ -449,6 +449,64 @@ Singleton in-memory DuckDB session manager for file queries:
 
 ---
 
+## Migration Toolkit System (Phase 20)
+**Location**: `src/migration/`, `src/api/endpoints/`
+**Added**: February 2026
+
+### 29. Schema Comparator
+**File**: `src/migration/schema_comparator.py`
+
+Compares two database schemas and produces a structured diff:
+- **Table Diffs**: Added, removed, modified tables
+- **Column Diffs**: Type changes, nullable changes, default changes
+- **Index/Constraint Diffs**: Added, removed indexes and foreign keys
+- **Risk Assessment**: Overall migration risk level
+- **Fingerprinting**: Schema fingerprints for drift detection
+
+**Key methods**: `compare()`, `SchemaDiff.from_dict()`, `SchemaDiff.to_dict()`
+
+**Output**: `SchemaDiff` with table_diffs, column_diffs, index_diffs, constraint_diffs, overall_risk
+
+### 30. Migration Planner
+**File**: `src/migration/migration_planner.py`
+
+Plans safe migration steps with dependency awareness:
+- **Topological Sort**: Orders tables by FK dependencies (both changed and existing FKs)
+- **Data Loss Detection**: Identifies column drops, type narrowing
+- **Lock Awareness**: Estimates lock impact for large tables
+- **LLM Enrichment**: Optional AI-generated intent descriptions for each step
+
+**Key methods**: `plan_migration()`, `_topological_sort_tables()`
+
+**Output**: `MigrationPlan` with ordered steps, warnings, estimated_downtime
+
+### 31. Script Generator
+**File**: `src/migration/script_generator.py`
+
+Generates executable SQL migration scripts:
+- **Multi-Dialect**: PostgreSQL, MySQL, SQLite support
+- **SQLite Recreate**: Full table recreation for column changes (preserves unchanged columns)
+- **Three Scripts**: up.sql (apply), down.sql (rollback), verify.sql (validation)
+- **SQL Injection Protection**: `_escape_literal()` helper for verify queries
+
+**Key methods**: `generate_scripts()`, `_generate_up()`, `_generate_down()`, `_generate_verify()`, `_sqlite_recreate()`
+
+### 32. Data Migration Assistant
+**File**: `src/migration/data_migration_assistant.py`
+
+Generates data migration queries with safety features:
+- **Staging Table Pattern**: INSERT INTO `table__new` SELECT FROM `table`
+- **Batched Inserts**: Configurable batch size (100-100,000)
+- **Validation Queries**: Row count comparison between source and staging tables
+- **Column Expression Mapping**: Handles type casts, defaults for new columns
+
+**Key methods**: `generate_data_migration_plan()`
+
+### Migration API Endpoints
+**File**: `src/api/endpoints/migration.py`
+
+13 REST endpoints for the full migration lifecycle (see API.md for details).
+
 ## Tool System
 **Location**: `src/tools/`
 

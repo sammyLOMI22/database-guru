@@ -468,25 +468,19 @@ class ScriptGenerator:
                 lines.append("")
 
             elif td.diff_type == "removed":
-                lines.append(f"-- Verify table '{td.table_name}' was dropped")
-                if self.dialect == DatabaseDialect.POSTGRESQL:
+                safe_name = self._escape_literal(td.table_name)
+                lines.append(f"-- Verify table '{safe_name}' was dropped")
+                if self.dialect in (DatabaseDialect.POSTGRESQL, DatabaseDialect.MYSQL):
                     lines.append(
                         f"SELECT NOT EXISTS ("
                         f"SELECT 1 FROM information_schema.tables "
-                        f"WHERE table_name = '{td.table_name}'"
-                        f") AS table_dropped;"
-                    )
-                elif self.dialect == DatabaseDialect.MYSQL:
-                    lines.append(
-                        f"SELECT NOT EXISTS ("
-                        f"SELECT 1 FROM information_schema.tables "
-                        f"WHERE table_name = '{td.table_name}'"
+                        f"WHERE table_name = '{safe_name}'"
                         f") AS table_dropped;"
                     )
                 elif self.dialect == DatabaseDialect.SQLITE:
                     lines.append(
                         f"SELECT COUNT(*) = 0 AS table_dropped "
-                        f"FROM sqlite_master WHERE type='table' AND name='{td.table_name}';"
+                        f"FROM sqlite_master WHERE type='table' AND name='{safe_name}';"
                     )
                 lines.append("")
 
@@ -516,6 +510,11 @@ class ScriptGenerator:
         if self.dialect == DatabaseDialect.MYSQL:
             return f"`{identifier}`"
         return f'"{identifier}"'
+
+    @staticmethod
+    def _escape_literal(value: str) -> str:
+        """Escape a string for use in a SQL string literal (single quotes)."""
+        return value.replace("'", "''")
 
     def _column_def(self, col: Dict[str, Any]) -> str:
         """Generate a column definition string."""
@@ -557,29 +556,8 @@ async def generate_scripts(
     if not diff_data:
         raise ValueError("Project has no diff snapshot")
 
-    # Reconstruct SchemaDiff
-    from src.migration.schema_comparator import SchemaDiff, TableDiff, ColumnDiff, ConstraintDiff
-
-    table_diffs = []
-    for td_dict in diff_data.get("table_diffs", []):
-        col_diffs = [ColumnDiff(**cd) for cd in td_dict.get("column_diffs", [])]
-        constraint_diffs = [ConstraintDiff(**cd) for cd in td_dict.get("constraint_diffs", [])]
-        table_diffs.append(TableDiff(
-            table_name=td_dict["table_name"],
-            diff_type=td_dict["diff_type"],
-            column_diffs=col_diffs,
-            constraint_diffs=constraint_diffs,
-        ))
-
-    diff = SchemaDiff(
-        source_connection_id=diff_data.get("source_connection_id"),
-        target_connection_id=diff_data.get("target_connection_id"),
-        table_diffs=table_diffs,
-        total_breaking_changes=diff_data.get("total_breaking_changes", 0),
-        total_safe_changes=diff_data.get("total_safe_changes", 0),
-        overall_risk=diff_data.get("overall_risk", "low"),
-        diff_summary=diff_data.get("diff_summary", ""),
-    )
+    from src.migration.schema_comparator import SchemaDiff
+    diff = SchemaDiff.from_dict(diff_data)
 
     dialect = get_dialect_for_database_type(target_dialect)
     generator = ScriptGenerator(dialect)

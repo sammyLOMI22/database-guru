@@ -316,27 +316,8 @@ async def generate_data_migration_plan(
     if not diff_data:
         raise ValueError("Project has no diff snapshot")
 
-    # Reconstruct SchemaDiff
-    from src.migration.schema_comparator import SchemaDiff, TableDiff, ColumnDiff, ConstraintDiff
-
-    table_diffs = []
-    for td_dict in diff_data.get("table_diffs", []):
-        col_diffs = [ColumnDiff(**cd) for cd in td_dict.get("column_diffs", [])]
-        constraint_diffs = [ConstraintDiff(**cd) for cd in td_dict.get("constraint_diffs", [])]
-        table_diffs.append(TableDiff(
-            table_name=td_dict["table_name"],
-            diff_type=td_dict["diff_type"],
-            column_diffs=col_diffs,
-            constraint_diffs=constraint_diffs,
-        ))
-
-    diff = SchemaDiff(
-        table_diffs=table_diffs,
-        total_breaking_changes=diff_data.get("total_breaking_changes", 0),
-        total_safe_changes=diff_data.get("total_safe_changes", 0),
-        overall_risk=diff_data.get("overall_risk", "low"),
-        diff_summary=diff_data.get("diff_summary", ""),
-    )
+    from src.migration.schema_comparator import SchemaDiff
+    diff = SchemaDiff.from_dict(diff_data)
 
     dialect_str = project.target_dialect or "postgresql"
     dialect = get_dialect_for_database_type(dialect_str)
