@@ -1374,6 +1374,28 @@ class GeneratedScriptsResponse(BaseModel):
     llm_used: bool = False
 
 
+class BackupScriptRequest(BaseModel):
+    """Request to generate backup/restore scripts for a single database."""
+    connection_id: int = Field(..., description="Database connection ID")
+    dialect: Optional[str] = Field(
+        None,
+        description="Target dialect (defaults to the connection's database_type)",
+        pattern=r"^(postgresql|mysql|sqlite|mssql|oracle|duckdb)?$",
+    )
+
+
+class BackupScriptResponse(BaseModel):
+    connection_id: int
+    connection_name: str = ""
+    dialect: str = ""
+    backup_sql: str = ""
+    restore_sql: str = ""
+    verify_sql: str = ""
+    table_count: int = 0
+    warnings: List[str] = Field(default_factory=list)
+    generated_at: str = ""
+
+
 class ColumnMappingSchema(BaseModel):
     source_col: Optional[str] = None
     target_col: str

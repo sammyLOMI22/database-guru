@@ -27,6 +27,8 @@ from src.models.schemas import (
     GenerateScriptsRequest,
     GeneratedScriptsResponse,
     DataMigrationPlanResponse,
+    BackupScriptRequest,
+    BackupScriptResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -430,3 +432,45 @@ async def get_data_migration(
     if not project.data_migration_plan:
         raise HTTPException(status_code=404, detail="No data migration plan generated yet")
     return DataMigrationPlanResponse(**project.data_migration_plan)
+
+
+# ---------------------------------------------------------------------------
+# Single-database Backup / Restore Scripts
+# ---------------------------------------------------------------------------
+
+@router.post("/backup", response_model=BackupScriptResponse)
+async def generate_backup_scripts(
+    request: BackupScriptRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate backup/restore DDL scripts for a single database connection.
+
+    Returns:
+    - backup.sql  — CREATE TABLE IF NOT EXISTS for the full schema
+    - restore.sql — DROP TABLE statements (children-before-parents FK order)
+    - verify.sql  — Column-count checks to confirm the schema is intact
+    """
+    try:
+        conn = await _get_connection(db, request.connection_id)
+        schema = await _get_schema_for_connection(conn)
+
+        target_dialect = request.dialect or conn.database_type or "postgresql"
+
+        from src.llm.dialect_registry import get_dialect_for_database_type
+        from src.migration.backup_script_generator import BackupScriptGenerator
+
+        dialect = get_dialect_for_database_type(target_dialect)
+        generator = BackupScriptGenerator(dialect)
+        scripts = generator.generate(
+            schema,
+            connection_id=conn.id,
+            connection_name=conn.name,
+        )
+
+        return BackupScriptResponse(**scripts.to_dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Backup script generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Backup script generation failed: {str(e)}")

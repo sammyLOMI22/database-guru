@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Loader2, GitCompare, FolderOpen, ListOrdered, FileCode, Database } from 'lucide-react';
+import { Loader2, GitCompare, FolderOpen, ListOrdered, FileCode, Database, Archive } from 'lucide-react';
 import { migrationAPI } from '../../services/migrationApi';
 import { SchemaDiffPanel } from './SchemaDiffPanel';
 import { MigrationPlanPanel } from './MigrationPlanPanel';
 import { ScriptGeneratorPanel } from './ScriptGeneratorPanel';
 import { DataMigrationPanel } from './DataMigrationPanel';
+import { BackupScriptPanel } from './BackupScriptPanel';
 import type { MigrationProjectSummary, MigrationProjectDetail } from '../../types/migration';
 
-type TabId = 'compare' | 'projects' | 'plan' | 'scripts' | 'data';
+type TabId = 'compare' | 'projects' | 'plan' | 'scripts' | 'data' | 'backup';
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'compare', label: 'Compare', icon: <GitCompare className="w-3.5 h-3.5" /> },
@@ -15,6 +16,7 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'plan', label: 'Plan', icon: <ListOrdered className="w-3.5 h-3.5" /> },
   { id: 'scripts', label: 'Scripts', icon: <FileCode className="w-3.5 h-3.5" /> },
   { id: 'data', label: 'Data', icon: <Database className="w-3.5 h-3.5" /> },
+  { id: 'backup', label: 'Backup', icon: <Archive className="w-3.5 h-3.5" /> },
 ];
 
 const RISK_COLORS: Record<string, string> = {
@@ -204,6 +206,8 @@ export function MigrationPanel() {
             </p>
           )
         )}
+
+        {activeTab === 'backup' && <BackupScriptPanel />}
       </div>
     </div>
   );

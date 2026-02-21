@@ -7,6 +7,7 @@ import type {
   MigrationPlanResponse,
   GeneratedScriptsResponse,
   DataMigrationPlanResponse,
+  BackupScriptsResponse,
 } from '../types/migration';
 
 export const migrationAPI = {
@@ -87,6 +88,18 @@ export const migrationAPI = {
 
   async getDataMigration(projectId: number): Promise<DataMigrationPlanResponse> {
     const { data } = await api.get<DataMigrationPlanResponse>(`/api/migration/projects/${projectId}/data-migration`);
+    return data;
+  },
+
+  // Single-database Backup / Restore Scripts
+  async generateBackupScripts(
+    connectionId: number,
+    dialect?: string,
+  ): Promise<BackupScriptsResponse> {
+    const { data } = await api.post<BackupScriptsResponse>('/api/migration/backup', {
+      connection_id: connectionId,
+      dialect: dialect || null,
+    });
     return data;
   },
 };

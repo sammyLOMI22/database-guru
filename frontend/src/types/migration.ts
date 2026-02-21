@@ -136,3 +136,15 @@ export interface ConnectionOption {
   name: string;
   database_type: string;
 }
+
+export interface BackupScriptsResponse {
+  connection_id: number;
+  connection_name: string;
+  dialect: string;
+  backup_sql: string;
+  restore_sql: string;
+  verify_sql: string;
+  table_count: number;
+  warnings: string[];
+  generated_at: string;
+}
