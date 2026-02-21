@@ -209,7 +209,8 @@ class TestDataMigrationFromDiffs:
 # ---------------------------------------------------------------------------
 
 class TestSQLGeneration:
-    def test_insert_sql(self):
+    def test_insert_sql_uses_staging_table(self):
+        """INSERT should target a staging table, not the source table."""
         assistant = DataMigrationAssistant(DatabaseDialect.POSTGRESQL)
         diff = _make_diff(table_diffs=[
             TableDiff(
@@ -223,8 +224,10 @@ class TestSQLGeneration:
         ])
         plan = assistant.generate_plan(diff)
         migration = plan.table_migrations[0]
-        assert "INSERT INTO" in migration.insert_sql
-        assert "SELECT" in migration.insert_sql
+        assert migration.source_table == "users"
+        assert migration.target_table == "users__new"
+        assert '"users__new"' in migration.insert_sql
+        assert 'FROM "users"' in migration.insert_sql
 
     def test_batched_sql(self):
         assistant = DataMigrationAssistant(DatabaseDialect.POSTGRESQL, batch_size=500)
@@ -244,8 +247,12 @@ class TestSQLGeneration:
         assert "OFFSET" in migration.batched_insert_sql
         # PostgreSQL uses ctid for ordering
         assert "ctid" in migration.batched_insert_sql
+        # Should reference staging table for INSERT and source for SELECT
+        assert '"t__new"' in migration.batched_insert_sql
+        assert 'FROM "t"' in migration.batched_insert_sql
 
-    def test_count_verify(self):
+    def test_count_verify_compares_source_and_staging(self):
+        """Verify SQL should compare source table vs staging table counts."""
         assistant = DataMigrationAssistant(DatabaseDialect.POSTGRESQL)
         diff = _make_diff(table_diffs=[
             TableDiff(
@@ -260,6 +267,8 @@ class TestSQLGeneration:
         plan = assistant.generate_plan(diff)
         migration = plan.table_migrations[0]
         assert "COUNT(*)" in migration.count_verify_sql
+        assert '"t"' in migration.count_verify_sql
+        assert '"t__new"' in migration.count_verify_sql
 
 
 # ---------------------------------------------------------------------------
@@ -281,8 +290,9 @@ class TestMySQLQuoting:
         ])
         plan = assistant.generate_plan(diff)
         migration = plan.table_migrations[0]
-        assert "`orders`" in migration.insert_sql
+        assert "`orders__new`" in migration.insert_sql
         assert "`total`" in migration.insert_sql
+        assert "FROM `orders`" in migration.insert_sql
 
 
 # ---------------------------------------------------------------------------

@@ -55,11 +55,25 @@ class ScriptGenerator:
     def __init__(self, dialect: DatabaseDialect):
         self.dialect = dialect
 
-    def generate(self, diff: SchemaDiff, project_id: int = 0) -> GeneratedScripts:
-        """Generate all three scripts from a diff."""
+    def generate(
+        self,
+        diff: SchemaDiff,
+        project_id: int = 0,
+        source_schema: Optional[Dict[str, Any]] = None,
+        target_schema: Optional[Dict[str, Any]] = None,
+    ) -> GeneratedScripts:
+        """Generate all three scripts from a diff.
+
+        Args:
+            diff: The schema diff to generate scripts from.
+            project_id: Associated project ID.
+            source_schema: Full source schema dict (needed for SQLite recreate
+                to include unchanged columns).
+            target_schema: Full target schema dict.
+        """
         warnings: List[str] = []
 
-        up_lines = self._generate_up(diff, warnings)
+        up_lines = self._generate_up(diff, warnings, source_schema, target_schema)
         down_lines = self._generate_down(diff, warnings)
         verify_lines = self._generate_verify(diff)
 
@@ -76,7 +90,13 @@ class ScriptGenerator:
     # up.sql
     # ------------------------------------------------------------------
 
-    def _generate_up(self, diff: SchemaDiff, warnings: List[str]) -> List[str]:
+    def _generate_up(
+        self,
+        diff: SchemaDiff,
+        warnings: List[str],
+        source_schema: Optional[Dict[str, Any]] = None,
+        target_schema: Optional[Dict[str, Any]] = None,
+    ) -> List[str]:
         """Generate the forward migration DDL."""
         lines = [
             f"-- Migration: up.sql",
@@ -97,9 +117,15 @@ class ScriptGenerator:
                 lines.append("")
 
         # 2. Modify existing tables
+        source_tables = (source_schema or {}).get("tables", {})
+        target_tables = (target_schema or {}).get("tables", {})
         for td in diff.table_diffs:
             if td.diff_type == "modified":
-                table_lines = self._alter_table_ddl(td, warnings)
+                table_lines = self._alter_table_ddl(
+                    td, warnings,
+                    source_table_schema=source_tables.get(td.table_name),
+                    target_table_schema=target_tables.get(td.table_name),
+                )
                 if table_lines:
                     lines.extend(table_lines)
                     lines.append("")
@@ -131,7 +157,13 @@ class ScriptGenerator:
         lines.append(");")
         return lines
 
-    def _alter_table_ddl(self, td: TableDiff, warnings: List[str]) -> List[str]:
+    def _alter_table_ddl(
+        self,
+        td: TableDiff,
+        warnings: List[str],
+        source_table_schema: Optional[Dict[str, Any]] = None,
+        target_table_schema: Optional[Dict[str, Any]] = None,
+    ) -> List[str]:
         """Generate ALTER TABLE statements for a modified table."""
         lines = [f"-- Modify table: {td.table_name}"]
 
@@ -145,7 +177,7 @@ class ScriptGenerator:
         )
 
         if needs_recreate:
-            return self._sqlite_recreate(td, warnings)
+            return self._sqlite_recreate(td, warnings, source_table_schema, target_table_schema)
 
         for cd in td.column_diffs:
             if cd.diff_type == "added" and cd.target_state:
@@ -224,8 +256,19 @@ class ScriptGenerator:
         # SQLite handled by _sqlite_recreate
         return []
 
-    def _sqlite_recreate(self, td: TableDiff, warnings: List[str]) -> List[str]:
-        """Generate SQLite table recreate pattern for unsupported ALTER COLUMN."""
+    def _sqlite_recreate(
+        self,
+        td: TableDiff,
+        warnings: List[str],
+        source_table_schema: Optional[Dict[str, Any]] = None,
+        target_table_schema: Optional[Dict[str, Any]] = None,
+    ) -> List[str]:
+        """Generate SQLite table recreate pattern for unsupported ALTER COLUMN.
+
+        Includes ALL columns (changed and unchanged) in the recreated table.
+        Requires source/target schemas to know about unchanged columns;
+        falls back to diff-only columns with a warning if schemas are unavailable.
+        """
         warnings.append(
             f"SQLite table recreate used for '{td.table_name}' "
             "(SQLite does not support ALTER COLUMN)"
@@ -236,34 +279,78 @@ class ScriptGenerator:
             f"-- (SQLite does not support ALTER COLUMN)",
         ]
 
-        # We need both source and target column info
-        # Build target column list from diffs
-        target_cols = []
-        source_col_names = []
+        # Build sets of changed column names for quick lookup
+        changed_cols = {cd.column_name for cd in td.column_diffs}
+        removed_cols = {cd.column_name for cd in td.column_diffs if cd.diff_type == "removed"}
+
+        target_col_defs = []
         select_exprs = []
 
-        for cd in td.column_diffs:
-            if cd.diff_type == "removed":
-                # Skip removed columns in new table
-                continue
-            elif cd.diff_type == "added" and cd.target_state:
-                col = cd.target_state
-                target_cols.append(self._column_def(col))
-                default_val = self._format_default(col.get("default")) if col.get("default") is not None else "NULL"
-                select_exprs.append(f"{default_val} AS {self._quote(cd.column_name)}")
-            elif cd.target_state:
-                col = cd.target_state
-                target_cols.append(self._column_def(col))
-                source_col_names.append(cd.column_name)
-                if cd.diff_type == "type_changed":
+        # If we have the target schema, use it as the authoritative column list
+        # (it includes both changed and unchanged columns)
+        if target_table_schema:
+            tgt_cols_list = target_table_schema.get("columns", [])
+            # Build a lookup of diff info by column name
+            diff_by_col = {cd.column_name: cd for cd in td.column_diffs}
+
+            for col in tgt_cols_list:
+                col_name = col.get("name", "")
+                target_col_defs.append(self._column_def(col))
+
+                cd = diff_by_col.get(col_name)
+                if cd and cd.diff_type == "added":
+                    # New column — use default or NULL
+                    default_val = self._format_default(col.get("default")) if col.get("default") is not None else "NULL"
+                    select_exprs.append(f"{default_val} AS {self._quote(col_name)}")
+                elif cd and cd.diff_type == "type_changed":
+                    # Type changed — CAST
                     select_exprs.append(
-                        f"CAST({self._quote(cd.column_name)} AS {col.get('type', 'TEXT')})"
+                        f"CAST({self._quote(col_name)} AS {col.get('type', 'TEXT')})"
                     )
                 else:
-                    select_exprs.append(self._quote(cd.column_name))
+                    # Unchanged or minor change (nullability, default) — pass through
+                    select_exprs.append(self._quote(col_name))
+        else:
+            # Fallback: no full schema available, use source schema + diffs
+            if source_table_schema:
+                src_cols_list = source_table_schema.get("columns", [])
+            else:
+                src_cols_list = []
+                warnings.append(
+                    f"No full schema available for '{td.table_name}'; "
+                    "recreated table may be missing unchanged columns"
+                )
+
+            # First, include unchanged columns from source
+            for col in src_cols_list:
+                col_name = col.get("name", "")
+                if col_name in removed_cols:
+                    continue
+                if col_name not in changed_cols:
+                    target_col_defs.append(self._column_def(col))
+                    select_exprs.append(self._quote(col_name))
+
+            # Then, include changed columns from diffs
+            for cd in td.column_diffs:
+                if cd.diff_type == "removed":
+                    continue
+                elif cd.diff_type == "added" and cd.target_state:
+                    col = cd.target_state
+                    target_col_defs.append(self._column_def(col))
+                    default_val = self._format_default(col.get("default")) if col.get("default") is not None else "NULL"
+                    select_exprs.append(f"{default_val} AS {self._quote(cd.column_name)}")
+                elif cd.target_state:
+                    col = cd.target_state
+                    target_col_defs.append(self._column_def(col))
+                    if cd.diff_type == "type_changed":
+                        select_exprs.append(
+                            f"CAST({self._quote(cd.column_name)} AS {col.get('type', 'TEXT')})"
+                        )
+                    else:
+                        select_exprs.append(self._quote(cd.column_name))
 
         new_table = f"{td.table_name}__new"
-        col_defs = ",\n    ".join(target_cols)
+        col_defs = ",\n    ".join(target_col_defs)
         select_list = ", ".join(select_exprs)
 
         lines.extend([
@@ -452,9 +539,20 @@ class ScriptGenerator:
 
 
 async def generate_scripts(
-    project, target_dialect: str, enrich_with_llm: bool = True, db=None,
+    project,
+    target_dialect: str,
+    enrich_with_llm: bool = True,
+    db=None,
+    source_schema: Optional[Dict[str, Any]] = None,
+    target_schema: Optional[Dict[str, Any]] = None,
 ) -> GeneratedScripts:
-    """High-level function to generate scripts for a project."""
+    """High-level function to generate scripts for a project.
+
+    Args:
+        source_schema: Full source schema dict. When provided, SQLite table
+            recreate will include unchanged columns correctly.
+        target_schema: Full target schema dict.
+    """
     diff_data = project.diff_snapshot
     if not diff_data:
         raise ValueError("Project has no diff snapshot")
@@ -485,6 +583,11 @@ async def generate_scripts(
 
     dialect = get_dialect_for_database_type(target_dialect)
     generator = ScriptGenerator(dialect)
-    result = generator.generate(diff, project_id=project.id)
+    result = generator.generate(
+        diff,
+        project_id=project.id,
+        source_schema=source_schema,
+        target_schema=target_schema,
+    )
 
     return result

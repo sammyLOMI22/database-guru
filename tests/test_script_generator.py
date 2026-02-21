@@ -219,12 +219,69 @@ class TestScriptGeneratorSQLite:
                 ],
             ),
         ])
-        result = self.gen.generate(diff)
+        # Provide source/target schemas so unchanged columns are included
+        source_schema = {"tables": {"t": {"columns": [
+            {"name": "id", "type": "INTEGER", "nullable": False},
+            {"name": "val", "type": "INTEGER", "nullable": True},
+        ]}}}
+        target_schema = {"tables": {"t": {"columns": [
+            {"name": "id", "type": "INTEGER", "nullable": False},
+            {"name": "val", "type": "TEXT", "nullable": True},
+        ]}}}
+        result = self.gen.generate(diff, source_schema=source_schema, target_schema=target_schema)
         assert '"t__new"' in result.up_sql
         assert "CAST" in result.up_sql
         assert "DROP TABLE" in result.up_sql
         assert "RENAME TO" in result.up_sql
         assert any("recreate" in w.lower() for w in result.warnings)
+        # Unchanged column "id" must be included in the recreated table
+        assert '"id"' in result.up_sql
+
+    def test_sqlite_recreate_includes_unchanged_columns(self):
+        """Regression: unchanged columns must not be silently dropped."""
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="users",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="users", column_name="bio", diff_type="type_changed",
+                               source_state={"name": "bio", "type": "VARCHAR(100)", "nullable": True},
+                               target_state={"name": "bio", "type": "TEXT", "nullable": True}),
+                ],
+            ),
+        ])
+        source_schema = {"tables": {"users": {"columns": [
+            {"name": "id", "type": "INTEGER", "nullable": False},
+            {"name": "name", "type": "TEXT", "nullable": False},
+            {"name": "bio", "type": "VARCHAR(100)", "nullable": True},
+        ]}}}
+        target_schema = {"tables": {"users": {"columns": [
+            {"name": "id", "type": "INTEGER", "nullable": False},
+            {"name": "name", "type": "TEXT", "nullable": False},
+            {"name": "bio", "type": "TEXT", "nullable": True},
+        ]}}}
+        result = self.gen.generate(diff, source_schema=source_schema, target_schema=target_schema)
+        # All three columns must appear in the CREATE TABLE for the new table
+        assert '"id" INTEGER NOT NULL' in result.up_sql
+        assert '"name" TEXT NOT NULL' in result.up_sql
+        assert '"bio" TEXT' in result.up_sql
+
+    def test_sqlite_recreate_fallback_without_schemas(self):
+        """Without schemas, only diff columns are included (with a warning)."""
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="t",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="t", column_name="val", diff_type="type_changed",
+                               source_state={"name": "val", "type": "INTEGER", "nullable": True},
+                               target_state={"name": "val", "type": "TEXT", "nullable": True}),
+                ],
+            ),
+        ])
+        result = self.gen.generate(diff)
+        assert '"t__new"' in result.up_sql
+        assert any("missing unchanged columns" in w.lower() for w in result.warnings)
 
     def test_sqlite_verify(self):
         diff = _make_diff(table_diffs=[

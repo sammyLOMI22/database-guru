@@ -299,7 +299,24 @@ async def generate_scripts(
 
     try:
         from src.migration.script_generator import generate_scripts as gen_scripts
-        result = await gen_scripts(project, request.target_dialect, request.enrich_with_llm, db)
+
+        # Fetch source/target schemas so SQLite recreate includes unchanged columns
+        source_schema = None
+        target_schema = None
+        if project.source_connection_id and project.target_connection_id:
+            try:
+                source_conn = await _get_connection(db, project.source_connection_id)
+                target_conn = await _get_connection(db, project.target_connection_id)
+                source_schema = await _get_schema_for_connection(source_conn)
+                target_schema = await _get_schema_for_connection(target_conn)
+            except Exception as e:
+                logger.warning(f"Could not fetch schemas for script generation: {e}")
+
+        result = await gen_scripts(
+            project, request.target_dialect, request.enrich_with_llm, db,
+            source_schema=source_schema,
+            target_schema=target_schema,
+        )
 
         project.up_sql = result.up_sql
         project.down_sql = result.down_sql

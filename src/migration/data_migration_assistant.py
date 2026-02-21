@@ -242,50 +242,50 @@ class DataMigrationAssistant:
         mappings: List[ColumnMapping],
         warnings: List[str],
     ) -> TableDataMigration:
-        """Build a TableDataMigration with SQL from mappings."""
+        """Build a TableDataMigration with SQL from mappings.
+
+        Uses a staging table pattern: SELECT from the original table and
+        INSERT INTO a staging table ({table}__new) to avoid self-referencing
+        INSERT issues. The caller is expected to rename after verification.
+        """
         if not mappings:
-            return TableDataMigration(source_table=table_name, target_table=table_name)
+            return TableDataMigration(source_table=table_name, target_table=f"{table_name}__new")
 
         target_cols = ", ".join(self._quote(m.target_col) for m in mappings)
         select_exprs = ", ".join(m.transform_expression for m in mappings)
 
-        qt = self._quote(table_name)
-        insert_sql = f"INSERT INTO {qt} ({target_cols})\nSELECT {select_exprs}\nFROM {qt};"
+        staging_name = f"{table_name}__new"
+        q_source = self._quote(table_name)
+        q_target = self._quote(staging_name)
+        insert_sql = f"INSERT INTO {q_target} ({target_cols})\nSELECT {select_exprs}\nFROM {q_source};"
 
         # Batched version
         if self.dialect == DatabaseDialect.POSTGRESQL:
             batched = (
-                f"INSERT INTO {qt} ({target_cols})\n"
+                f"INSERT INTO {q_target} ({target_cols})\n"
                 f"SELECT {select_exprs}\n"
-                f"FROM {qt}\n"
+                f"FROM {q_source}\n"
                 f"ORDER BY ctid\n"
-                f"LIMIT {self.batch_size} OFFSET {{offset}};"
-            )
-        elif self.dialect == DatabaseDialect.MYSQL:
-            batched = (
-                f"INSERT INTO {qt} ({target_cols})\n"
-                f"SELECT {select_exprs}\n"
-                f"FROM {qt}\n"
                 f"LIMIT {self.batch_size} OFFSET {{offset}};"
             )
         else:
             batched = (
-                f"INSERT INTO {qt} ({target_cols})\n"
+                f"INSERT INTO {q_target} ({target_cols})\n"
                 f"SELECT {select_exprs}\n"
-                f"FROM {qt}\n"
+                f"FROM {q_source}\n"
                 f"LIMIT {self.batch_size} OFFSET {{offset}};"
             )
 
         count_verify = (
             f"-- Verify row count matches\n"
             f"SELECT\n"
-            f"  (SELECT COUNT(*) FROM {qt}) AS source_count,\n"
-            f"  (SELECT COUNT(*) FROM {qt}) AS target_count;"
+            f"  (SELECT COUNT(*) FROM {q_source}) AS source_count,\n"
+            f"  (SELECT COUNT(*) FROM {q_target}) AS target_count;"
         )
 
         return TableDataMigration(
             source_table=table_name,
-            target_table=table_name,
+            target_table=staging_name,
             column_mappings=mappings,
             insert_sql=insert_sql,
             batched_insert_sql=batched,
