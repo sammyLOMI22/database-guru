@@ -42,6 +42,8 @@ class TaskType(Enum):
     SCHEMA_HEALTH = "schema_health"
     LINEAGE_CONVERSATION = "lineage_conversation"
     PATTERN_INTELLIGENCE = "pattern_intelligence"
+    # Phase 20: Migration Toolkit
+    MIGRATION_PLANNER = "migration_planner"
 
 
 @dataclass
@@ -80,6 +82,8 @@ class ModelRouter:
         TaskType.SCHEMA_HEALTH: 30,
         TaskType.LINEAGE_CONVERSATION: 15,
         TaskType.PATTERN_INTELLIGENCE: 20,
+        # Phase 20: Migration Toolkit
+        TaskType.MIGRATION_PLANNER: 30,
     }
 
     def __init__(
@@ -293,6 +297,9 @@ async def get_model_router(db_session=None) -> ModelRouter:
                 'timeout_schema_health': getattr(sys_settings, 'timeout_schema_health', 30),
                 'timeout_lineage_conversation': getattr(sys_settings, 'timeout_lineage_conversation', 15),
                 'timeout_pattern_intelligence': getattr(sys_settings, 'timeout_pattern_intelligence', 20),
+                # Phase 20: Migration Toolkit
+                'model_migration_planner': getattr(sys_settings, 'model_migration_planner', None),
+                'timeout_migration_planner': getattr(sys_settings, 'timeout_migration_planner', 30),
             }
 
             logger.debug(f"Loaded model settings from database: {model_settings}")

@@ -1237,3 +1237,155 @@ class FileSourceListResponse(BaseModel):
         default=0,
         description="Total number of files",
     )
+
+
+# ============================================================================
+# Phase 20: Migration Toolkit Schemas
+# ============================================================================
+
+class SchemaDiffRequest(BaseModel):
+    """Request to compare two database schemas."""
+    source_connection_id: int = Field(..., description="Source database connection ID")
+    target_connection_id: int = Field(..., description="Target database connection ID")
+    name: Optional[str] = Field(None, description="Project name (required if saving)")
+    save: bool = Field(False, description="Whether to save as a MigrationProject")
+
+
+class ColumnDiffSchema(BaseModel):
+    table_name: str
+    column_name: str
+    diff_type: str
+    source_state: Optional[Dict[str, Any]] = None
+    target_state: Optional[Dict[str, Any]] = None
+    is_breaking: bool = False
+    risk_level: str = "low"
+
+
+class ConstraintDiffSchema(BaseModel):
+    table_name: str
+    constraint_type: str
+    diff_type: str
+    source_state: Optional[Any] = None
+    target_state: Optional[Any] = None
+    risk_level: str = "low"
+
+
+class TableDiffSchema(BaseModel):
+    table_name: str
+    diff_type: str
+    column_diffs: List[ColumnDiffSchema] = Field(default_factory=list)
+    constraint_diffs: List[ConstraintDiffSchema] = Field(default_factory=list)
+    risk_level: str = "low"
+
+
+class SchemaDiffResponse(BaseModel):
+    source_connection_id: Optional[int] = None
+    target_connection_id: Optional[int] = None
+    source_fingerprint: str = ""
+    target_fingerprint: str = ""
+    table_diffs: List[TableDiffSchema] = Field(default_factory=list)
+    total_breaking_changes: int = 0
+    total_safe_changes: int = 0
+    overall_risk: str = "none"
+    diff_summary: str = ""
+    compared_at: str = ""
+    project_id: Optional[int] = None
+
+
+class MigrationProjectSummary(BaseModel):
+    id: int
+    name: str
+    source_connection_id: Optional[int] = None
+    target_connection_id: Optional[int] = None
+    source_connection_name: Optional[str] = None
+    target_connection_name: Optional[str] = None
+    overall_risk: Optional[str] = None
+    status: str = "draft"
+    target_dialect: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class MigrationProjectDetail(MigrationProjectSummary):
+    diff_snapshot: Optional[Dict[str, Any]] = None
+    migration_plan: Optional[Dict[str, Any]] = None
+    data_migration_plan: Optional[Dict[str, Any]] = None
+    up_sql: Optional[str] = None
+    down_sql: Optional[str] = None
+    verify_sql: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class MigrationStepSchema(BaseModel):
+    step_number: int
+    action: str
+    description: str
+    sql_hint: Optional[str] = None
+    table_name: Optional[str] = None
+    lock_type: str = "none"
+    estimated_duration: str = "instant"
+    risk_level: str = "low"
+    is_reversible: bool = True
+    depends_on: List[int] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+
+class MigrationPlanResponse(BaseModel):
+    project_id: int
+    steps: List[MigrationStepSchema] = Field(default_factory=list)
+    execution_order: List[str] = Field(default_factory=list)
+    total_estimated_downtime: str = "unknown"
+    recommended_maintenance_window: bool = False
+    pre_migration_checklist: List[str] = Field(default_factory=list)
+    post_migration_checklist: List[str] = Field(default_factory=list)
+    rollback_strategy: str = ""
+    overall_complexity: str = "simple"
+    llm_used: bool = False
+    generated_at: str = ""
+
+
+class GenerateScriptsRequest(BaseModel):
+    target_dialect: str = Field(
+        ...,
+        description="Target SQL dialect",
+        pattern=r"^(postgresql|mysql|sqlite)$",
+    )
+    enrich_with_llm: bool = Field(True, description="Use LLM for complex USING clauses")
+
+
+class GeneratedScriptsResponse(BaseModel):
+    project_id: int
+    target_dialect: str
+    up_sql: str = ""
+    down_sql: str = ""
+    verify_sql: str = ""
+    warnings: List[str] = Field(default_factory=list)
+    generated_at: str = ""
+    llm_used: bool = False
+
+
+class ColumnMappingSchema(BaseModel):
+    source_col: Optional[str] = None
+    target_col: str
+    transform_expression: str = ""
+    requires_llm: bool = False
+
+
+class TableDataMigrationSchema(BaseModel):
+    source_table: str
+    target_table: str
+    column_mappings: List[ColumnMappingSchema] = Field(default_factory=list)
+    insert_sql: str = ""
+    batched_insert_sql: str = ""
+    count_verify_sql: str = ""
+    warnings: List[str] = Field(default_factory=list)
+
+
+class DataMigrationPlanResponse(BaseModel):
+    project_id: int
+    table_migrations: List[TableDataMigrationSchema] = Field(default_factory=list)
+    batch_size: int = 1000
+    recommended_order: List[str] = Field(default_factory=list)
+    total_tables_with_data: int = 0
+    llm_used: bool = False
+    generated_at: str = ""

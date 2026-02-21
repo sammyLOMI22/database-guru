@@ -15,6 +15,7 @@ const TABS = [
   { id: 'lineage', label: 'Lineage', icon: '🔀' },
   { id: 'feedback', label: 'Stats', icon: '📊' },
   { id: 'usage', label: 'LLM Usage', icon: '⚡' },
+  { id: 'migration', label: 'Migrate', icon: '🔄' },
   { id: 'tools', label: 'Tools', icon: '🔧' },
   { id: 'cache', label: 'Cache', icon: '💾' },
   { id: 'pools', label: 'Pools', icon: '🔗' },
