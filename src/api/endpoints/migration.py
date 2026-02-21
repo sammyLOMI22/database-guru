@@ -65,14 +65,17 @@ async def _get_project(db: AsyncSession, project_id: int) -> MigrationProject:
     return project
 
 
-async def _get_schema_for_connection(connection: DatabaseConnection) -> dict:
+async def _get_schema_for_connection(
+    connection: DatabaseConnection,
+    force_refresh: bool = True,
+) -> dict:
     """Get schema dict for a connection via SchemaCache."""
     async with UserDatabaseConnector.get_user_db_session(connection) as session:
         schema = await SchemaCache.get_schema(
             connection_id=connection.id,
             connection_name=connection.name,
             user_db_session=session,
-            force_refresh=True,
+            force_refresh=force_refresh,
             include_samples=False,
         )
     return schema
@@ -246,15 +249,16 @@ async def generate_plan(
     try:
         from src.migration.migration_planner import plan_migration
 
-        # Fetch schemas so topo sort can consider existing FK relationships
+        # Fetch schemas so topo sort can consider existing FK relationships.
+        # Cache is sufficient here — diff snapshot was already computed from fresh data.
         source_schema = None
         target_schema = None
         if project.source_connection_id and project.target_connection_id:
             try:
                 source_conn = await _get_connection(db, project.source_connection_id)
                 target_conn = await _get_connection(db, project.target_connection_id)
-                source_schema = await _get_schema_for_connection(source_conn)
-                target_schema = await _get_schema_for_connection(target_conn)
+                source_schema = await _get_schema_for_connection(source_conn, force_refresh=False)
+                target_schema = await _get_schema_for_connection(target_conn, force_refresh=False)
             except Exception as e:
                 logger.warning(f"Could not fetch schemas for plan generation: {e}")
 
@@ -303,15 +307,16 @@ async def create_scripts(
     try:
         from src.migration.script_generator import generate_scripts
 
-        # Fetch source/target schemas so SQLite recreate includes unchanged columns
+        # Fetch source/target schemas so SQLite recreate includes unchanged columns.
+        # Cache is sufficient here — diff snapshot was already computed from fresh data.
         source_schema = None
         target_schema = None
         if project.source_connection_id and project.target_connection_id:
             try:
                 source_conn = await _get_connection(db, project.source_connection_id)
                 target_conn = await _get_connection(db, project.target_connection_id)
-                source_schema = await _get_schema_for_connection(source_conn)
-                target_schema = await _get_schema_for_connection(target_conn)
+                source_schema = await _get_schema_for_connection(source_conn, force_refresh=False)
+                target_schema = await _get_schema_for_connection(target_conn, force_refresh=False)
             except Exception as e:
                 logger.warning(f"Could not fetch schemas for script generation: {e}")
 

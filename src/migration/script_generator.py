@@ -126,9 +126,10 @@ class ScriptGenerator:
             lines.append("")
 
         # 1. Create new tables (FK dependency order from table_diffs)
+        target_tables = (target_schema or {}).get("tables", {})
         for td in diff.table_diffs:
             if td.diff_type == "added":
-                lines.extend(self._create_table_ddl(td))
+                lines.extend(self._create_table_ddl(td, target_tables.get(td.table_name)))
                 lines.append("")
 
         # 2. Modify existing tables
@@ -185,8 +186,12 @@ class ScriptGenerator:
 
         return lines
 
-    def _create_table_ddl(self, td: TableDiff) -> List[str]:
-        """Generate CREATE TABLE for an added table."""
+    def _create_table_ddl(
+        self,
+        td: TableDiff,
+        target_table_schema: Optional[Dict[str, Any]] = None,
+    ) -> List[str]:
+        """Generate CREATE TABLE for an added table, including PK and FK constraints."""
         lines = [f"CREATE TABLE {self._quote(td.table_name)} ("]
 
         col_defs = []
@@ -194,7 +199,26 @@ class ScriptGenerator:
             if cd.target_state:
                 col_defs.append(self._column_def(cd.target_state))
 
-        lines.append(",\n".join(f"    {c}" for c in col_defs))
+        constraints = []
+
+        # Primary key constraint
+        pks = (target_table_schema or {}).get("primary_keys", [])
+        if pks:
+            pk_cols = ", ".join(self._quote(c) for c in pks)
+            constraints.append(f"PRIMARY KEY ({pk_cols})")
+
+        # Foreign key constraints
+        fks = (target_table_schema or {}).get("foreign_keys", [])
+        for fk in fks:
+            fk_col = self._quote(fk["column"])
+            ref_table = self._quote(fk["referred_table"])
+            ref_col = self._quote(fk["referred_column"])
+            constraints.append(
+                f"FOREIGN KEY ({fk_col}) REFERENCES {ref_table} ({ref_col})"
+            )
+
+        all_defs = col_defs + constraints
+        lines.append(",\n".join(f"    {c}" for c in all_defs))
         lines.append(");")
         return lines
 
@@ -864,7 +888,7 @@ class ScriptGenerator:
             return "TRUE" if value else "FALSE"
         if isinstance(value, (int, float)):
             return str(value)
-        return f"'{value}'"
+        return f"'{self._escape_literal(str(value))}'"
 
 
 async def generate_scripts(

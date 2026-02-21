@@ -146,8 +146,14 @@ class MigrationPlanner:
                     if complexity.get("rollback_strategy"):
                         plan.rollback_strategy = complexity["rollback_strategy"]
 
-                plan.llm_used = True
-                logger.info("LLM enrichment applied to migration plan")
+                llm_enriched = any(
+                    not isinstance(r, Exception) and r for r in results
+                )
+                if llm_enriched:
+                    plan.llm_used = True
+                    logger.info("LLM enrichment applied to migration plan")
+                else:
+                    logger.warning("LLM enrichment produced no usable results, using deterministic plan")
             except Exception as e:
                 logger.warning(f"LLM enrichment failed, using deterministic plan: {e}")
 

@@ -275,7 +275,25 @@ class DataMigrationAssistant:
                 f"ORDER BY ctid\n"
                 f"LIMIT {self.batch_size} OFFSET 0;"
             )
+        elif self.dialect == DatabaseDialect.MSSQL:
+            batched = (
+                f"{batch_header}"
+                f"INSERT INTO {q_target} ({target_cols})\n"
+                f"SELECT {select_exprs}\n"
+                f"FROM {q_source}\n"
+                f"ORDER BY (SELECT NULL)\n"
+                f"OFFSET 0 ROWS FETCH NEXT {self.batch_size} ROWS ONLY;"
+            )
+        elif self.dialect == DatabaseDialect.ORACLE:
+            batched = (
+                f"{batch_header}"
+                f"INSERT INTO {q_target} ({target_cols})\n"
+                f"SELECT {select_exprs}\n"
+                f"FROM {q_source}\n"
+                f"FETCH FIRST {self.batch_size} ROWS ONLY;"
+            )
         else:
+            # MySQL, SQLite, DuckDB
             batched = (
                 f"{batch_header}"
                 f"INSERT INTO {q_target} ({target_cols})\n"
@@ -313,7 +331,7 @@ class DataMigrationAssistant:
             return "TRUE" if value else "FALSE"
         if isinstance(value, (int, float)):
             return str(value)
-        return f"'{value}'"
+        return f"'{str(value).replace(chr(39), chr(39) + chr(39))}'"
 
 
 async def generate_data_migration_plan(

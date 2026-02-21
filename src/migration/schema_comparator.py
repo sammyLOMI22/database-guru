@@ -59,7 +59,6 @@ _TYPE_SYNONYMS = {
     "xmltype": "text",
     # SQL Server (MSSQL) aliases
     "nvarchar": "varchar",
-    "nchar": "char",
     "ntext": "text",
     "bit": "boolean",
     "datetime": "timestamp",
@@ -266,12 +265,17 @@ class SchemaDiff:
         for td_dict in data.get("table_diffs", []):
             col_diffs = [ColumnDiff(**cd) for cd in td_dict.get("column_diffs", [])]
             constraint_diffs = [ConstraintDiff(**cd) for cd in td_dict.get("constraint_diffs", [])]
-            table_diffs.append(TableDiff(
+            td = TableDiff(
                 table_name=td_dict["table_name"],
                 diff_type=td_dict["diff_type"],
                 column_diffs=col_diffs,
                 constraint_diffs=constraint_diffs,
-            ))
+            )
+            # __post_init__ recomputes risk_level from children; restore the
+            # persisted value so round-trips through JSON are exact.
+            if "risk_level" in td_dict:
+                td.risk_level = td_dict["risk_level"]
+            table_diffs.append(td)
 
         return cls(
             source_connection_id=data.get("source_connection_id"),

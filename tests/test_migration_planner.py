@@ -248,9 +248,9 @@ class TestLLMEnrichment:
 
         # Plan should still work with deterministic fallback
         assert len(plan.steps) > 0
-        # LLM was attempted (client was present), so llm_used is True
-        # but individual LLM results are ignored (exceptions caught)
-        assert plan.llm_used is True
+        # All LLM calls raised exceptions — no enrichment was applied,
+        # so llm_used must be False
+        assert plan.llm_used is False
         # Deterministic values should still be present
         assert plan.overall_complexity == "high-risk"
         assert len(plan.pre_migration_checklist) > 0

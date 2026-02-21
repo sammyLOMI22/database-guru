@@ -1,7 +1,7 @@
 """Pydantic schemas for API requests and responses"""
 from datetime import datetime
 from typing import Optional, List, Any, Dict
-from pydantic import BaseModel, Field, validator, field_validator
+from pydantic import BaseModel, Field, validator, field_validator, model_validator
 
 from src.security.prompt_sanitizer import sanitize_user_input, detect_injection_attempt
 
@@ -1250,6 +1250,12 @@ class SchemaDiffRequest(BaseModel):
     name: Optional[str] = Field(None, description="Project name (required if saving)")
     save: bool = Field(False, description="Whether to save as a MigrationProject")
 
+    @model_validator(mode="after")
+    def source_and_target_must_differ(self) -> "SchemaDiffRequest":
+        if self.source_connection_id == self.target_connection_id:
+            raise ValueError("source_connection_id and target_connection_id must be different")
+        return self
+
 
 class ColumnDiffSchema(BaseModel):
     table_name: str
@@ -1352,7 +1358,7 @@ class GenerateScriptsRequest(BaseModel):
     target_dialect: str = Field(
         ...,
         description="Target SQL dialect",
-        pattern=r"^(postgresql|mysql|sqlite)$",
+        pattern=r"^(postgresql|mysql|sqlite|mssql|oracle|duckdb)$",
     )
     enrich_with_llm: bool = Field(True, description="Use LLM for complex USING clauses")
 
