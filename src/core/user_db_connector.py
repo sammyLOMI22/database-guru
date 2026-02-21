@@ -40,6 +40,12 @@ class UserDatabaseConnector:
             # Format: duckdb:///path/to/database.duckdb or duckdb:///:memory:
             return f"duckdb:///{connection.database_name}"
 
+        elif connection.database_type == 'mssql':
+            # SQL Server - uses pymssql (sync driver, no ODBC required)
+            password = connection.password_encrypted or ""  # TODO: decrypt
+            port = connection.port or 1433
+            return f"mssql+pymssql://{connection.username}:{password}@{connection.host}:{port}/{connection.database_name}"
+
         elif connection.database_type == 'mongodb':
             # MongoDB is not SQL, would need different handling
             raise NotImplementedError("MongoDB queries not yet supported")
@@ -67,8 +73,8 @@ class UserDatabaseConnector:
         # Get or create pool for this connection (metrics updated in get_pool())
         pool_entry = await pool_manager.get_pool(connection)
 
-        # DuckDB uses sync sessions
-        if connection.database_type == 'duckdb':
+        # DuckDB and MSSQL (pymssql) use sync sessions
+        if connection.database_type in ('duckdb', 'mssql'):
             # Create sync session from pool
             session = pool_entry.session_factory()
             try:

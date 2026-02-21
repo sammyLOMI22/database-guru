@@ -110,6 +110,10 @@ class ScriptGenerator:
         if self.dialect == DatabaseDialect.MYSQL:
             lines.append("SET FOREIGN_KEY_CHECKS = 0;")
             lines.append("")
+        elif self.dialect == DatabaseDialect.MSSQL:
+            lines.append("-- Disable FK constraints for migration")
+            lines.append("EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL';")
+            lines.append("")
 
         # 1. Create new tables (FK dependency order from table_diffs)
         for td in diff.table_diffs:
@@ -142,6 +146,11 @@ class ScriptGenerator:
 
         if self.dialect == DatabaseDialect.MYSQL:
             lines.append("SET FOREIGN_KEY_CHECKS = 1;")
+            lines.append("")
+        elif self.dialect == DatabaseDialect.MSSQL:
+            lines.append("")
+            lines.append("-- Re-enable FK constraints")
+            lines.append("EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL';")
             lines.append("")
 
         return lines
@@ -186,9 +195,11 @@ class ScriptGenerator:
                 col = cd.target_state
                 nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
                 default = f" DEFAULT {self._format_default(col['default'])}" if col.get("default") is not None else ""
+                # MSSQL uses ADD without COLUMN keyword
+                add_keyword = "ADD" if self.dialect == DatabaseDialect.MSSQL else "ADD COLUMN"
                 lines.append(
                     f"ALTER TABLE {self._quote(td.table_name)} "
-                    f"ADD COLUMN {self._quote(cd.column_name)} {col.get('type', 'TEXT')} {nullable}{default};"
+                    f"{add_keyword} {self._quote(cd.column_name)} {col.get('type', 'TEXT')} {nullable}{default};"
                 )
 
             elif cd.diff_type == "removed":
@@ -217,6 +228,13 @@ class ScriptGenerator:
                         f"ALTER TABLE {self._quote(td.table_name)} "
                         f"MODIFY COLUMN {self._quote(cd.column_name)} {col.get('type', 'TEXT')} {null_str};"
                     )
+                elif self.dialect == DatabaseDialect.MSSQL:
+                    col = cd.target_state
+                    null_str = "NULL" if nullable else "NOT NULL"
+                    lines.append(
+                        f"ALTER TABLE {self._quote(td.table_name)} "
+                        f"ALTER COLUMN {self._quote(cd.column_name)} {col.get('type', 'TEXT')} {null_str};"
+                    )
 
         # Constraint changes
         for cd in td.constraint_diffs:
@@ -233,7 +251,10 @@ class ScriptGenerator:
                 elif cd.diff_type == "removed" and cd.source_state:
                     cols, _ = cd.source_state
                     idx_name = f"idx_{td.table_name}_{'_'.join(cols)}"
-                    lines.append(f"DROP INDEX IF EXISTS {self._quote(idx_name)};")
+                    if self.dialect == DatabaseDialect.MSSQL:
+                        lines.append(f"DROP INDEX IF EXISTS {self._quote(idx_name)} ON {self._quote(td.table_name)};")
+                    else:
+                        lines.append(f"DROP INDEX IF EXISTS {self._quote(idx_name)};")
 
         return lines
 
@@ -254,6 +275,13 @@ class ScriptGenerator:
             return [
                 f"ALTER TABLE {self._quote(table_name)} "
                 f"MODIFY COLUMN {self._quote(cd.column_name)} {new_type} {nullable};"
+            ]
+        elif self.dialect == DatabaseDialect.MSSQL:
+            col = cd.target_state or {}
+            nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
+            return [
+                f"ALTER TABLE {self._quote(table_name)} "
+                f"ALTER COLUMN {self._quote(cd.column_name)} {new_type} {nullable};"
             ]
         # SQLite handled by _sqlite_recreate
         return []
@@ -387,6 +415,10 @@ class ScriptGenerator:
         if self.dialect == DatabaseDialect.MYSQL:
             lines.append("SET FOREIGN_KEY_CHECKS = 0;")
             lines.append("")
+        elif self.dialect == DatabaseDialect.MSSQL:
+            lines.append("-- Disable FK constraints for rollback")
+            lines.append("EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL';")
+            lines.append("")
 
         # Reverse: drop tables that were added
         for td in diff.table_diffs:
@@ -422,9 +454,10 @@ class ScriptGenerator:
                         # Reverse: re-add the column that was dropped
                         col = cd.source_state
                         nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
+                        add_keyword = "ADD" if self.dialect == DatabaseDialect.MSSQL else "ADD COLUMN"
                         lines.append(
                             f"ALTER TABLE {self._quote(td.table_name)} "
-                            f"ADD COLUMN {self._quote(cd.column_name)} "
+                            f"{add_keyword} {self._quote(cd.column_name)} "
                             f"{col.get('type', 'TEXT')} {nullable};"
                         )
                         lines.append(f"-- NOTE: Data for '{cd.column_name}' cannot be restored")
@@ -444,10 +477,22 @@ class ScriptGenerator:
                                 f"MODIFY COLUMN {self._quote(cd.column_name)} "
                                 f"{col.get('type', 'TEXT')} {nullable};"
                             )
+                        elif self.dialect == DatabaseDialect.MSSQL:
+                            col = cd.source_state
+                            nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
+                            lines.append(
+                                f"ALTER TABLE {self._quote(td.table_name)} "
+                                f"ALTER COLUMN {self._quote(cd.column_name)} "
+                                f"{col.get('type', 'TEXT')} {nullable};"
+                            )
 
         if self.dialect == DatabaseDialect.MYSQL:
             lines.append("")
             lines.append("SET FOREIGN_KEY_CHECKS = 1;")
+        elif self.dialect == DatabaseDialect.MSSQL:
+            lines.append("")
+            lines.append("-- Re-enable FK constraints")
+            lines.append("EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL';")
 
         return lines
 
@@ -496,6 +541,11 @@ class ScriptGenerator:
                         f"SELECT COUNT(*) = 0 AS table_dropped "
                         f"FROM sqlite_master WHERE type='table' AND name='{safe_name}';"
                     )
+                elif self.dialect == DatabaseDialect.MSSQL:
+                    lines.append(
+                        f"SELECT CASE WHEN OBJECT_ID(N'{safe_name}', N'U') IS NULL "
+                        f"THEN 1 ELSE 0 END AS table_dropped;"
+                    )
                 lines.append("")
 
             elif td.diff_type == "modified":
@@ -519,7 +569,7 @@ class ScriptGenerator:
                         lines.append(
                             f"-- Verify column '{cd.column_name}' was added to '{td.table_name}'"
                         )
-                        if self.dialect in (DatabaseDialect.POSTGRESQL, DatabaseDialect.MYSQL):
+                        if self.dialect in (DatabaseDialect.POSTGRESQL, DatabaseDialect.MYSQL, DatabaseDialect.MSSQL):
                             lines.append(
                                 f"SELECT COUNT(*) AS col_exists "
                                 f"FROM information_schema.columns "
@@ -672,6 +722,8 @@ class ScriptGenerator:
         """Quote an identifier based on dialect."""
         if self.dialect == DatabaseDialect.MYSQL:
             return f"`{identifier}`"
+        if self.dialect == DatabaseDialect.MSSQL:
+            return f"[{identifier}]"
         return f'"{identifier}"'
 
     @staticmethod

@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 # Type synonyms for normalization (lowercase)
 _TYPE_SYNONYMS = {
+    # PostgreSQL aliases
     "character varying": "varchar",
     "char varying": "varchar",
     "int4": "integer",
@@ -42,6 +43,22 @@ _TYPE_SYNONYMS = {
     "bigserial": "bigint",
     "smallserial": "smallint",
     "text": "text",
+    # SQL Server (MSSQL) aliases
+    "nvarchar": "varchar",
+    "nchar": "char",
+    "ntext": "text",
+    "bit": "boolean",
+    "datetime": "timestamp",
+    "datetime2": "timestamp",
+    "smalldatetime": "timestamp",
+    "datetimeoffset": "timestamp with time zone",
+    "uniqueidentifier": "uuid",
+    "money": "numeric",
+    "smallmoney": "numeric",
+    "tinyint": "smallint",
+    "image": "bytea",
+    "varbinary": "bytea",
+    "binary": "bytea",
 }
 
 # Types ordered by "width" for narrowing detection

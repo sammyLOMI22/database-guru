@@ -58,6 +58,13 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
       const port = formData.port || 3306;
       const db = formData.database_name || 'database';
       return `mysql://${user}:${pass}@${host}:${port}/${db}`;
+    } else if (formData.database_type === 'mssql') {
+      const user = formData.username || 'sa';
+      const pass = formData.password ? '****' : 'password';
+      const host = formData.host || 'localhost';
+      const port = formData.port || 1433;
+      const db = formData.database_name || 'database';
+      return `mssql+pymssql://${user}:${pass}@${host}:${port}/${db}`;
     } else {
       // PostgreSQL (default)
       const user = formData.username || 'username';
@@ -85,6 +92,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
       sqlite: 0,
       mongodb: 27017,
       duckdb: 0,
+      mssql: 1433,
     };
     setFormData((prev) => ({
       ...prev,
@@ -241,7 +249,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
               Select Protocol *
             </label>
             <div className="flex flex-wrap gap-2.5">
-              {['postgresql', 'mysql', 'sqlite', 'mongodb', 'duckdb'].map((type) => (
+              {['postgresql', 'mysql', 'sqlite', 'mssql', 'mongodb', 'duckdb'].map((type) => (
                 <button
                   key={type}
                   type="button"

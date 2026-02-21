@@ -7,6 +7,7 @@ class DatabaseDialect(Enum):
     MYSQL = "mysql"
     SQLITE = "sqlite"
     DUCKDB = "duckdb"
+    MSSQL = "mssql"
     MONGODB = "mongodb"  # For future MQL generation
 
 @dataclass
@@ -131,6 +132,26 @@ DIALECT_RULES: Dict[DatabaseDialect, DialectRules] = {
         array_contains="list_contains({col}, {val})",  # List containment function
         array_length="len({col})",  # Simple len() function
     ),
+    DatabaseDialect.MSSQL: DialectRules(
+        current_timestamp="GETDATE()",  # SQL Server timestamp function
+        date_diff="DATEADD({unit}, -{n}, GETDATE())",  # DATEADD function
+        date_format="FORMAT({col}, '{format}')",  # FORMAT function (SQL Server 2012+)
+        concat="+ ",  # String concatenation with + operator (requires CAST for non-strings)
+        substring="SUBSTRING({col}, {start}, {len})",
+        string_length="LEN({col})",  # LEN excludes trailing spaces (DATALENGTH for bytes)
+        case_insensitive="LIKE",  # Case sensitivity depends on collation (default CI)
+        limit_syntax="TOP {n}",  # SELECT TOP n, not LIMIT (pre-SQL Server 2012)
+        offset_syntax="OFFSET {n} ROWS FETCH NEXT {n} ROWS ONLY",  # SQL Server 2012+
+        true_value="1",  # No native boolean — uses BIT (0/1)
+        false_value="0",  # No native boolean — uses BIT (0/1)
+        null_safe_equals="IS NOT DISTINCT FROM",  # Not natively supported; use ISNULL(a,'') = ISNULL(b,'')
+        coalesce="COALESCE({args})",
+        cast_syntax="CAST({expr} AS {type})",
+        json_extract="JSON_VALUE({col}, '$.{key}')",  # JSON_VALUE returns scalar
+        json_array="JSON_QUERY({col}, '$')",  # JSON_QUERY returns JSON fragment
+        array_contains="",  # Not supported natively
+        array_length="",  # Not supported natively
+    ),
 }
 
 def build_dialect_context(dialect: DatabaseDialect) -> str:
@@ -179,6 +200,16 @@ DATABASE: DuckDB
 - Excellent JSON support: column.key notation
 - Supports QUALIFY for window functions
 """,
+        DatabaseDialect.MSSQL: """
+DATABASE: SQL Server (T-SQL)
+- Use square brackets for identifiers: [column_name]
+- Boolean: BIT type with values 1/0 (no TRUE/FALSE)
+- Date math: DATEADD(day, -7, GETDATE())
+- String concat: + operator (cast non-strings first)
+- Pagination: SELECT TOP n or OFFSET n ROWS FETCH NEXT n ROWS ONLY
+- JSON: JSON_VALUE(col, '$.key') for scalars, JSON_QUERY for objects
+- Use ISNULL() instead of COALESCE when checking single values
+""",
         DatabaseDialect.MONGODB: """
 DATABASE: MongoDB
 - No SQL
@@ -198,6 +229,8 @@ def get_dialect_for_database_type(db_type: str) -> DatabaseDialect:
         return DatabaseDialect.SQLITE
     elif "duckdb" in normalized:
         return DatabaseDialect.DUCKDB
+    elif "mssql" in normalized or "sqlserver" in normalized or "sql server" in normalized or "microsoft" in normalized:
+        return DatabaseDialect.MSSQL
     elif "mongo" in normalized:
         return DatabaseDialect.MONGODB
     else:
