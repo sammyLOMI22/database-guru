@@ -14,6 +14,8 @@ from typing import Dict, List, Any, Optional
 
 from src.migration.schema_comparator import (
     SchemaDiff, TableDiff, ColumnDiff, ConstraintDiff,
+    ViewDiff, SequenceDiff, CheckConstraintDiff, RoutineDiff,
+    TriggerDiff, EnumDiff,
     _normalize_type, _extract_base_type,
 )
 from src.llm.dialect_registry import DatabaseDialect, get_dialect_for_database_type
@@ -125,6 +127,20 @@ class ScriptGenerator:
             lines.append("/")
             lines.append("")
 
+        # 0a. Enums (PostgreSQL only, before tables that reference them)
+        if diff.enum_diffs:
+            lines.append("-- Enum type changes")
+            for ed in diff.enum_diffs:
+                lines.extend(self._enum_up(ed))
+            lines.append("")
+
+        # 0b. Sequences (before tables with DEFAULT nextval)
+        if diff.sequence_diffs:
+            lines.append("-- Sequence changes")
+            for sd in diff.sequence_diffs:
+                lines.extend(self._sequence_up(sd))
+            lines.append("")
+
         # 1. Create new tables (FK dependency order from table_diffs)
         target_tables = (target_schema or {}).get("tables", {})
         for td in diff.table_diffs:
@@ -163,6 +179,34 @@ class ScriptGenerator:
                 lines.append(f"DROP TABLE IF EXISTS {self._quote(td.table_name)};")
             lines.append("")
             warnings.append(f"DROP TABLE {td.table_name}: all data will be lost")
+
+        # 4. Check constraints (after tables exist)
+        if diff.check_constraint_diffs:
+            lines.append("-- Check constraint changes")
+            for cd in diff.check_constraint_diffs:
+                lines.extend(self._check_constraint_up(cd))
+            lines.append("")
+
+        # 5. Views (after tables they reference)
+        if diff.view_diffs:
+            lines.append("-- View changes")
+            for vd in diff.view_diffs:
+                lines.extend(self._view_up(vd))
+            lines.append("")
+
+        # 6. Routines (after tables/views they may reference)
+        if diff.routine_diffs:
+            lines.append("-- Stored procedure/function changes")
+            for rd in diff.routine_diffs:
+                lines.extend(self._routine_up(rd))
+            lines.append("")
+
+        # 7. Triggers (last — may call functions)
+        if diff.trigger_diffs:
+            lines.append("-- Trigger changes")
+            for trd in diff.trigger_diffs:
+                lines.extend(self._trigger_up(trd))
+            lines.append("")
 
         if self.dialect == DatabaseDialect.MYSQL:
             lines.append("SET FOREIGN_KEY_CHECKS = 1;")
@@ -521,6 +565,35 @@ class ScriptGenerator:
             lines.append("/")
             lines.append("")
 
+        # Reverse extended objects (reverse order of up.sql)
+        # 7→ Triggers
+        if diff.trigger_diffs:
+            lines.append("-- Rollback trigger changes")
+            for trd in diff.trigger_diffs:
+                lines.extend(self._trigger_down(trd))
+            lines.append("")
+
+        # 6→ Routines
+        if diff.routine_diffs:
+            lines.append("-- Rollback routine changes")
+            for rd in diff.routine_diffs:
+                lines.extend(self._routine_down(rd))
+            lines.append("")
+
+        # 5→ Views
+        if diff.view_diffs:
+            lines.append("-- Rollback view changes")
+            for vd in diff.view_diffs:
+                lines.extend(self._view_down(vd))
+            lines.append("")
+
+        # 4→ Check constraints
+        if diff.check_constraint_diffs:
+            lines.append("-- Rollback check constraint changes")
+            for cd in diff.check_constraint_diffs:
+                lines.extend(self._check_constraint_down(cd))
+            lines.append("")
+
         # Reverse: drop tables that were added
         for td in diff.table_diffs:
             if td.diff_type == "added":
@@ -600,6 +673,20 @@ class ScriptGenerator:
                                 f"MODIFY ({self._quote(cd.column_name)} "
                                 f"{col.get('type', 'VARCHAR2(255)')} {nullable});"
                             )
+
+        # 0b→ Sequences
+        if diff.sequence_diffs:
+            lines.append("-- Rollback sequence changes")
+            for sd in diff.sequence_diffs:
+                lines.extend(self._sequence_down(sd))
+            lines.append("")
+
+        # 0a→ Enums
+        if diff.enum_diffs:
+            lines.append("-- Rollback enum changes")
+            for ed in diff.enum_diffs:
+                lines.extend(self._enum_down(ed))
+            lines.append("")
 
         if self.dialect == DatabaseDialect.MYSQL:
             lines.append("")
@@ -725,7 +812,297 @@ class ScriptGenerator:
 
                 lines.append("")
 
+        # Verify extended objects
+        for vd in diff.view_diffs:
+            if vd.diff_type in ("added", "modified"):
+                safe = self._escape_literal(vd.view_name)
+                lines.append(f"-- Verify view '{vd.view_name}' exists")
+                if self.dialect in (DatabaseDialect.POSTGRESQL, DatabaseDialect.MYSQL, DatabaseDialect.MSSQL):
+                    lines.append(
+                        f"SELECT COUNT(*) AS view_exists FROM information_schema.views "
+                        f"WHERE table_name = '{safe}';"
+                    )
+                elif self.dialect == DatabaseDialect.SQLITE:
+                    lines.append(
+                        f"SELECT COUNT(*) AS view_exists FROM sqlite_master "
+                        f"WHERE type='view' AND name='{safe}';"
+                    )
+                elif self.dialect == DatabaseDialect.ORACLE:
+                    lines.append(
+                        f"SELECT COUNT(*) AS view_exists FROM user_views "
+                        f"WHERE view_name = UPPER('{safe}');"
+                    )
+                lines.append("")
+
+        for sd in diff.sequence_diffs:
+            if sd.diff_type in ("added", "modified"):
+                safe = self._escape_literal(sd.sequence_name)
+                lines.append(f"-- Verify sequence '{sd.sequence_name}' exists")
+                if self.dialect == DatabaseDialect.POSTGRESQL:
+                    lines.append(f"SELECT COUNT(*) AS seq_exists FROM pg_sequences WHERE sequencename = '{safe}';")
+                elif self.dialect == DatabaseDialect.MSSQL:
+                    lines.append(f"SELECT COUNT(*) AS seq_exists FROM sys.sequences WHERE name = '{safe}';")
+                elif self.dialect == DatabaseDialect.ORACLE:
+                    lines.append(f"SELECT COUNT(*) AS seq_exists FROM user_sequences WHERE sequence_name = UPPER('{safe}');")
+                lines.append("")
+
+        for rd in diff.routine_diffs:
+            if rd.diff_type in ("added", "modified"):
+                safe = self._escape_literal(rd.routine_name)
+                lines.append(f"-- Verify routine '{rd.routine_name}' exists")
+                if self.dialect in (DatabaseDialect.POSTGRESQL, DatabaseDialect.MYSQL):
+                    lines.append(
+                        f"SELECT COUNT(*) AS routine_exists FROM information_schema.routines "
+                        f"WHERE routine_name = '{safe}';"
+                    )
+                elif self.dialect == DatabaseDialect.MSSQL:
+                    lines.append(f"SELECT CASE WHEN OBJECT_ID(N'{safe}') IS NOT NULL THEN 1 ELSE 0 END AS routine_exists;")
+                elif self.dialect == DatabaseDialect.ORACLE:
+                    lines.append(f"SELECT COUNT(*) AS routine_exists FROM user_objects WHERE object_name = UPPER('{safe}') AND object_type IN ('PROCEDURE','FUNCTION');")
+                lines.append("")
+
         return lines
+
+    # ------------------------------------------------------------------
+    # Extended object DDL (up)
+    # ------------------------------------------------------------------
+
+    def _enum_up(self, ed: EnumDiff) -> List[str]:
+        q = self._quote
+        if ed.diff_type == "added":
+            vals = ", ".join(f"'{self._escape_literal(v)}'" for v in (ed.target_values or []))
+            return [f"CREATE TYPE {q(ed.enum_name)} AS ENUM ({vals});"]
+        elif ed.diff_type == "removed":
+            return [f"DROP TYPE IF EXISTS {q(ed.enum_name)};"]
+        elif ed.diff_type == "modified":
+            # PostgreSQL: add new values, cannot remove values without recreate
+            lines = [f"-- Modified enum '{ed.enum_name}'"]
+            src = set(ed.source_values or [])
+            tgt = ed.target_values or []
+            for val in tgt:
+                if val not in src:
+                    lines.append(f"ALTER TYPE {q(ed.enum_name)} ADD VALUE IF NOT EXISTS '{self._escape_literal(val)}';")
+            removed = src - set(tgt)
+            if removed:
+                lines.append(f"-- WARNING: Cannot remove enum values ({', '.join(sorted(removed))}) without recreating the type")
+            return lines
+        return []
+
+    def _enum_down(self, ed: EnumDiff) -> List[str]:
+        q = self._quote
+        if ed.diff_type == "added":
+            return [f"DROP TYPE IF EXISTS {q(ed.enum_name)};"]
+        elif ed.diff_type == "removed":
+            vals = ", ".join(f"'{self._escape_literal(v)}'" for v in (ed.source_values or []))
+            return [f"CREATE TYPE {q(ed.enum_name)} AS ENUM ({vals});"]
+        elif ed.diff_type == "modified":
+            return [f"-- NOTE: Cannot rollback enum modification for '{ed.enum_name}' — manual intervention needed"]
+        return []
+
+    def _sequence_up(self, sd: SequenceDiff) -> List[str]:
+        q = self._quote
+        if sd.diff_type == "added":
+            state = sd.target_state or {}
+            parts = [f"CREATE SEQUENCE {q(sd.sequence_name)}"]
+            if state.get("increment"):
+                parts.append(f"  INCREMENT BY {state['increment']}")
+            if state.get("start_value"):
+                parts.append(f"  START WITH {state['start_value']}")
+            if state.get("min_value") is not None:
+                parts.append(f"  MINVALUE {state['min_value']}")
+            if state.get("max_value") is not None:
+                parts.append(f"  MAXVALUE {state['max_value']}")
+            return ["\n".join(parts) + ";"]
+        elif sd.diff_type == "removed":
+            if self.dialect == DatabaseDialect.ORACLE:
+                return [f"DROP SEQUENCE {q(sd.sequence_name)};"]
+            return [f"DROP SEQUENCE IF EXISTS {q(sd.sequence_name)};"]
+        elif sd.diff_type == "modified":
+            state = sd.target_state or {}
+            parts = [f"ALTER SEQUENCE {q(sd.sequence_name)}"]
+            if state.get("increment"):
+                parts.append(f"  INCREMENT BY {state['increment']}")
+            if state.get("min_value") is not None:
+                parts.append(f"  MINVALUE {state['min_value']}")
+            if state.get("max_value") is not None:
+                parts.append(f"  MAXVALUE {state['max_value']}")
+            return ["\n".join(parts) + ";"]
+        return []
+
+    def _sequence_down(self, sd: SequenceDiff) -> List[str]:
+        q = self._quote
+        if sd.diff_type == "added":
+            if self.dialect == DatabaseDialect.ORACLE:
+                return [f"DROP SEQUENCE {q(sd.sequence_name)};"]
+            return [f"DROP SEQUENCE IF EXISTS {q(sd.sequence_name)};"]
+        elif sd.diff_type == "removed":
+            state = sd.source_state or {}
+            parts = [f"CREATE SEQUENCE {q(sd.sequence_name)}"]
+            if state.get("increment"):
+                parts.append(f"  INCREMENT BY {state['increment']}")
+            if state.get("start_value"):
+                parts.append(f"  START WITH {state['start_value']}")
+            return ["\n".join(parts) + ";"]
+        elif sd.diff_type == "modified":
+            state = sd.source_state or {}
+            parts = [f"ALTER SEQUENCE {q(sd.sequence_name)}"]
+            if state.get("increment"):
+                parts.append(f"  INCREMENT BY {state['increment']}")
+            return ["\n".join(parts) + ";"]
+        return []
+
+    def _check_constraint_up(self, cd: CheckConstraintDiff) -> List[str]:
+        q = self._quote
+        if cd.diff_type == "added":
+            defn = cd.target_definition or "TRUE"
+            return [f"ALTER TABLE {q(cd.table_name)} ADD CONSTRAINT {q(cd.constraint_name)} CHECK ({defn});"]
+        elif cd.diff_type == "removed":
+            return [f"ALTER TABLE {q(cd.table_name)} DROP CONSTRAINT {q(cd.constraint_name)};"]
+        elif cd.diff_type == "modified":
+            defn = cd.target_definition or "TRUE"
+            return [
+                f"ALTER TABLE {q(cd.table_name)} DROP CONSTRAINT {q(cd.constraint_name)};",
+                f"ALTER TABLE {q(cd.table_name)} ADD CONSTRAINT {q(cd.constraint_name)} CHECK ({defn});",
+            ]
+        return []
+
+    def _check_constraint_down(self, cd: CheckConstraintDiff) -> List[str]:
+        q = self._quote
+        if cd.diff_type == "added":
+            return [f"ALTER TABLE {q(cd.table_name)} DROP CONSTRAINT {q(cd.constraint_name)};"]
+        elif cd.diff_type == "removed":
+            defn = cd.source_definition or "TRUE"
+            return [f"ALTER TABLE {q(cd.table_name)} ADD CONSTRAINT {q(cd.constraint_name)} CHECK ({defn});"]
+        elif cd.diff_type == "modified":
+            defn = cd.source_definition or "TRUE"
+            return [
+                f"ALTER TABLE {q(cd.table_name)} DROP CONSTRAINT {q(cd.constraint_name)};",
+                f"ALTER TABLE {q(cd.table_name)} ADD CONSTRAINT {q(cd.constraint_name)} CHECK ({defn});",
+            ]
+        return []
+
+    def _view_up(self, vd: ViewDiff) -> List[str]:
+        q = self._quote
+        if vd.diff_type == "added":
+            defn = vd.target_definition
+            if defn:
+                return [f"CREATE VIEW {q(vd.view_name)} AS {defn};"]
+            return [f"-- WARNING: No definition available for view '{vd.view_name}'"]
+        elif vd.diff_type == "removed":
+            if self.dialect == DatabaseDialect.ORACLE:
+                return [f"DROP VIEW {q(vd.view_name)};"]
+            return [f"DROP VIEW IF EXISTS {q(vd.view_name)};"]
+        elif vd.diff_type == "modified":
+            defn = vd.target_definition
+            if defn:
+                return [f"CREATE OR REPLACE VIEW {q(vd.view_name)} AS {defn};"]
+            return [f"-- WARNING: No definition available for view '{vd.view_name}'"]
+        return []
+
+    def _view_down(self, vd: ViewDiff) -> List[str]:
+        q = self._quote
+        if vd.diff_type == "added":
+            if self.dialect == DatabaseDialect.ORACLE:
+                return [f"DROP VIEW {q(vd.view_name)};"]
+            return [f"DROP VIEW IF EXISTS {q(vd.view_name)};"]
+        elif vd.diff_type == "removed":
+            defn = vd.source_definition
+            if defn:
+                return [f"CREATE VIEW {q(vd.view_name)} AS {defn};"]
+            return [f"-- NOTE: Cannot restore view '{vd.view_name}' — definition not available"]
+        elif vd.diff_type == "modified":
+            defn = vd.source_definition
+            if defn:
+                return [f"CREATE OR REPLACE VIEW {q(vd.view_name)} AS {defn};"]
+            return [f"-- NOTE: Cannot rollback view '{vd.view_name}' — original definition not available"]
+        return []
+
+    def _routine_up(self, rd: RoutineDiff) -> List[str]:
+        q = self._quote
+        if rd.diff_type == "added" or rd.diff_type == "modified":
+            defn = rd.target_definition
+            if defn:
+                return [
+                    f"-- {rd.routine_type.upper()}: {rd.routine_name}",
+                    f"-- NOTE: Dialect-specific body — may need manual adaptation for target database",
+                    defn.rstrip(";") + ";",
+                ]
+            return [f"-- WARNING: No definition available for {rd.routine_type} '{rd.routine_name}'"]
+        elif rd.diff_type == "removed":
+            rtype = "PROCEDURE" if rd.routine_type == "procedure" else "FUNCTION"
+            if self.dialect == DatabaseDialect.ORACLE:
+                return [f"DROP {rtype} {q(rd.routine_name)};"]
+            return [f"DROP {rtype} IF EXISTS {q(rd.routine_name)};"]
+        return []
+
+    def _routine_down(self, rd: RoutineDiff) -> List[str]:
+        q = self._quote
+        rtype = "PROCEDURE" if rd.routine_type == "procedure" else "FUNCTION"
+        if rd.diff_type == "added":
+            if self.dialect == DatabaseDialect.ORACLE:
+                return [f"DROP {rtype} {q(rd.routine_name)};"]
+            return [f"DROP {rtype} IF EXISTS {q(rd.routine_name)};"]
+        elif rd.diff_type == "removed" or rd.diff_type == "modified":
+            defn = rd.source_definition
+            if defn:
+                return [
+                    f"-- Restore {rd.routine_type}: {rd.routine_name}",
+                    defn.rstrip(";") + ";",
+                ]
+            return [f"-- NOTE: Cannot restore {rd.routine_type} '{rd.routine_name}' — definition not available"]
+        return []
+
+    def _trigger_up(self, trd: TriggerDiff) -> List[str]:
+        q = self._quote
+        if trd.diff_type == "added" or trd.diff_type == "modified":
+            defn = trd.target_definition
+            if trd.diff_type == "modified":
+                # Drop first, then recreate
+                lines = [f"DROP TRIGGER IF EXISTS {q(trd.trigger_name)} ON {q(trd.table_name)};"] if self.dialect != DatabaseDialect.ORACLE else [
+                    f"BEGIN EXECUTE IMMEDIATE 'DROP TRIGGER {q(trd.trigger_name)}'; EXCEPTION WHEN OTHERS THEN NULL; END;", "/"
+                ]
+            else:
+                lines = []
+            if defn:
+                lines.extend([
+                    f"-- TRIGGER: {trd.trigger_name} on {trd.table_name}",
+                    f"-- NOTE: Dialect-specific body — may need manual adaptation",
+                    defn.rstrip(";") + ";",
+                ])
+            else:
+                lines.append(f"-- WARNING: No definition available for trigger '{trd.trigger_name}'")
+            return lines
+        elif trd.diff_type == "removed":
+            if self.dialect == DatabaseDialect.ORACLE:
+                return [
+                    f"BEGIN EXECUTE IMMEDIATE 'DROP TRIGGER {q(trd.trigger_name)}'; EXCEPTION WHEN OTHERS THEN NULL; END;",
+                    "/",
+                ]
+            if self.dialect == DatabaseDialect.MYSQL:
+                return [f"DROP TRIGGER IF EXISTS {q(trd.trigger_name)};"]
+            return [f"DROP TRIGGER IF EXISTS {q(trd.trigger_name)} ON {q(trd.table_name)};"]
+        return []
+
+    def _trigger_down(self, trd: TriggerDiff) -> List[str]:
+        q = self._quote
+        if trd.diff_type == "added":
+            if self.dialect == DatabaseDialect.ORACLE:
+                return [
+                    f"BEGIN EXECUTE IMMEDIATE 'DROP TRIGGER {q(trd.trigger_name)}'; EXCEPTION WHEN OTHERS THEN NULL; END;",
+                    "/",
+                ]
+            if self.dialect == DatabaseDialect.MYSQL:
+                return [f"DROP TRIGGER IF EXISTS {q(trd.trigger_name)};"]
+            return [f"DROP TRIGGER IF EXISTS {q(trd.trigger_name)} ON {q(trd.table_name)};"]
+        elif trd.diff_type == "removed" or trd.diff_type == "modified":
+            defn = trd.source_definition
+            if defn:
+                return [
+                    f"-- Restore trigger: {trd.trigger_name}",
+                    defn.rstrip(";") + ";",
+                ]
+            return [f"-- NOTE: Cannot restore trigger '{trd.trigger_name}' — definition not available"]
+        return []
 
     # ------------------------------------------------------------------
     # Helpers

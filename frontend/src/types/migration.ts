@@ -27,12 +27,33 @@ export interface TableDiff {
   risk_level: string;
 }
 
+export interface SchemaObjectFlags {
+  include_views?: boolean;
+  include_sequences?: boolean;
+  include_check_constraints?: boolean;
+  include_routines?: boolean;
+  include_triggers?: boolean;
+  include_enums?: boolean;
+}
+
+export interface ExtendedObjectDiff {
+  diff_type: 'added' | 'removed' | 'modified';
+  risk_level: string;
+  [key: string]: any;
+}
+
 export interface SchemaDiffResponse {
   source_connection_id: number | null;
   target_connection_id: number | null;
   source_fingerprint: string;
   target_fingerprint: string;
   table_diffs: TableDiff[];
+  view_diffs: ExtendedObjectDiff[];
+  sequence_diffs: ExtendedObjectDiff[];
+  check_constraint_diffs: ExtendedObjectDiff[];
+  routine_diffs: ExtendedObjectDiff[];
+  trigger_diffs: ExtendedObjectDiff[];
+  enum_diffs: ExtendedObjectDiff[];
   total_breaking_changes: number;
   total_safe_changes: number;
   overall_risk: string;
@@ -71,6 +92,7 @@ export interface MigrationStep {
   description: string;
   sql_hint: string | null;
   table_name: string | null;
+  object_type: string;
   lock_type: string;
   estimated_duration: string;
   risk_level: string;

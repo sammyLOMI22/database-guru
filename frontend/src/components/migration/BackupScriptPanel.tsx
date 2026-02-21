@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Loader2, Copy, Check, Download, AlertTriangle, Archive } from 'lucide-react';
 import { migrationAPI } from '../../services/migrationApi';
 import { connectionsAPI } from '../../services/api';
-import type { BackupScriptsResponse } from '../../types/migration';
+import { SchemaObjectToggles } from './SchemaObjectToggles';
+import type { BackupScriptsResponse, SchemaObjectFlags } from '../../types/migration';
 import type { DatabaseConnection } from '../../types/api';
 
 const DIALECTS = [
@@ -30,6 +31,7 @@ export function BackupScriptPanel() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<ScriptTab>('backup');
   const [copied, setCopied] = useState(false);
+  const [flags, setFlags] = useState<SchemaObjectFlags>({});
 
   useEffect(() => {
     connectionsAPI.listConnections().then((res) => {
@@ -56,6 +58,7 @@ export function BackupScriptPanel() {
       const result = await migrationAPI.generateBackupScripts(
         connectionId as number,
         dialect || undefined,
+        flags,
       );
       setScripts(result);
       setActiveTab('backup');
@@ -149,6 +152,9 @@ export function BackupScriptPanel() {
             : scripts ? 'Regenerate' : 'Generate Scripts'}
         </button>
       </div>
+
+      {/* Extended object toggles */}
+      <SchemaObjectToggles flags={flags} onChange={setFlags} dialect={dialect || undefined} />
 
       {error && (
         <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">

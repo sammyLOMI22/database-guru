@@ -8,6 +8,7 @@ import type {
   GeneratedScriptsResponse,
   DataMigrationPlanResponse,
   BackupScriptsResponse,
+  SchemaObjectFlags,
 } from '../types/migration';
 
 export const migrationAPI = {
@@ -17,12 +18,14 @@ export const migrationAPI = {
     targetId: number,
     save = false,
     name?: string,
+    flags?: SchemaObjectFlags,
   ): Promise<SchemaDiffResponse> {
     const { data } = await api.post<SchemaDiffResponse>('/api/migration/diff', {
       source_connection_id: sourceId,
       target_connection_id: targetId,
       save,
       name,
+      ...flags,
     });
     return data;
   },
@@ -58,10 +61,11 @@ export const migrationAPI = {
     projectId: number,
     targetDialect: string,
     enrichWithLlm = true,
+    flags?: SchemaObjectFlags,
   ): Promise<GeneratedScriptsResponse> {
     const { data } = await api.post<GeneratedScriptsResponse>(
       `/api/migration/projects/${projectId}/scripts`,
-      { target_dialect: targetDialect, enrich_with_llm: enrichWithLlm },
+      { target_dialect: targetDialect, enrich_with_llm: enrichWithLlm, ...flags },
     );
     return data;
   },
@@ -95,10 +99,12 @@ export const migrationAPI = {
   async generateBackupScripts(
     connectionId: number,
     dialect?: string,
+    flags?: SchemaObjectFlags,
   ): Promise<BackupScriptsResponse> {
     const { data } = await api.post<BackupScriptsResponse>('/api/migration/backup', {
       connection_id: connectionId,
       dialect: dialect || null,
+      ...flags,
     });
     return data;
   },

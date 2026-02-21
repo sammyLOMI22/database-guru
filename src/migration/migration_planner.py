@@ -29,6 +29,7 @@ class MigrationStep:
     description: str = ""
     sql_hint: Optional[str] = None
     table_name: Optional[str] = None
+    object_type: str = "table"  # "table" | "view" | "sequence" | "check_constraint" | "routine" | "trigger" | "enum"
     lock_type: str = "none"  # "none" | "row" | "table" | "exclusive"
     estimated_duration: str = "instant"  # "instant" | "seconds" | "minutes" | "hours"
     risk_level: str = "low"
@@ -320,6 +321,83 @@ class MigrationPlanner:
                     ))
                     step_num += 1
 
+        # Extended objects (dependency order: enums/sequences first, triggers last)
+        for ed in diff.enum_diffs:
+            steps.append(MigrationStep(
+                step_number=step_num,
+                action="ddl",
+                object_type="enum",
+                description=f"{ed.diff_type.title()} enum type '{ed.enum_name}'",
+                risk_level=ed.risk_level,
+                lock_type="none",
+                is_reversible=ed.diff_type != "removed",
+            ))
+            step_num += 1
+
+        for sd in diff.sequence_diffs:
+            steps.append(MigrationStep(
+                step_number=step_num,
+                action="ddl",
+                object_type="sequence",
+                description=f"{sd.diff_type.title()} sequence '{sd.sequence_name}'",
+                risk_level=sd.risk_level,
+                lock_type="none",
+                is_reversible=True,
+            ))
+            step_num += 1
+
+        for cd in diff.check_constraint_diffs:
+            steps.append(MigrationStep(
+                step_number=step_num,
+                action="ddl",
+                object_type="check_constraint",
+                description=f"{cd.diff_type.title()} check constraint '{cd.constraint_name}' on '{cd.table_name}'",
+                table_name=cd.table_name,
+                risk_level=cd.risk_level,
+                lock_type="table",
+                is_reversible=True,
+            ))
+            step_num += 1
+
+        for vd in diff.view_diffs:
+            steps.append(MigrationStep(
+                step_number=step_num,
+                action="ddl",
+                object_type="view",
+                description=f"{vd.diff_type.title()} view '{vd.view_name}'",
+                risk_level=vd.risk_level,
+                lock_type="none",
+                is_reversible=True,
+            ))
+            step_num += 1
+
+        for rd in diff.routine_diffs:
+            steps.append(MigrationStep(
+                step_number=step_num,
+                action="ddl",
+                object_type="routine",
+                description=f"{rd.diff_type.title()} {rd.routine_type} '{rd.routine_name}'",
+                risk_level=rd.risk_level,
+                lock_type="none",
+                is_reversible=True,
+                warnings=["Dialect-specific body — may need manual adaptation"] if rd.diff_type in ("added", "modified") else [],
+            ))
+            step_num += 1
+
+        for trd in diff.trigger_diffs:
+            steps.append(MigrationStep(
+                step_number=step_num,
+                action="ddl",
+                object_type="trigger",
+                description=f"{trd.diff_type.title()} trigger '{trd.trigger_name}' on '{trd.table_name}'",
+                table_name=trd.table_name,
+                risk_level=trd.risk_level,
+                lock_type="none",
+                is_reversible=True,
+                warnings=["Dialect-specific body — may need manual adaptation"] if trd.diff_type in ("added", "modified") else [],
+            ))
+            step_num += 1
+
         # Final verify step
         steps.append(MigrationStep(
             step_number=step_num,
@@ -360,6 +438,12 @@ class MigrationPlanner:
         total_changes = sum(
             len(td.column_diffs) + len(td.constraint_diffs)
             for td in diff.table_diffs
+        )
+        # Include extended object changes
+        total_changes += (
+            len(diff.view_diffs) + len(diff.sequence_diffs)
+            + len(diff.check_constraint_diffs) + len(diff.routine_diffs)
+            + len(diff.trigger_diffs) + len(diff.enum_diffs)
         )
         if diff.overall_risk == "critical" or total_changes > 20:
             return "high-risk"

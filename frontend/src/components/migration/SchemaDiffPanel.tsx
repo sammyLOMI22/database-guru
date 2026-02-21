@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Loader2, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { migrationAPI } from '../../services/migrationApi';
 import { connectionsAPI } from '../../services/api';
-import type { SchemaDiffResponse, TableDiff } from '../../types/migration';
+import { SchemaObjectToggles } from './SchemaObjectToggles';
+import type { SchemaDiffResponse, TableDiff, SchemaObjectFlags } from '../../types/migration';
 import type { DatabaseConnection } from '../../types/api';
 
 const RISK_COLORS: Record<string, string> = {
@@ -34,6 +35,7 @@ export function SchemaDiffPanel({ onProjectCreated }: Props) {
   const [diff, setDiff] = useState<SchemaDiffResponse | null>(null);
   const [error, setError] = useState('');
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
+  const [flags, setFlags] = useState<SchemaObjectFlags>({});
 
   useEffect(() => {
     connectionsAPI.listConnections().then((res) => {
@@ -52,6 +54,7 @@ export function SchemaDiffPanel({ onProjectCreated }: Props) {
         targetId as number,
         save,
         save ? (projectName || undefined) : undefined,
+        flags,
       );
       setDiff(result);
       if (save && result.project_id) {
@@ -110,6 +113,9 @@ export function SchemaDiffPanel({ onProjectCreated }: Props) {
           </select>
         </div>
       </div>
+
+      {/* Extended object toggles */}
+      <SchemaObjectToggles flags={flags} onChange={setFlags} />
 
       {/* Project name + actions */}
       <div className="flex items-end gap-3">
@@ -177,6 +183,14 @@ export function SchemaDiffPanel({ onProjectCreated }: Props) {
               onToggle={() => toggleTable(td.table_name)}
             />
           ))}
+
+          {/* Extended object diffs */}
+          <ExtendedDiffSection label="Views" diffs={diff.view_diffs} nameKey="view_name" />
+          <ExtendedDiffSection label="Sequences" diffs={diff.sequence_diffs} nameKey="sequence_name" />
+          <ExtendedDiffSection label="Check Constraints" diffs={diff.check_constraint_diffs} nameKey="constraint_name" />
+          <ExtendedDiffSection label="Routines" diffs={diff.routine_diffs} nameKey="routine_name" />
+          <ExtendedDiffSection label="Triggers" diffs={diff.trigger_diffs} nameKey="trigger_name" />
+          <ExtendedDiffSection label="Enums" diffs={diff.enum_diffs} nameKey="enum_name" />
         </div>
       )}
     </div>
@@ -261,6 +275,34 @@ function TableDiffCard({ tableDiff, expanded, onToggle }: {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function ExtendedDiffSection({ label, diffs, nameKey }: {
+  label: string;
+  diffs: Array<Record<string, any>>;
+  nameKey: string;
+}) {
+  if (!diffs || diffs.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+      <div className="px-4 py-3">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">{label}</p>
+        {diffs.map((d, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs py-1">
+            <span className={`font-bold ${DIFF_TYPE_COLORS[d.diff_type] || 'text-gray-600'}`}>
+              {d.diff_type}
+            </span>
+            <span className="font-mono text-gray-900 dark:text-white">{d[nameKey] || '?'}</span>
+            {d.table_name && <span className="text-gray-400">on {d.table_name}</span>}
+            <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${RISK_COLORS[d.risk_level] || RISK_COLORS.low}`}>
+              {d.risk_level}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

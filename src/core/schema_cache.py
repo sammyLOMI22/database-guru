@@ -84,6 +84,20 @@ class SchemaCache:
             col_names = sorted([col.get("name", "") for col in columns])
             fingerprint_parts.append(f"{table_name}:{','.join(col_names)}")
 
+        # Extended objects (only present when user opted in)
+        for view in sorted(schema_data.get("views", []), key=lambda v: v.get("name", "")):
+            fingerprint_parts.append(f"view:{view.get('name', '')}")
+        for seq in sorted(schema_data.get("sequences", []), key=lambda s: s.get("name", "")):
+            fingerprint_parts.append(f"seq:{seq.get('name', '')}")
+        for chk in sorted(schema_data.get("check_constraints", []), key=lambda c: c.get("constraint_name", "")):
+            fingerprint_parts.append(f"chk:{chk.get('table_name', '')}.{chk.get('constraint_name', '')}")
+        for routine in sorted(schema_data.get("routines", []), key=lambda r: r.get("name", "")):
+            fingerprint_parts.append(f"routine:{routine.get('name', '')}")
+        for trigger in sorted(schema_data.get("triggers", []), key=lambda t: t.get("name", "")):
+            fingerprint_parts.append(f"trigger:{trigger.get('name', '')}")
+        for enum in sorted(schema_data.get("enums", []), key=lambda e: e.get("name", "")):
+            fingerprint_parts.append(f"enum:{enum.get('name', '')}")
+
         fingerprint_data = "|".join(fingerprint_parts)
         return hashlib.sha256(fingerprint_data.encode()).hexdigest()[:16]
 
@@ -139,7 +153,8 @@ class SchemaCache:
         force_refresh: bool = False,
         include_samples: bool = True,
         ttl: Optional[int] = None,
-        validate_fingerprint: bool = True
+        validate_fingerprint: bool = True,
+        include_flags: Optional[Dict[str, bool]] = None,
     ) -> Dict[str, Any]:
         """
         Get database schema from cache or introspect if not cached
@@ -167,8 +182,11 @@ class SchemaCache:
             {"users": {"columns": [...], "primary_keys": [...]}}
         """
         cache = get_mapping_cache()
-        cache_key = f"schema:{connection_id}:{connection_name}"
-        fingerprint_key = f"schema_fp:{connection_id}:{connection_name}"
+        flags_suffix = ""
+        if include_flags:
+            flags_suffix = "|".join(sorted(k for k, v in include_flags.items() if v))
+        cache_key = f"schema:{connection_id}:{connection_name}:{flags_suffix}"
+        fingerprint_key = f"schema_fp:{connection_id}:{connection_name}:{flags_suffix}"
         ttl = ttl if ttl is not None else SchemaCache.DEFAULT_TTL
 
         # Try cache first (unless force refresh requested)
@@ -224,9 +242,15 @@ class SchemaCache:
 
         # Introspect schema (this is the expensive operation)
         schema_inspector = SchemaInspector()
+        extra_kwargs = {}
+        if include_flags:
+            for flag_name, flag_value in include_flags.items():
+                key = f"include_{flag_name}" if not flag_name.startswith("include_") else flag_name
+                extra_kwargs[key] = flag_value
         schema_data = await schema_inspector.get_full_schema(
             session=user_db_session,
-            include_samples=include_samples
+            include_samples=include_samples,
+            **extra_kwargs,
         )
 
         # Create and cache fingerprint

@@ -5,7 +5,7 @@ and data migration assistance.
 """
 
 import logging
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
@@ -67,9 +67,21 @@ async def _get_project(db: AsyncSession, project_id: int) -> MigrationProject:
     return project
 
 
+def _build_include_flags(request) -> Optional[Dict[str, bool]]:
+    """Extract include_* flags from a request into a dict for SchemaCache."""
+    flag_names = ["views", "sequences", "check_constraints", "routines", "triggers", "enums"]
+    flags = {}
+    for name in flag_names:
+        val = getattr(request, f"include_{name}", False)
+        if val:
+            flags[name] = True
+    return flags if flags else None
+
+
 async def _get_schema_for_connection(
     connection: DatabaseConnection,
     force_refresh: bool = True,
+    include_flags: Optional[Dict[str, bool]] = None,
 ) -> dict:
     """Get schema dict for a connection via SchemaCache."""
     async with UserDatabaseConnector.get_user_db_session(connection) as session:
@@ -79,6 +91,7 @@ async def _get_schema_for_connection(
             user_db_session=session,
             force_refresh=force_refresh,
             include_samples=False,
+            include_flags=include_flags,
         )
     return schema
 
@@ -100,8 +113,9 @@ async def compare_schemas(
         source_conn = await _get_connection(db, request.source_connection_id)
         target_conn = await _get_connection(db, request.target_connection_id)
 
-        source_schema = await _get_schema_for_connection(source_conn)
-        target_schema = await _get_schema_for_connection(target_conn)
+        include_flags = _build_include_flags(request)
+        source_schema = await _get_schema_for_connection(source_conn, include_flags=include_flags)
+        target_schema = await _get_schema_for_connection(target_conn, include_flags=include_flags)
 
         source_fp = SchemaCache.create_fingerprint_from_schema_dict(source_schema)
         target_fp = SchemaCache.create_fingerprint_from_schema_dict(target_schema)
@@ -452,7 +466,8 @@ async def generate_backup_scripts(
     """
     try:
         conn = await _get_connection(db, request.connection_id)
-        schema = await _get_schema_for_connection(conn)
+        include_flags = _build_include_flags(request)
+        schema = await _get_schema_for_connection(conn, include_flags=include_flags)
 
         target_dialect = request.dialect or conn.database_type or "postgresql"
 

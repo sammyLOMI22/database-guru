@@ -76,8 +76,8 @@ class BackupScriptGenerator:
         ordered = self._sort_tables_create_order(tables)
 
         backup_lines = self._generate_backup(ordered, tables, warnings, connection_name)
-        restore_lines = self._generate_restore(list(reversed(ordered)), tables)
-        verify_lines = self._generate_verify(ordered, tables)
+        restore_lines = self._generate_restore(list(reversed(ordered)), tables, schema)
+        verify_lines = self._generate_verify(ordered, tables, schema)
 
         return BackupScripts(
             connection_id=connection_id,
@@ -174,6 +174,9 @@ class BackupScriptGenerator:
             if index_lines:
                 lines.extend(index_lines)
 
+        # Extended objects (after tables)
+        lines.extend(self._generate_extended_backup(schema, warnings))
+
         if self.dialect == DatabaseDialect.MYSQL:
             lines += ["SET FOREIGN_KEY_CHECKS = 1;", ""]
         elif self.dialect == DatabaseDialect.MSSQL:
@@ -183,6 +186,96 @@ class BackupScriptGenerator:
                 "EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL';",
                 "",
             ]
+
+        return lines
+
+    def _generate_extended_backup(
+        self, schema: Dict[str, Any], warnings: List[str]
+    ) -> List[str]:
+        """Generate DDL for extended schema objects (views, sequences, etc.)."""
+        lines: List[str] = []
+        q = self._quote
+
+        # Enums (PostgreSQL only)
+        enums = schema.get("enums", [])
+        if enums:
+            lines.append("-- Enum types")
+            for e in enums:
+                vals = ", ".join(f"'{self._escape_literal(v)}'" for v in e.get("values", []))
+                lines.append(f"CREATE TYPE {q(e['name'])} AS ENUM ({vals});")
+            lines.append("")
+
+        # Sequences
+        sequences = schema.get("sequences", [])
+        if sequences:
+            lines.append("-- Sequences")
+            for s in sequences:
+                parts = [f"CREATE SEQUENCE {q(s['name'])}"]
+                if s.get("increment"):
+                    parts.append(f"  INCREMENT BY {s['increment']}")
+                if s.get("start_value"):
+                    parts.append(f"  START WITH {s['start_value']}")
+                if s.get("min_value") is not None:
+                    parts.append(f"  MINVALUE {s['min_value']}")
+                if s.get("max_value") is not None:
+                    parts.append(f"  MAXVALUE {s['max_value']}")
+                lines.append("\n".join(parts) + ";")
+            lines.append("")
+
+        # Check constraints
+        checks = schema.get("check_constraints", [])
+        if checks:
+            lines.append("-- Check constraints")
+            for c in checks:
+                defn = c.get("definition", "TRUE")
+                lines.append(
+                    f"ALTER TABLE {q(c['table_name'])} "
+                    f"ADD CONSTRAINT {q(c['constraint_name'])} CHECK ({defn});"
+                )
+            lines.append("")
+
+        # Views
+        views = schema.get("views", [])
+        if views:
+            lines.append("-- Views")
+            for v in views:
+                defn = v.get("definition")
+                if defn:
+                    lines.append(f"CREATE VIEW {q(v['name'])} AS {defn};")
+                else:
+                    lines.append(f"-- WARNING: No definition for view '{v['name']}'")
+                    warnings.append(f"View '{v['name']}': definition not available")
+            lines.append("")
+
+        # Routines (procedures/functions)
+        routines = schema.get("routines", [])
+        if routines:
+            lines.append("-- Stored procedures/functions")
+            lines.append("-- NOTE: Dialect-specific bodies — may need manual adaptation")
+            for r in routines:
+                defn = r.get("definition")
+                if defn:
+                    lines.append(f"-- {r.get('type', 'function').upper()}: {r['name']}")
+                    lines.append(defn.rstrip(";") + ";")
+                else:
+                    lines.append(f"-- WARNING: No definition for {r.get('type', 'routine')} '{r['name']}'")
+                    warnings.append(f"Routine '{r['name']}': definition not available")
+            lines.append("")
+
+        # Triggers
+        triggers = schema.get("triggers", [])
+        if triggers:
+            lines.append("-- Triggers")
+            lines.append("-- NOTE: Dialect-specific bodies — may need manual adaptation")
+            for t in triggers:
+                defn = t.get("definition")
+                if defn:
+                    lines.append(f"-- TRIGGER: {t['name']} on {t.get('table_name', '?')}")
+                    lines.append(defn.rstrip(";") + ";")
+                else:
+                    lines.append(f"-- WARNING: No definition for trigger '{t['name']}'")
+                    warnings.append(f"Trigger '{t['name']}': definition not available")
+            lines.append("")
 
         return lines
 
@@ -283,6 +376,7 @@ class BackupScriptGenerator:
         self,
         reverse_ordered: List[str],
         tables: Dict[str, Any],
+        schema: Optional[Dict[str, Any]] = None,
     ) -> List[str]:
         """Generate DROP TABLE script for pre-restore cleanup (children first)."""
         now = datetime.now(timezone.utc).isoformat()
@@ -315,6 +409,10 @@ class BackupScriptGenerator:
                 "",
             ]
 
+        # Drop extended objects in reverse order (triggers → routines → views → constraints → sequences → enums)
+        if schema:
+            lines.extend(self._generate_extended_restore(schema))
+
         for table_name in reverse_ordered:
             if self.dialect == DatabaseDialect.ORACLE:
                 lines += [
@@ -340,6 +438,71 @@ class BackupScriptGenerator:
 
         return lines
 
+    def _generate_extended_restore(self, schema: Dict[str, Any]) -> List[str]:
+        """Generate DROP statements for extended objects in reverse dependency order."""
+        lines: List[str] = []
+        q = self._quote
+
+        # Triggers first
+        for t in schema.get("triggers", []):
+            name = t["name"]
+            if self.dialect == DatabaseDialect.ORACLE:
+                lines.append(f"BEGIN EXECUTE IMMEDIATE 'DROP TRIGGER {q(name)}'; EXCEPTION WHEN OTHERS THEN NULL; END;")
+                lines.append("/")
+            elif self.dialect == DatabaseDialect.MYSQL:
+                lines.append(f"DROP TRIGGER IF EXISTS {q(name)};")
+            else:
+                tbl = t.get("table_name", "")
+                if tbl:
+                    lines.append(f"DROP TRIGGER IF EXISTS {q(name)} ON {q(tbl)};")
+                else:
+                    lines.append(f"DROP TRIGGER IF EXISTS {q(name)};")
+
+        # Routines
+        for r in schema.get("routines", []):
+            name = r["name"]
+            rtype = "PROCEDURE" if r.get("type") == "procedure" else "FUNCTION"
+            if self.dialect == DatabaseDialect.ORACLE:
+                lines.append(f"BEGIN EXECUTE IMMEDIATE 'DROP {rtype} {q(name)}'; EXCEPTION WHEN OTHERS THEN NULL; END;")
+                lines.append("/")
+            else:
+                lines.append(f"DROP {rtype} IF EXISTS {q(name)};")
+
+        # Views
+        for v in schema.get("views", []):
+            name = v["name"]
+            if self.dialect == DatabaseDialect.ORACLE:
+                lines.append(f"BEGIN EXECUTE IMMEDIATE 'DROP VIEW {q(name)}'; EXCEPTION WHEN OTHERS THEN NULL; END;")
+                lines.append("/")
+            else:
+                lines.append(f"DROP VIEW IF EXISTS {q(name)};")
+
+        # Check constraints
+        for c in schema.get("check_constraints", []):
+            tbl = c["table_name"]
+            cname = c["constraint_name"]
+            lines.append(f"ALTER TABLE {q(tbl)} DROP CONSTRAINT IF EXISTS {q(cname)};")
+
+        # Sequences
+        for s in schema.get("sequences", []):
+            name = s["name"]
+            if self.dialect == DatabaseDialect.ORACLE:
+                lines.append(f"BEGIN EXECUTE IMMEDIATE 'DROP SEQUENCE {q(name)}'; EXCEPTION WHEN OTHERS THEN NULL; END;")
+                lines.append("/")
+            else:
+                lines.append(f"DROP SEQUENCE IF EXISTS {q(name)};")
+
+        # Enums
+        for e in schema.get("enums", []):
+            name = e["name"]
+            lines.append(f"DROP TYPE IF EXISTS {q(name)};")
+
+        if lines:
+            lines.insert(0, "-- Drop extended objects")
+            lines.append("")
+
+        return lines
+
     # ------------------------------------------------------------------
     # verify.sql
     # ------------------------------------------------------------------
@@ -348,6 +511,7 @@ class BackupScriptGenerator:
         self,
         ordered_tables: List[str],
         tables: Dict[str, Any],
+        schema: Optional[Dict[str, Any]] = None,
     ) -> List[str]:
         """Generate verification queries to confirm the backup schema is intact."""
         now = datetime.now(timezone.utc).isoformat()
@@ -391,6 +555,48 @@ class BackupScriptGenerator:
                 lines.append(f"SELECT COUNT(*) AS row_count FROM {self._quote(table_name)};")
 
             lines.append("")
+
+        # Verify extended objects
+        if schema:
+            q = self._quote
+            views = schema.get("views", [])
+            if views:
+                lines.append("-- Verify views")
+                for v in views:
+                    safe = self._escape_literal(v["name"])
+                    if self.dialect in (DatabaseDialect.POSTGRESQL, DatabaseDialect.MYSQL, DatabaseDialect.MSSQL):
+                        lines.append(f"SELECT COUNT(*) AS view_exists FROM information_schema.views WHERE table_name = '{safe}';")
+                    elif self.dialect == DatabaseDialect.SQLITE:
+                        lines.append(f"SELECT COUNT(*) AS view_exists FROM sqlite_master WHERE type='view' AND name='{safe}';")
+                    elif self.dialect == DatabaseDialect.ORACLE:
+                        lines.append(f"SELECT COUNT(*) AS view_exists FROM user_views WHERE view_name = UPPER('{safe}');")
+                lines.append("")
+
+            sequences = schema.get("sequences", [])
+            if sequences:
+                lines.append("-- Verify sequences")
+                for s in sequences:
+                    safe = self._escape_literal(s["name"])
+                    if self.dialect == DatabaseDialect.POSTGRESQL:
+                        lines.append(f"SELECT COUNT(*) AS seq_exists FROM pg_sequences WHERE sequencename = '{safe}';")
+                    elif self.dialect == DatabaseDialect.MSSQL:
+                        lines.append(f"SELECT COUNT(*) AS seq_exists FROM sys.sequences WHERE name = '{safe}';")
+                    elif self.dialect == DatabaseDialect.ORACLE:
+                        lines.append(f"SELECT COUNT(*) AS seq_exists FROM user_sequences WHERE sequence_name = UPPER('{safe}');")
+                lines.append("")
+
+            routines = schema.get("routines", [])
+            if routines:
+                lines.append("-- Verify routines")
+                for r in routines:
+                    safe = self._escape_literal(r["name"])
+                    if self.dialect in (DatabaseDialect.POSTGRESQL, DatabaseDialect.MYSQL):
+                        lines.append(f"SELECT COUNT(*) AS routine_exists FROM information_schema.routines WHERE routine_name = '{safe}';")
+                    elif self.dialect == DatabaseDialect.MSSQL:
+                        lines.append(f"SELECT CASE WHEN OBJECT_ID(N'{safe}') IS NOT NULL THEN 1 ELSE 0 END AS routine_exists;")
+                    elif self.dialect == DatabaseDialect.ORACLE:
+                        lines.append(f"SELECT COUNT(*) AS routine_exists FROM user_objects WHERE object_name = UPPER('{safe}') AND object_type IN ('PROCEDURE','FUNCTION');")
+                lines.append("")
 
         return lines
 

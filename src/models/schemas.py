@@ -1249,6 +1249,12 @@ class SchemaDiffRequest(BaseModel):
     target_connection_id: int = Field(..., description="Target database connection ID")
     name: Optional[str] = Field(None, description="Project name (required if saving)")
     save: bool = Field(False, description="Whether to save as a MigrationProject")
+    include_views: bool = Field(False, description="Include views in comparison")
+    include_sequences: bool = Field(False, description="Include sequences in comparison")
+    include_check_constraints: bool = Field(False, description="Include check constraints in comparison")
+    include_routines: bool = Field(False, description="Include stored procedures/functions in comparison")
+    include_triggers: bool = Field(False, description="Include triggers in comparison")
+    include_enums: bool = Field(False, description="Include enum types in comparison")
 
     @model_validator(mode="after")
     def source_and_target_must_differ(self) -> "SchemaDiffRequest":
@@ -1290,6 +1296,12 @@ class SchemaDiffResponse(BaseModel):
     source_fingerprint: str = ""
     target_fingerprint: str = ""
     table_diffs: List[TableDiffSchema] = Field(default_factory=list)
+    view_diffs: List[Dict[str, Any]] = Field(default_factory=list)
+    sequence_diffs: List[Dict[str, Any]] = Field(default_factory=list)
+    check_constraint_diffs: List[Dict[str, Any]] = Field(default_factory=list)
+    routine_diffs: List[Dict[str, Any]] = Field(default_factory=list)
+    trigger_diffs: List[Dict[str, Any]] = Field(default_factory=list)
+    enum_diffs: List[Dict[str, Any]] = Field(default_factory=list)
     total_breaking_changes: int = 0
     total_safe_changes: int = 0
     overall_risk: str = "none"
@@ -1332,6 +1344,7 @@ class MigrationToolkitStepSchema(BaseModel):
     description: str
     sql_hint: Optional[str] = None
     table_name: Optional[str] = None
+    object_type: str = "table"
     lock_type: str = "none"
     estimated_duration: str = "instant"
     risk_level: str = "low"
@@ -1361,6 +1374,12 @@ class GenerateScriptsRequest(BaseModel):
         pattern=r"^(postgresql|mysql|sqlite|mssql|oracle|duckdb)$",
     )
     enrich_with_llm: bool = Field(True, description="Use LLM for complex USING clauses")
+    include_views: bool = Field(False, description="Include views in scripts")
+    include_sequences: bool = Field(False, description="Include sequences in scripts")
+    include_check_constraints: bool = Field(False, description="Include check constraints in scripts")
+    include_routines: bool = Field(False, description="Include stored procedures/functions in scripts")
+    include_triggers: bool = Field(False, description="Include triggers in scripts")
+    include_enums: bool = Field(False, description="Include enum types in scripts")
 
 
 class GeneratedScriptsResponse(BaseModel):
@@ -1382,6 +1401,12 @@ class BackupScriptRequest(BaseModel):
         description="Target dialect (defaults to the connection's database_type)",
         pattern=r"^(postgresql|mysql|sqlite|mssql|oracle|duckdb)?$",
     )
+    include_views: bool = Field(False, description="Include views in backup")
+    include_sequences: bool = Field(False, description="Include sequences in backup")
+    include_check_constraints: bool = Field(False, description="Include check constraints in backup")
+    include_routines: bool = Field(False, description="Include stored procedures/functions in backup")
+    include_triggers: bool = Field(False, description="Include triggers in backup")
+    include_enums: bool = Field(False, description="Include enum types in backup")
 
 
 class BackupScriptResponse(BaseModel):

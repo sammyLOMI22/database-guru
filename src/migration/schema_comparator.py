@@ -183,6 +183,87 @@ class ConstraintDiff:
 
 
 @dataclass
+class ViewDiff:
+    """Represents a view-level change."""
+    view_name: str
+    diff_type: str  # "added" | "removed" | "modified"
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "low"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class SequenceDiff:
+    """Represents a sequence-level change."""
+    sequence_name: str
+    diff_type: str  # "added" | "removed" | "modified"
+    source_state: Optional[Dict[str, Any]] = None
+    target_state: Optional[Dict[str, Any]] = None
+    risk_level: str = "low"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class CheckConstraintDiff:
+    """Represents a check constraint change."""
+    table_name: str
+    constraint_name: str
+    diff_type: str  # "added" | "removed" | "modified"
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "low"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class RoutineDiff:
+    """Represents a stored procedure/function change."""
+    routine_name: str
+    routine_type: str  # "procedure" | "function"
+    diff_type: str  # "added" | "removed" | "modified"
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "medium"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class TriggerDiff:
+    """Represents a trigger change."""
+    trigger_name: str
+    table_name: str
+    diff_type: str  # "added" | "removed" | "modified"
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "medium"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class EnumDiff:
+    """Represents a PostgreSQL enum type change."""
+    enum_name: str
+    diff_type: str  # "added" | "removed" | "modified"
+    source_values: Optional[List[str]] = None
+    target_values: Optional[List[str]] = None
+    risk_level: str = "low"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class TableDiff:
     """Represents all changes to a single table."""
     table_name: str
@@ -234,6 +315,12 @@ class SchemaDiff:
     source_fingerprint: str = ""
     target_fingerprint: str = ""
     table_diffs: List[TableDiff] = field(default_factory=list)
+    view_diffs: List[ViewDiff] = field(default_factory=list)
+    sequence_diffs: List[SequenceDiff] = field(default_factory=list)
+    check_constraint_diffs: List[CheckConstraintDiff] = field(default_factory=list)
+    routine_diffs: List[RoutineDiff] = field(default_factory=list)
+    trigger_diffs: List[TriggerDiff] = field(default_factory=list)
+    enum_diffs: List[EnumDiff] = field(default_factory=list)
     total_breaking_changes: int = 0
     total_safe_changes: int = 0
     overall_risk: str = "low"
@@ -251,6 +338,12 @@ class SchemaDiff:
             "source_fingerprint": self.source_fingerprint,
             "target_fingerprint": self.target_fingerprint,
             "table_diffs": [t.to_dict() for t in self.table_diffs],
+            "view_diffs": [d.to_dict() for d in self.view_diffs],
+            "sequence_diffs": [d.to_dict() for d in self.sequence_diffs],
+            "check_constraint_diffs": [d.to_dict() for d in self.check_constraint_diffs],
+            "routine_diffs": [d.to_dict() for d in self.routine_diffs],
+            "trigger_diffs": [d.to_dict() for d in self.trigger_diffs],
+            "enum_diffs": [d.to_dict() for d in self.enum_diffs],
             "total_breaking_changes": self.total_breaking_changes,
             "total_safe_changes": self.total_safe_changes,
             "overall_risk": self.overall_risk,
@@ -277,12 +370,25 @@ class SchemaDiff:
                 td.risk_level = td_dict["risk_level"]
             table_diffs.append(td)
 
+        view_diffs = [ViewDiff(**d) for d in data.get("view_diffs", [])]
+        sequence_diffs = [SequenceDiff(**d) for d in data.get("sequence_diffs", [])]
+        check_constraint_diffs = [CheckConstraintDiff(**d) for d in data.get("check_constraint_diffs", [])]
+        routine_diffs = [RoutineDiff(**d) for d in data.get("routine_diffs", [])]
+        trigger_diffs = [TriggerDiff(**d) for d in data.get("trigger_diffs", [])]
+        enum_diffs = [EnumDiff(**d) for d in data.get("enum_diffs", [])]
+
         return cls(
             source_connection_id=data.get("source_connection_id"),
             target_connection_id=data.get("target_connection_id"),
             source_fingerprint=data.get("source_fingerprint", ""),
             target_fingerprint=data.get("target_fingerprint", ""),
             table_diffs=table_diffs,
+            view_diffs=view_diffs,
+            sequence_diffs=sequence_diffs,
+            check_constraint_diffs=check_constraint_diffs,
+            routine_diffs=routine_diffs,
+            trigger_diffs=trigger_diffs,
+            enum_diffs=enum_diffs,
             total_breaking_changes=data.get("total_breaking_changes", 0),
             total_safe_changes=data.get("total_safe_changes", 0),
             overall_risk=data.get("overall_risk", "low"),
@@ -368,6 +474,14 @@ class SchemaComparator:
                     constraint_diffs=constraint_diffs,
                 ))
 
+        # Compare extended objects
+        view_diffs = self._compare_views(source_schema, target_schema)
+        sequence_diffs = self._compare_sequences(source_schema, target_schema)
+        check_constraint_diffs = self._compare_check_constraints(source_schema, target_schema)
+        routine_diffs = self._compare_routines(source_schema, target_schema)
+        trigger_diffs = self._compare_triggers(source_schema, target_schema)
+        enum_diffs = self._compare_enums(source_schema, target_schema)
+
         # Compute summary stats
         breaking = 0
         safe = 0
@@ -383,7 +497,21 @@ class SchemaComparator:
                 else:
                     safe += 1
 
-        all_risks = [td.risk_level for td in table_diffs]
+        # Count extended object diffs
+        all_extended_diffs = (
+            view_diffs + sequence_diffs + check_constraint_diffs
+            + routine_diffs + trigger_diffs + enum_diffs
+        )
+        for ed in all_extended_diffs:
+            if _RISK_ORDER.get(ed.risk_level, 0) >= 2:
+                breaking += 1
+            else:
+                safe += 1
+
+        all_risks = (
+            [td.risk_level for td in table_diffs]
+            + [d.risk_level for d in all_extended_diffs]
+        )
         overall = _max_risk(all_risks) if all_risks else "low"
 
         added = sum(1 for t in table_diffs if t.diff_type == "added")
@@ -397,7 +525,20 @@ class SchemaComparator:
             parts.append(f"{removed} table{'s' if removed != 1 else ''} removed")
         if modified:
             parts.append(f"{modified} table{'s' if modified != 1 else ''} modified")
+
+        # Summarize extended object changes
+        ext_counts = {
+            "view": len(view_diffs), "sequence": len(sequence_diffs),
+            "check constraint": len(check_constraint_diffs),
+            "routine": len(routine_diffs), "trigger": len(trigger_diffs),
+            "enum": len(enum_diffs),
+        }
+        for obj_type, count in ext_counts.items():
+            if count:
+                parts.append(f"{count} {obj_type}{'s' if count != 1 else ''} changed")
+
         summary = ", ".join(parts) if parts else "No differences found"
+        has_any_diff = table_diffs or all_extended_diffs
 
         diff = SchemaDiff(
             source_connection_id=source_connection_id,
@@ -405,9 +546,15 @@ class SchemaComparator:
             source_fingerprint=source_fingerprint,
             target_fingerprint=target_fingerprint,
             table_diffs=table_diffs,
+            view_diffs=view_diffs,
+            sequence_diffs=sequence_diffs,
+            check_constraint_diffs=check_constraint_diffs,
+            routine_diffs=routine_diffs,
+            trigger_diffs=trigger_diffs,
+            enum_diffs=enum_diffs,
             total_breaking_changes=breaking,
             total_safe_changes=safe,
-            overall_risk=overall if table_diffs else "none",
+            overall_risk=overall if has_any_diff else "none",
             diff_summary=summary,
         )
 
@@ -565,6 +712,185 @@ class SchemaComparator:
                 risk_level="low",
             ))
 
+        return diffs
+
+    @staticmethod
+    def _normalize_definition(defn: Optional[str]) -> str:
+        """Normalize a SQL definition for comparison (collapse whitespace)."""
+        if not defn:
+            return ""
+        return " ".join(defn.split()).strip().lower()
+
+    def _compare_views(
+        self, source: Dict[str, Any], target: Dict[str, Any]
+    ) -> List[ViewDiff]:
+        src_views = {v["name"]: v for v in source.get("views", [])}
+        tgt_views = {v["name"]: v for v in target.get("views", [])}
+        diffs: List[ViewDiff] = []
+
+        for name in sorted(set(tgt_views) - set(src_views)):
+            diffs.append(ViewDiff(view_name=name, diff_type="added",
+                                  target_definition=tgt_views[name].get("definition")))
+        for name in sorted(set(src_views) - set(tgt_views)):
+            diffs.append(ViewDiff(view_name=name, diff_type="removed",
+                                  source_definition=src_views[name].get("definition")))
+        for name in sorted(set(src_views) & set(tgt_views)):
+            src_def = self._normalize_definition(src_views[name].get("definition"))
+            tgt_def = self._normalize_definition(tgt_views[name].get("definition"))
+            if src_def != tgt_def:
+                diffs.append(ViewDiff(
+                    view_name=name, diff_type="modified",
+                    source_definition=src_views[name].get("definition"),
+                    target_definition=tgt_views[name].get("definition"),
+                ))
+        return diffs
+
+    def _compare_sequences(
+        self, source: Dict[str, Any], target: Dict[str, Any]
+    ) -> List[SequenceDiff]:
+        src_seqs = {s["name"]: s for s in source.get("sequences", [])}
+        tgt_seqs = {s["name"]: s for s in target.get("sequences", [])}
+        diffs: List[SequenceDiff] = []
+
+        for name in sorted(set(tgt_seqs) - set(src_seqs)):
+            diffs.append(SequenceDiff(sequence_name=name, diff_type="added",
+                                      target_state=tgt_seqs[name]))
+        for name in sorted(set(src_seqs) - set(tgt_seqs)):
+            diffs.append(SequenceDiff(sequence_name=name, diff_type="removed",
+                                      source_state=src_seqs[name]))
+        for name in sorted(set(src_seqs) & set(tgt_seqs)):
+            s, t = src_seqs[name], tgt_seqs[name]
+            compare_keys = ("data_type", "start_value", "increment", "min_value", "max_value")
+            if any(str(s.get(k)) != str(t.get(k)) for k in compare_keys):
+                diffs.append(SequenceDiff(
+                    sequence_name=name, diff_type="modified",
+                    source_state=s, target_state=t,
+                ))
+        return diffs
+
+    def _compare_check_constraints(
+        self, source: Dict[str, Any], target: Dict[str, Any]
+    ) -> List[CheckConstraintDiff]:
+        src_chks = {(c["table_name"], c["constraint_name"]): c
+                    for c in source.get("check_constraints", [])}
+        tgt_chks = {(c["table_name"], c["constraint_name"]): c
+                    for c in target.get("check_constraints", [])}
+        diffs: List[CheckConstraintDiff] = []
+
+        for key in sorted(set(tgt_chks) - set(src_chks)):
+            c = tgt_chks[key]
+            diffs.append(CheckConstraintDiff(
+                table_name=key[0], constraint_name=key[1], diff_type="added",
+                target_definition=c.get("definition"),
+            ))
+        for key in sorted(set(src_chks) - set(tgt_chks)):
+            c = src_chks[key]
+            diffs.append(CheckConstraintDiff(
+                table_name=key[0], constraint_name=key[1], diff_type="removed",
+                source_definition=c.get("definition"),
+            ))
+        for key in sorted(set(src_chks) & set(tgt_chks)):
+            s_def = self._normalize_definition(src_chks[key].get("definition"))
+            t_def = self._normalize_definition(tgt_chks[key].get("definition"))
+            if s_def != t_def:
+                diffs.append(CheckConstraintDiff(
+                    table_name=key[0], constraint_name=key[1], diff_type="modified",
+                    source_definition=src_chks[key].get("definition"),
+                    target_definition=tgt_chks[key].get("definition"),
+                ))
+        return diffs
+
+    def _compare_routines(
+        self, source: Dict[str, Any], target: Dict[str, Any]
+    ) -> List[RoutineDiff]:
+        src_routines = {r["name"]: r for r in source.get("routines", [])}
+        tgt_routines = {r["name"]: r for r in target.get("routines", [])}
+        diffs: List[RoutineDiff] = []
+
+        for name in sorted(set(tgt_routines) - set(src_routines)):
+            r = tgt_routines[name]
+            diffs.append(RoutineDiff(
+                routine_name=name, routine_type=r.get("type", "function"),
+                diff_type="added", target_definition=r.get("definition"),
+            ))
+        for name in sorted(set(src_routines) - set(tgt_routines)):
+            r = src_routines[name]
+            diffs.append(RoutineDiff(
+                routine_name=name, routine_type=r.get("type", "function"),
+                diff_type="removed", source_definition=r.get("definition"),
+            ))
+        for name in sorted(set(src_routines) & set(tgt_routines)):
+            s, t = src_routines[name], tgt_routines[name]
+            s_def = self._normalize_definition(s.get("definition"))
+            t_def = self._normalize_definition(t.get("definition"))
+            if s_def != t_def:
+                diffs.append(RoutineDiff(
+                    routine_name=name,
+                    routine_type=t.get("type", s.get("type", "function")),
+                    diff_type="modified",
+                    source_definition=s.get("definition"),
+                    target_definition=t.get("definition"),
+                ))
+        return diffs
+
+    def _compare_triggers(
+        self, source: Dict[str, Any], target: Dict[str, Any]
+    ) -> List[TriggerDiff]:
+        src_triggers = {t["name"]: t for t in source.get("triggers", [])}
+        tgt_triggers = {t["name"]: t for t in target.get("triggers", [])}
+        diffs: List[TriggerDiff] = []
+
+        for name in sorted(set(tgt_triggers) - set(src_triggers)):
+            t = tgt_triggers[name]
+            diffs.append(TriggerDiff(
+                trigger_name=name, table_name=t.get("table_name", ""),
+                diff_type="added", target_definition=t.get("definition"),
+            ))
+        for name in sorted(set(src_triggers) - set(tgt_triggers)):
+            t = src_triggers[name]
+            diffs.append(TriggerDiff(
+                trigger_name=name, table_name=t.get("table_name", ""),
+                diff_type="removed", source_definition=t.get("definition"),
+            ))
+        for name in sorted(set(src_triggers) & set(tgt_triggers)):
+            s, t = src_triggers[name], tgt_triggers[name]
+            s_def = self._normalize_definition(s.get("definition"))
+            t_def = self._normalize_definition(t.get("definition"))
+            if s_def != t_def:
+                diffs.append(TriggerDiff(
+                    trigger_name=name,
+                    table_name=t.get("table_name", s.get("table_name", "")),
+                    diff_type="modified",
+                    source_definition=s.get("definition"),
+                    target_definition=t.get("definition"),
+                ))
+        return diffs
+
+    def _compare_enums(
+        self, source: Dict[str, Any], target: Dict[str, Any]
+    ) -> List[EnumDiff]:
+        src_enums = {e["name"]: e for e in source.get("enums", [])}
+        tgt_enums = {e["name"]: e for e in target.get("enums", [])}
+        diffs: List[EnumDiff] = []
+
+        for name in sorted(set(tgt_enums) - set(src_enums)):
+            diffs.append(EnumDiff(enum_name=name, diff_type="added",
+                                  target_values=tgt_enums[name].get("values", [])))
+        for name in sorted(set(src_enums) - set(tgt_enums)):
+            diffs.append(EnumDiff(enum_name=name, diff_type="removed",
+                                  source_values=src_enums[name].get("values", [])))
+        for name in sorted(set(src_enums) & set(tgt_enums)):
+            s_vals = src_enums[name].get("values", [])
+            t_vals = tgt_enums[name].get("values", [])
+            if s_vals != t_vals:
+                # Removing values from an enum is risky
+                removed_vals = set(s_vals) - set(t_vals)
+                risk = "high" if removed_vals else "low"
+                diffs.append(EnumDiff(
+                    enum_name=name, diff_type="modified",
+                    source_values=s_vals, target_values=t_vals,
+                    risk_level=risk,
+                ))
         return diffs
 
     @staticmethod

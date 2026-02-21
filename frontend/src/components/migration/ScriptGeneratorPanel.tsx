@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Loader2, Copy, Check, Download, AlertTriangle } from 'lucide-react';
 import { migrationAPI } from '../../services/migrationApi';
-import type { MigrationProjectDetail, GeneratedScriptsResponse } from '../../types/migration';
+import { SchemaObjectToggles } from './SchemaObjectToggles';
+import type { MigrationProjectDetail, GeneratedScriptsResponse, SchemaObjectFlags } from '../../types/migration';
 
 const DIALECTS = [
   { value: 'postgresql', label: 'PostgreSQL' },
@@ -23,6 +24,7 @@ export function ScriptGeneratorPanel({ project, onRefresh }: Props) {
   const [dialect, setDialect] = useState(project.target_dialect || 'postgresql');
   const [activeScript, setActiveScript] = useState<ScriptTab>('up');
   const [copied, setCopied] = useState(false);
+  const [flags, setFlags] = useState<SchemaObjectFlags>({});
 
   useEffect(() => {
     if (project.up_sql) {
@@ -34,7 +36,7 @@ export function ScriptGeneratorPanel({ project, onRefresh }: Props) {
     setLoading(true);
     setError('');
     try {
-      const result = await migrationAPI.generateScripts(project.id, dialect);
+      const result = await migrationAPI.generateScripts(project.id, dialect, true, flags);
       setScripts(result);
       onRefresh();
     } catch (err: any) {
@@ -93,6 +95,9 @@ export function ScriptGeneratorPanel({ project, onRefresh }: Props) {
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : scripts ? 'Regenerate' : 'Generate Scripts'}
         </button>
       </div>
+
+      {/* Extended object toggles */}
+      <SchemaObjectToggles flags={flags} onChange={setFlags} dialect={dialect} />
 
       {error && (
         <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">

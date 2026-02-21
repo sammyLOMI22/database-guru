@@ -10,6 +10,16 @@ from src.core.column_semantics import ColumnSemanticsDetector, ColumnSemanticTyp
 
 logger = logging.getLogger(__name__)
 
+# Which extended object types each dialect supports
+DIALECT_CAPABILITIES: Dict[str, Dict[str, bool]] = {
+    "sqlite":     {"views": True,  "sequences": False, "check_constraints": False, "routines": False, "triggers": True,  "enums": False},
+    "postgresql": {"views": True,  "sequences": True,  "check_constraints": True,  "routines": True,  "triggers": True,  "enums": True},
+    "mysql":      {"views": True,  "sequences": False, "check_constraints": True,  "routines": True,  "triggers": True,  "enums": False},
+    "mssql":      {"views": True,  "sequences": True,  "check_constraints": True,  "routines": True,  "triggers": True,  "enums": False},
+    "oracle":     {"views": True,  "sequences": True,  "check_constraints": True,  "routines": True,  "triggers": True,  "enums": False},
+    "duckdb":     {"views": True,  "sequences": True,  "check_constraints": False, "routines": False, "triggers": False, "enums": False},
+}
+
 
 class SchemaInspector:
     """
@@ -88,6 +98,12 @@ class SchemaInspector:
         session: AsyncSession,
         schema_name: Optional[str] = None,
         include_samples: bool = True,
+        include_views: bool = False,
+        include_sequences: bool = False,
+        include_check_constraints: bool = False,
+        include_routines: bool = False,
+        include_triggers: bool = False,
+        include_enums: bool = False,
     ) -> Dict[str, Any]:
         """
         Get complete database schema information
@@ -96,6 +112,12 @@ class SchemaInspector:
             session: Database session
             schema_name: Schema name (None for default)
             include_samples: Whether to include sample values for key columns (state, status, type, etc.)
+            include_views: Include database views
+            include_sequences: Include sequences
+            include_check_constraints: Include check constraints
+            include_routines: Include stored procedures and functions
+            include_triggers: Include triggers
+            include_enums: Include enum types (PostgreSQL only)
 
         Returns:
             Dictionary with tables, columns, relationships, indexes, and sample values
@@ -202,6 +224,34 @@ class SchemaInspector:
                         )
                 # Update foreign_keys to only include valid ones
                 table_info["foreign_keys"] = valid_fks
+
+            # Extended objects — only fetched when explicitly requested
+            db_name = session.bind.dialect.name if session.bind else "unknown"
+            caps = DIALECT_CAPABILITIES.get(db_name, {})
+
+            if include_views and caps.get("views"):
+                schema["views"] = await self.get_views(session, schema_name)
+                schema["summary"]["view_count"] = len(schema["views"])
+
+            if include_sequences and caps.get("sequences"):
+                schema["sequences"] = await self.get_sequences(session, schema_name)
+                schema["summary"]["sequence_count"] = len(schema["sequences"])
+
+            if include_check_constraints and caps.get("check_constraints"):
+                schema["check_constraints"] = await self.get_check_constraints(session, schema_name)
+                schema["summary"]["check_constraint_count"] = len(schema["check_constraints"])
+
+            if include_routines and caps.get("routines"):
+                schema["routines"] = await self.get_routines(session, schema_name)
+                schema["summary"]["routine_count"] = len(schema["routines"])
+
+            if include_triggers and caps.get("triggers"):
+                schema["triggers"] = await self.get_triggers(session, schema_name)
+                schema["summary"]["trigger_count"] = len(schema["triggers"])
+
+            if include_enums and caps.get("enums"):
+                schema["enums"] = await self.get_enums(session, schema_name)
+                schema["summary"]["enum_count"] = len(schema["enums"])
 
             return schema
 
@@ -686,6 +736,454 @@ class SchemaInspector:
 
         except Exception as e:
             logger.debug(f"Error getting indexes for {table_name}: {e}")
+            return []
+
+    # ========================================================================
+    # EXTENDED OBJECT INTROSPECTION (Phase 20 — optional, user-toggled)
+    # ========================================================================
+
+    async def get_views(
+        self,
+        session: AsyncSession,
+        schema_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get database views with their definitions."""
+        try:
+            db_name = session.bind.dialect.name if session.bind else "unknown"
+
+            if db_name == "sqlite":
+                query = text("SELECT name, sql FROM sqlite_master WHERE type='view' ORDER BY name")
+                result = await self._execute_query(session, query)
+                return [{"name": row[0], "definition": row[1] or ""} for row in result.all()]
+
+            elif db_name == "duckdb":
+                query = text("""
+                    SELECT table_name, sql
+                    FROM duckdb_views()
+                    WHERE schema_name NOT IN ('information_schema', 'pg_catalog')
+                    ORDER BY table_name
+                """)
+                result = await self._execute_query(session, query)
+                return [{"name": row[0], "definition": row[1] or ""} for row in result.all()]
+
+            elif db_name == "mysql":
+                query = text("""
+                    SELECT table_name, view_definition
+                    FROM information_schema.views
+                    WHERE table_schema = DATABASE()
+                    ORDER BY table_name
+                """)
+                result = await self._execute_query(session, query)
+                return [{"name": row[0], "definition": row[1] or ""} for row in result.all()]
+
+            elif db_name == "mssql":
+                query = text("""
+                    SELECT name, OBJECT_DEFINITION(object_id) AS definition
+                    FROM sys.views
+                    ORDER BY name
+                """)
+                result = await self._execute_query(session, query)
+                return [{"name": row[0], "definition": row[1] or ""} for row in result.all()]
+
+            elif db_name == "oracle":
+                query = text("SELECT view_name, text FROM user_views ORDER BY view_name")
+                result = await self._execute_query(session, query)
+                return [{"name": row[0], "definition": row[1] or ""} for row in result.all()]
+
+            else:
+                # PostgreSQL
+                query = text("""
+                    SELECT viewname, definition
+                    FROM pg_views
+                    WHERE schemaname = COALESCE(:schema_name, 'public')
+                    ORDER BY viewname
+                """)
+                result = await self._execute_query(session, query, {"schema_name": schema_name or "public"})
+                return [{"name": row[0], "definition": row[1] or ""} for row in result.all()]
+
+        except Exception as e:
+            logger.debug(f"Error getting views: {e}")
+            return []
+
+    async def get_sequences(
+        self,
+        session: AsyncSession,
+        schema_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get database sequences."""
+        try:
+            db_name = session.bind.dialect.name if session.bind else "unknown"
+
+            if db_name == "postgresql":
+                query = text("""
+                    SELECT sequencename, data_type,
+                           start_value, increment_by, min_value, max_value
+                    FROM pg_sequences
+                    WHERE schemaname = COALESCE(:schema_name, 'public')
+                    ORDER BY sequencename
+                """)
+                result = await self._execute_query(session, query, {"schema_name": schema_name or "public"})
+                return [
+                    {"name": r[0], "data_type": r[1] or "bigint",
+                     "start_value": r[2], "increment": r[3],
+                     "min_value": r[4], "max_value": r[5]}
+                    for r in result.all()
+                ]
+
+            elif db_name == "mssql":
+                query = text("""
+                    SELECT name,
+                           CAST(start_value AS BIGINT),
+                           CAST(increment AS BIGINT),
+                           CAST(minimum_value AS BIGINT),
+                           CAST(maximum_value AS BIGINT)
+                    FROM sys.sequences
+                    ORDER BY name
+                """)
+                result = await self._execute_query(session, query)
+                return [
+                    {"name": r[0], "data_type": "bigint",
+                     "start_value": r[1], "increment": r[2],
+                     "min_value": r[3], "max_value": r[4]}
+                    for r in result.all()
+                ]
+
+            elif db_name == "oracle":
+                query = text("""
+                    SELECT sequence_name, min_value, max_value,
+                           increment_by, last_number
+                    FROM user_sequences
+                    ORDER BY sequence_name
+                """)
+                result = await self._execute_query(session, query)
+                return [
+                    {"name": r[0], "data_type": "number",
+                     "start_value": r[4], "increment": r[3],
+                     "min_value": r[1], "max_value": r[2]}
+                    for r in result.all()
+                ]
+
+            elif db_name == "duckdb":
+                query = text("""
+                    SELECT sequence_name, start_value, increment_by,
+                           min_value, max_value
+                    FROM duckdb_sequences()
+                    WHERE schema_name NOT IN ('information_schema', 'pg_catalog')
+                    ORDER BY sequence_name
+                """)
+                result = await self._execute_query(session, query)
+                return [
+                    {"name": r[0], "data_type": "bigint",
+                     "start_value": r[1], "increment": r[2],
+                     "min_value": r[3], "max_value": r[4]}
+                    for r in result.all()
+                ]
+
+            # sqlite, mysql: no sequence support
+            return []
+
+        except Exception as e:
+            logger.debug(f"Error getting sequences: {e}")
+            return []
+
+    async def get_check_constraints(
+        self,
+        session: AsyncSession,
+        schema_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get check constraints (excludes system-generated NOT NULL constraints)."""
+        try:
+            db_name = session.bind.dialect.name if session.bind else "unknown"
+
+            if db_name == "postgresql":
+                query = text("""
+                    SELECT conname, conrelid::regclass::text, pg_get_constraintdef(oid)
+                    FROM pg_constraint
+                    WHERE contype = 'c'
+                    AND connamespace = (
+                        SELECT oid FROM pg_namespace
+                        WHERE nspname = COALESCE(:schema_name, 'public')
+                    )
+                    AND conname NOT LIKE '%_not_null'
+                    ORDER BY conrelid::regclass::text, conname
+                """)
+                result = await self._execute_query(session, query, {"schema_name": schema_name or "public"})
+                return [
+                    {"table_name": r[1], "constraint_name": r[0], "definition": r[2] or ""}
+                    for r in result.all()
+                ]
+
+            elif db_name == "mysql":
+                query = text("""
+                    SELECT cc.constraint_name, tc.table_name, cc.check_clause
+                    FROM information_schema.check_constraints cc
+                    JOIN information_schema.table_constraints tc
+                        ON cc.constraint_name = tc.constraint_name
+                        AND cc.constraint_schema = tc.constraint_schema
+                    WHERE cc.constraint_schema = DATABASE()
+                    ORDER BY tc.table_name, cc.constraint_name
+                """)
+                result = await self._execute_query(session, query)
+                return [
+                    {"table_name": r[1], "constraint_name": r[0], "definition": r[2] or ""}
+                    for r in result.all()
+                ]
+
+            elif db_name == "mssql":
+                query = text("""
+                    SELECT cc.name, t.name, cc.definition
+                    FROM sys.check_constraints cc
+                    JOIN sys.tables t ON cc.parent_object_id = t.object_id
+                    ORDER BY t.name, cc.name
+                """)
+                result = await self._execute_query(session, query)
+                return [
+                    {"table_name": r[1], "constraint_name": r[0], "definition": r[2] or ""}
+                    for r in result.all()
+                ]
+
+            elif db_name == "oracle":
+                query = text("""
+                    SELECT constraint_name, table_name, search_condition
+                    FROM user_constraints
+                    WHERE constraint_type = 'C'
+                    AND generated != 'GENERATED NAME'
+                    ORDER BY table_name, constraint_name
+                """)
+                result = await self._execute_query(session, query)
+                return [
+                    {"table_name": r[1], "constraint_name": r[0], "definition": r[2] or ""}
+                    for r in result.all()
+                ]
+
+            # sqlite, duckdb: no check constraint introspection
+            return []
+
+        except Exception as e:
+            logger.debug(f"Error getting check constraints: {e}")
+            return []
+
+    async def get_routines(
+        self,
+        session: AsyncSession,
+        schema_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get stored procedures and functions."""
+        try:
+            db_name = session.bind.dialect.name if session.bind else "unknown"
+
+            if db_name == "postgresql":
+                query = text("""
+                    SELECT p.proname,
+                           CASE WHEN p.prokind = 'p' THEN 'procedure' ELSE 'function' END,
+                           l.lanname,
+                           pg_get_functiondef(p.oid),
+                           pg_get_function_result(p.oid)
+                    FROM pg_proc p
+                    JOIN pg_namespace n ON p.pronamespace = n.oid
+                    JOIN pg_language l ON p.prolang = l.oid
+                    WHERE n.nspname = COALESCE(:schema_name, 'public')
+                    AND l.lanname != 'c'
+                    AND l.lanname != 'internal'
+                    ORDER BY p.proname
+                """)
+                result = await self._execute_query(session, query, {"schema_name": schema_name or "public"})
+                return [
+                    {"name": r[0], "type": r[1], "language": r[2] or "",
+                     "definition": r[3] or "", "return_type": r[4] or ""}
+                    for r in result.all()
+                ]
+
+            elif db_name == "mysql":
+                query = text("""
+                    SELECT routine_name, routine_type, routine_definition,
+                           dtd_identifier
+                    FROM information_schema.routines
+                    WHERE routine_schema = DATABASE()
+                    ORDER BY routine_name
+                """)
+                result = await self._execute_query(session, query)
+                return [
+                    {"name": r[0], "type": (r[1] or "function").lower(),
+                     "language": "sql", "definition": r[2] or "",
+                     "return_type": r[3] or ""}
+                    for r in result.all()
+                ]
+
+            elif db_name == "mssql":
+                query = text("""
+                    SELECT name,
+                           CASE WHEN type = 'P' THEN 'procedure'
+                                ELSE 'function' END,
+                           OBJECT_DEFINITION(object_id)
+                    FROM sys.objects
+                    WHERE type IN ('P', 'FN', 'TF', 'IF')
+                    ORDER BY name
+                """)
+                result = await self._execute_query(session, query)
+                return [
+                    {"name": r[0], "type": r[1], "language": "tsql",
+                     "definition": r[2] or "", "return_type": ""}
+                    for r in result.all()
+                ]
+
+            elif db_name == "oracle":
+                query = text("""
+                    SELECT object_name,
+                           LOWER(object_type),
+                           DBMS_METADATA.GET_DDL(object_type, object_name) AS ddl
+                    FROM user_objects
+                    WHERE object_type IN ('PROCEDURE', 'FUNCTION')
+                    ORDER BY object_name
+                """)
+                try:
+                    result = await self._execute_query(session, query)
+                    return [
+                        {"name": r[0], "type": r[1], "language": "plsql",
+                         "definition": r[2] or "", "return_type": ""}
+                        for r in result.all()
+                    ]
+                except Exception:
+                    # DBMS_METADATA may not be available — fall back to user_source
+                    query2 = text("""
+                        SELECT name, LOWER(type), LISTAGG(text, '') WITHIN GROUP (ORDER BY line)
+                        FROM user_source
+                        WHERE type IN ('PROCEDURE', 'FUNCTION')
+                        GROUP BY name, type
+                        ORDER BY name
+                    """)
+                    result = await self._execute_query(session, query2)
+                    return [
+                        {"name": r[0], "type": r[1], "language": "plsql",
+                         "definition": r[2] or "", "return_type": ""}
+                        for r in result.all()
+                    ]
+
+            # sqlite, duckdb: no routine support
+            return []
+
+        except Exception as e:
+            logger.debug(f"Error getting routines: {e}")
+            return []
+
+    async def get_triggers(
+        self,
+        session: AsyncSession,
+        schema_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get database triggers."""
+        try:
+            db_name = session.bind.dialect.name if session.bind else "unknown"
+
+            if db_name == "sqlite":
+                query = text("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger' ORDER BY name")
+                result = await self._execute_query(session, query)
+                return [
+                    {"name": r[0], "table_name": r[1], "timing": "",
+                     "event": "", "definition": r[2] or ""}
+                    for r in result.all()
+                ]
+
+            elif db_name == "postgresql":
+                query = text("""
+                    SELECT trigger_name, event_object_table,
+                           action_timing, event_manipulation,
+                           action_statement
+                    FROM information_schema.triggers
+                    WHERE trigger_schema = COALESCE(:schema_name, 'public')
+                    ORDER BY event_object_table, trigger_name
+                """)
+                result = await self._execute_query(session, query, {"schema_name": schema_name or "public"})
+                return [
+                    {"name": r[0], "table_name": r[1], "timing": r[2] or "",
+                     "event": r[3] or "", "definition": r[4] or ""}
+                    for r in result.all()
+                ]
+
+            elif db_name == "mysql":
+                query = text("""
+                    SELECT trigger_name, event_object_table,
+                           action_timing, event_manipulation,
+                           action_statement
+                    FROM information_schema.triggers
+                    WHERE trigger_schema = DATABASE()
+                    ORDER BY event_object_table, trigger_name
+                """)
+                result = await self._execute_query(session, query)
+                return [
+                    {"name": r[0], "table_name": r[1], "timing": r[2] or "",
+                     "event": r[3] or "", "definition": r[4] or ""}
+                    for r in result.all()
+                ]
+
+            elif db_name == "mssql":
+                query = text("""
+                    SELECT t.name, OBJECT_NAME(t.parent_id),
+                           te.type_desc,
+                           OBJECT_DEFINITION(t.object_id)
+                    FROM sys.triggers t
+                    JOIN sys.trigger_events te ON t.object_id = te.object_id
+                    WHERE t.parent_id != 0
+                    ORDER BY OBJECT_NAME(t.parent_id), t.name
+                """)
+                result = await self._execute_query(session, query)
+                return [
+                    {"name": r[0], "table_name": r[1], "timing": "",
+                     "event": r[2] or "", "definition": r[3] or ""}
+                    for r in result.all()
+                ]
+
+            elif db_name == "oracle":
+                query = text("""
+                    SELECT trigger_name, table_name,
+                           trigger_type, triggering_event,
+                           trigger_body
+                    FROM user_triggers
+                    ORDER BY table_name, trigger_name
+                """)
+                result = await self._execute_query(session, query)
+                return [
+                    {"name": r[0], "table_name": r[1], "timing": r[2] or "",
+                     "event": r[3] or "", "definition": r[4] or ""}
+                    for r in result.all()
+                ]
+
+            return []
+
+        except Exception as e:
+            logger.debug(f"Error getting triggers: {e}")
+            return []
+
+    async def get_enums(
+        self,
+        session: AsyncSession,
+        schema_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get enum types (PostgreSQL only)."""
+        try:
+            db_name = session.bind.dialect.name if session.bind else "unknown"
+
+            if db_name == "postgresql":
+                query = text("""
+                    SELECT t.typname,
+                           array_agg(e.enumlabel ORDER BY e.enumsortorder)
+                    FROM pg_type t
+                    JOIN pg_enum e ON t.oid = e.enumtypid
+                    JOIN pg_namespace n ON t.typnamespace = n.oid
+                    WHERE n.nspname = COALESCE(:schema_name, 'public')
+                    GROUP BY t.typname
+                    ORDER BY t.typname
+                """)
+                result = await self._execute_query(session, query, {"schema_name": schema_name or "public"})
+                return [
+                    {"name": r[0], "values": list(r[1]) if r[1] else []}
+                    for r in result.all()
+                ]
+
+            return []
+
+        except Exception as e:
+            logger.debug(f"Error getting enums: {e}")
             return []
 
     def _parse_index_columns_from_sql(self, sql: str) -> List[str]:
