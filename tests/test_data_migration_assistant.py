@@ -251,6 +251,26 @@ class TestSQLGeneration:
         assert '"t__new"' in migration.batched_insert_sql
         assert 'FROM "t"' in migration.batched_insert_sql
 
+    def test_batched_sql_includes_loop_comment(self):
+        """Batched SQL should include a comment explaining the loop pattern."""
+        assistant = DataMigrationAssistant(DatabaseDialect.POSTGRESQL, batch_size=1000)
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="t",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="t", column_name="a", diff_type="default_changed",
+                               source_state={"type": "TEXT"}, target_state={"type": "TEXT"}),
+                ],
+            ),
+        ])
+        plan = assistant.generate_plan(diff)
+        migration = plan.table_migrations[0]
+        # Comment should mention incrementing OFFSET and batch size
+        assert "OFFSET" in migration.batched_insert_sql
+        assert "1000" in migration.batched_insert_sql
+        assert "-- Batch template" in migration.batched_insert_sql
+
     def test_count_verify_compares_source_and_staging(self):
         """Verify SQL should compare source table vs staging table counts."""
         assistant = DataMigrationAssistant(DatabaseDialect.POSTGRESQL)

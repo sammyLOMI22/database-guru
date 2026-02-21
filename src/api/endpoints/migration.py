@@ -136,6 +136,7 @@ async def compare_schemas(
     except HTTPException:
         raise
     except Exception as e:
+        await db.rollback()
         logger.error(f"Schema diff failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Schema diff failed: {str(e)}")
 
@@ -267,6 +268,7 @@ async def generate_plan(
     except ImportError:
         raise HTTPException(status_code=501, detail="Migration planner not yet implemented")
     except Exception as e:
+        await db.rollback()
         logger.error(f"Migration plan generation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Plan generation failed: {str(e)}")
 
@@ -330,6 +332,7 @@ async def create_scripts(
     except ImportError:
         raise HTTPException(status_code=501, detail="Script generator not yet implemented")
     except Exception as e:
+        await db.rollback()
         logger.error(f"Script generation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Script generation failed: {str(e)}")
 
@@ -407,6 +410,7 @@ async def generate_data_migration(
     except ImportError:
         raise HTTPException(status_code=501, detail="Data migration assistant not yet implemented")
     except Exception as e:
+        await db.rollback()
         logger.error(f"Data migration generation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Data migration failed: {str(e)}")
 

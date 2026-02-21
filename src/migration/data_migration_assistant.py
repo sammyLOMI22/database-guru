@@ -259,21 +259,29 @@ class DataMigrationAssistant:
         q_target = self._quote(staging_name)
         insert_sql = f"INSERT INTO {q_target} ({target_cols})\nSELECT {select_exprs}\nFROM {q_source};"
 
-        # Batched version
+        # Batched version — this is batch 0 (OFFSET 0).
+        # To migrate all rows, run this statement repeatedly with
+        # OFFSET 0, {batch_size}, {batch_size*2}, ... until 0 rows are inserted.
+        batch_header = (
+            f"-- Batch template: run with OFFSET 0, {self.batch_size}, "
+            f"{self.batch_size * 2}, ... until 0 rows inserted.\n"
+        )
         if self.dialect == DatabaseDialect.POSTGRESQL:
             batched = (
+                f"{batch_header}"
                 f"INSERT INTO {q_target} ({target_cols})\n"
                 f"SELECT {select_exprs}\n"
                 f"FROM {q_source}\n"
                 f"ORDER BY ctid\n"
-                f"LIMIT {self.batch_size} OFFSET {{offset}};"
+                f"LIMIT {self.batch_size} OFFSET 0;"
             )
         else:
             batched = (
+                f"{batch_header}"
                 f"INSERT INTO {q_target} ({target_cols})\n"
                 f"SELECT {select_exprs}\n"
                 f"FROM {q_source}\n"
-                f"LIMIT {self.batch_size} OFFSET {{offset}};"
+                f"LIMIT {self.batch_size} OFFSET 0;"
             )
 
         count_verify = (

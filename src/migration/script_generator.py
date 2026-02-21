@@ -7,6 +7,7 @@ No DDL is executed — scripts are returned as strings for download/copy.
 """
 
 import logging
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
@@ -74,7 +75,7 @@ class ScriptGenerator:
         warnings: List[str] = []
 
         up_lines = self._generate_up(diff, warnings, source_schema, target_schema)
-        down_lines = self._generate_down(diff, warnings)
+        down_lines = self._generate_down(diff, warnings, source_schema)
         verify_lines = self._generate_verify(diff)
 
         return GeneratedScripts(
@@ -130,9 +131,10 @@ class ScriptGenerator:
                     lines.extend(table_lines)
                     lines.append("")
 
-        # 3. Drop removed tables (reverse FK order)
+        # 3. Drop removed tables — children before parents (FK-aware)
         removed = [td for td in diff.table_diffs if td.diff_type == "removed"]
-        for td in reversed(removed):
+        removed = self._sort_removed_tables_for_drop(removed, source_schema)
+        for td in removed:
             lines.append(f"-- WARNING: Data loss — dropping table '{td.table_name}'")
             lines.append(f"DROP TABLE IF EXISTS {self._quote(td.table_name)};")
             lines.append("")
@@ -368,7 +370,12 @@ class ScriptGenerator:
     # down.sql
     # ------------------------------------------------------------------
 
-    def _generate_down(self, diff: SchemaDiff, warnings: List[str]) -> List[str]:
+    def _generate_down(
+        self,
+        diff: SchemaDiff,
+        warnings: List[str],
+        source_schema: Optional[Dict[str, Any]] = None,
+    ) -> List[str]:
         """Generate the rollback DDL (inverse of up.sql)."""
         lines = [
             f"-- Migration: down.sql (rollback)",
@@ -394,16 +401,23 @@ class ScriptGenerator:
                 lines.append("")
 
         # Reverse: undo modifications
+        source_tables = (source_schema or {}).get("tables", {})
         for td in diff.table_diffs:
             if td.diff_type == "modified":
+                # SQLite: use table recreate to rollback all column changes
+                if self.dialect == DatabaseDialect.SQLITE and td.column_diffs:
+                    src_tbl = source_tables.get(td.table_name)
+                    lines.extend(self._sqlite_rollback(td, src_tbl))
+                    lines.append("")
+                    continue
+
                 for cd in td.column_diffs:
                     if cd.diff_type == "added":
                         # Reverse: drop the column that was added
-                        if self.dialect != DatabaseDialect.SQLITE:
-                            lines.append(
-                                f"ALTER TABLE {self._quote(td.table_name)} "
-                                f"DROP COLUMN {self._quote(cd.column_name)};"
-                            )
+                        lines.append(
+                            f"ALTER TABLE {self._quote(td.table_name)} "
+                            f"DROP COLUMN {self._quote(cd.column_name)};"
+                        )
                     elif cd.diff_type == "removed" and cd.source_state:
                         # Reverse: re-add the column that was dropped
                         col = cd.source_state
@@ -488,8 +502,8 @@ class ScriptGenerator:
                 lines.append(f"-- Verify modifications to '{td.table_name}'")
                 lines.append(f"SELECT COUNT(*) AS row_count FROM {self._quote(td.table_name)};")
 
-                # Check NOT NULL constraints hold
                 for cd in td.column_diffs:
+                    # Check NOT NULL constraints hold after nullability change
                     if cd.diff_type == "nullability_changed" and cd.target_state:
                         if not cd.target_state.get("nullable", True):
                             lines.append(
@@ -497,6 +511,30 @@ class ScriptGenerator:
                                 f"FROM {self._quote(td.table_name)} "
                                 f"WHERE {self._quote(cd.column_name)} IS NULL;"
                             )
+
+                    # Verify added column exists in the schema
+                    if cd.diff_type == "added":
+                        safe_tbl = self._escape_literal(td.table_name)
+                        safe_col = self._escape_literal(cd.column_name)
+                        lines.append(
+                            f"-- Verify column '{cd.column_name}' was added to '{td.table_name}'"
+                        )
+                        if self.dialect in (DatabaseDialect.POSTGRESQL, DatabaseDialect.MYSQL):
+                            lines.append(
+                                f"SELECT COUNT(*) AS col_exists "
+                                f"FROM information_schema.columns "
+                                f"WHERE table_name = '{safe_tbl}' "
+                                f"AND column_name = '{safe_col}';"
+                                f"  -- Expected: 1"
+                            )
+                        elif self.dialect == DatabaseDialect.SQLITE:
+                            lines.append(
+                                f"SELECT COUNT(*) AS col_exists "
+                                f"FROM pragma_table_info('{safe_tbl}') "
+                                f"WHERE name = '{safe_col}';"
+                                f"  -- Expected: 1"
+                            )
+
                 lines.append("")
 
         return lines
@@ -504,6 +542,131 @@ class ScriptGenerator:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _sort_removed_tables_for_drop(
+        self,
+        removed: List[TableDiff],
+        source_schema: Optional[Dict[str, Any]],
+    ) -> List[TableDiff]:
+        """Return removed tables sorted so FK-dependent children are dropped before parents.
+
+        Without FK-aware ordering, dropping a parent before a child fails when
+        FK constraints are enforced (e.g. PostgreSQL, MySQL with FK checks on).
+        """
+        if not removed or not source_schema:
+            return removed
+
+        removed_names = {td.table_name for td in removed}
+        source_tables = source_schema.get("tables", {})
+
+        # Build drop-order graph: A → B means "drop A before B"
+        # (A is a child that references B, so A must go first)
+        successors: Dict[str, set] = defaultdict(set)
+        in_degree: Dict[str, int] = {td.table_name: 0 for td in removed}
+
+        for td in removed:
+            for fk in source_tables.get(td.table_name, {}).get("foreign_keys", []):
+                parent = fk.get("referred_table", "")
+                if parent in removed_names and parent != td.table_name:
+                    # td (child) must be dropped before parent
+                    if parent not in successors[td.table_name]:
+                        successors[td.table_name].add(parent)
+                        in_degree[parent] = in_degree.get(parent, 0) + 1
+
+        queue = deque(sorted(t for t in in_degree if in_degree[t] == 0))
+        td_by_name = {td.table_name: td for td in removed}
+        result: List[TableDiff] = []
+
+        while queue:
+            name = queue.popleft()
+            if name in td_by_name:
+                result.append(td_by_name[name])
+            for successor in sorted(successors.get(name, [])):
+                in_degree[successor] -= 1
+                if in_degree[successor] == 0:
+                    queue.append(successor)
+
+        # Append any remaining (circular FK dependencies — unlikely but safe)
+        seen = {td.table_name for td in result}
+        result.extend(td for td in removed if td.table_name not in seen)
+        return result
+
+    def _sqlite_rollback(
+        self,
+        td: TableDiff,
+        source_table_schema: Optional[Dict[str, Any]] = None,
+    ) -> List[str]:
+        """Generate SQLite table recreate pattern for rolling back a modified table.
+
+        The database is in the post-up state. We recreate the table with the
+        original (source) column definitions to reverse the migration.
+        Dropped columns are filled with NULL (data is unrecoverable).
+        Added columns are omitted from the rollback table.
+        """
+        lines = [
+            f"-- SQLite: recreate table '{td.table_name}' to rollback changes",
+            f"-- (SQLite does not support ALTER COLUMN)",
+        ]
+
+        changed_cols = {cd.column_name: cd for cd in td.column_diffs}
+        added_cols = {cd.column_name for cd in td.column_diffs if cd.diff_type == "added"}
+
+        target_col_defs: List[str] = []
+        select_exprs: List[str] = []
+
+        if source_table_schema:
+            # Iterate over the original (source) column list
+            for col in source_table_schema.get("columns", []):
+                col_name = col.get("name", "")
+                target_col_defs.append(self._column_def(col))
+                cd = changed_cols.get(col_name)
+                if cd and cd.diff_type == "removed":
+                    # Column was dropped in up.sql — data is gone
+                    lines.append(f"-- NOTE: Data for '{col_name}' was lost when the column was dropped")
+                    select_exprs.append(f"NULL AS {self._quote(col_name)}")
+                elif cd and cd.diff_type == "type_changed" and cd.source_state:
+                    # Cast from the post-up type back to the original type
+                    old_type = cd.source_state.get("type", "TEXT")
+                    select_exprs.append(f"CAST({self._quote(col_name)} AS {old_type})")
+                else:
+                    select_exprs.append(self._quote(col_name))
+        else:
+            # No full schema — use source_state from diffs, skipping added columns
+            for cd in td.column_diffs:
+                if cd.diff_type == "added":
+                    continue
+                if cd.source_state:
+                    col = cd.source_state
+                    col_name = cd.column_name
+                    target_col_defs.append(self._column_def(col))
+                    if cd.diff_type == "removed":
+                        select_exprs.append(f"NULL AS {self._quote(col_name)}")
+                    elif cd.diff_type == "type_changed":
+                        old_type = col.get("type", "TEXT")
+                        select_exprs.append(f"CAST({self._quote(col_name)} AS {old_type})")
+                    else:
+                        select_exprs.append(self._quote(col_name))
+
+        if not target_col_defs:
+            lines.append(f"-- WARNING: No column definitions available for rollback of '{td.table_name}'")
+            return lines
+
+        rollback_name = f"{td.table_name}__rollback"
+        col_defs_str = ",\n    ".join(target_col_defs)
+        # select_exprs only covers source (original) columns — added columns are
+        # not included because they don't belong in the rollback table, and they
+        # are not in source_table_schema / skipped in the diff-only branch.
+        select_list = ", ".join(select_exprs)
+
+        lines.extend([
+            f"CREATE TABLE {self._quote(rollback_name)} (",
+            f"    {col_defs_str}",
+            f");",
+            f"INSERT INTO {self._quote(rollback_name)} SELECT {select_list} FROM {self._quote(td.table_name)};",
+            f"DROP TABLE {self._quote(td.table_name)};",
+            f"ALTER TABLE {self._quote(rollback_name)} RENAME TO {self._quote(td.table_name)};",
+        ])
+        return lines
 
     def _quote(self, identifier: str) -> str:
         """Quote an identifier based on dialect."""

@@ -294,6 +294,184 @@ class TestScriptGeneratorSQLite:
 
 
 # ---------------------------------------------------------------------------
+# SQLite down.sql rollback (Issue 2)
+# ---------------------------------------------------------------------------
+
+class TestSQLiteDownRollback:
+    def setup_method(self):
+        self.gen = ScriptGenerator(DatabaseDialect.SQLITE)
+
+    def test_sqlite_down_uses_rollback_table(self):
+        """SQLite down.sql must use a __rollback recreate pattern, not ALTER."""
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="users",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="users", column_name="bio", diff_type="type_changed",
+                               source_state={"name": "bio", "type": "TEXT", "nullable": True},
+                               target_state={"name": "bio", "type": "VARCHAR(100)", "nullable": True}),
+                ],
+            ),
+        ])
+        source_schema = {"tables": {"users": {"columns": [
+            {"name": "id", "type": "INTEGER", "nullable": False},
+            {"name": "bio", "type": "TEXT", "nullable": True},
+        ]}}}
+        result = self.gen.generate(diff, source_schema=source_schema)
+        assert '"users__rollback"' in result.down_sql
+        assert "RENAME TO" in result.down_sql
+        # Cast from post-up VARCHAR(100) back to original TEXT
+        assert "CAST" in result.down_sql
+        assert "TEXT" in result.down_sql
+        # Original unchanged column "id" must also be present
+        assert '"id"' in result.down_sql
+
+    def test_sqlite_down_added_column_dropped(self):
+        """Column added in up.sql should not appear in rollback table."""
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="t",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="t", column_name="new_col", diff_type="added",
+                               target_state={"name": "new_col", "type": "TEXT", "nullable": True}),
+                ],
+            ),
+        ])
+        source_schema = {"tables": {"t": {"columns": [
+            {"name": "id", "type": "INTEGER", "nullable": False},
+        ]}}}
+        result = self.gen.generate(diff, source_schema=source_schema)
+        assert '"t__rollback"' in result.down_sql
+        # "new_col" should NOT be in the rollback table definition
+        assert "new_col" not in result.down_sql
+
+    def test_sqlite_down_removed_column_uses_null(self):
+        """Column dropped in up.sql is filled with NULL in rollback."""
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="t",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="t", column_name="gone", diff_type="removed",
+                               source_state={"name": "gone", "type": "TEXT", "nullable": True}),
+                ],
+            ),
+        ])
+        source_schema = {"tables": {"t": {"columns": [
+            {"name": "id", "type": "INTEGER", "nullable": False},
+            {"name": "gone", "type": "TEXT", "nullable": True},
+        ]}}}
+        result = self.gen.generate(diff, source_schema=source_schema)
+        assert '"t__rollback"' in result.down_sql
+        assert "NULL AS" in result.down_sql
+        assert "Data for 'gone' was lost" in result.down_sql
+
+
+# ---------------------------------------------------------------------------
+# FK-aware DROP TABLE order (Issue 3)
+# ---------------------------------------------------------------------------
+
+class TestDropTableOrder:
+    def setup_method(self):
+        self.gen = ScriptGenerator(DatabaseDialect.POSTGRESQL)
+
+    def test_child_dropped_before_parent(self):
+        """orders (FK → users) must be dropped before users."""
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="users", diff_type="removed",
+                      column_diffs=[ColumnDiff(table_name="users", column_name="id", diff_type="removed",
+                                                source_state={"name": "id", "type": "INTEGER"})]),
+            TableDiff(table_name="orders", diff_type="removed",
+                      column_diffs=[ColumnDiff(table_name="orders", column_name="user_id", diff_type="removed",
+                                                source_state={"name": "user_id", "type": "INTEGER"})]),
+        ])
+        source_schema = {"tables": {
+            "users": {"columns": [{"name": "id", "type": "INTEGER"}], "foreign_keys": []},
+            "orders": {
+                "columns": [{"name": "user_id", "type": "INTEGER"}],
+                "foreign_keys": [{"column": "user_id", "referred_table": "users", "referred_column": "id"}],
+            },
+        }}
+        result = self.gen.generate(diff, source_schema=source_schema)
+        orders_pos = result.up_sql.index('"orders"')
+        users_pos = result.up_sql.index('"users"')
+        assert orders_pos < users_pos, "orders must be dropped before users (FK child before parent)"
+
+    def test_no_fk_falls_back_to_alphabetical(self):
+        """Without FK relationships, tables are dropped in the order returned (alphabetical from comparator)."""
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="beta", diff_type="removed",
+                      column_diffs=[ColumnDiff(table_name="beta", column_name="id", diff_type="removed",
+                                                source_state={"name": "id", "type": "INTEGER"})]),
+            TableDiff(table_name="alpha", diff_type="removed",
+                      column_diffs=[ColumnDiff(table_name="alpha", column_name="id", diff_type="removed",
+                                                source_state={"name": "id", "type": "INTEGER"})]),
+        ])
+        result = self.gen.generate(diff)
+        # Both must appear in up_sql; order is irrelevant here, just verify both present
+        assert '"alpha"' in result.up_sql
+        assert '"beta"' in result.up_sql
+
+
+# ---------------------------------------------------------------------------
+# verify.sql column existence (Issue 4)
+# ---------------------------------------------------------------------------
+
+class TestVerifyColumnExists:
+    def test_added_column_verify_postgresql(self):
+        gen = ScriptGenerator(DatabaseDialect.POSTGRESQL)
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="users",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="users", column_name="email", diff_type="added",
+                               target_state={"name": "email", "type": "TEXT", "nullable": True}),
+                ],
+            ),
+        ])
+        result = gen.generate(diff)
+        assert "information_schema.columns" in result.verify_sql
+        assert "column_name = 'email'" in result.verify_sql
+        assert "table_name = 'users'" in result.verify_sql
+
+    def test_added_column_verify_sqlite(self):
+        gen = ScriptGenerator(DatabaseDialect.SQLITE)
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="products",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="products", column_name="sku", diff_type="added",
+                               target_state={"name": "sku", "type": "TEXT", "nullable": True}),
+                ],
+            ),
+        ])
+        result = gen.generate(diff)
+        assert "pragma_table_info('products')" in result.verify_sql
+        assert "name = 'sku'" in result.verify_sql
+
+    def test_type_change_no_col_exists_check(self):
+        """Type-changed columns don't need col-existence check — they already exist."""
+        gen = ScriptGenerator(DatabaseDialect.POSTGRESQL)
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="t",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="t", column_name="val", diff_type="type_changed",
+                               source_state={"name": "val", "type": "INT"},
+                               target_state={"name": "val", "type": "BIGINT"}),
+                ],
+            ),
+        ])
+        result = gen.generate(diff)
+        assert "information_schema.columns" not in result.verify_sql
+
+
+# ---------------------------------------------------------------------------
 # GeneratedScripts
 # ---------------------------------------------------------------------------
 

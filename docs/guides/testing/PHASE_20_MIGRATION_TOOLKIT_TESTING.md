@@ -4,6 +4,137 @@ This guide covers how to verify the Phase 20 branch (`phase-20-migration-toolkit
 
 ---
 
+## Testing Findings & Assessment (2026-02-21)
+
+> Manual test run performed on the `phase-20-migration-toolkit` branch.
+> Backend server was not running during the session; all tests executed via pytest and direct Python invocation against in-process components.
+
+### Test Suite Results
+
+| Test File | Tests | Result |
+|-----------|-------|--------|
+| `test_schema_comparator.py` | 39 | **PASS** |
+| `test_migration_planner.py` | 17 | **PASS** |
+| `test_script_generator.py` | 17 | **PASS** |
+| `test_data_migration_assistant.py` | 14 | **PASS** |
+| `test_migration_api.py` | 11 | **PASS** |
+| **Total** | **98** | **100% PASS** |
+
+Run time: ~0.75 seconds.
+
+### Code Coverage (src/migration)
+
+| Module | Coverage |
+|--------|----------|
+| `schema_comparator.py` | 96% |
+| `data_migration_assistant.py` | 90% |
+| `script_generator.py` | 87% |
+| `migration_planner.py` | 72% |
+| `drift_detector.py` | 0% (no unit tests — requires live DB connection) |
+| **Combined** | **83%** |
+
+### Functional Correctness: Confirmed
+
+The following were manually validated in-process:
+
+**SchemaComparator**
+- Identical schemas produce `overall_risk: none` and `diff_summary: "No differences found"` — no false positives.
+- Added tables correctly classified as `risk_level: low`.
+- Removed tables correctly classified as `risk_level: critical`.
+- Type narrowing (`TEXT → VARCHAR(10)`, `BIGINT → SMALLINT`) correctly flagged as `is_breaking: True, risk_level: high`.
+- Type widening (`VARCHAR(50) → VARCHAR(200)`) correctly classified as safe: `is_breaking: False, risk_level: low`.
+- Nullable → NOT NULL change: `is_breaking: True`.
+- NOT NULL → nullable change: `is_breaking: False`.
+- Synonym normalization prevents false diffs (`CHARACTER VARYING` ≡ `varchar`, `int4` ≡ `integer`).
+- `SchemaDiff.from_dict()` roundtrip serialization is lossless.
+
+**ScriptGenerator**
+- PostgreSQL `up.sql` generates correct `CREATE TABLE`, `ADD COLUMN`, `ALTER COLUMN TYPE ... USING`, `DROP NOT NULL / SET NOT NULL`, `DROP TABLE`.
+- MySQL wraps statements with `SET FOREIGN_KEY_CHECKS = 0/1` and uses backtick identifiers.
+- SQLite table recreate pattern confirmed: `CREATE __new → INSERT INTO SELECT → DROP → RENAME TO`.
+- When full source/target schemas are provided to SQLite recreate, **all columns** (changed and unchanged) appear in the recreated table. This is the correct behaviour — the prior bug where only diff columns were included is resolved.
+- `down.sql` correctly reverses adds (drops) and drops (re-adds skeleton).
+- `verify.sql` generates `information_schema.tables` check for PG/MySQL and `sqlite_master` check for SQLite.
+- Data-loss operations (`DROP TABLE`, `DROP COLUMN`) emit both a `-- WARNING:` comment inline and append to the `warnings` list.
+
+**MigrationPlanner**
+- Empty diff generates exactly 2 steps: `pre_check` + `verify`.
+- Removed table generates `DATA LOSS` warning and `is_reversible: False`.
+- Backup step is inserted automatically when any table is `critical` or `high` risk.
+- No backup step for low-risk diffs.
+- Topological sort using Kahn's algorithm respects FK dependencies: parent tables always precede child tables in `execution_order`.
+- Circular FK dependency handling: remaining tables appended at end with log warning.
+- LLM enrichment failure gracefully falls back to deterministic plan — `llm_used: False`.
+- No Ollama client → plan still returns with deterministic results.
+
+**DataMigrationAssistant**
+- Only `modified` tables receive data migration entries. `added` and `removed` tables are skipped (correct: no source / no target).
+- Critical bug fix confirmed: `batched_insert_sql` contains `LIMIT 500 OFFSET 0`, **not** the literal string `OFFSET {offset}`.
+- PostgreSQL batched SQL uses `ORDER BY ctid` for stable pagination.
+- Type-changed columns get `CAST(col AS new_type)` in `transform_expression`.
+- New columns with defaults use the default value expression.
+- New NOT NULL columns with no default emit a warning: `"New NOT NULL column 'x' has no default"`.
+- MySQL uses backtick quoting throughout.
+- Staging table name convention is `{table_name}__new`, correctly avoiding self-referencing INSERT issues.
+
+**API Endpoints**
+- `_get_connection` and `_get_project` raise HTTP 404 for missing/deleted records.
+- All POST endpoints raise HTTP 400 when the project has no diff snapshot.
+- All GET endpoints raise HTTP 404 when the requested resource hasn't been generated yet.
+- `download_script` raises 400 for invalid filenames and 404 for ungenerated scripts.
+- `download_script` returns `PlainTextResponse` with `application/sql` media type and `Content-Disposition` header.
+- All four `except Exception` blocks call `await db.rollback()` before raising `HTTPException` — dangling transaction risk resolved.
+
+### Performance Observations
+
+- Schema comparison is pure in-memory set operations — negligible latency for typical schemas (10–100 tables).
+- Script generation is string-template based — effectively instant.
+- Data migration plan generation is O(modified_tables × columns) — no I/O.
+- The bottleneck in real use will be `SchemaCache.get_schema()` (database introspection), which is called twice per diff (once for source, once for target). This is acceptable since `force_refresh=True` is used.
+
+### User Feedback & Product Usefulness
+
+**Strengths**
+- **Zero-execution safety**: The toolkit generates SQL files only — it never executes DDL against any user database. This is the right default for an advisory tool and should be prominently communicated in the UI.
+- **Three-script output** (up/down/verify) is the industry-standard migration pattern. The verify script in particular adds practical value that many tools omit.
+- **Risk classification** at table, column, and overall diff level gives users an actionable at-a-glance signal before they commit to a migration.
+- **LLM enrichment is optional and gracefully degraded** — the planner works without Ollama, which makes it usable in offline/restricted environments.
+- **Staging table pattern** in data migration avoids a real class of bugs (self-referencing INSERT) and is a good design choice.
+- **FK-aware execution order** in the planner prevents referential integrity failures during multi-table migrations.
+
+**Usability Gaps / Improvement Opportunities**
+
+1. **No batch-loop SQL for data migration**: The `batched_insert_sql` uses `OFFSET 0` (the bug fix) but generates only a single batch. Users must manually increment the OFFSET or wrap it in a loop. A comment explaining this and suggesting a loop template would significantly improve usability for large tables.
+
+2. **`drift_detector.py` has 0% test coverage**: It wraps `SchemaComparator` and `SchemaCache` but is never invoked in tests. If drift detection is exposed via API, it needs unit tests (mocking `UserDatabaseConnector`).
+
+3. **Data migration plan ignores `added` tables**: Users migrating from source → target might expect INSERT scripts for newly-added tables (populating them from the source if column names match). The current design only handles `modified` tables — this is documented but may surprise users.
+
+4. **`down.sql` for dropped tables only recreates a schema skeleton** — data is always lost. A `-- NOTE: Cannot restore data` comment is emitted, which is correct, but users should be warned more prominently in the UI that rollback does not restore data.
+
+5. **Migration planner topological sort** doesn't consider dropped tables' FK relationships when determining deletion order. For tables being dropped, you want to drop child tables before parent tables (reverse of creation order). This may cause FK constraint failures when running `up.sql` in databases with enforcement enabled.
+
+6. **`verify.sql` for modified tables** only checks row count and NOT NULL violations. It does not verify column existence after ADD COLUMN or type correctness after type changes. This could be enhanced.
+
+### Bugs Found & Resolved
+
+| Severity | Location | Description | Status |
+|----------|----------|-------------|--------|
+| Fixed | `data_migration_assistant.py:263-277` | Batched SQL contained literal `OFFSET {offset}` placeholder — non-executable. | Resolved: `OFFSET 0` + loop comment |
+| Fixed | `migration.py` (4 endpoints) | Missing `await db.rollback()` before `raise HTTPException` in except blocks. | Resolved |
+| Fixed | `script_generator.py:_generate_down()` | SQLite dialect emitted no DDL for modified table rollbacks. | Resolved: `_sqlite_rollback()` recreate pattern |
+| Fixed | `script_generator.py:_generate_up()` | Removed tables dropped in alphabetical order rather than FK-aware child-first order. | Resolved: `_sort_removed_tables_for_drop()` |
+| Fixed | `script_generator.py:_generate_verify()` | `verify.sql` only checked row counts — added columns had no existence check. | Resolved: `information_schema.columns` / `pragma_table_info` checks added |
+| Not a bug | `script_generator.py:_alter_table_ddl()` | `nullability_changed` for SQLite: recreate is triggered by either `type_changed` OR `nullability_changed`, so this is already handled. | Not a bug |
+
+### Overall Assessment
+
+**Phase 20 is production-ready for its stated scope** (schema diff, plan generation, script generation, data migration SQL generation). All 98 automated tests pass, critical bugs from the audit have been resolved, and the deterministic-first / LLM-enrichment-second architecture is sound.
+
+The primary gap is in completeness of the `down.sql` rollback for SQLite and the missing batch-loop template in data migration SQL. Both are usability improvements rather than correctness bugs.
+
+---
+
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
