@@ -1,7 +1,7 @@
 """Pydantic schemas for API requests and responses"""
 from datetime import datetime
 from typing import Optional, List, Any, Dict
-from pydantic import BaseModel, Field, validator, field_validator
+from pydantic import BaseModel, Field, validator, field_validator, model_validator
 
 from src.security.prompt_sanitizer import sanitize_user_input, detect_injection_attempt
 
@@ -1237,3 +1237,261 @@ class FileSourceListResponse(BaseModel):
         default=0,
         description="Total number of files",
     )
+
+
+# ============================================================================
+# Phase 20: Migration Toolkit Schemas
+# ============================================================================
+
+class SchemaDiffRequest(BaseModel):
+    """Request to compare two database schemas."""
+    source_connection_id: int = Field(..., description="Source database connection ID")
+    target_connection_id: int = Field(..., description="Target database connection ID")
+    name: Optional[str] = Field(None, description="Project name (required if saving)")
+    save: bool = Field(False, description="Whether to save as a MigrationProject")
+    include_views: bool = Field(False, description="Include views in comparison")
+    include_sequences: bool = Field(False, description="Include sequences in comparison")
+    include_check_constraints: bool = Field(False, description="Include check constraints in comparison")
+    include_routines: bool = Field(False, description="Include stored procedures/functions in comparison")
+    include_triggers: bool = Field(False, description="Include triggers in comparison")
+    include_enums: bool = Field(False, description="Include enum types in comparison")
+
+    @model_validator(mode="after")
+    def source_and_target_must_differ(self) -> "SchemaDiffRequest":
+        if self.source_connection_id == self.target_connection_id:
+            raise ValueError("source_connection_id and target_connection_id must be different")
+        return self
+
+
+class ColumnDiffSchema(BaseModel):
+    table_name: str
+    column_name: str
+    diff_type: str
+    source_state: Optional[Dict[str, Any]] = None
+    target_state: Optional[Dict[str, Any]] = None
+    is_breaking: bool = False
+    risk_level: str = "low"
+
+
+class ConstraintDiffSchema(BaseModel):
+    table_name: str
+    constraint_type: str
+    diff_type: str
+    source_state: Optional[Any] = None
+    target_state: Optional[Any] = None
+    risk_level: str = "low"
+
+
+class TableDiffSchema(BaseModel):
+    table_name: str
+    diff_type: str
+    column_diffs: List[ColumnDiffSchema] = Field(default_factory=list)
+    constraint_diffs: List[ConstraintDiffSchema] = Field(default_factory=list)
+    risk_level: str = "low"
+
+
+class ViewDiffSchema(BaseModel):
+    view_name: str
+    diff_type: str
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "low"
+
+
+class SequenceDiffSchema(BaseModel):
+    sequence_name: str
+    diff_type: str
+    source_state: Optional[Dict[str, Any]] = None
+    target_state: Optional[Dict[str, Any]] = None
+    risk_level: str = "low"
+
+
+class CheckConstraintDiffSchema(BaseModel):
+    table_name: str
+    constraint_name: str
+    diff_type: str
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "low"
+
+
+class RoutineDiffSchema(BaseModel):
+    routine_name: str
+    routine_type: str
+    diff_type: str
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "medium"
+
+
+class TriggerDiffSchema(BaseModel):
+    trigger_name: str
+    table_name: str
+    diff_type: str
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "medium"
+
+
+class EnumDiffSchema(BaseModel):
+    enum_name: str
+    diff_type: str
+    source_values: Optional[List[str]] = None
+    target_values: Optional[List[str]] = None
+    risk_level: str = "low"
+
+
+class SchemaDiffResponse(BaseModel):
+    source_connection_id: Optional[int] = None
+    target_connection_id: Optional[int] = None
+    source_fingerprint: str = ""
+    target_fingerprint: str = ""
+    table_diffs: List[TableDiffSchema] = Field(default_factory=list)
+    view_diffs: List[ViewDiffSchema] = Field(default_factory=list)
+    sequence_diffs: List[SequenceDiffSchema] = Field(default_factory=list)
+    check_constraint_diffs: List[CheckConstraintDiffSchema] = Field(default_factory=list)
+    routine_diffs: List[RoutineDiffSchema] = Field(default_factory=list)
+    trigger_diffs: List[TriggerDiffSchema] = Field(default_factory=list)
+    enum_diffs: List[EnumDiffSchema] = Field(default_factory=list)
+    total_breaking_changes: int = 0
+    total_safe_changes: int = 0
+    overall_risk: str = "none"
+    diff_summary: str = ""
+    compared_at: str = ""
+    project_id: Optional[int] = None
+
+
+class MigrationProjectSummary(BaseModel):
+    id: int
+    name: str
+    source_connection_id: Optional[int] = None
+    target_connection_id: Optional[int] = None
+    source_connection_name: Optional[str] = None
+    target_connection_name: Optional[str] = None
+    overall_risk: Optional[str] = None
+    status: str = "draft"
+    target_dialect: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class MigrationProjectDetail(MigrationProjectSummary):
+    diff_snapshot: Optional[Dict[str, Any]] = None
+    migration_plan: Optional[Dict[str, Any]] = None
+    data_migration_plan: Optional[Dict[str, Any]] = None
+    up_sql: Optional[str] = None
+    down_sql: Optional[str] = None
+    verify_sql: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class MigrationToolkitStepSchema(BaseModel):
+    """A single step in a Phase 20 migration toolkit plan.
+
+    Distinct from MigrationStepSchema (used by ImpactAdvisor).
+    """
+    step_number: int
+    action: str
+    description: str
+    sql_hint: Optional[str] = None
+    table_name: Optional[str] = None
+    object_type: str = "table"
+    lock_type: str = "none"
+    estimated_duration: str = "instant"
+    risk_level: str = "low"
+    is_reversible: bool = True
+    depends_on: List[int] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+
+class MigrationPlanResponse(BaseModel):
+    project_id: int
+    steps: List[MigrationToolkitStepSchema] = Field(default_factory=list)
+    execution_order: List[str] = Field(default_factory=list)
+    total_estimated_downtime: str = "unknown"
+    recommended_maintenance_window: bool = False
+    pre_migration_checklist: List[str] = Field(default_factory=list)
+    post_migration_checklist: List[str] = Field(default_factory=list)
+    rollback_strategy: str = ""
+    overall_complexity: str = "simple"
+    llm_used: bool = False
+    generated_at: str = ""
+
+
+class GenerateScriptsRequest(BaseModel):
+    target_dialect: str = Field(
+        ...,
+        description="Target SQL dialect",
+        pattern=r"^(postgresql|mysql|sqlite|mssql|oracle|duckdb)$",
+    )
+    include_views: bool = Field(False, description="Include views in scripts")
+    include_sequences: bool = Field(False, description="Include sequences in scripts")
+    include_check_constraints: bool = Field(False, description="Include check constraints in scripts")
+    include_routines: bool = Field(False, description="Include stored procedures/functions in scripts")
+    include_triggers: bool = Field(False, description="Include triggers in scripts")
+    include_enums: bool = Field(False, description="Include enum types in scripts")
+
+
+class GeneratedScriptsResponse(BaseModel):
+    project_id: int
+    target_dialect: str
+    up_sql: str = ""
+    down_sql: str = ""
+    verify_sql: str = ""
+    warnings: List[str] = Field(default_factory=list)
+    generated_at: str = ""
+
+
+class BackupScriptRequest(BaseModel):
+    """Request to generate backup/restore scripts for a single database."""
+    connection_id: int = Field(..., description="Database connection ID")
+    dialect: Optional[str] = Field(
+        None,
+        description="Target dialect (defaults to the connection's database_type)",
+        pattern=r"^(postgresql|mysql|sqlite|mssql|oracle|duckdb)?$",
+    )
+    include_views: bool = Field(False, description="Include views in backup")
+    include_sequences: bool = Field(False, description="Include sequences in backup")
+    include_check_constraints: bool = Field(False, description="Include check constraints in backup")
+    include_routines: bool = Field(False, description="Include stored procedures/functions in backup")
+    include_triggers: bool = Field(False, description="Include triggers in backup")
+    include_enums: bool = Field(False, description="Include enum types in backup")
+
+
+class BackupScriptResponse(BaseModel):
+    connection_id: int
+    connection_name: str = ""
+    dialect: str = ""
+    backup_sql: str = ""
+    restore_sql: str = ""
+    verify_sql: str = ""
+    table_count: int = 0
+    warnings: List[str] = Field(default_factory=list)
+    generated_at: str = ""
+
+
+class ColumnMappingSchema(BaseModel):
+    source_col: Optional[str] = None
+    target_col: str
+    transform_expression: str = ""
+    requires_llm: bool = False
+
+
+class TableDataMigrationSchema(BaseModel):
+    source_table: str
+    target_table: str
+    column_mappings: List[ColumnMappingSchema] = Field(default_factory=list)
+    insert_sql: str = ""
+    batched_insert_sql: str = ""
+    count_verify_sql: str = ""
+    warnings: List[str] = Field(default_factory=list)
+
+
+class DataMigrationPlanResponse(BaseModel):
+    project_id: int
+    table_migrations: List[TableDataMigrationSchema] = Field(default_factory=list)
+    batch_size: int = 1000
+    recommended_order: List[str] = Field(default_factory=list)
+    total_tables_with_data: int = 0
+    llm_used: bool = False
+    generated_at: str = ""

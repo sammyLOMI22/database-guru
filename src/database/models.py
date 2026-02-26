@@ -1,7 +1,7 @@
 """Database models for Database Guru"""
 from datetime import datetime, timezone
 import uuid
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey, Index, Date, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey, Index, Date, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from src.database.connection import Base
 
@@ -501,8 +501,78 @@ class SystemSettings(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
+    # Phase 20: Migration Toolkit
+    model_migration_planner = Column(String(100), nullable=True)
+    timeout_migration_planner = Column(Integer, default=30, nullable=False)
+
     def __repr__(self):
         return (
             f"<SystemSettings(auto_learning={self.auto_learning_enabled}, "
             f"threshold={self.confidence_threshold}, mode={self.apply_mode})>"
         )
+
+
+class MigrationProject(Base):
+    """Store migration projects: schema diffs, plans, and generated scripts.
+
+    Phase 20: Migration Toolkit
+    A single project record carries state through the full workflow:
+    diff → plan → script generation → data migration.
+    """
+    __tablename__ = "migration_projects"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+
+    # Connection references
+    source_connection_id = Column(
+        Integer,
+        ForeignKey("database_connections.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    target_connection_id = Column(
+        Integer,
+        ForeignKey("database_connections.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # Diff snapshot (SchemaDiff.to_dict())
+    diff_snapshot = Column(JSON, nullable=True)
+    source_fingerprint = Column(String(64), nullable=True)
+    target_fingerprint = Column(String(64), nullable=True)
+
+    # LLM-generated migration plan (MigrationPlan.to_dict())
+    migration_plan = Column(JSON, nullable=True)
+
+    # Generated scripts
+    up_sql = Column(Text, nullable=True)
+    down_sql = Column(Text, nullable=True)
+    verify_sql = Column(Text, nullable=True)
+
+    # Data migration queries (DataMigrationPlan.to_dict())
+    data_migration_plan = Column(JSON, nullable=True)
+
+    # Metadata
+    target_dialect = Column(String(50), nullable=True)  # postgresql|mysql|sqlite
+    status = Column(String(20), default="draft")  # draft|planned|scripted
+    notes = Column(Text, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
+                        onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    source_connection = relationship(
+        "DatabaseConnection", foreign_keys=[source_connection_id]
+    )
+    target_connection = relationship(
+        "DatabaseConnection", foreign_keys=[target_connection_id]
+    )
+
+    __table_args__ = (
+        Index('idx_migration_source', 'source_connection_id'),
+        Index('idx_migration_target', 'target_connection_id'),
+        Index('idx_migration_status', 'status'),
+        CheckConstraint("status IN ('draft', 'planned', 'scripted')", name='ck_migration_status'),
+    )

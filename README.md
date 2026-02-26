@@ -144,6 +144,7 @@ The demo showcases:
 - 📁 **CSV/Excel File Data Sources (NEW!)** - Upload CSV/Excel files as queryable data sources with DuckDB
 - 📊 **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance across all agents
 - 🔬 **Data Insights Enhancement (NEW!)** - Tiered narratives by model size, analytics caching, multi-source quality insights, adaptive chart presets
+- 🔄 **Database Migration Toolkit (NEW!)** - Schema diff, migration planner, script generator (up/down/verify SQL), data migration assistant
 
 All with mock data - no database connection needed!
 
@@ -255,6 +256,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **CSV/Excel File Data Sources (NEW!)** - Upload and query CSV/Excel files as DuckDB tables
 - ✅ **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance per session and globally with full dashboard
 - ✅ **Data Insights Enhancement (NEW!)** - Tiered narrative prompts (compact/standard/enhanced), analytics caching, multi-source data quality analysis, adaptive chart scoring presets, parallel analysis pipeline with early exit optimization
+- ✅ **Database Migration Toolkit (NEW!)** - Schema diff engine, dependency-aware migration planner, multi-dialect script generator (up.sql/down.sql/verify.sql), data migration assistant with staging table pattern and batched INSERT SELECT
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection

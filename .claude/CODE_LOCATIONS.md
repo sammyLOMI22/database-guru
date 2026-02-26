@@ -292,6 +292,36 @@ Quick reference for finding important code in the Database Guru codebase.
 | Extended tests | `tests/test_llm_usage_extended.py` |
 | Integration tests | `tests/integration/test_usage_tracking_integration.py` |
 
+## Database Migration Toolkit (Phase 20 - February 2026)
+| Component | Location |
+|-----------|----------|
+| **Backend Core** | |
+| Schema comparator | `src/migration/schema_comparator.py` |
+| Schema diff model | `src/migration/schema_comparator.py:SchemaDiff` |
+| SchemaDiff.from_dict | `src/migration/schema_comparator.py:SchemaDiff.from_dict()` |
+| Migration planner | `src/migration/migration_planner.py` |
+| Topo sort (with FKs) | `src/migration/migration_planner.py:_topological_sort_tables()` |
+| Script generator | `src/migration/script_generator.py` |
+| SQLite recreate | `src/migration/script_generator.py:_sqlite_recreate()` |
+| SQL injection escape | `src/migration/script_generator.py:_escape_literal()` |
+| Data migration asst. | `src/migration/data_migration_assistant.py` |
+| Drift detector (stub) | `src/migration/drift_detector.py` |
+| **API Endpoints** | |
+| Migration API | `src/api/endpoints/migration.py` (13 endpoints) |
+| Schema diff | `src/api/endpoints/migration.py:compare_schemas()` |
+| Plan generation | `src/api/endpoints/migration.py:generate_plan()` |
+| Script generation | `src/api/endpoints/migration.py:create_scripts()` |
+| Data migration | `src/api/endpoints/migration.py:generate_data_migration()` |
+| Script download | `src/api/endpoints/migration.py:download_script()` |
+| **Database Model** | |
+| MigrationProject model | `src/database/models.py:MigrationProject` |
+| Migration (Alembic) | `alembic/versions/b7e3a1d2f456_*.py` |
+| **Schemas** | |
+| Request/Response schemas | `src/models/schemas.py` (SchemaDiffRequest, MigrationPlanResponse, etc.) |
+| MigrationToolkitStepSchema | `src/models/schemas.py:MigrationToolkitStepSchema` |
+| **Tests** | |
+| Migration API tests | `tests/test_migration_api.py` |
+
 ## File Data Source System (Phase 13 - January 2026)
 | Component | Location |
 |-----------|----------|

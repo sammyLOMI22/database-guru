@@ -19,8 +19,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Add response_data JSON column to chat_messages for full response persistence."""
-    with op.batch_alter_table('chat_messages', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('response_data', sa.JSON(), nullable=True))
+    # Check if the column already exists (create_tables_async may have added it already)
+    conn = op.get_bind()
+    columns = [row[1] for row in conn.execute(sa.text("PRAGMA table_info(chat_messages)"))]
+    if 'response_data' not in columns:
+        with op.batch_alter_table('chat_messages', schema=None) as batch_op:
+            batch_op.add_column(sa.Column('response_data', sa.JSON(), nullable=True))
 
 
 def downgrade() -> None:

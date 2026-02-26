@@ -239,3 +239,43 @@ GET /api/llm/usage/recent?limit=50&agent_type=sql_generator&model_name=qwen2.5-c
 - **LLMUsageTimeSeriesResponse**: Period-based totals for charting
 - **SessionUsageSummaryResponse**: Per-session breakdown with by_agent map
 - **LLMUsageResponse**: Individual call records with full details
+
+## Migration Toolkit API (Phase 20 - February 2026)
+**File**: `migration.py`
+
+Schema diff, migration planning, script generation, and data migration assistance.
+
+### Schema Diff & Projects
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/migration/diff` | Compare two database schemas, optionally save as project |
+| GET | `/api/migration/projects` | List all migration projects |
+| GET | `/api/migration/projects/{id}` | Get project with full details |
+| DELETE | `/api/migration/projects/{id}` | Delete a migration project |
+
+### Migration Planning
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/migration/projects/{id}/plan` | Generate LLM-enriched migration plan |
+| GET | `/api/migration/projects/{id}/plan` | Get cached migration plan |
+
+### Script Generation
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/migration/projects/{id}/scripts` | Generate up.sql, down.sql, verify.sql |
+| GET | `/api/migration/projects/{id}/scripts` | Get cached generated scripts |
+| GET | `/api/migration/projects/{id}/scripts/{filename}` | Download specific script file |
+
+### Data Migration
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/migration/projects/{id}/data-migration` | Generate batched INSERT SELECT queries |
+| GET | `/api/migration/projects/{id}/data-migration` | Get cached data migration plan |
+
+### Features
+- **Schema Comparison**: Detects added/removed/modified tables, columns, indexes, constraints
+- **Migration Planning**: Topological sort with FK awareness, data-loss detection, LLM intent enrichment
+- **Script Generation**: Multi-dialect (PostgreSQL, MySQL, SQLite), SQLite recreate for column changes
+- **Data Migration**: Staging table pattern (`table__new`), batched inserts, validation queries
+- **Project Lifecycle**: draft → planned → scripted status progression
+- **N+1 Prevention**: Uses `selectinload` for connection names

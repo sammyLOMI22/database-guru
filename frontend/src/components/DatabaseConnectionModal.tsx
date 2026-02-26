@@ -58,6 +58,20 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
       const port = formData.port || 3306;
       const db = formData.database_name || 'database';
       return `mysql://${user}:${pass}@${host}:${port}/${db}`;
+    } else if (formData.database_type === 'mssql') {
+      const user = formData.username || 'sa';
+      const pass = formData.password ? '****' : 'password';
+      const host = formData.host || 'localhost';
+      const port = formData.port || 1433;
+      const db = formData.database_name || 'database';
+      return `mssql+pymssql://${user}:${pass}@${host}:${port}/${db}`;
+    } else if (formData.database_type === 'oracle') {
+      const user = formData.username || 'system';
+      const pass = formData.password ? '****' : 'password';
+      const host = formData.host || 'localhost';
+      const port = formData.port || 1521;
+      const svc = formData.database_name || 'ORCL';
+      return `oracle+oracledb://${user}:${pass}@${host}:${port}/?service_name=${svc}`;
     } else {
       // PostgreSQL (default)
       const user = formData.username || 'username';
@@ -85,6 +99,8 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
       sqlite: 0,
       mongodb: 27017,
       duckdb: 0,
+      mssql: 1433,
+      oracle: 1521,
     };
     setFormData((prev) => ({
       ...prev,
@@ -241,7 +257,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
               Select Protocol *
             </label>
             <div className="flex flex-wrap gap-2.5">
-              {['postgresql', 'mysql', 'sqlite', 'mongodb', 'duckdb'].map((type) => (
+              {['postgresql', 'mysql', 'sqlite', 'mssql', 'oracle', 'mongodb', 'duckdb'].map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -308,10 +324,10 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                 </div>
               </div>
 
-              {/* Database Name */}
+              {/* Database Name / Service Name */}
               <div className="space-y-3">
                 <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                  Database Schema Name *
+                  {formData.database_type === 'oracle' ? 'Service Name *' : 'Database Schema Name *'}
                 </label>
                 <input
                   type="text"
@@ -319,9 +335,15 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
                   value={formData.database_name}
                   onChange={handleChange}
                   required
-                  placeholder="e.g., app_production"
+                  placeholder={formData.database_type === 'oracle' ? 'e.g., ORCL or XEPDB1' : 'e.g., app_production'}
                   className="w-full px-4 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
                 />
+                {formData.database_type === 'oracle' && (
+                  <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-xl text-[11px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                    Tip: Use the Oracle service name (e.g., ORCL, XEPDB1) — not the SID
+                  </div>
+                )}
               </div>
 
               {/* Username and Password */}
