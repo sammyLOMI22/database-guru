@@ -1290,18 +1290,69 @@ class TableDiffSchema(BaseModel):
     risk_level: str = "low"
 
 
+class ViewDiffSchema(BaseModel):
+    view_name: str
+    diff_type: str
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "low"
+
+
+class SequenceDiffSchema(BaseModel):
+    sequence_name: str
+    diff_type: str
+    source_state: Optional[Dict[str, Any]] = None
+    target_state: Optional[Dict[str, Any]] = None
+    risk_level: str = "low"
+
+
+class CheckConstraintDiffSchema(BaseModel):
+    table_name: str
+    constraint_name: str
+    diff_type: str
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "low"
+
+
+class RoutineDiffSchema(BaseModel):
+    routine_name: str
+    routine_type: str
+    diff_type: str
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "medium"
+
+
+class TriggerDiffSchema(BaseModel):
+    trigger_name: str
+    table_name: str
+    diff_type: str
+    source_definition: Optional[str] = None
+    target_definition: Optional[str] = None
+    risk_level: str = "medium"
+
+
+class EnumDiffSchema(BaseModel):
+    enum_name: str
+    diff_type: str
+    source_values: Optional[List[str]] = None
+    target_values: Optional[List[str]] = None
+    risk_level: str = "low"
+
+
 class SchemaDiffResponse(BaseModel):
     source_connection_id: Optional[int] = None
     target_connection_id: Optional[int] = None
     source_fingerprint: str = ""
     target_fingerprint: str = ""
     table_diffs: List[TableDiffSchema] = Field(default_factory=list)
-    view_diffs: List[Dict[str, Any]] = Field(default_factory=list)
-    sequence_diffs: List[Dict[str, Any]] = Field(default_factory=list)
-    check_constraint_diffs: List[Dict[str, Any]] = Field(default_factory=list)
-    routine_diffs: List[Dict[str, Any]] = Field(default_factory=list)
-    trigger_diffs: List[Dict[str, Any]] = Field(default_factory=list)
-    enum_diffs: List[Dict[str, Any]] = Field(default_factory=list)
+    view_diffs: List[ViewDiffSchema] = Field(default_factory=list)
+    sequence_diffs: List[SequenceDiffSchema] = Field(default_factory=list)
+    check_constraint_diffs: List[CheckConstraintDiffSchema] = Field(default_factory=list)
+    routine_diffs: List[RoutineDiffSchema] = Field(default_factory=list)
+    trigger_diffs: List[TriggerDiffSchema] = Field(default_factory=list)
+    enum_diffs: List[EnumDiffSchema] = Field(default_factory=list)
     total_breaking_changes: int = 0
     total_safe_changes: int = 0
     overall_risk: str = "none"
@@ -1373,7 +1424,6 @@ class GenerateScriptsRequest(BaseModel):
         description="Target SQL dialect",
         pattern=r"^(postgresql|mysql|sqlite|mssql|oracle|duckdb)$",
     )
-    enrich_with_llm: bool = Field(True, description="Use LLM for complex USING clauses")
     include_views: bool = Field(False, description="Include views in scripts")
     include_sequences: bool = Field(False, description="Include sequences in scripts")
     include_check_constraints: bool = Field(False, description="Include check constraints in scripts")
@@ -1390,7 +1440,6 @@ class GeneratedScriptsResponse(BaseModel):
     verify_sql: str = ""
     warnings: List[str] = Field(default_factory=list)
     generated_at: str = ""
-    llm_used: bool = False
 
 
 class BackupScriptRequest(BaseModel):

@@ -324,20 +324,36 @@ async def create_scripts(
         from src.migration.script_generator import generate_scripts
 
         # Fetch source/target schemas so SQLite recreate includes unchanged columns.
-        # Cache is sufficient here — diff snapshot was already computed from fresh data.
         source_schema = None
         target_schema = None
+        include_flags = _build_include_flags(request)
         if project.source_connection_id and project.target_connection_id:
             try:
                 source_conn = await _get_connection(db, project.source_connection_id)
                 target_conn = await _get_connection(db, project.target_connection_id)
-                source_schema = await _get_schema_for_connection(source_conn, force_refresh=False)
-                target_schema = await _get_schema_for_connection(target_conn, force_refresh=False)
+                source_schema = await _get_schema_for_connection(
+                    source_conn, force_refresh=False, include_flags=include_flags,
+                )
+                target_schema = await _get_schema_for_connection(
+                    target_conn, force_refresh=False, include_flags=include_flags,
+                )
             except Exception as e:
                 logger.warning(f"Could not fetch schemas for script generation: {e}")
 
+        # If extended-object flags were set, re-diff with those flags so the
+        # generated scripts include views/sequences/routines/etc.
+        if include_flags and source_schema and target_schema:
+            diff = _comparator.compare(
+                source_schema=source_schema,
+                target_schema=target_schema,
+                source_connection_id=project.source_connection_id,
+                target_connection_id=project.target_connection_id,
+            )
+            # Update the project's diff snapshot with extended objects included
+            project.diff_snapshot = diff.to_dict()
+
         result = await generate_scripts(
-            project, request.target_dialect, request.enrich_with_llm, db,
+            project, request.target_dialect, db=db,
             source_schema=source_schema,
             target_schema=target_schema,
         )
@@ -401,7 +417,7 @@ async def download_script(
     return PlainTextResponse(
         content=content,
         media_type="application/sql",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -422,7 +438,24 @@ async def generate_data_migration(
 
     try:
         from src.migration.data_migration_assistant import generate_data_migration_plan
-        plan = await generate_data_migration_plan(project, batch_size, db)
+
+        # Fetch source/target schemas for type-aware column mapping.
+        source_schema = None
+        target_schema = None
+        if project.source_connection_id and project.target_connection_id:
+            try:
+                source_conn = await _get_connection(db, project.source_connection_id)
+                target_conn = await _get_connection(db, project.target_connection_id)
+                source_schema = await _get_schema_for_connection(source_conn, force_refresh=False)
+                target_schema = await _get_schema_for_connection(target_conn, force_refresh=False)
+            except Exception as e:
+                logger.warning(f"Could not fetch schemas for data migration: {e}")
+
+        plan = await generate_data_migration_plan(
+            project, batch_size, db,
+            source_schema=source_schema,
+            target_schema=target_schema,
+        )
 
         project.data_migration_plan = plan.to_dict()
         await db.commit()

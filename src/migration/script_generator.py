@@ -19,6 +19,7 @@ from src.migration.schema_comparator import (
     _normalize_type, _extract_base_type,
 )
 from src.llm.dialect_registry import DatabaseDialect, get_dialect_for_database_type
+from src.migration.sql_helpers import quote_identifier, escape_literal
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,6 @@ class GeneratedScripts:
     verify_sql: str = ""
     warnings: List[str] = field(default_factory=list)
     generated_at: str = ""
-    llm_used: bool = False
 
     def __post_init__(self):
         if not self.generated_at:
@@ -48,7 +48,6 @@ class GeneratedScripts:
             "verify_sql": self.verify_sql,
             "warnings": self.warnings,
             "generated_at": self.generated_at,
-            "llm_used": self.llm_used,
         }
 
 
@@ -1234,18 +1233,11 @@ class ScriptGenerator:
         return lines
 
     def _quote(self, identifier: str) -> str:
-        """Quote an identifier based on dialect."""
-        if self.dialect == DatabaseDialect.MYSQL:
-            return f"`{identifier}`"
-        if self.dialect == DatabaseDialect.MSSQL:
-            return f"[{identifier}]"
-        # PostgreSQL, SQLite, DuckDB, Oracle all use ANSI double quotes
-        return f'"{identifier}"'
+        return quote_identifier(identifier, self.dialect)
 
     @staticmethod
     def _escape_literal(value: str) -> str:
-        """Escape a string for use in a SQL string literal (single quotes)."""
-        return value.replace("'", "''")
+        return escape_literal(value)
 
     def _column_def(self, col: Dict[str, Any]) -> str:
         """Generate a column definition string."""
@@ -1271,7 +1263,6 @@ class ScriptGenerator:
 async def generate_scripts(
     project,
     target_dialect: str,
-    enrich_with_llm: bool = True,
     db=None,
     source_schema: Optional[Dict[str, Any]] = None,
     target_schema: Optional[Dict[str, Any]] = None,

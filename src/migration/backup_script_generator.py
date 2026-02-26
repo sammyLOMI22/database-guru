@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 
 from src.llm.dialect_registry import DatabaseDialect
+from src.migration.sql_helpers import quote_identifier, escape_literal
 
 logger = logging.getLogger(__name__)
 
@@ -319,9 +320,11 @@ class BackupScriptGenerator:
             safe = self._escape_literal(table_name)
             return [
                 f"IF OBJECT_ID(N'{safe}', N'U') IS NULL",
-                f"CREATE TABLE {self._quote(table_name)} (",
-                body,
-                ");",
+                "BEGIN",
+                f"  CREATE TABLE {self._quote(table_name)} (",
+                f"  {body}",
+                "  );",
+                "END",
             ]
         else:
             return [
@@ -603,19 +606,15 @@ class BackupScriptGenerator:
         return lines
 
     # ------------------------------------------------------------------
-    # Helpers (mirrored from ScriptGenerator for consistency)
+    # Helpers
     # ------------------------------------------------------------------
 
     def _quote(self, identifier: str) -> str:
-        if self.dialect == DatabaseDialect.MYSQL:
-            return f"`{identifier}`"
-        if self.dialect == DatabaseDialect.MSSQL:
-            return f"[{identifier}]"
-        return f'"{identifier}"'
+        return quote_identifier(identifier, self.dialect)
 
     @staticmethod
     def _escape_literal(value: str) -> str:
-        return value.replace("'", "''")
+        return escape_literal(value)
 
     def _column_def(self, col: Dict[str, Any]) -> str:
         name = self._quote(col.get("name", "unknown"))

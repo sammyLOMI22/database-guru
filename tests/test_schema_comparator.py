@@ -7,6 +7,12 @@ from src.migration.schema_comparator import (
     TableDiff,
     ColumnDiff,
     ConstraintDiff,
+    ViewDiff,
+    SequenceDiff,
+    CheckConstraintDiff,
+    RoutineDiff,
+    TriggerDiff,
+    EnumDiff,
     _normalize_type,
     _extract_base_type,
     _extract_length,
@@ -82,8 +88,8 @@ class TestIsTypeNarrowing:
         assert _is_type_narrowing("text", "integer")
 
     def test_unknown_types(self):
-        # Unknown types assumed narrowing for safety
-        assert _is_type_narrowing("custom_type", "other_type")
+        # Unknown types default to non-narrowing (avoids false high-risk alerts)
+        assert not _is_type_narrowing("custom_type", "other_type")
 
 
 # ---------------------------------------------------------------------------
@@ -448,3 +454,241 @@ class TestSchemaComparator:
         })
         diff = self.comp.compare(source, target)
         assert len(diff.table_diffs) == 0
+
+    def test_none_default_not_false_positive(self):
+        """None vs None defaults should not produce a diff (str(None) fix)."""
+        source = self._schema({
+            "t": {
+                "columns": [{"name": "val", "type": "TEXT", "nullable": True, "default": None}],
+                "primary_keys": [], "foreign_keys": [], "indexes": [],
+            }
+        })
+        target = self._schema({
+            "t": {
+                "columns": [{"name": "val", "type": "TEXT", "nullable": True}],
+                "primary_keys": [], "foreign_keys": [], "indexes": [],
+            }
+        })
+        diff = self.comp.compare(source, target)
+        # Both defaults are None, should have no diff
+        assert len(diff.table_diffs) == 0
+
+
+# ---------------------------------------------------------------------------
+# Extended object diffs (views, sequences, enums, routines, triggers, checks)
+# ---------------------------------------------------------------------------
+
+class TestExtendedObjectDiffs:
+    def setup_method(self):
+        self.comp = SchemaComparator()
+
+    def _schema(self, tables=None, **kwargs):
+        s = {"tables": tables or {}, "relationships": [], "summary": {}}
+        s.update(kwargs)
+        return s
+
+    # --- Views ---
+
+    def test_view_added(self):
+        source = self._schema()
+        target = self._schema(views=[{"name": "v_test", "definition": "SELECT 1"}])
+        diff = self.comp.compare(source, target)
+        assert len(diff.view_diffs) == 1
+        assert diff.view_diffs[0].view_name == "v_test"
+        assert diff.view_diffs[0].diff_type == "added"
+
+    def test_view_removed(self):
+        source = self._schema(views=[{"name": "v_old", "definition": "SELECT 1"}])
+        target = self._schema()
+        diff = self.comp.compare(source, target)
+        assert len(diff.view_diffs) == 1
+        assert diff.view_diffs[0].diff_type == "removed"
+
+    def test_view_modified(self):
+        source = self._schema(views=[{"name": "v1", "definition": "SELECT 1"}])
+        target = self._schema(views=[{"name": "v1", "definition": "SELECT 2"}])
+        diff = self.comp.compare(source, target)
+        assert len(diff.view_diffs) == 1
+        assert diff.view_diffs[0].diff_type == "modified"
+
+    def test_view_unchanged(self):
+        source = self._schema(views=[{"name": "v1", "definition": "SELECT 1"}])
+        target = self._schema(views=[{"name": "v1", "definition": "SELECT 1"}])
+        diff = self.comp.compare(source, target)
+        assert len(diff.view_diffs) == 0
+
+    # --- Sequences ---
+
+    def test_sequence_added(self):
+        source = self._schema()
+        target = self._schema(sequences=[{"name": "seq_id", "increment": 1}])
+        diff = self.comp.compare(source, target)
+        assert len(diff.sequence_diffs) == 1
+        assert diff.sequence_diffs[0].diff_type == "added"
+
+    def test_sequence_removed(self):
+        source = self._schema(sequences=[{"name": "seq_old"}])
+        target = self._schema()
+        diff = self.comp.compare(source, target)
+        assert len(diff.sequence_diffs) == 1
+        assert diff.sequence_diffs[0].diff_type == "removed"
+
+    # --- Enums ---
+
+    def test_enum_added(self):
+        source = self._schema()
+        target = self._schema(enums=[{"name": "status", "values": ["a", "b"]}])
+        diff = self.comp.compare(source, target)
+        assert len(diff.enum_diffs) == 1
+        assert diff.enum_diffs[0].diff_type == "added"
+
+    def test_enum_values_modified(self):
+        source = self._schema(enums=[{"name": "status", "values": ["a", "b"]}])
+        target = self._schema(enums=[{"name": "status", "values": ["a", "b", "c"]}])
+        diff = self.comp.compare(source, target)
+        assert len(diff.enum_diffs) == 1
+        assert diff.enum_diffs[0].diff_type == "modified"
+
+    def test_enum_unchanged(self):
+        source = self._schema(enums=[{"name": "status", "values": ["a", "b"]}])
+        target = self._schema(enums=[{"name": "status", "values": ["a", "b"]}])
+        diff = self.comp.compare(source, target)
+        assert len(diff.enum_diffs) == 0
+
+    # --- Routines ---
+
+    def test_routine_added(self):
+        source = self._schema()
+        target = self._schema(routines=[{"name": "my_func", "type": "function", "definition": "CREATE..."}])
+        diff = self.comp.compare(source, target)
+        assert len(diff.routine_diffs) == 1
+        assert diff.routine_diffs[0].diff_type == "added"
+
+    def test_routine_removed(self):
+        source = self._schema(routines=[{"name": "old_proc", "type": "procedure", "definition": "..."}])
+        target = self._schema()
+        diff = self.comp.compare(source, target)
+        assert len(diff.routine_diffs) == 1
+        assert diff.routine_diffs[0].diff_type == "removed"
+
+    # --- Triggers ---
+
+    def test_trigger_added(self):
+        source = self._schema()
+        target = self._schema(triggers=[{"name": "trg_test", "table_name": "t", "definition": "..."}])
+        diff = self.comp.compare(source, target)
+        assert len(diff.trigger_diffs) == 1
+        assert diff.trigger_diffs[0].diff_type == "added"
+
+    # --- Check constraints ---
+
+    def test_check_constraint_added(self):
+        source = self._schema()
+        target = self._schema(check_constraints=[
+            {"table_name": "t", "constraint_name": "ck_pos", "definition": "val > 0"}
+        ])
+        diff = self.comp.compare(source, target)
+        assert len(diff.check_constraint_diffs) == 1
+        assert diff.check_constraint_diffs[0].diff_type == "added"
+
+    def test_check_constraint_removed(self):
+        source = self._schema(check_constraints=[
+            {"table_name": "t", "constraint_name": "ck_old", "definition": "val > 0"}
+        ])
+        target = self._schema()
+        diff = self.comp.compare(source, target)
+        assert len(diff.check_constraint_diffs) == 1
+        assert diff.check_constraint_diffs[0].diff_type == "removed"
+
+
+# ---------------------------------------------------------------------------
+# SchemaDiff.from_dict() round-trip
+# ---------------------------------------------------------------------------
+
+class TestSchemaDiffRoundTrip:
+    def setup_method(self):
+        self.comp = SchemaComparator()
+
+    def _schema(self, tables=None, **kwargs):
+        s = {"tables": tables or {}, "relationships": [], "summary": {}}
+        s.update(kwargs)
+        return s
+
+    def test_table_diff_round_trip(self):
+        source = self._schema({
+            "t": {
+                "columns": [{"name": "val", "type": "INTEGER", "nullable": True}],
+                "primary_keys": [], "foreign_keys": [], "indexes": [],
+            }
+        })
+        target = self._schema({
+            "t": {
+                "columns": [
+                    {"name": "val", "type": "BIGINT", "nullable": False},
+                    {"name": "new_col", "type": "TEXT", "nullable": True},
+                ],
+                "primary_keys": ["val"],
+                "foreign_keys": [], "indexes": [],
+            }
+        })
+        diff = self.comp.compare(source, target)
+        d = diff.to_dict()
+        restored = SchemaDiff.from_dict(d)
+
+        assert restored.overall_risk == diff.overall_risk
+        assert restored.total_breaking_changes == diff.total_breaking_changes
+        assert len(restored.table_diffs) == len(diff.table_diffs)
+        assert restored.table_diffs[0].table_name == diff.table_diffs[0].table_name
+        assert len(restored.table_diffs[0].column_diffs) == len(diff.table_diffs[0].column_diffs)
+        assert len(restored.table_diffs[0].constraint_diffs) == len(diff.table_diffs[0].constraint_diffs)
+
+    def test_extended_diffs_round_trip(self):
+        source = self._schema(
+            views=[{"name": "v1", "definition": "SELECT 1"}],
+            enums=[{"name": "e1", "values": ["a"]}],
+            sequences=[{"name": "s1"}],
+            routines=[{"name": "r1", "type": "function", "definition": "..."}],
+            triggers=[{"name": "t1", "table_name": "t", "definition": "..."}],
+            check_constraints=[{"table_name": "t", "constraint_name": "ck1", "definition": "x > 0"}],
+        )
+        target = self._schema()
+        diff = self.comp.compare(source, target)
+        d = diff.to_dict()
+        restored = SchemaDiff.from_dict(d)
+
+        assert len(restored.view_diffs) == len(diff.view_diffs)
+        assert len(restored.enum_diffs) == len(diff.enum_diffs)
+        assert len(restored.sequence_diffs) == len(diff.sequence_diffs)
+        assert len(restored.routine_diffs) == len(diff.routine_diffs)
+        assert len(restored.trigger_diffs) == len(diff.trigger_diffs)
+        assert len(restored.check_constraint_diffs) == len(diff.check_constraint_diffs)
+
+    def test_from_dict_preserves_risk_level(self):
+        """risk_level should survive round-trip (not be recomputed to default)."""
+        diff = SchemaDiff(
+            table_diffs=[
+                TableDiff(
+                    table_name="t",
+                    diff_type="removed",
+                    column_diffs=[
+                        ColumnDiff(table_name="t", column_name="id", diff_type="removed",
+                                   source_state={"name": "id", "type": "INT"},
+                                   is_breaking=True, risk_level="critical"),
+                    ],
+                    risk_level="critical",
+                )
+            ],
+            total_breaking_changes=1,
+            overall_risk="critical",
+        )
+        d = diff.to_dict()
+        restored = SchemaDiff.from_dict(d)
+        assert restored.table_diffs[0].risk_level == "critical"
+        assert restored.overall_risk == "critical"
+
+    def test_empty_diff_round_trip(self):
+        diff = SchemaDiff(diff_summary="No differences found", overall_risk="none")
+        d = diff.to_dict()
+        restored = SchemaDiff.from_dict(d)
+        assert restored.overall_risk == "none"
+        assert len(restored.table_diffs) == 0

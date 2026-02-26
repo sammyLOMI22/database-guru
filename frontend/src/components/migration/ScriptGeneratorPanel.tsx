@@ -8,6 +8,8 @@ const DIALECTS = [
   { value: 'postgresql', label: 'PostgreSQL' },
   { value: 'mysql', label: 'MySQL' },
   { value: 'sqlite', label: 'SQLite' },
+  { value: 'mssql', label: 'SQL Server' },
+  { value: 'oracle', label: 'Oracle' },
 ];
 
 type ScriptTab = 'up' | 'down' | 'verify';
@@ -36,7 +38,7 @@ export function ScriptGeneratorPanel({ project, onRefresh }: Props) {
     setLoading(true);
     setError('');
     try {
-      const result = await migrationAPI.generateScripts(project.id, dialect, true, flags);
+      const result = await migrationAPI.generateScripts(project.id, dialect, flags);
       setScripts(result);
       onRefresh();
     } catch (err: any) {
@@ -141,7 +143,7 @@ export function ScriptGeneratorPanel({ project, onRefresh }: Props) {
             {/* Toolbar */}
             <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
               <span className="text-[10px] text-gray-500 uppercase tracking-wide">
-                {scripts.target_dialect} &middot; {scripts.llm_used ? 'LLM Enhanced' : 'Deterministic'}
+                {scripts.target_dialect}
               </span>
               <div className="flex items-center gap-2">
                 <button

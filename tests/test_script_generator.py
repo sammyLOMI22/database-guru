@@ -486,3 +486,131 @@ class TestGeneratedScripts:
     def test_auto_timestamp(self):
         gs = GeneratedScripts()
         assert gs.generated_at != ""
+
+
+# ---------------------------------------------------------------------------
+# MSSQL
+# ---------------------------------------------------------------------------
+
+class TestScriptGeneratorMSSQL:
+    def setup_method(self):
+        self.gen = ScriptGenerator(DatabaseDialect.MSSQL)
+
+    def test_bracket_quoting(self):
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="orders", diff_type="added",
+                      column_diffs=[ColumnDiff(table_name="orders", column_name="id", diff_type="added",
+                                                target_state={"name": "id", "type": "INT", "nullable": False})]),
+        ])
+        result = self.gen.generate(diff)
+        assert "[orders]" in result.up_sql
+        assert "[id]" in result.up_sql
+
+    def test_bracket_escaping(self):
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="t]x", diff_type="added",
+                      column_diffs=[ColumnDiff(table_name="t]x", column_name="id", diff_type="added",
+                                                target_state={"name": "id", "type": "INT"})]),
+        ])
+        result = self.gen.generate(diff)
+        assert "[t]]x]" in result.up_sql
+
+    def test_create_table(self):
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="users", diff_type="added",
+                      column_diffs=[
+                          ColumnDiff(table_name="users", column_name="id", diff_type="added",
+                                     target_state={"name": "id", "type": "INT", "nullable": False}),
+                          ColumnDiff(table_name="users", column_name="name", diff_type="added",
+                                     target_state={"name": "name", "type": "NVARCHAR(100)", "nullable": True}),
+                      ]),
+        ])
+        result = self.gen.generate(diff)
+        assert "CREATE TABLE [users]" in result.up_sql
+        assert "[id] INT NOT NULL" in result.up_sql
+
+    def test_drop_table(self):
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="old", diff_type="removed",
+                      column_diffs=[ColumnDiff(table_name="old", column_name="id", diff_type="removed",
+                                                source_state={"name": "id", "type": "INT"})]),
+        ])
+        result = self.gen.generate(diff)
+        assert "DROP TABLE" in result.up_sql
+        assert "[old]" in result.up_sql
+
+    def test_alter_column(self):
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="t", diff_type="modified",
+                      column_diffs=[
+                          ColumnDiff(table_name="t", column_name="val", diff_type="type_changed",
+                                     source_state={"name": "val", "type": "INT", "nullable": True},
+                                     target_state={"name": "val", "type": "BIGINT", "nullable": True}),
+                      ]),
+        ])
+        result = self.gen.generate(diff)
+        assert "ALTER COLUMN" in result.up_sql
+        assert "BIGINT" in result.up_sql
+
+    def test_verify_sql_generated(self):
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="t", diff_type="added",
+                      column_diffs=[ColumnDiff(table_name="t", column_name="id", diff_type="added",
+                                                target_state={"name": "id", "type": "INT"})]),
+        ])
+        result = self.gen.generate(diff)
+        assert "SELECT COUNT(*)" in result.verify_sql
+        assert "[t]" in result.verify_sql
+
+
+# ---------------------------------------------------------------------------
+# Oracle
+# ---------------------------------------------------------------------------
+
+class TestScriptGeneratorOracle:
+    def setup_method(self):
+        self.gen = ScriptGenerator(DatabaseDialect.ORACLE)
+
+    def test_double_quote_quoting(self):
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="orders", diff_type="added",
+                      column_diffs=[ColumnDiff(table_name="orders", column_name="id", diff_type="added",
+                                                target_state={"name": "id", "type": "NUMBER", "nullable": False})]),
+        ])
+        result = self.gen.generate(diff)
+        assert '"orders"' in result.up_sql
+        assert '"id"' in result.up_sql
+
+    def test_create_table(self):
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="users", diff_type="added",
+                      column_diffs=[
+                          ColumnDiff(table_name="users", column_name="id", diff_type="added",
+                                     target_state={"name": "id", "type": "NUMBER", "nullable": False}),
+                      ]),
+        ])
+        result = self.gen.generate(diff)
+        assert 'CREATE TABLE "users"' in result.up_sql
+
+    def test_modify_column_type(self):
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="t", diff_type="modified",
+                      column_diffs=[
+                          ColumnDiff(table_name="t", column_name="val", diff_type="type_changed",
+                                     source_state={"name": "val", "type": "NUMBER(10)", "nullable": True},
+                                     target_state={"name": "val", "type": "NUMBER(20)", "nullable": True}),
+                      ]),
+        ])
+        result = self.gen.generate(diff)
+        assert "MODIFY" in result.up_sql
+        assert "NUMBER(20)" in result.up_sql
+
+    def test_verify_sql_generated(self):
+        diff = _make_diff(table_diffs=[
+            TableDiff(table_name="t", diff_type="added",
+                      column_diffs=[ColumnDiff(table_name="t", column_name="id", diff_type="added",
+                                                target_state={"name": "id", "type": "NUMBER"})]),
+        ])
+        result = self.gen.generate(diff)
+        assert "SELECT COUNT(*)" in result.verify_sql
+        assert '"t"' in result.verify_sql

@@ -123,7 +123,6 @@ export interface GeneratedScriptsResponse {
   verify_sql: string;
   warnings: string[];
   generated_at: string;
-  llm_used: boolean;
 }
 
 export interface ColumnMapping {

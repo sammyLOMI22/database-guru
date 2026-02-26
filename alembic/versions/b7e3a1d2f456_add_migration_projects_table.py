@@ -42,7 +42,7 @@ def upgrade() -> None:
         sa.Column('status', sa.String(20), server_default='draft'),
         sa.Column('notes', sa.Text(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.current_timestamp()),
-        sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.current_timestamp()),
+        sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.current_timestamp(), onupdate=sa.func.current_timestamp()),
     )
     op.create_index('idx_migration_source', 'migration_projects', ['source_connection_id'])
     op.create_index('idx_migration_target', 'migration_projects', ['target_connection_id'])

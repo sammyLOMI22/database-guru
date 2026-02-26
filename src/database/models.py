@@ -1,7 +1,7 @@
 """Database models for Database Guru"""
 from datetime import datetime, timezone
 import uuid
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey, Index, Date, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey, Index, Date, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from src.database.connection import Base
 
@@ -574,4 +574,5 @@ class MigrationProject(Base):
         Index('idx_migration_source', 'source_connection_id'),
         Index('idx_migration_target', 'target_connection_id'),
         Index('idx_migration_status', 'status'),
+        CheckConstraint("status IN ('draft', 'planned', 'scripted')", name='ck_migration_status'),
     )

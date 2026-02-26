@@ -149,8 +149,9 @@ def _is_type_narrowing(source_type: str, target_type: str) -> bool:
     if src_width is not None and tgt_width is not None:
         return tgt_width < src_width
 
-    # Unknown types — assume potentially narrowing to be safe
-    return True
+    # Unknown types — log and default to non-breaking (avoids false high-risk alerts)
+    logger.warning("Unknown type pair in narrowing check: %s → %s", source_type, target_type)
+    return False
 
 
 @dataclass
@@ -638,7 +639,9 @@ class SchemaComparator:
 
             src_default = src.get("default")
             tgt_default = tgt.get("default")
-            if str(src_default) != str(tgt_default):
+            src_norm = None if src_default is None else str(src_default)
+            tgt_norm = None if tgt_default is None else str(tgt_default)
+            if src_norm != tgt_norm:
                 diffs.append(ColumnDiff(
                     table_name=table_name,
                     column_name=name,

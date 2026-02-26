@@ -15,6 +15,7 @@ from src.migration.schema_comparator import (
     _normalize_type, _extract_base_type,
 )
 from src.llm.dialect_registry import DatabaseDialect, get_dialect_for_database_type
+from src.migration.sql_helpers import quote_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -290,7 +291,8 @@ class DataMigrationAssistant:
                 f"INSERT INTO {q_target} ({target_cols})\n"
                 f"SELECT {select_exprs}\n"
                 f"FROM {q_source}\n"
-                f"FETCH FIRST {self.batch_size} ROWS ONLY;"
+                f"ORDER BY ROWID\n"
+                f"OFFSET 0 ROWS FETCH NEXT {self.batch_size} ROWS ONLY;"
             )
         else:
             # MySQL, SQLite, DuckDB
@@ -320,9 +322,7 @@ class DataMigrationAssistant:
         )
 
     def _quote(self, identifier: str) -> str:
-        if self.dialect == DatabaseDialect.MYSQL:
-            return f"`{identifier}`"
-        return f'"{identifier}"'
+        return quote_identifier(identifier, self.dialect)
 
     def _format_default(self, value) -> str:
         if value is None:
@@ -335,7 +335,11 @@ class DataMigrationAssistant:
 
 
 async def generate_data_migration_plan(
-    project, batch_size: int = 1000, db=None,
+    project,
+    batch_size: int = 1000,
+    db=None,
+    source_schema: Optional[Dict[str, Any]] = None,
+    target_schema: Optional[Dict[str, Any]] = None,
 ) -> DataMigrationPlan:
     """High-level function to generate a data migration plan."""
     diff_data = project.diff_snapshot
@@ -349,4 +353,9 @@ async def generate_data_migration_plan(
     dialect = get_dialect_for_database_type(dialect_str)
 
     assistant = DataMigrationAssistant(dialect=dialect, batch_size=batch_size)
-    return assistant.generate_plan(diff, project_id=project.id)
+    return assistant.generate_plan(
+        diff,
+        source_schema=source_schema,
+        target_schema=target_schema,
+        project_id=project.id,
+    )

@@ -347,3 +347,85 @@ class TestDataMigrationSerialization:
         assert assistant._format_default(False) == "FALSE"
         assert assistant._format_default(42) == "42"
         assert assistant._format_default("hello") == "'hello'"
+
+
+# ---------------------------------------------------------------------------
+# Oracle batch offset correctness
+# ---------------------------------------------------------------------------
+
+class TestOracleBatchOffset:
+    def test_oracle_batch_has_offset(self):
+        """Oracle batch template must use OFFSET to avoid infinite loop."""
+        assistant = DataMigrationAssistant(DatabaseDialect.ORACLE, batch_size=500)
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="t",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="t", column_name="a", diff_type="default_changed",
+                               source_state={"type": "NUMBER"}, target_state={"type": "NUMBER"}),
+                ],
+            ),
+        ])
+        plan = assistant.generate_plan(diff)
+        migration = plan.table_migrations[0]
+        assert "OFFSET" in migration.batched_insert_sql
+        assert "FETCH NEXT 500 ROWS ONLY" in migration.batched_insert_sql
+        assert "ORDER BY ROWID" in migration.batched_insert_sql
+
+    def test_oracle_insert_uses_double_quotes(self):
+        assistant = DataMigrationAssistant(DatabaseDialect.ORACLE)
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="orders",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="orders", column_name="total", diff_type="default_changed",
+                               source_state={"type": "NUMBER"}, target_state={"type": "NUMBER"}),
+                ],
+            ),
+        ])
+        plan = assistant.generate_plan(diff)
+        migration = plan.table_migrations[0]
+        assert '"orders__new"' in migration.insert_sql
+        assert '"total"' in migration.insert_sql
+
+
+# ---------------------------------------------------------------------------
+# MSSQL batch
+# ---------------------------------------------------------------------------
+
+class TestMSSQLBatch:
+    def test_mssql_batch_has_offset_fetch(self):
+        assistant = DataMigrationAssistant(DatabaseDialect.MSSQL, batch_size=1000)
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="t",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="t", column_name="a", diff_type="default_changed",
+                               source_state={"type": "INT"}, target_state={"type": "INT"}),
+                ],
+            ),
+        ])
+        plan = assistant.generate_plan(diff)
+        migration = plan.table_migrations[0]
+        assert "OFFSET" in migration.batched_insert_sql
+        assert "FETCH NEXT 1000 ROWS ONLY" in migration.batched_insert_sql
+
+    def test_mssql_bracket_quoting(self):
+        assistant = DataMigrationAssistant(DatabaseDialect.MSSQL)
+        diff = _make_diff(table_diffs=[
+            TableDiff(
+                table_name="orders",
+                diff_type="modified",
+                column_diffs=[
+                    ColumnDiff(table_name="orders", column_name="total", diff_type="default_changed",
+                               source_state={"type": "INT"}, target_state={"type": "INT"}),
+                ],
+            ),
+        ])
+        plan = assistant.generate_plan(diff)
+        migration = plan.table_migrations[0]
+        assert "[orders__new]" in migration.insert_sql
+        assert "[total]" in migration.insert_sql

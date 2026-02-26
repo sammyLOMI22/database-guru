@@ -60,12 +60,11 @@ export const migrationAPI = {
   async generateScripts(
     projectId: number,
     targetDialect: string,
-    enrichWithLlm = true,
     flags?: SchemaObjectFlags,
   ): Promise<GeneratedScriptsResponse> {
     const { data } = await api.post<GeneratedScriptsResponse>(
       `/api/migration/projects/${projectId}/scripts`,
-      { target_dialect: targetDialect, enrich_with_llm: enrichWithLlm, ...flags },
+      { target_dialect: targetDialect, ...flags },
     );
     return data;
   },

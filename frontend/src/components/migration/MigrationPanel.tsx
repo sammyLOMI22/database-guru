@@ -32,14 +32,17 @@ export function MigrationPanel() {
   const [projects, setProjects] = useState<MigrationProjectSummary[]>([]);
   const [selectedProject, setSelectedProject] = useState<MigrationProjectDetail | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [error, setError] = useState('');
 
   const loadProjects = async () => {
     setLoadingProjects(true);
+    setError('');
     try {
       const data = await migrationAPI.listProjects();
       setProjects(data);
-    } catch {
-      // silently handle
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load projects';
+      setError(message);
     } finally {
       setLoadingProjects(false);
     }
@@ -58,8 +61,9 @@ export function MigrationPanel() {
     try {
       const detail = await migrationAPI.getProject(projectId);
       setSelectedProject(detail);
-    } catch {
-      // handle error
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load project';
+      setError(message);
     }
   };
 
@@ -68,8 +72,9 @@ export function MigrationPanel() {
       await migrationAPI.deleteProject(id);
       if (selectedProject?.id === id) setSelectedProject(null);
       loadProjects();
-    } catch {
-      // handle error
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete project';
+      setError(message);
     }
   };
 
@@ -112,6 +117,14 @@ export function MigrationPanel() {
           </div>
         )}
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="mx-4 mt-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center justify-between">
+          <span className="text-xs text-red-700 dark:text-red-300">{error}</span>
+          <button onClick={() => setError('')} className="text-red-400 hover:text-red-600 text-sm">&times;</button>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-auto p-4">

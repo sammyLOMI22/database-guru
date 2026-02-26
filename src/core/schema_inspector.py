@@ -10,6 +10,21 @@ from src.core.column_semantics import ColumnSemanticsDetector, ColumnSemanticTyp
 
 logger = logging.getLogger(__name__)
 
+# Strict allowlist for SQL identifiers used in PRAGMA / SHOW statements
+# where bound parameters are not supported.
+_SAFE_IDENT_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_$]*$')
+
+
+def _safe_identifier(name: str) -> str:
+    """Validate that *name* is a safe SQL identifier.
+
+    Raises ValueError for anything that doesn't match the allowlist so it
+    cannot be used for SQL injection via PRAGMA or SHOW statements.
+    """
+    if not _SAFE_IDENT_RE.match(name):
+        raise ValueError(f"Unsafe SQL identifier rejected: {name!r}")
+    return name
+
 # Which extended object types each dialect supports
 DIALECT_CAPABILITIES: Dict[str, Dict[str, bool]] = {
     "sqlite":     {"views": True,  "sequences": False, "check_constraints": False, "routines": False, "triggers": True,  "enums": False},
@@ -19,6 +34,35 @@ DIALECT_CAPABILITIES: Dict[str, Dict[str, bool]] = {
     "oracle":     {"views": True,  "sequences": True,  "check_constraints": True,  "routines": True,  "triggers": True,  "enums": False},
     "duckdb":     {"views": True,  "sequences": True,  "check_constraints": False, "routines": False, "triggers": False, "enums": False},
 }
+
+
+def _get_dialect_name(session) -> str:
+    """Safely extract the dialect name from a sync or async SQLAlchemy session.
+
+    Works with:
+    - Sync sessions (DuckDB): session.bind.dialect.name
+    - Async sessions (PostgreSQL, MySQL, etc.): session.get_bind().dialect.name
+    """
+    # Try direct bind first (sync sessions)
+    try:
+        if session.bind is not None:
+            return session.bind.dialect.name
+    except Exception:
+        pass
+
+    # Async session: try get_bind() on the underlying sync session
+    try:
+        sync_session = getattr(session, 'sync_session', None)
+        if sync_session is not None:
+            bind = sync_session.get_bind()
+            if bind is not None:
+                return bind.dialect.name
+    except Exception:
+        pass
+
+    # Last resort: check if session has a cached _db_name attribute
+    # (set by SchemaInspector when dialect is known from caller)
+    return getattr(session, '_dialect_hint', "unknown")
 
 
 class SchemaInspector:
@@ -81,8 +125,10 @@ class SchemaInspector:
             List of sample values
         """
         try:
-            # Build safe query with quoted identifiers
-            query = text(f'SELECT DISTINCT "{column_name}" FROM "{table_name}" WHERE "{column_name}" IS NOT NULL LIMIT :limit')
+            # Build safe query with validated identifiers
+            safe_table = _safe_identifier(table_name)
+            safe_col = _safe_identifier(column_name)
+            query = text(f'SELECT DISTINCT "{safe_col}" FROM "{safe_table}" WHERE "{safe_col}" IS NOT NULL LIMIT :limit')
             result = await self._execute_query(session, query, {"limit": limit})
 
             # Extract values
@@ -226,7 +272,7 @@ class SchemaInspector:
                 table_info["foreign_keys"] = valid_fks
 
             # Extended objects — only fetched when explicitly requested
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
             caps = DIALECT_CAPABILITIES.get(db_name, {})
 
             if include_views and caps.get("views"):
@@ -276,7 +322,7 @@ class SchemaInspector:
         """
         try:
             # Detect database type
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
 
             if db_name == "sqlite":
                 # SQLite query
@@ -334,11 +380,12 @@ class SchemaInspector:
             List of column dictionaries
         """
         try:
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
 
             if db_name == "sqlite":
                 # SQLite query using PRAGMA
-                query = f"PRAGMA table_info({table_name})"
+                safe_name = _safe_identifier(table_name)
+                query = f"PRAGMA table_info({safe_name})"
                 result = await self._execute_query(session, text(query))
 
                 columns = []
@@ -420,11 +467,12 @@ class SchemaInspector:
             List of primary key column names
         """
         try:
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
 
             if db_name == "sqlite":
                 # SQLite - use PRAGMA
-                query = f"PRAGMA table_info({table_name})"
+                safe_name = _safe_identifier(table_name)
+                query = f"PRAGMA table_info({safe_name})"
                 result = await self._execute_query(session, text(query))
                 # pk column is at index 5, returns 1 if primary key
                 return [row[1] for row in result.all() if row[5] == 1]
@@ -476,11 +524,12 @@ class SchemaInspector:
             List of foreign key dictionaries
         """
         try:
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
 
             if db_name == "sqlite":
                 # SQLite - use PRAGMA foreign_key_list
-                query = f"PRAGMA foreign_key_list({table_name})"
+                safe_name = _safe_identifier(table_name)
+                query = f"PRAGMA foreign_key_list({safe_name})"
                 result = await self._execute_query(session, text(query))
 
                 foreign_keys = []
@@ -497,13 +546,14 @@ class SchemaInspector:
             elif db_name == "duckdb":
                 # DuckDB - use duckdb_constraints() function
                 # information_schema.key_column_usage doesn't have referenced_table_name in DuckDB
+                safe_name = _safe_identifier(table_name)
                 query = f"""
                     SELECT
                         constraint_column_names,
                         constraint_name,
                         constraint_text
                     FROM duckdb_constraints()
-                    WHERE table_name = '{table_name}'
+                    WHERE table_name = '{safe_name}'
                     AND constraint_type = 'FOREIGN KEY'
                 """
                 result = await self._execute_query(session, text(query))
@@ -622,12 +672,13 @@ class SchemaInspector:
             - unique: Whether the index has a unique constraint
         """
         try:
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
 
             if db_name == "sqlite":
                 # SQLite - use PRAGMA index_list and index_info
                 # First get list of indexes
-                query = f"PRAGMA index_list({table_name})"
+                safe_name = _safe_identifier(table_name)
+                query = f"PRAGMA index_list({safe_name})"
                 result = await self._execute_query(session, text(query))
 
                 indexes = []
@@ -637,7 +688,8 @@ class SchemaInspector:
                     is_unique = row[2] == 1
 
                     # Get columns for this index
-                    col_query = f"PRAGMA index_info({index_name})"
+                    safe_idx = _safe_identifier(index_name)
+                    col_query = f"PRAGMA index_info({safe_idx})"
                     col_result = await self._execute_query(session, text(col_query))
                     columns = [col_row[2] for col_row in col_result.all()]  # column name at index 2
 
@@ -651,13 +703,14 @@ class SchemaInspector:
 
             elif db_name == "duckdb":
                 # DuckDB - use duckdb_indexes()
+                safe_name = _safe_identifier(table_name)
                 query = f"""
                     SELECT
                         index_name,
                         is_unique,
                         sql
                     FROM duckdb_indexes()
-                    WHERE table_name = '{table_name}'
+                    WHERE table_name = '{safe_name}'
                 """
                 result = await self._execute_query(session, text(query))
 
@@ -680,7 +733,8 @@ class SchemaInspector:
 
             elif db_name == "mysql":
                 # MySQL - use SHOW INDEX
-                query = f"SHOW INDEX FROM {table_name}"
+                safe_name = _safe_identifier(table_name)
+                query = f"SHOW INDEX FROM {safe_name}"
                 result = await self._execute_query(session, text(query))
 
                 # Group by index name
@@ -749,7 +803,7 @@ class SchemaInspector:
     ) -> List[Dict[str, Any]]:
         """Get database views with their definitions."""
         try:
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
 
             if db_name == "sqlite":
                 query = text("SELECT name, sql FROM sqlite_master WHERE type='view' ORDER BY name")
@@ -812,7 +866,7 @@ class SchemaInspector:
     ) -> List[Dict[str, Any]]:
         """Get database sequences."""
         try:
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
 
             if db_name == "postgresql":
                 query = text("""
@@ -893,7 +947,7 @@ class SchemaInspector:
     ) -> List[Dict[str, Any]]:
         """Get check constraints (excludes system-generated NOT NULL constraints)."""
         try:
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
 
             if db_name == "postgresql":
                 query = text("""
@@ -970,7 +1024,7 @@ class SchemaInspector:
     ) -> List[Dict[str, Any]]:
         """Get stored procedures and functions."""
         try:
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
 
             if db_name == "postgresql":
                 query = text("""
@@ -1073,7 +1127,7 @@ class SchemaInspector:
     ) -> List[Dict[str, Any]]:
         """Get database triggers."""
         try:
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
 
             if db_name == "sqlite":
                 query = text("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger' ORDER BY name")
@@ -1161,7 +1215,7 @@ class SchemaInspector:
     ) -> List[Dict[str, Any]]:
         """Get enum types (PostgreSQL only)."""
         try:
-            db_name = session.bind.dialect.name if session.bind else "unknown"
+            db_name = _get_dialect_name(session)
 
             if db_name == "postgresql":
                 query = text("""
