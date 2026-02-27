@@ -507,6 +507,60 @@ Generates data migration queries with safety features:
 
 13 REST endpoints for the full migration lifecycle (see API.md for details).
 
+## Performance Guru System (Phase 22)
+**Location**: `src/guru/`, `src/api/endpoints/performance.py`
+**Added**: February 2026
+
+### 33. Explain Analyzer
+**File**: `src/guru/explain_analyzer.py`
+
+Deterministic EXPLAIN plan parser — no LLM involvement:
+- **Multi-Dialect**: PostgreSQL, MySQL, SQLite, DuckDB
+- **Tree Parsing**: Builds structured `PlanNode` tree from raw EXPLAIN output
+- **PostgreSQL**: Regex-based parser for cost, rows, actual time, filters, disk spill detection
+- **MySQL**: Tabular EXPLAIN parsing, access type mapping (ALL→Full Table Scan, REF→Index Lookup)
+- **SQLite**: EXPLAIN QUERY PLAN detail parsing (SCAN, SEARCH, TEMP B-TREE)
+- **DuckDB**: Box-drawing character stripping, node type extraction
+- **Deterministic Warnings**: Rule-based alerts for seq scans, disk spills, high loop counts, filesort
+
+**Key methods**: `run_explain()`, `build_explain_sql()`, `parse_plan()`, `_parse_postgresql()`, `_parse_mysql()`, `_parse_sqlite()`, `_parse_duckdb()`
+
+**Output**: `ExecutionPlan` with root_node, all_nodes, seq_scan_tables, warnings, has_disk_spill
+
+### 34. Explain Interpreter
+**File**: `src/guru/explain_interpreter.py`
+
+LLM-powered execution plan interpreter:
+- **Tiered Prompts**: Compact/Standard/Enhanced based on model size (via `explain_prompts.py`)
+- **JSON Parsing**: Uses `extract_json_object()` for robust brace-balanced extraction
+- **Timeout + Fallback**: `asyncio.wait_for()` with deterministic fallback on timeout/error
+- **SQLite Short-Circuit**: Returns deterministic-only analysis (no LLM call needed)
+- **Model Router Integration**: `TaskType.EXPLAIN_ANALYSIS` for per-task model selection
+
+**Key methods**: `interpret()`, `_build_prompt()`, `_parse_response()`, `_fallback_insights()`, `_sqlite_deterministic_insights()`
+
+**Output**: `PerformanceInsights` with summary, bottlenecks, index_suggestions, query_rewrites, confidence
+
+### Performance Guru API Endpoints
+**File**: `src/api/endpoints/performance.py`
+
+2 REST endpoints:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/performance/analyze` | POST | Full EXPLAIN + LLM insights (rate-limited) |
+| `/api/performance/explain-only` | POST | Raw EXPLAIN plan only (no LLM, no rate limit) |
+
+### Performance Guru Prompts
+**File**: `src/guru/prompts/explain_prompts.py`
+
+Tiered prompt templates for EXPLAIN analysis:
+- **COMPACT** (small models): Top-3 bottlenecks, 1 index suggestion, ~600 tokens
+- **STANDARD** (medium models): Full analysis with index + rewrite suggestions, ~1200 tokens
+- **ENHANCED** (large models): Comprehensive analysis with before/after estimates, memory tuning, ~2000 tokens
+
+---
+
 ## Tool System
 **Location**: `src/tools/`
 

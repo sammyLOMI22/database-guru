@@ -1495,3 +1495,142 @@ class DataMigrationPlanResponse(BaseModel):
     total_tables_with_data: int = 0
     llm_used: bool = False
     generated_at: str = ""
+
+
+# ============================================================================
+# Performance Guru Schemas (Phase 22)
+# ============================================================================
+
+def _validate_explain_sql(v: str) -> str:
+    """Shared validator: block DDL/DML and multi-statement queries for EXPLAIN endpoints."""
+    stripped = v.strip()
+    upper = stripped.upper()
+    for keyword in ("DROP ", "TRUNCATE ", "DELETE ", "UPDATE ", "INSERT ", "ALTER ", "CREATE "):
+        if upper.startswith(keyword):
+            raise ValueError("Performance analysis only supports SELECT queries")
+    if ";" in stripped:
+        raise ValueError("Multi-statement queries are not allowed")
+    return v
+
+
+class PerformanceAnalysisRequest(BaseModel):
+    """Request to analyze query performance via EXPLAIN."""
+    sql: str = Field(..., min_length=1, max_length=20000, description="SQL query to analyze")
+    connection_id: int = Field(..., description="Database connection to run EXPLAIN on")
+    run_analyze: bool = Field(
+        default=False,
+        description="Run EXPLAIN ANALYZE (actually executes the query). Requires explicit opt-in.",
+    )
+    include_schema_context: bool = Field(default=True, description="Include schema context for LLM")
+    model: Optional[str] = Field(default=None, description="Override LLM model for analysis")
+
+    @field_validator("sql")
+    @classmethod
+    def validate_sql_is_select(cls, v: str) -> str:
+        return _validate_explain_sql(v)
+
+
+class ExplainOnlyRequest(BaseModel):
+    """Request for raw EXPLAIN plan without LLM interpretation."""
+    sql: str = Field(..., min_length=1, max_length=20000, description="SQL query to explain")
+    connection_id: int = Field(..., description="Database connection to run EXPLAIN on")
+    run_analyze: bool = Field(default=False, description="Run EXPLAIN ANALYZE")
+
+    @field_validator("sql")
+    @classmethod
+    def validate_sql_is_select(cls, v: str) -> str:
+        return _validate_explain_sql(v)
+
+
+class PlanNodeSchema(BaseModel):
+    node_type: str
+    relation: Optional[str] = None
+    cost_startup: Optional[float] = None
+    cost_total: Optional[float] = None
+    rows_estimated: Optional[int] = None
+    rows_actual: Optional[int] = None
+    loops: Optional[int] = None
+    actual_time_ms: Optional[float] = None
+    filter: Optional[str] = None
+    index_name: Optional[str] = None
+    join_type: Optional[str] = None
+    disk_spill: bool = False
+    children: List["PlanNodeSchema"] = Field(default_factory=list)
+    raw_text: str = ""
+    depth: int = 0
+
+
+PlanNodeSchema.model_rebuild()
+
+
+class ExecutionPlanSchema(BaseModel):
+    dialect: str
+    sql: str
+    analyzed: bool
+    root_node: Optional[PlanNodeSchema] = None
+    all_nodes: List[PlanNodeSchema] = Field(default_factory=list)
+    total_cost: Optional[float] = None
+    total_actual_time_ms: Optional[float] = None
+    has_seq_scans: bool = False
+    has_disk_spill: bool = False
+    has_hash_batches: bool = False
+    node_count: int = 0
+    seq_scan_tables: List[str] = Field(default_factory=list)
+    missing_index_hints: List[str] = Field(default_factory=list)
+    raw_plan: List[str] = Field(default_factory=list)
+    parsed_at: Optional[str] = None
+    warnings: List[str] = Field(default_factory=list)
+
+
+class BottleneckSchema(BaseModel):
+    node_type: str
+    table_or_index: str
+    severity: str
+    description: str
+    impact_estimate: str
+
+
+class IndexSuggestionSchema(BaseModel):
+    table: str
+    columns: List[str] = Field(default_factory=list)
+    reason: str
+    create_sql: str
+    estimated_speedup: str
+
+
+class QueryRewriteSchema(BaseModel):
+    original_pattern: str
+    rewritten_sql: str
+    reason: str
+    expected_improvement: str
+
+
+class PerformanceInsightsSchema(BaseModel):
+    summary: str
+    overall_severity: str = "warning"
+    bottlenecks: List[BottleneckSchema] = Field(default_factory=list)
+    index_suggestions: List[IndexSuggestionSchema] = Field(default_factory=list)
+    query_rewrites: List[QueryRewriteSchema] = Field(default_factory=list)
+    before_after_estimate: Optional[str] = None
+    general_recommendations: List[str] = Field(default_factory=list)
+    confidence: float = 0.5
+    llm_used: bool = False
+    generated_at: Optional[str] = None
+
+
+class PerformanceAnalysisResponse(BaseModel):
+    """Response with execution plan and LLM-powered insights."""
+    plan: ExecutionPlanSchema
+    insights: PerformanceInsightsSchema
+    connection_id: int
+    sql: str
+    analyzed: bool
+    dialect: str
+
+
+class ExplainOnlyResponse(BaseModel):
+    """Response with raw execution plan only (no LLM)."""
+    plan: ExecutionPlanSchema
+    dialect: str
+    analyzed: bool
+    warnings: List[str] = Field(default_factory=list)

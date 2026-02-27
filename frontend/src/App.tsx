@@ -11,6 +11,7 @@ import { ConnectionPoolMetrics } from './components/ConnectionPoolMetrics';
 import { LineagePanel } from './components/lineage/LineagePanel';
 import { LLMUsageDashboard } from './components/dashboard/LLMUsageDashboard';
 import { MigrationPanel } from './components/migration/MigrationPanel';
+import { PerformancePanel } from './components/performance/PerformancePanel';
 import SchemaPanel from './components/SchemaPanel';
 import { healthAPI } from './services/api';
 import { useDarkMode } from './hooks/useDarkMode';
@@ -28,7 +29,7 @@ function App() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [isHealthy, setIsHealthy] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'migration' | 'settings'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'migration' | 'performance' | 'settings'>('chat');
 
   // Cross-component lineage navigation state
   const [lineageNav, setLineageNav] = useState<{ sql?: string; tab?: 'explore' | 'history' | 'impact'; impactTable?: string } | null>(null);
@@ -42,6 +43,14 @@ function App() {
   const handleAnalyzeImpact = useCallback((tableName: string) => {
     setLineageNav({ impactTable: tableName, tab: 'impact' });
     setActiveTab('lineage');
+  }, []);
+
+  // Cross-component performance navigation state (Phase 22)
+  const [performanceNav, setPerformanceNav] = useState<{ sql?: string; connectionId?: number } | null>(null);
+
+  const handleAnalyzePerformance = useCallback((sql: string, connectionId?: number) => {
+    setPerformanceNav({ sql, connectionId });
+    setActiveTab('performance');
   }, []);
 
   useEffect(() => {
@@ -82,7 +91,7 @@ function App() {
           <main className="flex-1 flex h-full">
             {/* Chat - always mounted to preserve history */}
             <div className={`flex-1 flex ${activeTab === 'chat' ? '' : 'hidden'}`}>
-              <EnhancedChatInterface onViewLineage={handleViewLineage} onLastSqlChange={setLastExecutedSql} />
+              <EnhancedChatInterface onViewLineage={handleViewLineage} onAnalyzePerformance={handleAnalyzePerformance} onLastSqlChange={setLastExecutedSql} />
             </div>
 
             {/* Schema */}
@@ -132,6 +141,16 @@ function App() {
             <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'migration' ? '' : 'hidden'}`}>
               <div className="flex-1 flex flex-col h-full min-h-0">
                 <MigrationPanel />
+              </div>
+            </div>
+
+            {/* Performance */}
+            <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'performance' ? '' : 'hidden'}`}>
+              <div className="flex-1 flex flex-col h-full min-h-0">
+                <PerformancePanel
+                  initialSql={performanceNav?.sql}
+                  initialConnectionId={performanceNav?.connectionId}
+                />
               </div>
             </div>
 

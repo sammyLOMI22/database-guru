@@ -279,3 +279,24 @@ Schema diff, migration planning, script generation, and data migration assistanc
 - **Data Migration**: Staging table pattern (`table__new`), batched inserts, validation queries
 - **Project Lifecycle**: draft → planned → scripted status progression
 - **N+1 Prevention**: Uses `selectinload` for connection names
+
+---
+
+## Performance Guru API (Phase 22)
+
+**Router**: `src/api/endpoints/performance.py`
+**Prefix**: `/api/performance`
+
+### Analysis
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/performance/analyze` | Run EXPLAIN + LLM-powered performance insights (rate-limited) |
+| POST | `/api/performance/explain-only` | Run EXPLAIN without LLM interpretation (fast, no rate limit) |
+
+### Features
+- **SQL Validation**: Blocks DDL/DML (DROP, INSERT, UPDATE, DELETE, ALTER, CREATE, TRUNCATE) and multi-statement queries
+- **EXPLAIN ANALYZE**: Opt-in via `run_analyze=true` (actually executes the query)
+- **Schema Context**: Optional schema context passed to LLM for better index suggestions
+- **Multi-Dialect**: PostgreSQL (EXPLAIN FORMAT TEXT), MySQL (EXPLAIN), SQLite (EXPLAIN QUERY PLAN), DuckDB (EXPLAIN/EXPLAIN ANALYZE)
+- **Deterministic Fallback**: Returns rule-based insights when LLM is unavailable or times out
+- **SQLite Short-Circuit**: Deterministic-only analysis (no LLM call) for SQLite plans

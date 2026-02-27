@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: February 21, 2026
+**Last Updated**: February 27, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -555,6 +555,14 @@
     │  • 98 tests | 13 API endpoints | ~5,676 lines                    │
     └───────────────────────────────────────────────────────────────────┘
 
+    ┌───────────────────────────────────────────────────────────────────┐
+    │        PERFORMANCE GURU (Phase 22) ✅ COMPLETE                    │
+    │  • EXPLAIN plan parser (PG, MySQL, SQLite, DuckDB)               │
+    │  • LLM-powered interpretation with tiered prompts + fallback     │
+    │  • Index suggestions, query rewrites, bottleneck detection        │
+    │  • 77 tests | 2 API endpoints | ~3,282 lines                     │
+    └───────────────────────────────────────────────────────────────────┘
+
 
     INDEPENDENT FEATURES (Can Start Anytime):
     =========================================
@@ -578,15 +586,6 @@
     │  • Multi-provider routing with automatic fallback                 │
     │  • Est: 3-4 weeks | Plan: LLM_PROVIDER_EXPANSION_PLAN.md          │
     │  • NOTE: Ideally after Phase 21 (Auth) for cost controls          │
-    └───────────────────────────────────────────────────────────────────┘
-
-    ┌───────────────────────────────────────────────────────────────────┐
-    │        PERFORMANCE GURU (Phase 22) ◀── MEDIUM PRIORITY            │
-    │                                                                   │
-    │  • EXPLAIN ANALYZE interpretation via LLM                         │
-    │  • Actionable index/rewrite suggestions                           │
-    │  • Multi-dialect support (PG, MySQL, SQLite)                      │
-    │  • Est: 2-3 weeks | ~1,300 lines                                  │
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
@@ -786,6 +785,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - **Phase 16** ✅: LLM Usage Monitoring (9 endpoints, full dashboard)
 - **Phase 19** ✅: Data Insights Enhancement (tiered narratives, analytics cache, multi-source quality, chart presets, parallel analysis — 108 tests)
 - **Phase 20** ✅: Database Migration Toolkit (schema diff, planner, script gen, data migration — 98 tests, 13 endpoints, ~5,676 lines)
+- **Phase 22** ✅: Performance Guru (EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects — 77 tests, 2 endpoints, ~3,282 lines)
 - **Phase 23** ✅: Docker Containerization (Compose profiles, security hardened, least-privilege Postgres, Ollama retry, prompts refactor, CTE lineage support)
 - **Table Sorting** ✅: Click-to-sort with smart type detection
 - Plus 10+ earlier phases (see Quick Reference below)
@@ -807,7 +807,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 15 - HIGH** | ~3,000 lines |
 | **Migration Toolkit** | Schema diff, migration planner, script gen, data migration | **Phase 20 ✅ COMPLETE** | ~5,676 lines |
 | **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, simulation mode, undo | **Phase 18 - HIGH** (needs 21) | ~4,000 lines |
-| **Performance Guru** | EXPLAIN analysis, LLM interpretation, index suggestions | **Phase 22 - MEDIUM** | ~1,300 lines |
+| **Performance Guru** | EXPLAIN analysis, LLM interpretation, index suggestions | **Phase 22 ✅ COMPLETE** | ~3,282 lines |
 | **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 17 - MEDIUM** (needs 15+16✅) | ~1,200 lines |
 | **Data Insights** | Tiered narratives, analytics cache, multi-source quality, chart presets, parallel analysis | **Phase 19 ✅ COMPLETE** | ~1,800 lines |
 | **NoSQL Expansion** | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch | **Phase 14 - LOW** (deprioritized) | ~6,000 lines |
@@ -846,6 +846,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | Docker Containerization (Phase 23) | Compose profiles, Nginx proxy, security hardened, Ollama retry, CTE lineage | Deployment guide |
 | Table Sorting | Click-to-sort columns, smart type detection | 24 tests |
 | Migration Toolkit (Phase 20) | Schema diff, migration planner, script generator, data migration | 98 tests |
+| Performance Guru (Phase 22) | EXPLAIN plan analysis, LLM insights, index suggestions, query rewrites, 4 dialects | 77 tests |
 
 **Total Tests**: 1000+ passing
 
@@ -859,7 +860,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Phase 15** | LLM Provider Expansion | Ideally after 21 | ~3,000 lines | HIGH |
 | **Phase 20** | Migration Toolkit | Phase 11✅ + 12✅ | ~5,676 lines | ✅ **COMPLETE** |
 | **Phase 18** | Edit Mode & DML Operations | Phase 21 | ~4,000 lines | HIGH |
-| **Phase 22** | Performance Guru (EXPLAIN) | None | ~1,300 lines | MEDIUM |
+| **Phase 22** | Performance Guru (EXPLAIN) | None | ~3,282 lines | ✅ **COMPLETE** |
 | **Phase 17** | Multi-Provider Monitoring | Phase 15 + 16✅ | ~1,200 lines | MEDIUM |
 | **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | ✅ **COMPLETE** |
 | **Phase 23** | Docker Containerization | None | ~200 lines config | ✅ **COMPLETE** |
@@ -889,7 +890,15 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 
 ---
 
-**Updated**: February 21, 2026
+**Updated**: February 27, 2026
+- **Phase 22 ✅ COMPLETE**: Performance Guru
+  - 22.1: Explain Analyzer — deterministic EXPLAIN plan parser for PostgreSQL, MySQL, SQLite, DuckDB
+  - 22.2: Explain Interpreter — LLM-powered plan interpretation with tiered prompts (compact/standard/enhanced)
+  - 22.3: Performance API — 2 endpoints (analyze with LLM, explain-only without)
+  - Frontend: PerformancePanel, ExecutionPlanTree (collapsible nodes), PerformanceInsightsPanel (bottlenecks, index suggestions, query rewrites)
+  - Safety: SQL validation blocks DDL/DML and multi-statement queries, EXPLAIN ANALYZE requires opt-in
+  - Deterministic fallback on LLM timeout/error, SQLite short-circuit (no LLM needed)
+  - 77 tests, 2 API endpoints, ~3,282 lines
 - **Phase 20 ✅ COMPLETE**: Database Migration Toolkit
   - 20.1: Schema diff engine (visual DB-to-DB comparison, drift analysis, fingerprinting)
   - 20.2: Migration planner (topological sort with existing FKs, data-loss detection, LLM enrichment)
