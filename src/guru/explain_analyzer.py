@@ -96,6 +96,7 @@ class ExplainAnalyzer:
         elif db_lower == "mysql":
             return f"EXPLAIN {sql}"
         elif db_lower == "sqlite":
+            # SQLite doesn't support EXPLAIN ANALYZE; always use EXPLAIN QUERY PLAN
             return f"EXPLAIN QUERY PLAN {sql}"
         elif db_lower == "duckdb":
             if analyze:
@@ -122,7 +123,15 @@ class ExplainAnalyzer:
             Parsed ExecutionPlan with structured nodes
         """
         dialect = connection.database_type
+
+        # SQLite doesn't support EXPLAIN ANALYZE — force analyze=False
+        effective_analyze = analyze and dialect.lower() not in ("sqlite",)
+
         explain_sql = self.build_explain_sql(sql, dialect, analyze)
+
+        warnings: List[str] = []
+        if analyze and not effective_analyze:
+            warnings.append(f"{dialect} does not support EXPLAIN ANALYZE; returning cost-based plan only")
 
         try:
             async with UserDatabaseConnector.get_user_db_session(connection) as session:
@@ -132,12 +141,15 @@ class ExplainAnalyzer:
             return ExecutionPlan(
                 dialect=dialect,
                 sql=sql,
-                analyzed=analyze,
+                analyzed=False,
                 raw_plan=[f"Error: {str(e)}"],
                 warnings=[f"Failed to run EXPLAIN: {str(e)}"],
             )
 
-        return self.parse_plan(rows, dialect, sql, analyze)
+        plan = self.parse_plan(rows, dialect, sql, effective_analyze)
+        if warnings:
+            plan.warnings = warnings + plan.warnings
+        return plan
 
     async def _execute_explain(
         self,
@@ -150,7 +162,7 @@ class ExplainAnalyzer:
 
         if isinstance(session, Session):
             # Sync session (DuckDB, MSSQL, Oracle) - run in thread pool
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 None, lambda: session.execute(query).fetchall()
             )

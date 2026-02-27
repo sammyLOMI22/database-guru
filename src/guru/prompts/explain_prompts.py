@@ -33,6 +33,7 @@ EXPLAIN plan:
 Warnings:
 {warnings}
 
+{schema_context}
 Return JSON ONLY:
 {{"summary": "1 sentence on worst bottleneck", "overall_severity": "good|warning|critical", "bottlenecks": [{{"node_type": "str", "table_or_index": "str", "severity": "low|medium|high|critical", "description": "str", "impact_estimate": "str"}}], "index_suggestions": [{{"table": "str", "columns": ["col"], "reason": "str", "create_sql": "CREATE INDEX ...", "estimated_speedup": "str"}}], "query_rewrites": [], "general_recommendations": ["str"], "confidence": 0.0-1.0}}"""
 

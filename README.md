@@ -257,6 +257,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance per session and globally with full dashboard
 - ✅ **Data Insights Enhancement (NEW!)** - Tiered narrative prompts (compact/standard/enhanced), analytics caching, multi-source data quality analysis, adaptive chart scoring presets, parallel analysis pipeline with early exit optimization
 - ✅ **Database Migration Toolkit (NEW!)** - Schema diff engine, dependency-aware migration planner, multi-dialect script generator (up.sql/down.sql/verify.sql), data migration assistant with staging table pattern and batched INSERT SELECT
+- ✅ **Performance Guru (NEW!)** - EXPLAIN plan analysis with LLM-powered insights, bottleneck detection, index suggestions with CREATE INDEX SQL, query rewrite recommendations, multi-dialect support (PostgreSQL, MySQL, SQLite, DuckDB), tiered prompts, deterministic fallback
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection

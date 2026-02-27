@@ -54,7 +54,7 @@ docker compose down -v                         # Stop + remove volumes
 
 ## Architecture Overview
 
-The system uses a multi-agent architecture with 27+ specialized agents. See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
+The system uses a multi-agent architecture with 29+ specialized agents. See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
 
 ### Key Agents (Quick Reference)
 | Agent | File | Purpose |
@@ -81,6 +81,8 @@ The system uses a multi-agent architecture with 27+ specialized agents. See [.cl
 | Migration Planner | `src/migration/migration_planner.py` | Dependency-aware migration planning (Phase 20) |
 | Script Generator | `src/migration/script_generator.py` | up.sql/down.sql/verify.sql generation (Phase 20) |
 | Data Migration Asst. | `src/migration/data_migration_assistant.py` | Batched INSERT SELECT with validation (Phase 20) |
+| Explain Analyzer | `src/guru/explain_analyzer.py` | Deterministic EXPLAIN plan parser, multi-dialect (Phase 22) |
+| Explain Interpreter | `src/guru/explain_interpreter.py` | LLM-powered plan interpretation with fallback (Phase 22) |
 
 ### Data Flow
 ```
@@ -146,9 +148,10 @@ Key docs in `docs/`:
 | **Guides** | `guides/MULTI_DATABASE_GUIDE.md`, `guides/CONNECTION_POOLING_GUIDE.md`, `guides/DATA_LINEAGE_GUIDE.md`, `guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md`, `guides/FILE_DATA_SOURCE_USER_GUIDE.md` |
 | **Technical** | `technical/PARALLEL_EXECUTION.md`, `technical/SEMANTIC_CACHING.md`, `technical/SQL_GENERATION_PIPELINE.md` |
 | **Modules** | `modules/QUERY_PLANNING_AGENT.md`, `modules/TOOL_USING_AGENT.md` |
-| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/DATA_INSIGHTS_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
+| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/DATA_INSIGHTS_TESTING.md`, `guides/testing/PHASE_22_PERFORMANCE_GURU_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
 | **Planning** | `planning/FUTURE_PLANS.md`, `planning/MASTER_ROADMAP.md` |
 | **LLM Usage** | `guides/LLM_USAGE_MONITORING_GUIDE.md` |
 | **Data Insights** | `planning/DATA_INSIGHTS_ENHANCEMENT_PLAN.md` |
 | **Migration** | `planning/MIGRATION_TOOLKIT_PROPOSAL.md` |
+| **Performance** | `guides/PERFORMANCE_GURU_GUIDE.md` |
 | **Deployment** | `guides/DOCKER_DEPLOYMENT_GUIDE.md`, `planning/DOCKER_CONTAINERIZATION_PLAN.md` |

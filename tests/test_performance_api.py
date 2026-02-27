@@ -65,6 +65,14 @@ class TestSchemaValidation:
         with pytest.raises(Exception):
             ExplainOnlyRequest(sql="CREATE TABLE t (id INT)", connection_id=1)
 
+    def test_analysis_request_blocks_semicolon(self):
+        with pytest.raises(Exception):
+            PerformanceAnalysisRequest(sql="SELECT 1; DROP TABLE orders", connection_id=1)
+
+    def test_explain_only_blocks_semicolon(self):
+        with pytest.raises(Exception):
+            ExplainOnlyRequest(sql="SELECT 1; DROP TABLE orders", connection_id=1)
+
     def test_analysis_request_empty_sql_rejected(self):
         with pytest.raises(Exception):
             PerformanceAnalysisRequest(sql="", connection_id=1)

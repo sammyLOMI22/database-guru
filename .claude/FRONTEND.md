@@ -252,6 +252,26 @@ frontend/src/
 | `getRecent(limit)` | Fetch recent call records |
 | `getSessionUsage(sessionId)` | Fetch per-session usage |
 
+## Performance Guru UI (Phase 22)
+**Location**: `frontend/src/components/performance/`
+
+### Components
+- **PerformancePanel** (`PerformancePanel.tsx`): Main panel with connection selector, SQL input, EXPLAIN ANALYZE toggle, results display
+- **ExecutionPlanTree** (`ExecutionPlanTree.tsx`): Collapsible tree view of execution plan nodes with color-coded severity (green=index scan, amber=seq scan, red=disk spill), raw plan toggle
+- **PerformanceInsightsPanel** (`PerformanceInsightsPanel.tsx`): AI insights display with severity banner, bottlenecks, index suggestions (with copy-to-clipboard CREATE INDEX), query rewrites, general recommendations
+
+### Cross-Component Navigation
+- Chat results show a Zap (⚡) icon button on each SQL result to navigate to Performance tab
+- `onAnalyzePerformance` callback flows: `MultiDatabaseResults` → `Message` → `EnhancedChatInterface` → `App.tsx` → `PerformancePanel`
+
+**API Service** (`services/performanceApi.ts`):
+| Method | Purpose |
+|--------|---------|
+| `analyzeQuery(request)` | Full EXPLAIN + LLM insights (60s timeout) |
+| `explainOnly(connectionId, sql, runAnalyze)` | Raw EXPLAIN plan only |
+
+**Types** (`types/performance.ts`): `PlanNode`, `ExecutionPlan`, `Bottleneck`, `IndexSuggestion`, `QueryRewrite`, `PerformanceInsights`, `PerformanceAnalysisRequest`, `PerformanceAnalysisResponse`, `ExplainOnlyResponse`
+
 ## App.tsx Tab Structure
 
 | Tab | Color | Purpose |
@@ -259,6 +279,8 @@ frontend/src/
 | Query | Default | Main query interface |
 | Connections | Default | Database connection management |
 | Lineage | Purple | Data lineage visualization |
+| Migrate | Default | Database migration toolkit |
+| Perf | Amber | Performance Guru (EXPLAIN analysis) |
 | Tools | Orange | Tool-Using Agent management |
 | Cache | Amber | Semantic cache monitoring |
 | Usage | Default | LLM usage monitoring dashboard |

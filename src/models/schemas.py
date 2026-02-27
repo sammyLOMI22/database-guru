@@ -1501,6 +1501,18 @@ class DataMigrationPlanResponse(BaseModel):
 # Performance Guru Schemas (Phase 22)
 # ============================================================================
 
+def _validate_explain_sql(v: str) -> str:
+    """Shared validator: block DDL/DML and multi-statement queries for EXPLAIN endpoints."""
+    stripped = v.strip()
+    upper = stripped.upper()
+    for keyword in ("DROP ", "TRUNCATE ", "DELETE ", "UPDATE ", "INSERT ", "ALTER ", "CREATE "):
+        if upper.startswith(keyword):
+            raise ValueError("Performance analysis only supports SELECT queries")
+    if ";" in stripped:
+        raise ValueError("Multi-statement queries are not allowed")
+    return v
+
+
 class PerformanceAnalysisRequest(BaseModel):
     """Request to analyze query performance via EXPLAIN."""
     sql: str = Field(..., min_length=1, max_length=20000, description="SQL query to analyze")
@@ -1515,11 +1527,7 @@ class PerformanceAnalysisRequest(BaseModel):
     @field_validator("sql")
     @classmethod
     def validate_sql_is_select(cls, v: str) -> str:
-        upper = v.strip().upper()
-        for keyword in ("DROP ", "TRUNCATE ", "DELETE ", "UPDATE ", "INSERT ", "ALTER ", "CREATE "):
-            if upper.startswith(keyword):
-                raise ValueError("Performance analysis only supports SELECT queries")
-        return v
+        return _validate_explain_sql(v)
 
 
 class ExplainOnlyRequest(BaseModel):
@@ -1531,11 +1539,7 @@ class ExplainOnlyRequest(BaseModel):
     @field_validator("sql")
     @classmethod
     def validate_sql_is_select(cls, v: str) -> str:
-        upper = v.strip().upper()
-        for keyword in ("DROP ", "TRUNCATE ", "DELETE ", "UPDATE ", "INSERT ", "ALTER ", "CREATE "):
-            if upper.startswith(keyword):
-                raise ValueError("Performance analysis only supports SELECT queries")
-        return v
+        return _validate_explain_sql(v)
 
 
 class PlanNodeSchema(BaseModel):

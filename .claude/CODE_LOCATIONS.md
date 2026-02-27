@@ -363,3 +363,36 @@ Quick reference for finding important code in the Database Guru codebase.
 | Upload directory | `FILE_UPLOAD_DIR` |
 | Max file size | `FILE_MAX_SIZE_MB` |
 | DuckDB memory | `DUCKDB_FILE_MEMORY_LIMIT` |
+
+---
+
+### Performance Guru (Phase 22)
+
+| Component | Location |
+|-----------|----------|
+| **Backend Core** | |
+| Explain Analyzer | `src/guru/explain_analyzer.py` (~640 lines) |
+| Explain Interpreter | `src/guru/explain_interpreter.py` (~380 lines) |
+| Explain Prompts | `src/guru/prompts/explain_prompts.py` (~200 lines) |
+| Package init | `src/guru/__init__.py` |
+| **API** | |
+| Performance endpoints | `src/api/endpoints/performance.py` (~160 lines) |
+| Router registration | `src/main.py` (line ~192) |
+| **Schemas** | |
+| Request/Response schemas | `src/models/schemas.py` (Performance Guru section) |
+| PerformanceAnalysisRequest | `src/models/schemas.py:PerformanceAnalysisRequest` |
+| ExecutionPlanSchema | `src/models/schemas.py:ExecutionPlanSchema` |
+| PerformanceInsightsSchema | `src/models/schemas.py:PerformanceInsightsSchema` |
+| SQL validator | `src/models/schemas.py:_validate_explain_sql` |
+| **Model Router** | |
+| TaskType.EXPLAIN_ANALYSIS | `src/llm/model_router.py` |
+| **Frontend Components** | |
+| Performance Panel | `frontend/src/components/performance/PerformancePanel.tsx` (~215 lines) |
+| Execution Plan Tree | `frontend/src/components/performance/ExecutionPlanTree.tsx` (~147 lines) |
+| Insights Panel | `frontend/src/components/performance/PerformanceInsightsPanel.tsx` (~245 lines) |
+| API service | `frontend/src/services/performanceApi.ts` |
+| Type definitions | `frontend/src/types/performance.ts` |
+| **Tests** | |
+| Analyzer tests | `tests/test_explain_analyzer.py` (355+ tests) |
+| Interpreter tests | `tests/test_explain_interpreter.py` (374+ tests) |
+| API tests | `tests/test_performance_api.py` (257+ tests) |

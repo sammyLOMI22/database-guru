@@ -36,10 +36,11 @@ export function PerformancePanel({ initialSql, initialConnectionId }: Performanc
         database_type: c.database_type,
       }));
       setConnections(conns);
-      if (!selectedConnectionId && conns.length > 0) {
-        setSelectedConnectionId(conns[0].id);
+      if (conns.length > 0) {
+        setSelectedConnectionId(prev => prev ?? conns[0].id);
       }
     }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update from initial props (cross-tab navigation)
