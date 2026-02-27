@@ -27,6 +27,7 @@ interface MultiDatabaseResultsProps {
   cacheInfo?: CacheInfo | null;
   combinedAnalysis?: any; // ResultAnalysis from multi-db response
   onViewLineage?: (sql: string) => void;
+  onAnalyzePerformance?: (sql: string, connectionId?: number) => void;
 }
 
 export default function MultiDatabaseResults({
@@ -37,6 +38,7 @@ export default function MultiDatabaseResults({
   cacheInfo,
   combinedAnalysis,
   onViewLineage,
+  onAnalyzePerformance,
 }: MultiDatabaseResultsProps) {
   console.log('DEBUG: MultiDatabaseResults props:', { combinedAnalysis, resultAnalysis0: results[0]?.result_analysis });
 
@@ -380,6 +382,15 @@ export default function MultiDatabaseResults({
                             title="View Lineage"
                           >
                             <GitBranch className="w-3 h-3" />
+                          </button>
+                        )}
+                        {onAnalyzePerformance && result.sql && (
+                          <button
+                            onClick={() => onAnalyzePerformance(result.sql, result.connection_id)}
+                            className="text-gray-400 hover:text-amber-500 transition-colors p-1"
+                            title="Analyze Performance"
+                          >
+                            <Zap className="w-3 h-3" />
                           </button>
                         )}
                       </div>

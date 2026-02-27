@@ -44,6 +44,8 @@ class TaskType(Enum):
     PATTERN_INTELLIGENCE = "pattern_intelligence"
     # Phase 20: Migration Toolkit
     MIGRATION_PLANNER = "migration_planner"
+    # Phase 22: Performance Guru
+    EXPLAIN_ANALYSIS = "explain_analysis"
 
 
 @dataclass
@@ -84,6 +86,8 @@ class ModelRouter:
         TaskType.PATTERN_INTELLIGENCE: 20,
         # Phase 20: Migration Toolkit
         TaskType.MIGRATION_PLANNER: 30,
+        # Phase 22: Performance Guru
+        TaskType.EXPLAIN_ANALYSIS: 25,
     }
 
     def __init__(
@@ -300,6 +304,9 @@ async def get_model_router(db_session=None) -> ModelRouter:
                 # Phase 20: Migration Toolkit
                 'model_migration_planner': getattr(sys_settings, 'model_migration_planner', None),
                 'timeout_migration_planner': getattr(sys_settings, 'timeout_migration_planner', 30),
+                # Phase 22: Performance Guru
+                'model_explain_analysis': getattr(sys_settings, 'model_explain_analysis', None),
+                'timeout_explain_analysis': getattr(sys_settings, 'timeout_explain_analysis', 25),
             }
 
             logger.debug(f"Loaded model settings from database: {model_settings}")

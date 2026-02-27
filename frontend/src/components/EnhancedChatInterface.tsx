@@ -32,10 +32,11 @@ interface PerTaskModelSettings {
 
 interface EnhancedChatInterfaceProps {
   onViewLineage?: (sql: string) => void;
+  onAnalyzePerformance?: (sql: string, connectionId?: number) => void;
   onLastSqlChange?: (sql: string) => void;
 }
 
-export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }: EnhancedChatInterfaceProps) {
+export default function EnhancedChatInterface({ onViewLineage, onAnalyzePerformance, onLastSqlChange }: EnhancedChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -642,6 +643,7 @@ export default function EnhancedChatInterface({ onViewLineage, onLastSqlChange }
                     content={message.content}
                     multiQueryResponse={message.multiQueryResponse}
                     onViewLineage={onViewLineage}
+                    onAnalyzePerformance={onAnalyzePerformance}
                   />
                 </div>
               ))}

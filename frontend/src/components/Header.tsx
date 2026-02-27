@@ -14,6 +14,7 @@ const TABS = [
   { id: 'schema', label: 'Schema', icon: '🗂️' },
   { id: 'lineage', label: 'Lineage', icon: '🔀' },
   { id: 'migration', label: 'Migrate', icon: '🔄' },
+  { id: 'performance', label: 'Perf', icon: '🏎️' },
   { id: 'feedback', label: 'Stats', icon: '📊' },
   { id: 'usage', label: 'LLM Usage', icon: '⚡' },
   { id: 'tools', label: 'Tools', icon: '🔧' },
