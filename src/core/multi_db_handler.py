@@ -28,6 +28,85 @@ class MultiDatabaseHandler:
     def __init__(self):
         self.schema_inspector = SchemaInspector()
 
+    async def _introspect_nosql_database(self, conn: DatabaseConnection) -> Dict[str, Any]:
+        """Introspect schema for a NoSQL database via its native schema inspector."""
+        from datetime import datetime
+
+        db_type = conn.database_type.lower()
+
+        # Check schema cache first (30-minute TTL)
+        cached = conn.schema_cache
+        if cached and isinstance(cached, dict) and cached.get("tables"):
+            updated_at = conn.schema_updated_at
+            if updated_at:
+                age = (datetime.utcnow() - updated_at).total_seconds()
+                if age < 1800:
+                    tables_dict = cached.get("tables", {})
+                    tables_list = [{"name": name, **info} for name, info in tables_dict.items()]
+                    logger.info(f"Using cached NoSQL schema for '{conn.name}' ({int(age)}s old)")
+                    return {
+                        "connection_id": conn.id,
+                        "name": conn.name,
+                        "database_type": conn.database_type,
+                        "database_name": conn.database_name,
+                        "tables": tables_list,
+                        "table_count": len(tables_list),
+                    }
+
+        # Fresh introspection via per-DB inspector
+        schema_dict = None
+        if db_type == "mongodb":
+            from src.nosql.mongodb.client_pool import MongoClientPool
+            from src.nosql.mongodb.schema_inspector import MongoSchemaInspector
+            pool = await MongoClientPool.get_instance()
+            _, mongo_db = await pool.get_client(conn)
+            inspector = MongoSchemaInspector(mongo_db)
+            schema_dict = await inspector.get_schema()
+        elif db_type == "redis":
+            from src.nosql.redis.client_pool import RedisClientPool
+            from src.nosql.redis.schema_inspector import RedisSchemaInspector
+            pool = await RedisClientPool.get_instance()
+            client = await pool.get_client(conn)
+            inspector = RedisSchemaInspector(client)
+            schema_dict = await inspector.get_schema()
+        elif db_type == "cassandra":
+            from src.nosql.cassandra.client_pool import CassandraClientPool
+            from src.nosql.cassandra.schema_inspector import CassandraSchemaInspector
+            pool = await CassandraClientPool.get_instance()
+            session = await pool.get_client(conn)
+            inspector = CassandraSchemaInspector(session, conn.database_name)
+            schema_dict = await inspector.get_schema()
+        elif db_type == "dynamodb":
+            from src.nosql.dynamodb.client_pool import DynamoDBClientPool
+            from src.nosql.dynamodb.schema_inspector import DynamoDBSchemaInspector
+            pool = await DynamoDBClientPool.get_instance()
+            client = await pool.get_client(conn)
+            inspector = DynamoDBSchemaInspector(client)
+            schema_dict = await inspector.get_schema()
+        elif db_type == "elasticsearch":
+            from src.nosql.elasticsearch.client_pool import ElasticsearchClientPool
+            from src.nosql.elasticsearch.schema_inspector import ElasticsearchSchemaInspector
+            pool = await ElasticsearchClientPool.get_instance()
+            client = await pool.get_client(conn)
+            inspector = ElasticsearchSchemaInspector(client)
+            schema_dict = await inspector.get_schema()
+        else:
+            raise ValueError(f"Unknown NoSQL type: {db_type}")
+
+        tables_dict = schema_dict.get("tables", {})
+        tables_list = [{"name": name, **info} for name, info in tables_dict.items()]
+
+        logger.info(f"Introspected NoSQL schema for '{conn.name}': {len(tables_list)} collections/indices")
+
+        return {
+            "connection_id": conn.id,
+            "name": conn.name,
+            "database_type": conn.database_type,
+            "database_name": conn.database_name,
+            "tables": tables_list,
+            "table_count": len(tables_list),
+        }
+
     async def _introspect_single_database(self, conn: DatabaseConnection) -> Dict[str, Any]:
         """
         Introspect schema for a single database connection
@@ -39,6 +118,11 @@ class MultiDatabaseHandler:
             Dict with database info and schema, or error info
         """
         try:
+            # Route NoSQL databases to their own schema inspectors
+            from src.nosql.router import is_nosql
+            if is_nosql(conn.database_type):
+                return await self._introspect_nosql_database(conn)
+
             async with UserDatabaseConnector.get_user_db_session(conn) as user_db:
                 # Get schema for this database (with caching)
                 from src.core.schema_cache import SchemaCache
@@ -382,6 +466,20 @@ class MultiDatabaseHandler:
                 lines.append("- Generate SEPARATE queries for databases vs files - they use different engines")
                 lines.append("- For file queries, use: FILE_SOURCE: file_name prefix")
                 lines.append("")
+
+        # Add NoSQL guidance if mixed sources
+        nosql_types = {"mongodb", "redis", "cassandra", "dynamodb", "elasticsearch"}
+        nosql_dbs = [
+            db for db in combined_schema.get("databases", [])
+            if db.get("database_type") in nosql_types and "error" not in db
+        ]
+        if nosql_dbs:
+            lines.append("\n## NoSQL DATA SOURCES")
+            lines.append("These databases use native query languages (NOT SQL).")
+            lines.append("Generate SEPARATE native queries for each NoSQL source.\n")
+            for db in nosql_dbs:
+                lines.append(f"- {db['name']} ({db['database_type']}): Use native {db['database_type']} query syntax")
+            lines.append("")
 
         return "\n".join(lines)
 

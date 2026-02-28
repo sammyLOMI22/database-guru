@@ -4,6 +4,8 @@
 
 This document describes how Database Guru converts natural language questions into SQL queries, including the quality control mechanisms and planned improvements.
 
+For the NoSQL pipeline (MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch), see [NOSQL_QUERY_PIPELINE.md](NOSQL_QUERY_PIPELINE.md).
+
 ---
 
 ## Current Architecture
@@ -145,10 +147,44 @@ User Question (Multi-DB Mode)
 │  - FULL databases: Execute original SQL                          │
 │  - PARTIAL databases: Execute suggested_sql with alternatives    │
 │  - CANNOT databases: Skip with informative error message         │
+│  - NoSQL databases: Route via NoSQL pipeline (see below)         │
 │  - Per-database result narratives generated                      │
 │  - Combined analysis synthesizes insights across all databases   │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### Mixed SQL + NoSQL Execution (Phase 14 - February 2026)
+
+When a chat session includes both SQL and NoSQL connections, the `MultiDatabaseHandler`
+routes each query through the appropriate pipeline:
+
+```
+User Question (Mixed SQL + NoSQL Session)
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              SCHEMA INTROSPECTION (All Sources)                  │
+├─────────────────────────────────────────────────────────────────┤
+│  SQL databases: UserDatabaseConnector → SchemaInspector          │
+│  NoSQL databases: _introspect_nosql_database() → per-DB         │
+│    schema inspector (MongoDB/Redis/Cassandra/DynamoDB/ES)       │
+│  Schema formatted with NoSQL guidance section for LLM            │
+└─────────────────────────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              PARALLEL EXECUTION (asyncio.gather)                 │
+├─────────────────────────────────────────────────────────────────┤
+│  For each connection (in parallel):                              │
+│  - is_nosql(type)? → execute_nosql_query() → NoSQL pipeline     │
+│  - else → _execute_sql_query() → SQL pipeline                   │
+│  All return unified result contract                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+The NoSQL pipeline generates native queries (MQL, Redis commands, CQL, PartiQL, Query DSL)
+via LLM, executes them with native drivers, and normalizes results to match the SQL contract.
+See [NOSQL_QUERY_PIPELINE.md](NOSQL_QUERY_PIPELINE.md) for full details.
 
 ### Query Capability Assessment
 
@@ -714,6 +750,9 @@ System: "This database doesn't have location data. Did you mean:
 | **Schema Glance UI (NEW)** | `frontend/src/components/SchemaGlance.tsx` | Database schema overview |
 | **Assessment UI (NEW)** | `frontend/src/components/MultiDatabaseAssessment.tsx` | Per-DB capability selection |
 | **Feasibility Badge (NEW)** | `frontend/src/components/QueryFeasibilityBadge.tsx` | Capability status badges |
+| **NoSQL Router (Phase 14)** | `src/nosql/router.py` | `is_nosql()`, `execute_nosql_query()` |
+| **NoSQL Result Formatter** | `src/nosql/result_formatter.py` | `normalize_nosql_result()` |
+| **Multi-DB NoSQL Introspection** | `src/core/multi_db_handler.py` | `_introspect_nosql_database()` |
 
 ---
 
@@ -731,6 +770,8 @@ The SQL generation pipeline has evolved to include:
 9. **Multi-DB pre-flight validation (NEW - Jan 2026)** - Assess query feasibility per database before execution
 10. **Dialect-aware SQL generation (NEW - Jan 10, 2026)** - Database-specific syntax for dates, booleans, strings
 11. **Query compilation & caching (NEW - Jan 2026)** - sqlparse-based SQL normalization with LRU template caching
+12. **NoSQL pipeline integration (NEW - Feb 2026)** - Unified dispatch for MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch via native query generation (see [NOSQL_QUERY_PIPELINE.md](NOSQL_QUERY_PIPELINE.md))
+13. **Mixed SQL + NoSQL chat sessions (NEW - Feb 2026)** - Combined schema introspection and parallel execution across SQL and NoSQL data sources
 
 Future improvements focus on:
 - ~~Pre-generation intent classification~~ ✅ Implemented via TemplateEngine
