@@ -229,92 +229,37 @@ async def process_query(
         await db.flush()
         await db.refresh(query_record)
 
-        # Connect to user's database for schema and query execution
-        async with UserDatabaseConnector.get_user_db_session(active_connection) as user_db:
-            # Initialize schema inspector (needed for tool-using agent)
-            schema_inspector = SchemaInspector()
+        # Route NoSQL databases to their own pipeline
+        from src.nosql.router import is_nosql, execute_nosql_query
 
-            # Get actual database schema from USER's database
-            # ALWAYS get schema_data for validation, even if request.schema is provided
-            from src.core.schema_cache import SchemaCache
-
-            schema_data = await SchemaCache.get_schema(
-                connection_id=active_connection.id,
-                connection_name=active_connection.name,
-                user_db_session=user_db,
-                force_refresh=request.force_schema_refresh
-            )
-            logger.debug(f"Got schema_data with {len(schema_data.get('tables', {}))} tables for validation")
-
-            if request.schema:
-                # Use provided schema for LLM prompt
-                schema = request.schema
-            else:
-                # Auto-introspect schema from user's database
-                schema = schema_inspector.format_schema_for_llm(schema_data)
-                logger.debug(f"Using schema with {len(schema_data['tables'])} tables")
-
-            # Load system settings and create quality profile with semantic settings
-            settings_record = await get_or_create_settings(db)
-            quality_profile = get_quality_profile_with_settings(
-                settings_record.query_quality_level,
-                system_settings={
-                    'enable_intent_classification': settings_record.enable_intent_classification,
-                    'enable_dynamic_examples': settings_record.enable_dynamic_examples,
-                    'enable_semantic_validation': settings_record.enable_semantic_validation,
-                    # Prompt Optimization (Phase 2.2)
-                    'enable_prompt_optimization': settings_record.enable_prompt_optimization,
-                }
-            )
-            logger.info(f"Using quality profile: {quality_profile.level.value} (level={settings_record.query_quality_level})")
-
-            # Use Self-Correcting Agent for automatic error recovery
-            self_correcting_agent = SelfCorrectingSQLAgent(
-                sql_generator=sql_generator,
-                max_retries=3,  # Will be overridden by quality_profile
-                enable_diagnostics=True,
-                planning_session=db,  # Pass metadata db session for learned mappings
-                quality_profile=quality_profile,
-            )
-
-            # Generate and execute with automatic retry
-            # Use enhanced_question if conversational context is available
-            agent_result = await self_correcting_agent.generate_and_execute_with_retry(
+        if is_nosql(database_type):
+            agent_result = await execute_nosql_query(
                 question=enhanced_question,
-                schema=schema,
-                session=user_db,
-                database_type=database_type,
-                allow_write=request.allow_write,
+                connection=active_connection,
                 model=request.model,
-                schema_dict=schema_data,  # Pass for LocationMapper (location hints)
-                connection_name=active_connection.name,  # Pass connection name for learned mappings
-                schema_inspector=schema_inspector,  # Pass for tool-using agent
-                connection_id=active_connection.id,  # Pass for tool-using agent
-                row_limit=request.row_limit,  # Pass row limit from request
+                allow_write=request.allow_write,
+                row_limit=request.row_limit,
                 db=db,
                 query_history_id=query_record.id,
                 chat_session_id=request.session_id,
             )
 
-            # Extract results from agent
+            # Extract results from NoSQL agent (same shape as SQL agent)
             sql = agent_result["sql"]
             execution_result = agent_result.get("result") if agent_result["success"] else None
             model_used = agent_result.get("model_used", settings.OLLAMA_MODEL)
 
             # Build warnings
             warnings = []
-            if agent_result["self_corrected"]:
+            if agent_result.get("self_corrected"):
                 warnings.append(
-                    f"✨ Query auto-corrected after {agent_result['total_attempts'] - 1} error(s)"
+                    f"Query auto-corrected after {agent_result['total_attempts'] - 1} error(s)"
                 )
-                logger.info(f"🔧 Self-correction successful after {agent_result['total_attempts']} attempts")
-
             if not agent_result["success"]:
                 warnings.append(f"Query failed: {agent_result.get('error', 'Unknown error')}")
 
-            # Determine validity
             is_valid = agent_result["success"]
-            is_read_only = True  # Determine from SQL if needed
+            is_read_only = not request.allow_write
 
             # Format execution result for compatibility
             if execution_result:
@@ -323,7 +268,7 @@ async def process_query(
                     "data": execution_result.get("data", []),
                     "row_count": execution_result.get("row_count", 0),
                     "execution_time_ms": execution_result.get("execution_time_ms", 0),
-                    "error": execution_result.get("error")
+                    "error": execution_result.get("error"),
                 }
             else:
                 execution_result = {
@@ -334,16 +279,129 @@ async def process_query(
                     "execution_time_ms": 0,
                 }
 
-            # Format attempts for UI if present
             formatted_attempts = None
             if agent_result.get("attempts"):
-                formatted_attempts = self_correcting_agent.format_attempts_for_ui(
-                    agent_result["attempts"]
-                )
+                formatted_attempts = agent_result["attempts"]
 
-            # Add verification warnings to main warnings if present
             if agent_result.get("verification_warnings"):
                 warnings.extend(agent_result["verification_warnings"])
+
+        else:
+            # Connect to user's database for schema and query execution (SQL path)
+            async with UserDatabaseConnector.get_user_db_session(active_connection) as user_db:
+                # Initialize schema inspector (needed for tool-using agent)
+                schema_inspector = SchemaInspector()
+
+                # Get actual database schema from USER's database
+                # ALWAYS get schema_data for validation, even if request.schema is provided
+                from src.core.schema_cache import SchemaCache
+
+                schema_data = await SchemaCache.get_schema(
+                    connection_id=active_connection.id,
+                    connection_name=active_connection.name,
+                    user_db_session=user_db,
+                    force_refresh=request.force_schema_refresh
+                )
+                logger.debug(f"Got schema_data with {len(schema_data.get('tables', {}))} tables for validation")
+
+                if request.schema:
+                    # Use provided schema for LLM prompt
+                    schema = request.schema
+                else:
+                    # Auto-introspect schema from user's database
+                    schema = schema_inspector.format_schema_for_llm(schema_data)
+                    logger.debug(f"Using schema with {len(schema_data['tables'])} tables")
+
+                # Load system settings and create quality profile with semantic settings
+                settings_record = await get_or_create_settings(db)
+                quality_profile = get_quality_profile_with_settings(
+                    settings_record.query_quality_level,
+                    system_settings={
+                        'enable_intent_classification': settings_record.enable_intent_classification,
+                        'enable_dynamic_examples': settings_record.enable_dynamic_examples,
+                        'enable_semantic_validation': settings_record.enable_semantic_validation,
+                        # Prompt Optimization (Phase 2.2)
+                        'enable_prompt_optimization': settings_record.enable_prompt_optimization,
+                    }
+                )
+                logger.info(f"Using quality profile: {quality_profile.level.value} (level={settings_record.query_quality_level})")
+
+                # Use Self-Correcting Agent for automatic error recovery
+                self_correcting_agent = SelfCorrectingSQLAgent(
+                    sql_generator=sql_generator,
+                    max_retries=3,  # Will be overridden by quality_profile
+                    enable_diagnostics=True,
+                    planning_session=db,  # Pass metadata db session for learned mappings
+                    quality_profile=quality_profile,
+                )
+
+                # Generate and execute with automatic retry
+                # Use enhanced_question if conversational context is available
+                agent_result = await self_correcting_agent.generate_and_execute_with_retry(
+                    question=enhanced_question,
+                    schema=schema,
+                    session=user_db,
+                    database_type=database_type,
+                    allow_write=request.allow_write,
+                    model=request.model,
+                    schema_dict=schema_data,  # Pass for LocationMapper (location hints)
+                    connection_name=active_connection.name,  # Pass connection name for learned mappings
+                    schema_inspector=schema_inspector,  # Pass for tool-using agent
+                    connection_id=active_connection.id,  # Pass for tool-using agent
+                    row_limit=request.row_limit,  # Pass row limit from request
+                    db=db,
+                    query_history_id=query_record.id,
+                    chat_session_id=request.session_id,
+                )
+
+                # Extract results from agent
+                sql = agent_result["sql"]
+                execution_result = agent_result.get("result") if agent_result["success"] else None
+                model_used = agent_result.get("model_used", settings.OLLAMA_MODEL)
+
+                # Build warnings
+                warnings = []
+                if agent_result["self_corrected"]:
+                    warnings.append(
+                        f"Query auto-corrected after {agent_result['total_attempts'] - 1} error(s)"
+                    )
+                    logger.info(f"Self-correction successful after {agent_result['total_attempts']} attempts")
+
+                if not agent_result["success"]:
+                    warnings.append(f"Query failed: {agent_result.get('error', 'Unknown error')}")
+
+                # Determine validity
+                is_valid = agent_result["success"]
+                is_read_only = True  # Determine from SQL if needed
+
+                # Format execution result for compatibility
+                if execution_result:
+                    execution_result = {
+                        "success": execution_result.get("success", False),
+                        "data": execution_result.get("data", []),
+                        "row_count": execution_result.get("row_count", 0),
+                        "execution_time_ms": execution_result.get("execution_time_ms", 0),
+                        "error": execution_result.get("error")
+                    }
+                else:
+                    execution_result = {
+                        "success": False,
+                        "error": agent_result.get("error", "Execution failed"),
+                        "data": [],
+                        "row_count": 0,
+                        "execution_time_ms": 0,
+                    }
+
+                # Format attempts for UI if present
+                formatted_attempts = None
+                if agent_result.get("attempts"):
+                    formatted_attempts = self_correcting_agent.format_attempts_for_ui(
+                        agent_result["attempts"]
+                    )
+
+                # Add verification warnings to main warnings if present
+                if agent_result.get("verification_warnings"):
+                    warnings.extend(agent_result["verification_warnings"])
 
         # Build error message: include validation warnings OR execution errors
         error_msg = None

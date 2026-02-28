@@ -14,10 +14,17 @@ class TestDialectRegistry:
     """Test dialect registry functionality."""
 
     def test_all_dialects_have_rules(self):
-        """Ensure all dialects have rules defined."""
+        """Ensure all SQL dialects have rules defined."""
+        nosql_dialects = {
+            DatabaseDialect.MONGODB,
+            DatabaseDialect.REDIS,
+            DatabaseDialect.CASSANDRA,
+            DatabaseDialect.DYNAMODB,
+            DatabaseDialect.ELASTICSEARCH,
+        }
         for dialect in DatabaseDialect:
-            if dialect == DatabaseDialect.MONGODB:
-                continue # MongoDB doesn't have SQL rules
+            if dialect in nosql_dialects:
+                continue  # NoSQL dialects don't have SQL rules
             assert dialect in DIALECT_RULES
             assert isinstance(DIALECT_RULES[dialect], DialectRules)
 

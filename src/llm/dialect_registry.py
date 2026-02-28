@@ -9,7 +9,11 @@ class DatabaseDialect(Enum):
     DUCKDB = "duckdb"
     MSSQL = "mssql"
     ORACLE = "oracle"
-    MONGODB = "mongodb"  # For future MQL generation
+    MONGODB = "mongodb"
+    REDIS = "redis"
+    CASSANDRA = "cassandra"
+    DYNAMODB = "dynamodb"
+    ELASTICSEARCH = "elasticsearch"
 
 @dataclass
 class DialectRules:
@@ -244,9 +248,57 @@ DATABASE: SQL Server (T-SQL)
 - Use ISNULL() instead of COALESCE when checking single values
 """,
         DatabaseDialect.MONGODB: """
-DATABASE: MongoDB
-- No SQL
-- Use MQL (MongoDB Query Language)
+DATABASE: MongoDB (MQL - MongoDB Query Language)
+- Queries use MQL, NOT SQL
+- Collections are equivalent to SQL tables
+- Documents are equivalent to SQL rows
+- Fields are equivalent to SQL columns
+- Use aggregation pipelines for GROUP BY, JOIN ($lookup), and complex transformations
+- Pipeline stages: $match, $group, $sort, $limit, $project, $lookup, $unwind, $count
+- Filter operators: $eq, $gt, $gte, $lt, $lte, $ne, $in, $nin, $regex, $exists
+- Logical operators: $and, $or, $not, $nor
+- Array operators: $elemMatch, $all, $size
+- Aggregation accumulators: $sum, $avg, $min, $max, $first, $last, $push, $addToSet
+- Date handling: use ISODate strings for comparisons
+- Return ONLY valid JSON with keys: operation, collection, query, pipeline, sort, limit
+""",
+        DatabaseDialect.REDIS: """
+DATABASE: Redis (Key-Value Store)
+- Queries use Redis commands, NOT SQL
+- Data is organized by keys with typed values (string, hash, list, set, sorted set)
+- Key patterns group related data (e.g., user:*, session:*, order:*)
+- Common read commands: GET, HGETALL, LRANGE, SMEMBERS, ZRANGE
+- Common write commands: SET, HSET, LPUSH, SADD, ZADD
+- Pattern scanning: SCAN with MATCH pattern
+- Return ONLY valid JSON with keys: command, args, data_type, is_write
+""",
+        DatabaseDialect.CASSANDRA: """
+DATABASE: Apache Cassandra (CQL - Cassandra Query Language)
+- CQL is SQL-like but with NoSQL constraints
+- Must query by partition key (or use ALLOW FILTERING)
+- No JOIN, no subquery, limited GROUP BY
+- Time-series optimized: use clustering columns for range queries
+- Common: SELECT, INSERT, UPDATE, DELETE
+- Aggregations: COUNT, SUM, AVG, MIN, MAX (limited)
+""",
+        DatabaseDialect.DYNAMODB: """
+DATABASE: Amazon DynamoDB (PartiQL / Native API)
+- PartiQL provides SQL-like syntax for DynamoDB
+- Must specify partition key in WHERE clause
+- Sort key enables range queries within a partition
+- No JOIN, limited filtering on non-key attributes
+- Global Secondary Indexes (GSI) allow alternative query patterns
+""",
+        DatabaseDialect.ELASTICSEARCH: """
+DATABASE: Elasticsearch (Query DSL)
+- Queries use JSON Query DSL, NOT SQL
+- Indices are equivalent to SQL tables
+- Documents are equivalent to SQL rows
+- Fields are equivalent to SQL columns
+- Use "query" for filtering, "aggs" for aggregations, "sort" for ordering
+- Query types: match, term, range, bool (must/should/must_not)
+- Aggregation types: terms, date_histogram, avg, sum, min, max, cardinality
+- Return ONLY valid JSON with keys: index, query, aggs, sort, size
 """,
     }
     return contexts.get(dialect, "")
@@ -268,6 +320,14 @@ def get_dialect_for_database_type(db_type: str) -> DatabaseDialect:
         return DatabaseDialect.ORACLE
     elif "mongo" in normalized:
         return DatabaseDialect.MONGODB
+    elif "redis" in normalized:
+        return DatabaseDialect.REDIS
+    elif "cassandra" in normalized:
+        return DatabaseDialect.CASSANDRA
+    elif "dynamo" in normalized:
+        return DatabaseDialect.DYNAMODB
+    elif "elastic" in normalized or "opensearch" in normalized:
+        return DatabaseDialect.ELASTICSEARCH
     else:
         # Default to SQLite if unknown, as it's the safest lowest common denominator
         return DatabaseDialect.SQLITE

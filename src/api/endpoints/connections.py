@@ -15,7 +15,7 @@ router = APIRouter(prefix="/connections", tags=["connections"])
 class ConnectionCreate(BaseModel):
     """Request model for creating a database connection"""
     name: str = Field(..., min_length=1, max_length=255)
-    database_type: str = Field(..., pattern="^(postgresql|mysql|sqlite|mongodb|duckdb)$")
+    database_type: str = Field(..., pattern="^(postgresql|mysql|sqlite|mongodb|duckdb|mssql|oracle|redis|cassandra|dynamodb|elasticsearch)$")
     host: Optional[str] = None
     port: Optional[int] = None
     database_name: str = Field(..., min_length=1)

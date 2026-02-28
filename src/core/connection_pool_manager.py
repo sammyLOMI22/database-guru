@@ -199,12 +199,11 @@ class ConnectionPoolManager:
                 "Set ENABLE_CONNECTION_POOLING=true to enable."
             )
 
-        # MongoDB not supported yet
-        if connection.database_type == 'mongodb':
-            raise NotImplementedError(
-                "Connection pooling not available for MongoDB. "
-                "MongoDB support will be added in a future update. "
-                "Supported databases: PostgreSQL, MySQL, SQLite, DuckDB, SQL Server, Oracle"
+        # NoSQL databases use their own client pools in src/nosql/
+        if connection.database_type in ('mongodb', 'redis', 'cassandra', 'dynamodb', 'elasticsearch'):
+            raise ValueError(
+                f"{connection.database_type} uses its own client pool in src/nosql/. "
+                "NoSQL connections are routed via src.nosql.router before reaching this pool manager."
             )
 
         # Pool key: (connection_id, database_type)

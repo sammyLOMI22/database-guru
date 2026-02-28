@@ -53,9 +53,13 @@ class UserDatabaseConnector:
             port = connection.port or 1521
             return f"oracle+oracledb://{connection.username}:{password}@{connection.host}:{port}/?service_name={connection.database_name}"
 
-        elif connection.database_type == 'mongodb':
-            # MongoDB is not SQL, would need different handling
-            raise NotImplementedError("MongoDB queries not yet supported")
+        elif connection.database_type in ('mongodb', 'redis', 'cassandra', 'dynamodb', 'elasticsearch'):
+            # NoSQL databases use their own client pools in src/nosql/
+            # They are routed via src.nosql.router before reaching this method
+            raise ValueError(
+                f"{connection.database_type} does not use SQLAlchemy URLs. "
+                "NoSQL connections are routed through src.nosql.router."
+            )
 
         else:
             raise ValueError(f"Unsupported database type: {connection.database_type}")

@@ -45,6 +45,14 @@ class ConnectionTester:
                 return await self._test_duckdb(database_name)
             elif database_type == "mongodb":
                 return await self._test_mongodb(host, port, database_name, username, password)
+            elif database_type == "redis":
+                return await self._test_redis(host, port, database_name, password)
+            elif database_type == "cassandra":
+                return await self._test_cassandra(host, port, database_name, username, password)
+            elif database_type == "dynamodb":
+                return await self._test_dynamodb(username, password, host)
+            elif database_type == "elasticsearch":
+                return await self._test_elasticsearch(host, port, username, password)
             else:
                 return {
                     "success": False,
@@ -215,4 +223,146 @@ class ConnectionTester:
             return {
                 "success": False,
                 "message": f"MongoDB connection failed: {str(e)}",
+            }
+
+    async def _test_redis(
+        self, host: str, port: int, database_name: str, password: str
+    ) -> Dict[str, Any]:
+        """Test Redis connection"""
+        try:
+            import redis.asyncio as aioredis
+
+            db_num = 0
+            try:
+                db_num = int(database_name)
+            except (ValueError, TypeError):
+                pass
+
+            client = aioredis.Redis(
+                host=host or "localhost",
+                port=port or 6379,
+                password=password or None,
+                db=db_num,
+                socket_connect_timeout=5,
+            )
+
+            info = await client.info("server")
+            version = info.get("redis_version", "unknown")
+            await client.aclose()
+
+            return {
+                "success": True,
+                "message": f"Successfully connected to Redis {version}",
+            }
+        except ImportError:
+            return {
+                "success": False,
+                "message": "Redis support not installed. Run: pip install redis",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Redis connection failed: {str(e)}",
+            }
+
+    async def _test_cassandra(
+        self, host: str, port: int, database_name: str, username: str, password: str
+    ) -> Dict[str, Any]:
+        """Test Cassandra connection"""
+        try:
+            from cassandra.cluster import Cluster
+            from cassandra.auth import PlainTextAuthProvider
+
+            auth = None
+            if username and password:
+                auth = PlainTextAuthProvider(username=username, password=password)
+
+            cluster = Cluster(
+                contact_points=[host or "localhost"],
+                port=port or 9042,
+                auth_provider=auth,
+                connect_timeout=5,
+            )
+
+            session = cluster.connect(database_name if database_name else None)
+            release = cluster.metadata.release_version or "unknown"
+            session.shutdown()
+            cluster.shutdown()
+
+            return {
+                "success": True,
+                "message": f"Successfully connected to Cassandra {release}",
+            }
+        except ImportError:
+            return {
+                "success": False,
+                "message": "Cassandra support not installed. Run: pip install cassandra-driver",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Cassandra connection failed: {str(e)}",
+            }
+
+    async def _test_dynamodb(
+        self, access_key: str, secret_key: str, region: str
+    ) -> Dict[str, Any]:
+        """Test DynamoDB connection (AWS credentials mapped via username/password/host)"""
+        try:
+            import aioboto3
+
+            session = aioboto3.Session(
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=region or "us-east-1",
+            )
+
+            async with session.client("dynamodb") as client:
+                response = await client.list_tables(Limit=1)
+                table_count = len(response.get("TableNames", []))
+
+            return {
+                "success": True,
+                "message": f"Successfully connected to DynamoDB ({region or 'us-east-1'})",
+            }
+        except ImportError:
+            return {
+                "success": False,
+                "message": "DynamoDB support not installed. Run: pip install aioboto3",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"DynamoDB connection failed: {str(e)}",
+            }
+
+    async def _test_elasticsearch(
+        self, host: str, port: int, username: str, password: str
+    ) -> Dict[str, Any]:
+        """Test Elasticsearch connection"""
+        try:
+            from elasticsearch import AsyncElasticsearch
+
+            url = f"http://{host or 'localhost'}:{port or 9200}"
+            auth = (username, password) if username and password else None
+
+            client = AsyncElasticsearch(url, basic_auth=auth, request_timeout=5)
+
+            info = await client.info()
+            version = info.get("version", {}).get("number", "unknown")
+            await client.close()
+
+            return {
+                "success": True,
+                "message": f"Successfully connected to Elasticsearch {version}",
+            }
+        except ImportError:
+            return {
+                "success": False,
+                "message": "Elasticsearch support not installed. Run: pip install elasticsearch",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Elasticsearch connection failed: {str(e)}",
             }

@@ -594,6 +594,25 @@ class MultiDatabaseHandler:
             Dict with execution results and metadata (NOT including QueryHistory record)
         """
         try:
+            # Route NoSQL databases to their own pipeline
+            from src.nosql.router import is_nosql, execute_nosql_query
+
+            if is_nosql(connection.database_type):
+                nosql_result = await execute_nosql_query(
+                    question=question,
+                    connection=connection,
+                    model=model_used,
+                    allow_write=allow_write,
+                    row_limit=row_limit,
+                )
+                return {
+                    **nosql_result,
+                    "connection": connection,
+                    "model_used": model_used,
+                    "database_name": connection.name,
+                    "connection_id": connection.id,
+                }
+
             # ALWAYS get full schema directly from database for accurate WHERE validation
             # The combined_schema_data may not have columns in the right format
             db_schema_dict = None
@@ -601,7 +620,7 @@ class MultiDatabaseHandler:
                 schema_data = await self.schema_inspector.get_full_schema(user_db)
                 db_schema_dict = schema_data  # Full schema for WHERE column validation
                 db_schema = self._format_single_db_schema(schema_data)
-                logger.info(f"🔍 [SCHEMA_DEBUG] Got schema for {connection.name} with {len(schema_data.get('tables', {}))} tables, schema_dict is not None: {db_schema_dict is not None}")
+                logger.info(f"[SCHEMA_DEBUG] Got schema for {connection.name} with {len(schema_data.get('tables', {}))} tables, schema_dict is not None: {db_schema_dict is not None}")
 
             # Execute query with self-correction
             exec_result = await self.execute_query_with_self_correction(
