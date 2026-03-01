@@ -77,7 +77,8 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
       }
       case 'elasticsearch': {
         const authStr = formData.username ? `${user}:${pass}@` : '';
-        return `https://${authStr}${host}:${formData.port || 9200}`;
+        const esScheme = formData.username ? 'https' : 'http';
+        return `${esScheme}://${authStr}${host}:${formData.port || 9200}`;
       }
       default:
         return `postgresql://${user}:${pass}@${host}:${port}/${db}`;

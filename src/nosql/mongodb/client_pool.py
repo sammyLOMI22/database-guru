@@ -5,17 +5,19 @@ client lifecycle (creation, caching, eviction) rather than individual connection
 """
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional, Tuple
+from urllib.parse import quote_plus
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from src.database.models import DatabaseConnection
+from src.nosql.base import NoSQLClientPoolMixin
 
 logger = logging.getLogger(__name__)
 
 
-class MongoClientPool:
+class MongoClientPool(NoSQLClientPoolMixin):
     """Singleton pool of motor AsyncIOMotorClient instances, keyed by connection_id."""
 
     _instance: Optional["MongoClientPool"] = None
@@ -23,6 +25,7 @@ class MongoClientPool:
 
     def __init__(self):
         self._clients: Dict[int, Tuple[AsyncIOMotorClient, str, datetime]] = {}
+        self._pool_dict = self._clients
 
     @classmethod
     async def get_instance(cls) -> "MongoClientPool":
@@ -39,11 +42,13 @@ class MongoClientPool:
         Returns:
             Tuple of (client, database) for the connection.
         """
+        self._cleanup_stale()
+
         conn_id = connection.id
 
         if conn_id in self._clients:
             client, db_name, _ = self._clients[conn_id]
-            self._clients[conn_id] = (client, db_name, datetime.utcnow())
+            self._clients[conn_id] = (client, db_name, self._now())
             return client, client[db_name]
 
         # Build connection URI
@@ -57,21 +62,31 @@ class MongoClientPool:
         )
 
         db_name = connection.database_name
-        self._clients[conn_id] = (client, db_name, datetime.utcnow())
+        self._clients[conn_id] = (client, db_name, self._now())
+        self._enforce_max_size()
         logger.info(f"Created motor client for connection {conn_id} ({db_name})")
 
         return client, client[db_name]
 
     def _build_uri(self, connection: DatabaseConnection) -> str:
-        """Build MongoDB connection URI from connection details."""
+        """Build MongoDB connection URI from connection details.
+
+        Credentials are URL-encoded to handle special characters (@, :, /, %).
+        """
         host = connection.host or "localhost"
         port = connection.port or 27017
         username = connection.username
-        password = connection.password_encrypted  # TODO: decrypt
+        password = connection.password_encrypted or ""
 
         if username and password:
-            return f"mongodb://{username}:{password}@{host}:{port}/{connection.database_name}"
+            encoded_user = quote_plus(username)
+            encoded_pass = quote_plus(password)
+            return f"mongodb://{encoded_user}:{encoded_pass}@{host}:{port}/{connection.database_name}"
         return f"mongodb://{host}:{port}/{connection.database_name}"
+
+    def _close_entry_sync(self, key: int, entry: Tuple) -> None:
+        client, _, _ = entry
+        client.close()
 
     async def evict(self, connection_id: int) -> None:
         """Close and remove a client from the pool."""

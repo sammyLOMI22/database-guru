@@ -5,17 +5,18 @@ manages client lifecycle (creation, caching, eviction).
 """
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional, Tuple
 
 import redis.asyncio as aioredis
 
 from src.database.models import DatabaseConnection
+from src.nosql.base import NoSQLClientPoolMixin
 
 logger = logging.getLogger(__name__)
 
 
-class RedisClientPool:
+class RedisClientPool(NoSQLClientPoolMixin):
     """Singleton pool of async Redis client instances, keyed by connection_id."""
 
     _instance: Optional["RedisClientPool"] = None
@@ -23,6 +24,7 @@ class RedisClientPool:
 
     def __init__(self):
         self._clients: Dict[int, Tuple[aioredis.Redis, datetime]] = {}
+        self._pool_dict = self._clients
 
     @classmethod
     async def get_instance(cls) -> "RedisClientPool":
@@ -33,11 +35,13 @@ class RedisClientPool:
 
     async def get_client(self, connection: DatabaseConnection) -> aioredis.Redis:
         """Get or create an async Redis client for the given connection."""
+        self._cleanup_stale()
+
         conn_id = connection.id
 
         if conn_id in self._clients:
             client, _ = self._clients[conn_id]
-            self._clients[conn_id] = (client, datetime.utcnow())
+            self._clients[conn_id] = (client, self._now())
             return client
 
         host = connection.host or "localhost"
@@ -59,9 +63,19 @@ class RedisClientPool:
             socket_timeout=10,
         )
 
-        self._clients[conn_id] = (client, datetime.utcnow())
+        self._clients[conn_id] = (client, self._now())
+        self._enforce_max_size()
         logger.info(f"Created Redis client for connection {conn_id} ({host}:{port})")
         return client
+
+    def _close_entry_sync(self, key: int, entry: Tuple) -> None:
+        # Redis aclose() is async; schedule fire-and-forget
+        client, _ = entry
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(client.aclose())
+        except RuntimeError:
+            pass  # No event loop — client will be GC'd
 
     async def evict(self, connection_id: int) -> None:
         """Close and remove a client from the pool."""

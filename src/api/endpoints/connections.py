@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from src.api.dependencies import get_db
 from src.database.models import DatabaseConnection
@@ -18,9 +18,20 @@ class ConnectionCreate(BaseModel):
     database_type: str = Field(..., pattern="^(postgresql|mysql|sqlite|mongodb|duckdb|mssql|oracle|redis|cassandra|dynamodb|elasticsearch)$")
     host: Optional[str] = None
     port: Optional[int] = None
-    database_name: str = Field(..., min_length=1)
+    database_name: str = Field(default="", min_length=0)
     username: Optional[str] = None
     password: Optional[str] = None
+
+    # DynamoDB and Elasticsearch don't require a database_name;
+    # all other types do.
+    _DB_NAME_OPTIONAL_TYPES = {"dynamodb", "elasticsearch", "redis"}
+
+    @model_validator(mode="after")
+    def validate_database_name(self):
+        if self.database_type not in self._DB_NAME_OPTIONAL_TYPES:
+            if not self.database_name or not self.database_name.strip():
+                raise ValueError(f"database_name is required for {self.database_type}")
+        return self
 
 
 class ConnectionResponse(BaseModel):
@@ -239,3 +250,7 @@ async def delete_connection(
         connection_id=connection_id,
         connection_name=connection.name
     )
+
+    # Evict from NoSQL client pool if applicable
+    from src.nosql.router import evict_nosql_pool
+    await evict_nosql_pool(connection_id, connection.database_type)

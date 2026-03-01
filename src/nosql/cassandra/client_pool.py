@@ -4,15 +4,16 @@ The driver is synchronous, so queries are run in a thread pool executor.
 """
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional, Tuple
 
 from src.database.models import DatabaseConnection
+from src.nosql.base import NoSQLClientPoolMixin
 
 logger = logging.getLogger(__name__)
 
 
-class CassandraClientPool:
+class CassandraClientPool(NoSQLClientPoolMixin):
     """Singleton pool of Cassandra Cluster/Session instances."""
 
     _instance: Optional["CassandraClientPool"] = None
@@ -20,6 +21,7 @@ class CassandraClientPool:
 
     def __init__(self):
         self._sessions: Dict[int, Tuple["Session", "Cluster", datetime]] = {}
+        self._pool_dict = self._sessions
 
     @classmethod
     async def get_instance(cls) -> "CassandraClientPool":
@@ -33,11 +35,13 @@ class CassandraClientPool:
 
         Returns a cassandra-driver Session object (sync).
         """
+        self._cleanup_stale()
+
         conn_id = connection.id
 
         if conn_id in self._sessions:
             session, cluster, _ = self._sessions[conn_id]
-            self._sessions[conn_id] = (session, cluster, datetime.utcnow())
+            self._sessions[conn_id] = (session, cluster, self._now())
             return session
 
         # Create in thread pool since cassandra-driver is sync
@@ -46,7 +50,8 @@ class CassandraClientPool:
             None, self._create_session, connection
         )
 
-        self._sessions[conn_id] = (session, cluster, datetime.utcnow())
+        self._sessions[conn_id] = (session, cluster, self._now())
+        self._enforce_max_size()
         logger.info(f"Created Cassandra session for connection {conn_id}")
         return session
 
@@ -72,6 +77,14 @@ class CassandraClientPool:
         keyspace = connection.database_name or None
         session = cluster.connect(keyspace)
         return session, cluster
+
+    def _close_entry_sync(self, key: int, entry: Tuple) -> None:
+        session, cluster, _ = entry
+        try:
+            session.shutdown()
+            cluster.shutdown()
+        except Exception:
+            pass
 
     async def evict(self, connection_id: int) -> None:
         if connection_id in self._sessions:

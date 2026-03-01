@@ -4,11 +4,13 @@ Provides the branch point that query.py and multi_db_handler.py use to route
 NoSQL connections away from the SQL pipeline.
 """
 import logging
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import DatabaseConnection
+from src.nosql.base import NoSQLSchemaInspector, SCHEMA_TTL_SECONDS
 
 logger = logging.getLogger(__name__)
 
@@ -86,3 +88,112 @@ async def execute_nosql_query(
         query_history_id=query_history_id,
         chat_session_id=chat_session_id,
     )
+
+
+async def get_nosql_inspector(
+    connection: DatabaseConnection,
+) -> Tuple[NoSQLSchemaInspector, Any]:
+    """Get the appropriate schema inspector for a NoSQL connection.
+
+    Returns (inspector, native_client) — caller can use inspector.get_schema()
+    and inspector.format_schema_for_llm().
+    """
+    db_type = connection.database_type.lower()
+
+    if db_type == "mongodb":
+        from src.nosql.mongodb.client_pool import MongoClientPool
+        from src.nosql.mongodb.schema_inspector import MongoSchemaInspector
+        pool = await MongoClientPool.get_instance()
+        _, mongo_db = await pool.get_client(connection)
+        return MongoSchemaInspector(mongo_db), mongo_db
+    elif db_type == "redis":
+        from src.nosql.redis.client_pool import RedisClientPool
+        from src.nosql.redis.schema_inspector import RedisSchemaInspector
+        pool = await RedisClientPool.get_instance()
+        client = await pool.get_client(connection)
+        return RedisSchemaInspector(client), client
+    elif db_type == "cassandra":
+        from src.nosql.cassandra.client_pool import CassandraClientPool
+        from src.nosql.cassandra.schema_inspector import CassandraSchemaInspector
+        pool = await CassandraClientPool.get_instance()
+        session = await pool.get_session(connection)
+        keyspace = connection.database_name or "system"
+        return CassandraSchemaInspector(session, keyspace), session
+    elif db_type == "dynamodb":
+        from src.nosql.dynamodb.client_pool import DynamoDBClientPool
+        from src.nosql.dynamodb.schema_inspector import DynamoDBSchemaInspector
+        pool = await DynamoDBClientPool.get_instance()
+        boto_session, region = pool.get_session(connection)
+        return DynamoDBSchemaInspector(boto_session, region), boto_session
+    elif db_type == "elasticsearch":
+        from src.nosql.elasticsearch.client_pool import ElasticsearchClientPool
+        from src.nosql.elasticsearch.schema_inspector import ElasticsearchSchemaInspector
+        pool = await ElasticsearchClientPool.get_instance()
+        client = await pool.get_client(connection)
+        return ElasticsearchSchemaInspector(client), client
+    else:
+        raise ValueError(f"Unknown NoSQL type: {db_type}")
+
+
+async def get_cached_or_fresh_schema(
+    connection: DatabaseConnection,
+    inspector: NoSQLSchemaInspector,
+    db: Optional[AsyncSession] = None,
+) -> Dict[str, Any]:
+    """Return schema from cache (TTL-based) or inspect fresh.
+
+    Shared by handlers (via NoSQLHandler._get_schema) and
+    multi_db_handler._introspect_nosql_database.
+    """
+    cached = connection.schema_cache
+    if cached and isinstance(cached, dict) and cached.get("tables"):
+        updated_at = connection.schema_updated_at
+        if updated_at:
+            age_seconds = (datetime.utcnow() - updated_at).total_seconds()
+            if age_seconds < SCHEMA_TTL_SECONDS:
+                return cached
+
+    # Fresh inspection
+    schema_dict = await inspector.get_schema()
+
+    # Persist to DatabaseConnection.schema_cache
+    if db:
+        try:
+            connection.schema_cache = schema_dict
+            connection.schema_updated_at = datetime.utcnow()
+            await db.commit()
+        except Exception as e:
+            logger.warning(f"Failed to cache NoSQL schema: {e}")
+
+    return schema_dict
+
+
+async def evict_nosql_pool(connection_id: int, database_type: str) -> None:
+    """Evict a connection from its NoSQL client pool (called on connection delete)."""
+    db_type = database_type.lower()
+    if db_type not in NOSQL_TYPES:
+        return
+
+    try:
+        if db_type == "mongodb":
+            from src.nosql.mongodb.client_pool import MongoClientPool
+            pool = await MongoClientPool.get_instance()
+            await pool.evict(connection_id)
+        elif db_type == "redis":
+            from src.nosql.redis.client_pool import RedisClientPool
+            pool = await RedisClientPool.get_instance()
+            await pool.evict(connection_id)
+        elif db_type == "cassandra":
+            from src.nosql.cassandra.client_pool import CassandraClientPool
+            pool = await CassandraClientPool.get_instance()
+            await pool.evict(connection_id)
+        elif db_type == "dynamodb":
+            from src.nosql.dynamodb.client_pool import DynamoDBClientPool
+            pool = await DynamoDBClientPool.get_instance()
+            await pool.evict(connection_id)
+        elif db_type == "elasticsearch":
+            from src.nosql.elasticsearch.client_pool import ElasticsearchClientPool
+            pool = await ElasticsearchClientPool.get_instance()
+            await pool.evict(connection_id)
+    except Exception as e:
+        logger.warning(f"Failed to evict NoSQL pool for connection {connection_id}: {e}")

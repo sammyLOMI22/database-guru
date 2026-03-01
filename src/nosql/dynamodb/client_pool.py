@@ -7,15 +7,16 @@ Auth is mapped from DatabaseConnection fields:
 """
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional, Tuple
 
 from src.database.models import DatabaseConnection
+from src.nosql.base import NoSQLClientPoolMixin
 
 logger = logging.getLogger(__name__)
 
 
-class DynamoDBClientPool:
+class DynamoDBClientPool(NoSQLClientPoolMixin):
     """Singleton pool managing aioboto3 sessions for DynamoDB."""
 
     _instance: Optional["DynamoDBClientPool"] = None
@@ -23,6 +24,7 @@ class DynamoDBClientPool:
 
     def __init__(self):
         self._sessions: Dict[int, Tuple["aioboto3.Session", str, datetime]] = {}
+        self._pool_dict = self._sessions
 
     @classmethod
     async def get_instance(cls) -> "DynamoDBClientPool":
@@ -38,12 +40,14 @@ class DynamoDBClientPool:
         """
         import aioboto3
 
+        self._cleanup_stale()
+
         conn_id = connection.id
         region = connection.host or "us-east-1"
 
         if conn_id in self._sessions:
             session, _, _ = self._sessions[conn_id]
-            self._sessions[conn_id] = (session, region, datetime.utcnow())
+            self._sessions[conn_id] = (session, region, self._now())
             return session, region
 
         session = aioboto3.Session(
@@ -52,7 +56,8 @@ class DynamoDBClientPool:
             region_name=region,
         )
 
-        self._sessions[conn_id] = (session, region, datetime.utcnow())
+        self._sessions[conn_id] = (session, region, self._now())
+        self._enforce_max_size()
         logger.info(f"Created DynamoDB session for connection {conn_id} ({region})")
         return session, region
 

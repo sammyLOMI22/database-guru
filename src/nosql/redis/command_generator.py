@@ -101,14 +101,16 @@ Generate the Redis command as JSON:"""
         self,
         question: str,
         schema: str,
-        previous_command: str,
-        error_message: str,
+        previous_query: str = "",
+        error_message: str = "",
         model: Optional[str] = None,
         db=None,
         query_history_id: Optional[int] = None,
         chat_session_id: Optional[str] = None,
+        previous_command: Optional[str] = None,
     ) -> RedisCommand:
         """Regenerate command with error context for self-correction."""
+        cmd = previous_command if previous_command is not None else previous_query
         prompt = f"""{SYSTEM_PROMPT}
 
 {schema}
@@ -116,7 +118,7 @@ Generate the Redis command as JSON:"""
 User Query: {question}
 
 PREVIOUS ATTEMPT FAILED:
-Command: {previous_command}
+Command: {cmd}
 Error: {error_message}
 
 Fix the command and try again. Return ONLY valid JSON:"""

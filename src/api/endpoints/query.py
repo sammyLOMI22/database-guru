@@ -279,9 +279,10 @@ async def process_query(
                     "execution_time_ms": 0,
                 }
 
-            formatted_attempts = None
-            if agent_result.get("attempts"):
-                formatted_attempts = agent_result["attempts"]
+            # NoSQL handler attempts are already UI-formatted dicts with
+            # {attempt, query, success, error, error_type} — no conversion needed
+            # (the SQL path converts CorrectionAttempt objects via format_attempts_for_ui)
+            formatted_attempts = agent_result.get("attempts") or None
 
             if agent_result.get("verification_warnings"):
                 warnings.extend(agent_result["verification_warnings"])

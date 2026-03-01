@@ -343,7 +343,11 @@ class ConnectionTester:
         try:
             from elasticsearch import AsyncElasticsearch
 
-            url = f"http://{host or 'localhost'}:{port or 9200}"
+            es_host = host or "localhost"
+            es_port = port or 9200
+            # Use HTTPS when credentials are provided (typical for production/cloud clusters)
+            scheme = "https" if (username and password) else "http"
+            url = f"{scheme}://{es_host}:{es_port}"
             auth = (username, password) if username and password else None
 
             client = AsyncElasticsearch(url, basic_auth=auth, request_timeout=5)

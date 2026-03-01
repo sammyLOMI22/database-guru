@@ -1,6 +1,7 @@
 """DynamoDB query executor - runs PartiQL via aioboto3."""
 import asyncio
 import logging
+import re
 import time
 from typing import Any, Dict, List
 
@@ -9,6 +10,7 @@ from src.nosql.result_formatter import normalize_nosql_result
 logger = logging.getLogger(__name__)
 
 _WRITE_KEYWORDS = {"INSERT", "UPDATE", "DELETE"}
+_ALLOWED_FIRST_KEYWORDS = {"SELECT", "INSERT", "UPDATE", "DELETE"}
 
 
 class DynamoDBQueryExecutor:
@@ -28,9 +30,38 @@ class DynamoDBQueryExecutor:
         self.timeout_seconds = timeout_seconds
         self.allow_write = allow_write
 
+    def _validate_partiql(self, partiql: str) -> str | None:
+        """Validate PartiQL statement for injection risks.
+
+        Returns an error message if invalid, None if OK.
+        """
+        stripped = partiql.strip()
+        if not stripped:
+            return "Empty query"
+
+        # Block multi-statement injection via semicolons
+        # Remove semicolons inside single-quoted string literals before checking
+        without_strings = re.sub(r"'[^']*'", "", stripped)
+        if ";" in without_strings:
+            return "Multi-statement queries are not allowed (semicolons detected)"
+
+        # Only allow known PartiQL statement types
+        first_word = stripped.split()[0].upper()
+        if first_word not in _ALLOWED_FIRST_KEYWORDS:
+            return f"Unsupported PartiQL statement type: '{first_word}'. Only SELECT/INSERT/UPDATE/DELETE allowed."
+
+        return None
+
     async def execute(self, partiql: str) -> Dict[str, Any]:
         """Execute a PartiQL string and return a normalized result."""
-        first_word = partiql.strip().split()[0].upper() if partiql.strip() else ""
+        # Validate for injection risks
+        validation_error = self._validate_partiql(partiql)
+        if validation_error:
+            return normalize_nosql_result(
+                data=[], execution_time_ms=0, error=validation_error,
+            )
+
+        first_word = partiql.strip().split()[0].upper()
         if first_word in _WRITE_KEYWORDS and not self.allow_write:
             return normalize_nosql_result(
                 data=[], execution_time_ms=0,

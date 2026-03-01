@@ -30,68 +30,10 @@ class MultiDatabaseHandler:
 
     async def _introspect_nosql_database(self, conn: DatabaseConnection) -> Dict[str, Any]:
         """Introspect schema for a NoSQL database via its native schema inspector."""
-        from datetime import datetime
+        from src.nosql.router import get_nosql_inspector, get_cached_or_fresh_schema
 
-        db_type = conn.database_type.lower()
-
-        # Check schema cache first (30-minute TTL)
-        cached = conn.schema_cache
-        if cached and isinstance(cached, dict) and cached.get("tables"):
-            updated_at = conn.schema_updated_at
-            if updated_at:
-                age = (datetime.utcnow() - updated_at).total_seconds()
-                if age < 1800:
-                    tables_dict = cached.get("tables", {})
-                    tables_list = [{"name": name, **info} for name, info in tables_dict.items()]
-                    logger.info(f"Using cached NoSQL schema for '{conn.name}' ({int(age)}s old)")
-                    return {
-                        "connection_id": conn.id,
-                        "name": conn.name,
-                        "database_type": conn.database_type,
-                        "database_name": conn.database_name,
-                        "tables": tables_list,
-                        "table_count": len(tables_list),
-                    }
-
-        # Fresh introspection via per-DB inspector
-        schema_dict = None
-        if db_type == "mongodb":
-            from src.nosql.mongodb.client_pool import MongoClientPool
-            from src.nosql.mongodb.schema_inspector import MongoSchemaInspector
-            pool = await MongoClientPool.get_instance()
-            _, mongo_db = await pool.get_client(conn)
-            inspector = MongoSchemaInspector(mongo_db)
-            schema_dict = await inspector.get_schema()
-        elif db_type == "redis":
-            from src.nosql.redis.client_pool import RedisClientPool
-            from src.nosql.redis.schema_inspector import RedisSchemaInspector
-            pool = await RedisClientPool.get_instance()
-            client = await pool.get_client(conn)
-            inspector = RedisSchemaInspector(client)
-            schema_dict = await inspector.get_schema()
-        elif db_type == "cassandra":
-            from src.nosql.cassandra.client_pool import CassandraClientPool
-            from src.nosql.cassandra.schema_inspector import CassandraSchemaInspector
-            pool = await CassandraClientPool.get_instance()
-            session = await pool.get_client(conn)
-            inspector = CassandraSchemaInspector(session, conn.database_name)
-            schema_dict = await inspector.get_schema()
-        elif db_type == "dynamodb":
-            from src.nosql.dynamodb.client_pool import DynamoDBClientPool
-            from src.nosql.dynamodb.schema_inspector import DynamoDBSchemaInspector
-            pool = await DynamoDBClientPool.get_instance()
-            client = await pool.get_client(conn)
-            inspector = DynamoDBSchemaInspector(client)
-            schema_dict = await inspector.get_schema()
-        elif db_type == "elasticsearch":
-            from src.nosql.elasticsearch.client_pool import ElasticsearchClientPool
-            from src.nosql.elasticsearch.schema_inspector import ElasticsearchSchemaInspector
-            pool = await ElasticsearchClientPool.get_instance()
-            client = await pool.get_client(conn)
-            inspector = ElasticsearchSchemaInspector(client)
-            schema_dict = await inspector.get_schema()
-        else:
-            raise ValueError(f"Unknown NoSQL type: {db_type}")
+        inspector, _ = await get_nosql_inspector(conn)
+        schema_dict = await get_cached_or_fresh_schema(conn, inspector)
 
         tables_dict = schema_dict.get("tables", {})
         tables_list = [{"name": name, **info} for name, info in tables_dict.items()]
