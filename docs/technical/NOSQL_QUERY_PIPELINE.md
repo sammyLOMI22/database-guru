@@ -63,9 +63,24 @@ User Question (NoSQL Connection)
 ├─────────────────────────────────────────────────────────────────┤
 │  Up to 3 attempts per query:                                     │
 │  1. Classify error → ErrorType + human-readable hint             │
-│  2. Pass error context + hint to LLM (temp=0.2)                  │
-│  3. LLM regenerates with error awareness                         │
-│  4. Re-execute and verify                                        │
+│  2. Non-retryable check (PERMISSION_DENIED, TIMEOUT → fail fast) │
+│  3. Schema hints appended for TABLE/COLUMN_NOT_FOUND errors      │
+│  4. Correction Learner: find past fixes for similar errors       │
+│  5. Pass enriched error context + hints to LLM (temp=0.2)        │
+│  6. Confidence Scorer: skip if score < 0.2 (saves wasted calls)  │
+│  7. LLM regenerates with error awareness                         │
+│  8. Re-execute and verify                                        │
+└─────────────────────────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     VERIFICATION & LEARNING (If Success)         │
+├─────────────────────────────────────────────────────────────────┤
+│  1. Result Verification Agent (diagnostics disabled):            │
+│     - Empty results, all-nulls, extreme values, negative counts  │
+│     - Warnings included in response (no SQL diagnostic queries)  │
+│  2. Correction Learner: persist successful correction pattern    │
+│     (only on self-corrected queries, attempt > 1)                │
 └─────────────────────────────────────────────────────────────────┘
      │
      ▼
@@ -76,6 +91,7 @@ User Question (NoSQL Connection)
 │  2. Display string of native query (shell syntax)                │
 │  3. Agent trace with per-attempt tracking                        │
 │  4. self_corrected=True if success on attempt > 1                │
+│  5. verification_warnings[] from Result Verification Agent       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -459,15 +475,51 @@ classify_error("collection 'user' not found")
   → (TABLE_NOT_FOUND, "Collection 'user' not found. Check available collections.")
      │
      ▼
+Non-retryable check: TABLE_NOT_FOUND is retryable → continue
+     │
+     ▼
+Schema hints: Append "Available collections/fields: users, orders, ..."
+     │
+     ▼
+Correction Learner: find_applicable_corrections(TABLE_NOT_FOUND, "mongodb")
+  → Found 1 past correction: "Fix for missing table: user → users"
+     │
+     ▼
 Attempt 2 (temp=0.2): generate_with_error_context(
     question, schema,
     previous_query="db.user.find({})",
-    error_message="Collection 'user' not found. Check available collections."
+    error_message="Collection 'user' not found. [...schema hints...] [...past corrections...]"
 )
-  → LLM corrects to "db.users.find({})"
      │
      ▼
-Execute → Success → Return (self_corrected=True, total_attempts=2)
+Confidence Scorer: predict_success_probability() → 0.72 (MEDIUM) → proceed
+     │
+     ▼
+Execute → Success
+     │
+     ▼
+Result Verification: verify_results(enable_diagnostics=False) → no issues
+     │
+     ▼
+Correction Learner: learn_from_correction(TABLE_NOT_FOUND, "mongodb", ...)
+     │
+     ▼
+Return (self_corrected=True, total_attempts=2, verification_warnings=[])
+```
+
+**Non-Retryable Error Flow:**
+```
+Attempt 1: Generate → Execute → PERMISSION_DENIED
+     │
+     ▼
+classify_error("not authorized on admin")
+  → (PERMISSION_DENIED, "Check user permissions")
+     │
+     ▼
+Non-retryable check: PERMISSION_DENIED → fail immediately (no retry)
+     │
+     ▼
+Return error: "Non-retryable error (permission_denied): not authorized on admin"
 ```
 
 ---
@@ -562,6 +614,9 @@ Both paths run in parallel via `asyncio.gather()` with the same timeout and erro
 | `sample_size` | 100 | MongoDB/ES inspectors — docs sampled for schema inference |
 | Temperature (first attempt) | 0.1 | All generators — stable first generation |
 | Temperature (retry) | 0.2 | All generators — slightly more creative on retries |
+| Confidence skip threshold | 0.2 | Skip execution if ConfidenceScorer < 0.2 |
+| Schema hint truncation | 500 chars | Max schema text appended to not-found errors |
+| `NON_RETRYABLE_ERROR_NAMES` | permission_denied, timeout, connection_error | Errors that skip remaining retry attempts |
 
 ---
 

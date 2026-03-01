@@ -62,7 +62,7 @@ class CassandraHandler(NoSQLHandler):
             return await self._generate_and_execute_with_retry(
                 question=question, schema_str=schema_str,
                 generator=generator, executor=executor, trace=trace,
-                error_classifier=classify_error,
+                error_classifier=classify_error, database_type="cassandra",
                 model=model, db=db, query_history_id=query_history_id,
                 chat_session_id=chat_session_id,
             )

@@ -98,9 +98,13 @@ The system uses a multi-agent architecture with 35+ specialized agents (includin
 Natural Language Query → Input Sanitization → Injection Detection
   → Conversational Memory → Tool-Using Agent → Query Planning
   → [SQL Path] SQL Generator → Confidence Scorer → SQL Executor
+      → Result Verification → [If Error: Parallel Corrections / Self-Correction Loop]
+      → [If Success: Learn Pattern]
   → [NoSQL Path] NoSQL Router → Native Query Generator (MQL/CQL/PartiQL/DSL/Commands) → Executor
-  → Result Verification → [If Error: Parallel Corrections / Self-Correction Loop]
-  → [If Success: Learn Pattern] → Parallel Analysis (stats/anomalies/correlations)
+      → [If Error: Non-retryable check → Schema Hints → Correction Learner lookup
+         → Confidence Scorer gate → Self-Correction Loop (up to 3 attempts)]
+      → [If Success: Result Verification → Correction Learner persist]
+  → Parallel Analysis (stats/anomalies/correlations)
   → Tiered Narrative Generation → Return Results
 ```
 

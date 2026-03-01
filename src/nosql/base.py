@@ -8,9 +8,20 @@ Each NoSQL database implements these interfaces to provide:
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Set, Tuple
+
+from src.llm.self_correcting_agent import ErrorType
 
 logger = logging.getLogger(__name__)
+
+# Error types that cannot be fixed by regenerating the query
+NON_RETRYABLE_ERRORS: Set[str] = {
+    ErrorType.PERMISSION_DENIED.value,
+    ErrorType.TIMEOUT.value,
+}
+# CONNECTION_ERROR is not in self_correcting_agent.ErrorType but may appear
+# from confidence_scorer's ErrorType — handle by string value too
+NON_RETRYABLE_ERROR_NAMES: Set[str] = {"connection_error", "permission_denied", "timeout"}
 
 # ── Shared client pool lifecycle management ──────────────────────────────
 
@@ -268,6 +279,7 @@ class NoSQLHandler(ABC):
         executor: Any,
         trace: Any,
         error_classifier: Callable[[str], Tuple[Any, str]],
+        database_type: str,
         model: Optional[str] = None,
         db: Optional[Any] = None,
         query_history_id: Optional[int] = None,
@@ -277,10 +289,24 @@ class NoSQLHandler(ABC):
 
         Works with any NoSQL generator/executor pair. The error_classifier
         is a callable(error_msg) -> (ErrorType, hint) specific to each DB.
+
+        Integrates:
+        - CorrectionLearner: hints from past corrections on retry, learns on success
+        - ConfidenceScorer: skips low-confidence corrections (< 0.2)
+        - ResultVerificationAgent: checks results for suspicious patterns
+        - Non-retryable error detection: breaks early on permission/connection/timeout
+        - Schema hints: includes valid names in error context for not-found errors
         """
         last_query_str = ""
         last_error = ""
+        last_error_type: Optional[Any] = None
+        first_failed_query = ""
         attempts: List[Dict[str, Any]] = []
+        verification_warnings: List[str] = []
+
+        # Lazily initialised agents (only when needed)
+        correction_learner = None
+        confidence_scorer = None
 
         for attempt_num in range(1, MAX_RETRIES + 1):
             trace.add_step(
@@ -289,7 +315,7 @@ class NoSQLHandler(ABC):
                 metadata={"attempt": attempt_num},
             )
 
-            # Generate query
+            # ── Generate query ───────────────────────────────────────
             try:
                 if attempt_num == 1:
                     query = await generator.generate(
@@ -301,11 +327,18 @@ class NoSQLHandler(ABC):
                         chat_session_id=chat_session_id,
                     )
                 else:
+                    # Enrich error context with learned corrections
+                    enriched_error = last_error
+                    if db and last_error_type is not None:
+                        enriched_error = await self._enrich_error_with_corrections(
+                            db, last_error_type, last_error, database_type, trace
+                        )
+
                     query = await generator.generate_with_error_context(
                         question=question,
                         schema=schema_str,
                         previous_query=last_query_str,
-                        error_message=last_error,
+                        error_message=enriched_error,
                         model=model,
                         db=db,
                         query_history_id=query_history_id,
@@ -325,9 +358,26 @@ class NoSQLHandler(ABC):
 
             query_str = generator.query_to_display_string(query)
             last_query_str = query_str
+            if not first_failed_query and attempt_num > 1:
+                # first_failed_query stays as the original failed query
+                pass
             trace.add_step("generation", f"Generated: {query_str[:120]}")
 
-            # Execute
+            # ── Confidence check on retries ──────────────────────────
+            if attempt_num > 1 and first_failed_query:
+                skip = await self._check_confidence(
+                    first_failed_query, query_str, last_error_type, last_error, trace
+                )
+                if skip:
+                    attempts.append({
+                        "attempt": attempt_num,
+                        "query": query_str,
+                        "error": "Skipped: confidence too low",
+                        "success": False,
+                    })
+                    continue
+
+            # ── Execute ──────────────────────────────────────────────
             result = await executor.execute(query)
 
             if result["success"]:
@@ -342,6 +392,18 @@ class NoSQLHandler(ABC):
                     "row_count": result["row_count"],
                 })
 
+                # ── Result verification ──────────────────────────────
+                verification_warnings = await self._verify_result(
+                    question, query_str, result, schema_str, database_type, trace
+                )
+
+                # ── Learn from successful correction ─────────────────
+                if attempt_num > 1 and db and first_failed_query and last_error_type:
+                    await self._learn_correction(
+                        db, last_error_type, first_failed_query, last_error,
+                        query_str, database_type, trace
+                    )
+
                 return {
                     "success": True,
                     "sql": query_str,
@@ -353,16 +415,46 @@ class NoSQLHandler(ABC):
                     "agent_trace": trace.to_dict(),
                     "model_used": model or "default",
                     "query_plan": None,
-                    "verification_warnings": [],
+                    "verification_warnings": verification_warnings,
                     "used_planning": False,
                 }
 
-            # Query failed — classify error for retry
+            # ── Query failed — classify error ────────────────────────
             error_msg = result.get("error", "Unknown error")
             error_type, hint = error_classifier(error_msg)
-            last_error = f"{error_msg}\nHint: {hint}"
-
             error_type_value = error_type.value if hasattr(error_type, "value") else str(error_type)
+            last_error_type = error_type
+
+            # Remember the first failed query for correction learning
+            if attempt_num == 1:
+                first_failed_query = query_str
+
+            # ── Non-retryable error check ────────────────────────────
+            if error_type_value in NON_RETRYABLE_ERROR_NAMES:
+                trace.add_step(
+                    "error",
+                    f"Non-retryable error ({error_type_value}): {error_msg[:100]}",
+                )
+                attempts.append({
+                    "attempt": attempt_num,
+                    "query": query_str,
+                    "error": error_msg,
+                    "error_type": error_type_value,
+                    "success": False,
+                })
+                return self._build_error_result(
+                    f"Non-retryable error ({error_type_value}): {error_msg}",
+                    trace,
+                    sql=query_str,
+                    attempts=attempts,
+                )
+
+            # ── Build error context with schema hints ────────────────
+            error_context = f"{error_msg}\nHint: {hint}"
+            if error_type_value in ("table_not_found", "column_not_found"):
+                error_context = self._add_schema_hints(error_context, schema_str)
+            last_error = error_context
+
             trace.add_step(
                 "error",
                 f"Query failed: {error_msg[:100]}",
@@ -384,6 +476,155 @@ class NoSQLHandler(ABC):
             sql=last_query_str,
             attempts=attempts,
         )
+
+    # ── Agent integration helpers (all wrapped in try/except) ─────────
+
+    async def _enrich_error_with_corrections(
+        self,
+        db: Any,
+        error_type: Any,
+        error_msg: str,
+        database_type: str,
+        trace: Any,
+    ) -> str:
+        """Look up learned corrections and append hints to the error message."""
+        try:
+            from src.llm.correction_learner import CorrectionLearner
+
+            learner = CorrectionLearner(db_session=db)
+            corrections = await learner.find_applicable_corrections(
+                error_type=error_type,
+                error_message=error_msg,
+                database_type=database_type,
+                limit=3,
+            )
+            if corrections:
+                hints = []
+                for c in corrections:
+                    desc = c.get("correction_description") or "similar correction"
+                    hints.append(f"- {desc} (confidence: {c.get('confidence_score', 0):.2f})")
+                correction_block = "\n".join(hints)
+                trace.add_step(
+                    "correction_learner",
+                    f"Found {len(corrections)} applicable learned corrections",
+                )
+                return (
+                    f"{error_msg}\n\n"
+                    f"Previously successful corrections for similar errors:\n{correction_block}"
+                )
+        except Exception as e:
+            logger.debug(f"Correction learner lookup failed (non-fatal): {e}")
+        return error_msg
+
+    async def _check_confidence(
+        self,
+        original_query: str,
+        correction_query: str,
+        error_type: Any,
+        error_msg: str,
+        trace: Any,
+    ) -> bool:
+        """Score the correction and return True if it should be skipped."""
+        try:
+            from src.llm.confidence_scorer import get_confidence_scorer
+
+            scorer = get_confidence_scorer()
+            error_type_value = error_type.value if hasattr(error_type, "value") else str(error_type)
+            score = scorer.predict_success_probability(
+                error_type=error_type_value,
+                original_sql=original_query,
+                correction_sql=correction_query,
+                error_message=error_msg,
+            )
+            trace.add_step(
+                "confidence",
+                f"Confidence: {score.overall:.2f} ({score.recommendation})",
+                metadata={"confidence_score": score.overall},
+            )
+            scorer.update_historical_stats(error_type_value, success=False)
+            if score.overall < 0.2:
+                logger.info(f"Skipping low-confidence correction ({score.overall:.2f})")
+                trace.add_step("confidence", "Skipping execution — confidence < 0.2")
+                return True
+        except Exception as e:
+            logger.debug(f"Confidence scoring failed (non-fatal): {e}")
+        return False
+
+    async def _verify_result(
+        self,
+        question: str,
+        query_str: str,
+        result: Dict[str, Any],
+        schema_str: str,
+        database_type: str,
+        trace: Any,
+    ) -> List[str]:
+        """Run result verification and return any warning messages."""
+        warnings: List[str] = []
+        try:
+            from src.llm.result_verification_agent import ResultVerificationAgent
+
+            verifier = ResultVerificationAgent(enable_diagnostics=False)
+            verification = await verifier.verify_results(
+                question=question,
+                sql=query_str,
+                result=result,
+                schema=schema_str,
+                database_type=database_type,
+            )
+            if verification.is_suspicious:
+                warnings.append(verification.description)
+                trace.add_step(
+                    "verification",
+                    f"Suspicious result: {verification.description}",
+                    metadata={"issue_type": verification.issue_type.value},
+                )
+            else:
+                trace.add_step("verification", "Result verification passed")
+        except Exception as e:
+            logger.debug(f"Result verification failed (non-fatal): {e}")
+        return warnings
+
+    async def _learn_correction(
+        self,
+        db: Any,
+        error_type: Any,
+        original_query: str,
+        error_msg: str,
+        corrected_query: str,
+        database_type: str,
+        trace: Any,
+    ) -> None:
+        """Persist a successful correction for future use."""
+        try:
+            from src.llm.correction_learner import CorrectionLearner
+
+            learner = CorrectionLearner(db_session=db)
+            correction_id = await learner.learn_from_correction(
+                error_type=error_type,
+                original_sql=original_query,
+                original_error=error_msg,
+                corrected_sql=corrected_query,
+                database_type=database_type,
+                was_successful=True,
+            )
+            if correction_id:
+                trace.add_step(
+                    "correction_learner",
+                    f"Learned correction #{correction_id} for {database_type}",
+                )
+        except Exception as e:
+            logger.debug(f"Correction learning failed (non-fatal): {e}")
+
+    @staticmethod
+    def _add_schema_hints(error_context: str, schema_str: str) -> str:
+        """Append truncated schema info to help the LLM fix not-found errors."""
+        if schema_str:
+            truncated = schema_str[:500]
+            if len(schema_str) > 500:
+                truncated += "..."
+            return f"{error_context}\n\nAvailable collections/fields:\n{truncated}"
+        return error_context
 
     def _build_error_result(
         self,

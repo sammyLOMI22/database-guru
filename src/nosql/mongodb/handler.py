@@ -80,6 +80,7 @@ class MongoDBHandler(NoSQLHandler):
                 executor=executor,
                 trace=trace,
                 error_classifier=classify_error,
+                database_type="mongodb",
                 model=model,
                 db=db,
                 query_history_id=query_history_id,
