@@ -40,8 +40,8 @@ class DynamoDBQueryExecutor:
             return "Empty query"
 
         # Block multi-statement injection via semicolons
-        # Remove semicolons inside single-quoted string literals before checking
-        without_strings = re.sub(r"'[^']*'", "", stripped)
+        # Remove single-quoted string literals (handling escaped quotes '') before checking
+        without_strings = re.sub(r"'(?:[^']|'')*'", "", stripped)
         if ";" in without_strings:
             return "Multi-statement queries are not allowed (semicolons detected)"
 

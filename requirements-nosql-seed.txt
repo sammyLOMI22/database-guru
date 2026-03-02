@@ -1,0 +1,7 @@
+# Python drivers for scripts/seed_nosql_data.py
+# Install with: pip install -r requirements-nosql-seed.txt
+pymongo>=4.6
+redis>=5.0
+cassandra-driver>=3.29
+boto3>=1.34
+elasticsearch>=8.12

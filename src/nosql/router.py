@@ -4,7 +4,7 @@ Provides the branch point that query.py and multi_db_handler.py use to route
 NoSQL connections away from the SQL pipeline.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -149,7 +149,8 @@ async def get_cached_or_fresh_schema(
     if cached and isinstance(cached, dict) and cached.get("tables"):
         updated_at = connection.schema_updated_at
         if updated_at:
-            age_seconds = (datetime.utcnow() - updated_at).total_seconds()
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            age_seconds = (now - updated_at).total_seconds()
             if age_seconds < SCHEMA_TTL_SECONDS:
                 return cached
 
@@ -160,7 +161,7 @@ async def get_cached_or_fresh_schema(
     if db:
         try:
             connection.schema_cache = schema_dict
-            connection.schema_updated_at = datetime.utcnow()
+            connection.schema_updated_at = datetime.now(timezone.utc)
             await db.commit()
         except Exception as e:
             logger.warning(f"Failed to cache NoSQL schema: {e}")

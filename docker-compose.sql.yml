@@ -1,0 +1,59 @@
+# SQL sample databases for testing Database Guru
+# Usage:
+#   docker compose -f docker-compose.sql.yml up -d
+#   docker compose -f docker-compose.sql.yml down
+#   docker compose -f docker-compose.sql.yml down -v  # remove data
+#
+# Note: SQLite and DuckDB are file-based and don't need Docker.
+
+services:
+  postgresql:
+    image: postgres:16-alpine
+    container_name: dbguru-pg-sample
+    ports:
+      - "127.0.0.1:5433:5432"
+    environment:
+      POSTGRES_USER: dbguru
+      POSTGRES_PASSWORD: dbguru
+      POSTGRES_DB: ecommerce
+    volumes:
+      - pg-sample-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbguru -d ecommerce"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - sql-net
+
+  mysql:
+    image: mysql:8.0
+    container_name: dbguru-mysql-sample
+    ports:
+      - "127.0.0.1:3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_USER: dbguru
+      MYSQL_PASSWORD: dbguru
+      MYSQL_DATABASE: ecommerce
+    volumes:
+      - mysql-sample-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "dbguru", "-pdbguru"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - sql-net
+
+volumes:
+  pg-sample-data:
+  mysql-sample-data:
+
+networks:
+  sql-net:
+    driver: bridge

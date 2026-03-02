@@ -24,8 +24,22 @@ class ElasticsearchQueryExecutor:
         self.timeout_seconds = timeout_seconds
         self.allow_write = allow_write
 
+    # Keys in the query DSL that indicate a write/mutate operation
+    _WRITE_INDICATORS = frozenset({
+        "script", "update", "delete", "upsert", "doc", "doc_as_upsert",
+    })
+
     async def execute(self, query_dsl: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a Query DSL dict and return normalized results."""
+        # Block write operations unless explicitly allowed
+        if not self.allow_write:
+            write_keys = self._WRITE_INDICATORS & set(query_dsl.keys())
+            if write_keys:
+                return normalize_nosql_result(
+                    data=[], execution_time_ms=0,
+                    error=f"Write operation not allowed (found keys: {', '.join(write_keys)}). Enable allow_write.",
+                )
+
         start_time = time.time()
 
         try:

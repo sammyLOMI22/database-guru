@@ -1,5 +1,5 @@
 """Database connection management endpoints"""
-from typing import List, Optional
+from typing import ClassVar, List, Optional, Set
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
@@ -24,11 +24,11 @@ class ConnectionCreate(BaseModel):
 
     # DynamoDB and Elasticsearch don't require a database_name;
     # all other types do.
-    _DB_NAME_OPTIONAL_TYPES = {"dynamodb", "elasticsearch", "redis"}
+    DB_NAME_OPTIONAL_TYPES: ClassVar[Set[str]] = {"dynamodb", "elasticsearch", "redis"}
 
     @model_validator(mode="after")
     def validate_database_name(self):
-        if self.database_type not in self._DB_NAME_OPTIONAL_TYPES:
+        if self.database_type not in self.DB_NAME_OPTIONAL_TYPES:
             if not self.database_name or not self.database_name.strip():
                 raise ValueError(f"database_name is required for {self.database_type}")
         return self

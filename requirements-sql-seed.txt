@@ -1,0 +1,6 @@
+# Python drivers for scripts/seed_sql_data.py
+# Install with: pip install -r requirements-sql-seed.txt
+psycopg2-binary>=2.9
+pymysql>=1.1
+duckdb>=0.10
+# sqlite3 is included in Python stdlib

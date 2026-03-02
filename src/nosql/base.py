@@ -243,7 +243,8 @@ class NoSQLHandler(ABC):
         if cached and isinstance(cached, dict) and cached.get("tables"):
             updated_at = connection.schema_updated_at
             if updated_at:
-                age_seconds = (datetime.utcnow() - updated_at).total_seconds()
+                now = datetime.now(timezone.utc).replace(tzinfo=None)
+                age_seconds = (now - updated_at).total_seconds()
                 if age_seconds < SCHEMA_TTL_SECONDS:
                     tables = cached.get("tables", {})
                     trace.add_step(
@@ -264,7 +265,7 @@ class NoSQLHandler(ABC):
         if db:
             try:
                 connection.schema_cache = schema_dict
-                connection.schema_updated_at = datetime.utcnow()
+                connection.schema_updated_at = datetime.now(timezone.utc)
                 await db.commit()
             except Exception as e:
                 logger.warning(f"Failed to cache schema: {e}")
