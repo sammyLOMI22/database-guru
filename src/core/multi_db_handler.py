@@ -615,6 +615,8 @@ class MultiDatabaseHandler:
         allow_write: bool = False,
         model_used: str = "unknown",
         row_limit: int = 100,
+        db: Optional[Any] = None,
+        chat_session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Internal helper method to execute a single database query with self-correction
@@ -629,6 +631,8 @@ class MultiDatabaseHandler:
             combined_schema_data: Full schema data for all databases
             allow_write: Allow write operations
             model_used: LLM model name for tracking
+            db: Optional metadata DB session (for correction learning)
+            chat_session_id: Optional chat session ID (for context)
 
         Returns:
             Dict with execution results and metadata (NOT including QueryHistory record)
@@ -644,6 +648,8 @@ class MultiDatabaseHandler:
                     model=model_used,
                     allow_write=allow_write,
                     row_limit=row_limit,
+                    db=db,
+                    chat_session_id=chat_session_id,
                 )
                 return {
                     **nosql_result,

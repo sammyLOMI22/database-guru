@@ -30,8 +30,8 @@ ALLOWED_READ_COMMANDS = frozenset({
     "ZRANGE", "ZRANGEBYSCORE", "ZRANGEBYLEX", "ZREVRANGE", "ZREVRANGEBYSCORE",
     "ZCARD", "ZCOUNT", "ZSCORE", "ZRANK", "ZREVRANK", "ZSCAN",
     # Key inspection
-    "EXISTS", "TYPE", "TTL", "PTTL", "KEYS", "SCAN", "DBSIZE", "RANDOMKEY",
-    "OBJECT", "DUMP",
+    "EXISTS", "TYPE", "TTL", "PTTL", "SCAN", "DBSIZE", "RANDOMKEY",
+    "OBJECT",
     # Stream (read)
     "XRANGE", "XREVRANGE", "XLEN", "XINFO", "XREAD",
     # Server info (read-only)

@@ -131,6 +131,6 @@ class RedisSchemaInspector(NoSQLSchemaInspector):
         lines.append("  Lists: LRANGE, LPUSH, RPUSH, LLEN, LPOP")
         lines.append("  Sets: SMEMBERS, SADD, SREM, SINTER, SUNION, SCARD")
         lines.append("  Sorted Sets: ZRANGE, ZRANGEBYSCORE, ZADD, ZREM, ZCARD, ZREVRANGE")
-        lines.append("  General: KEYS, SCAN, TYPE, TTL, DEL, EXISTS")
+        lines.append("  General: SCAN, TYPE, TTL, DEL, EXISTS")
 
         return "\n".join(lines)

@@ -24,20 +24,47 @@ class ElasticsearchQueryExecutor:
         self.timeout_seconds = timeout_seconds
         self.allow_write = allow_write
 
-    # Keys in the query DSL that indicate a write/mutate operation
-    _WRITE_INDICATORS = frozenset({
-        "script", "update", "delete", "upsert", "doc", "doc_as_upsert",
+    # Keys that indicate a write/mutate operation when found at top level
+    _WRITE_TOP_LEVEL = frozenset({
+        "update", "delete", "upsert", "doc", "doc_as_upsert",
     })
+
+    # Keys that indicate scripting when found at any depth
+    _SCRIPT_KEYS = frozenset({
+        "script", "scripted_metric", "script_score", "script_fields",
+    })
+
+    def _contains_script(self, obj: Any) -> List[str]:
+        """Recursively check for script-related keys in a nested dict."""
+        found = []
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                if key in self._SCRIPT_KEYS:
+                    found.append(key)
+                else:
+                    found.extend(self._contains_script(value))
+        elif isinstance(obj, list):
+            for item in obj:
+                found.extend(self._contains_script(item))
+        return found
 
     async def execute(self, query_dsl: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a Query DSL dict and return normalized results."""
         # Block write operations unless explicitly allowed
         if not self.allow_write:
-            write_keys = self._WRITE_INDICATORS & set(query_dsl.keys())
+            write_keys = self._WRITE_TOP_LEVEL & set(query_dsl.keys())
             if write_keys:
                 return normalize_nosql_result(
                     data=[], execution_time_ms=0,
                     error=f"Write operation not allowed (found keys: {', '.join(write_keys)}). Enable allow_write.",
+                )
+
+            # Recursively check for script usage at any depth
+            script_keys = self._contains_script(query_dsl)
+            if script_keys:
+                return normalize_nosql_result(
+                    data=[], execution_time_ms=0,
+                    error=f"Script execution not allowed (found: {', '.join(set(script_keys))}). Enable allow_write.",
                 )
 
         start_time = time.time()

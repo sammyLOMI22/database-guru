@@ -71,15 +71,19 @@ class DynamoDBQueryExecutor:
         start_time = time.time()
 
         try:
-            result = await asyncio.wait_for(
+            rows, has_more = await asyncio.wait_for(
                 self._execute_partiql(partiql),
                 timeout=self.timeout_seconds,
             )
             elapsed_ms = (time.time() - start_time) * 1000
-            return normalize_nosql_result(
-                data=result, execution_time_ms=elapsed_ms,
+            result = normalize_nosql_result(
+                data=rows, execution_time_ms=elapsed_ms,
                 max_rows=self.max_rows,
             )
+            # Flag truncation if DynamoDB has more pages beyond what we fetched
+            if has_more and not result.get("truncated"):
+                result["truncated"] = True
+            return result
 
         except asyncio.TimeoutError:
             elapsed_ms = (time.time() - start_time) * 1000
@@ -95,8 +99,11 @@ class DynamoDBQueryExecutor:
                 data=[], execution_time_ms=elapsed_ms, error=str(e),
             )
 
-    async def _execute_partiql(self, partiql: str) -> List[Dict]:
-        """Execute PartiQL and deserialize DynamoDB items."""
+    async def _execute_partiql(self, partiql: str) -> tuple[List[Dict], bool]:
+        """Execute PartiQL and deserialize DynamoDB items.
+
+        Returns (rows, has_more) where has_more indicates truncated results.
+        """
         async with self.session.client("dynamodb", region_name=self.region) as client:
             response = await client.execute_statement(
                 Statement=partiql,
@@ -104,7 +111,8 @@ class DynamoDBQueryExecutor:
             )
 
             items = response.get("Items", [])
-            return [self._deserialize_item(item) for item in items]
+            has_more = "NextToken" in response
+            return [self._deserialize_item(item) for item in items], has_more
 
     def _deserialize_item(self, item: Dict) -> Dict:
         """Convert DynamoDB typed dict to plain dict."""

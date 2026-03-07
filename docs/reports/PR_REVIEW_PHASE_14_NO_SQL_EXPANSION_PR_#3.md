@@ -4,24 +4,23 @@ PR Review: NoSQL Database Expansion (Phase 14) — Review #3
 
   This review consolidates findings from Reviews #1 and #2, re-evaluates all previously flagged issues against
   the latest commit (09ca2e1), and adds new findings. Items marked [FIXED] were addressed since Review #2.
-  Items marked [OPEN] remain unresolved.
+  Items marked [FIXED in #3] were addressed during this review cycle.
 
   ---
   Status Summary
 
-  | Category        | Review #2 | Fixed | Still Open | New in #3 | Fixed in #3 | Total Open |
-  |-----------------|-----------|-------|------------|-----------|-------------|------------|
-  | Critical        | 5         | 2     | 3          | 1         | 4           | 0          |
-  | Major           | 14        | 3     | 11         | 1         | 1           | 11         |
-  | Minor           | 20+       | 2     | 16+        | 2         | 0           | 18+        |
+  | Category        | Review #2 | Fixed pre-#3 | Fixed in #3 | Total Open |
+  |-----------------|-----------|--------------|-------------|------------|
+  | Critical        | 5         | 2            | 4           | 0          |
+  | Major           | 14        | 3            | 8           | 4          |
+  | Minor           | 20+       | 2            | 1           | 17+        |
 
   ---
-  Fixed Since Review #2
+  Fixed Since Review #2 (pre-Review #3)
 
   [FIXED] C2. Timezone mismatch (naive vs aware datetime)
   datetime.utcnow() replaced with datetime.now(timezone.utc) and .replace(tzinfo=None) used consistently
-  for comparison with connection.schema_updated_at. The pattern is still fragile (see M-NEW-1) but no
-  longer causes TypeError.
+  for comparison with connection.schema_updated_at.
 
   [FIXED] C3. Cassandra cluster.connect() blocking the event loop
   Connection tester now wraps Cassandra operations in asyncio.to_thread().
@@ -42,66 +41,111 @@ PR Review: NoSQL Database Expansion (Phase 14) — Review #3
   Verified — executor wraps session.execute() in asyncio.to_thread() correctly.
 
   ---
-  Critical Issues (0 open — all fixed in Review #3)
+  Fixed in Review #3
+
+  Critical:
 
   C1. [FIXED in #3] password_encrypted used as plaintext — frontend claim corrected
 
-  Files: All 5 client pools (mongodb, redis, cassandra, dynamodb, elasticsearch)
-
-  The field connection.password_encrypted is passed directly to database clients as the password/secret.
-  The field stores plaintext (connections.py:121 stores raw password). The field name is misleading and
-  AWS secret keys sit unencrypted in the SQLite metadata DB.
-
-  Fix applied: DatabaseConnectionModal.tsx:314 changed from "Credentials are stored encrypted" to
+  DatabaseConnectionModal.tsx:314 changed from "Credentials are stored encrypted" to
   "AWS credentials are stored locally" to stop misleading users.
-
-  Note: The underlying plaintext storage remains. Full encryption is a separate effort (field rename +
-  encrypt/decrypt layer across all client pools). Tracked as a future improvement, not a blocker.
+  Note: Underlying plaintext storage remains — full encryption tracked as future improvement.
 
   C4. [FIXED in #3] Credential leakage in connection tester error messages
 
-  File: src/core/connection_tester.py
-
-  Added _sanitize_error() helper that strips:
+  Added _sanitize_error() helper to src/core/connection_tester.py that strips:
   - Connection URIs (mongodb://, postgresql://, etc.)
   - AWS access keys (AKIA...)
   - Password/secret key-value pairs
-  Applied to all 10 _test_* methods and the top-level catch-all (13 call sites total).
+  Applied to all 10 _test_* methods and top-level catch-all (13 call sites).
 
   C5. [FIXED in #3] Dead router test — replaced with full dispatch coverage
 
-  File: tests/nosql/test_router.py
-
-  The broken test_routes_to_mongodb was replaced with 5 working tests that actually call
-  execute_nosql_query() and assert the correct handler is instantiated and invoked for each
-  NoSQL database type (MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch). All 29 tests pass.
+  Replaced broken test_routes_to_mongodb with 5 working tests that call execute_nosql_query()
+  and assert correct handler instantiation for all NoSQL types. All 29 router tests pass.
 
   C-NEW-1. [FIXED in #3] CQL injection — added _validate_cql() to Cassandra executor
 
-  File: src/nosql/cassandra/query_executor.py
-
-  Added _validate_cql() method modeled after DynamoDB's _validate_partiql():
-  - Strips single-quoted string literals (handling escaped quotes '')
-  - Strips block comments (/* ... */)
-  - Rejects multi-statement queries (semicolons outside strings/comments)
+  Added _validate_cql() to src/nosql/cassandra/query_executor.py:
+  - Strips string literals and block comments before checking for semicolons
+  - Rejects multi-statement queries
   - Validates first keyword against allowlist (SELECT/INSERT/UPDATE/DELETE/USE)
-  - Write check now operates on comment-stripped input (blocks /* comment */ INSERT ...)
+  - Write check operates on comment-stripped input (blocks /* comment */ INSERT ...)
+
+  Major:
+
+  M2. [FIXED in #3] Duplicated schema caching logic (DRY violation)
+
+  Refactored src/nosql/base.py:_get_schema() to delegate to router.get_cached_or_fresh_schema()
+  for actual cache logic. Base class now only handles trace step messaging around the shared function.
+
+  M3. [FIXED in #3] MongoDB missing_count never incremented — nullability detection broken
+
+  Added _extract_field_names() helper to src/nosql/mongodb/schema_inspector.py and a second pass
+  after document analysis that counts fields missing from each sampled document. Nullability
+  detection now works correctly.
+
+  M5. [FIXED in #3] Redis KEYS command in the allowlist — production DoS risk
+
+  Removed KEYS from ALLOWED_READ_COMMANDS in src/nosql/redis/query_executor.py and from the
+  LLM prompt in src/nosql/redis/schema_inspector.py. SCAN remains as the safe alternative.
+
+  M7. [FIXED in #3] DynamoDB execute_statement ignores pagination (NextToken)
+
+  Updated src/nosql/dynamodb/query_executor.py to return (rows, has_more) from _execute_partiql()
+  and set result["truncated"] = True when NextToken is present in the DynamoDB response.
+
+  M8. [FIXED in #3] evict_nosql_pool failure after DB commit causes 500
+
+  Wrapped evict_nosql_pool() call in src/api/endpoints/connections.py:delete_connection() in
+  try/except with warning log. Added logger to the module.
+
+  M9. [FIXED in #3] Multi-DB NoSQL path missing db, chat_session_id
+
+  Added db and chat_session_id parameters to _execute_single_query_task() in
+  src/core/multi_db_handler.py and passed them through to execute_nosql_query(). Updated
+  call site in src/api/endpoints/multi_db_query.py. (query_history_id not available per-database
+  in multi-DB path — documented in TECH_DEBT.md)
+
+  M-NEW-1. [FIXED in #3] Elasticsearch write detection only checks top-level keys
+
+  Replaced flat key check with recursive _contains_script() method in
+  src/nosql/elasticsearch/query_executor.py. Now checks for script, scripted_metric,
+  script_score, and script_fields at any nesting depth. Top-level write indicators
+  (update, delete, upsert, doc, doc_as_upsert) still checked at top level only.
+
+  M6/C-NEW-1. [FIXED in #3] CQL injection — escalated to Critical, fixed (see above)
+
+  M11. [FIXED in #3] No routing tests / router utility tests
+
+  Added dispatch tests for all 5 NoSQL types (C5 fix) plus tests for evict_nosql_pool()
+  (SQL noop, MongoDB eviction, error swallowing) and get_cached_or_fresh_schema() (cached hit,
+  expired cache, no cache, DB persistence) in tests/nosql/test_security_and_executors.py.
+
+  M12. [PARTIALLY FIXED in #3] No executor tests for Cassandra or DynamoDB
+
+  Added CQL validation tests (10 tests) and PartiQL validation tests (8 tests including
+  pagination truncation) in tests/nosql/test_security_and_executors.py. End-to-end executor
+  tests against real databases remain as integration test gap.
+
+  Tests added in Review #3 (tests/nosql/test_security_and_executors.py — 43 new tests):
+
+  - TestCQLValidation: 10 tests (valid select, trailing semicolon, empty, multi-statement,
+    semicolon in string, comment-prefixed write, unsupported type, USE allowed, write blocked,
+    comment-bypassed write blocked)
+  - TestPartiQLValidation: 8 tests (valid select, empty, multi-statement, semicolon in string,
+    escaped quotes, unsupported type, pagination truncation flag, no truncation without NextToken)
+  - TestRedisBlockedCommands: 7 tests (FLUSHALL, CONFIG, EVAL, SHUTDOWN, DEBUG blocked,
+    KEYS not in allowlist, KEYS command blocked)
+  - TestElasticsearchScriptDetection: 7 tests (top-level script, nested script_score,
+    nested scripted_metric, deeply nested, safe query allowed, top-level update, script with allow_write)
+  - TestEvictNoSQLPool: 3 tests (SQL noop, MongoDB eviction, error swallowed)
+  - TestGetCachedOrFreshSchema: 4 tests (cached fresh, expired, no cache, DB persist)
+
+  Total NoSQL test count: 170 (up from 127)
 
   ---
-  Major Issues (12 open)
-
-  M2. [OPEN] Duplicated schema caching logic (DRY violation)
-
-  Files: src/nosql/router.py:138-169 duplicates src/nosql/base.py:234-273
-
-  Both implement TTL-check-then-inspect-then-persist. If semantics change, both must be updated in lockstep.
-
-  M3. [OPEN] MongoDB missing_count never incremented — nullability detection broken
-
-  File: src/nosql/mongodb/schema_inspector.py:107
-
-  missing_count is initialized to 0 but never updated, so the nullability check (info["missing_count"] > 0)
-  is always False.
+  Remaining Major Issues (4 open)
 
   M4. [OPEN] MongoDB write operations defined in enum but executor raises on them
 
@@ -110,71 +154,24 @@ PR Review: NoSQL Database Expansion (Phase 14) — Review #3
   MQLOperationType includes INSERT/UPDATE/DELETE, and allow_write parameter exists, but _execute_query has no
   handlers for them. They hit a generic ValueError. Either implement write execution or remove the enum values.
 
-  M5. [OPEN] Redis KEYS command in the allowlist — blocks server on large keyspaces
-
-  File: src/nosql/redis/query_executor.py:33
-
-  KEYS scans the entire keyspace, blocking Redis. SCAN is already in the list as the safe alternative.
-  The schema inspector prompt (schema_inspector.py:134) also lists KEYS as available, making it likely
-  the LLM will generate it. Remove KEYS from both locations.
-
-  M6/C-NEW-1. [FIXED in #3] CQL injection — escalated to Critical, fixed (see above)
-
-  M7. [OPEN] DynamoDB execute_statement ignores pagination (NextToken)
-
-  File: src/nosql/dynamodb/query_executor.py:98-107
-
-  Large results may be silently truncated. At minimum, add a truncated flag when NextToken is present.
-
-  M8. [OPEN] evict_nosql_pool failure after DB commit causes 500
-
-  File: src/api/endpoints/connections.py:254-256
-
-  Connection is deleted in DB, then pool eviction runs unwrapped. If eviction throws, user gets 500 even
-  though deletion succeeded. Wrap in try/except with warning log.
-
-  M9. [OPEN] Multi-DB NoSQL path missing db, query_history_id, chat_session_id
-
-  File: src/core/multi_db_handler.py:~637-648
-
-  NoSQL queries via multi-DB handler skip metadata session, query history, and session context — no learned
-  corrections or tracking.
-
   M10. [OPEN] Elasticsearch scheme inferred from auth presence
 
   Files: src/nosql/elasticsearch/client_pool.py:46-48, src/core/connection_tester.py:354-355
 
   scheme = "https" if has_auth else "http" — breaks for HTTP+auth (local dev) or HTTPS+no-auth (VPN) clusters.
 
-  M11. [PARTIALLY FIXED in #3] No routing tests for Redis, Cassandra, DynamoDB, or Elasticsearch
-
-  File: tests/nosql/test_router.py
-
-  Dispatch tests added for all 5 NoSQL types (see C5 fix). Still no tests for get_cached_or_fresh_schema()
-  or evict_nosql_pool().
-
-  M12. [OPEN] No executor tests for Cassandra or DynamoDB
-
-  Missing coverage for CQL execution/normalization and PartiQL execution through boto3.
-
   M13. [OPEN] No happy-path handler tests for Redis, Cassandra, or DynamoDB
 
   These only test the error path (connection refused). MongoDB and Elasticsearch both have full handler
   success tests.
 
-  M-NEW-1. Elasticsearch write detection only checks top-level keys
+  M12. [PARTIALLY OPEN] No end-to-end executor tests for Cassandra or DynamoDB
 
-  File: src/nosql/elasticsearch/query_executor.py:28-41
-
-  _WRITE_INDICATORS = {"script", "update", "delete", ...} only checks top-level keys of the query DSL dict.
-  Elasticsearch scripting can be deeply nested (e.g., {"query": {"script_score": {"script": {"source": "..."}}}}
-  or {"aggs": {"scripted_metric": {...}}}). An LLM-generated response could embed scripts at deeper levels and
-  bypass the check.
-
-  Fix: Recursively check for script keys in the entire query DSL dict.
+  Validation tests added, but no tests exercising _execute_sync (Cassandra) or _execute_partiql (DynamoDB)
+  with mocked database sessions.
 
   ---
-  Minor Issues (18+ open)
+  Minor Issues (17+ open)
 
   Key items (unchanged from Review #2 unless noted):
 
@@ -195,12 +192,8 @@ PR Review: NoSQL Database Expansion (Phase 14) — Review #3
   - database_name changed from required to optional in Pydantic schema weakens OpenAPI docs
   - Handler instantiated per query in router.py — no caching/singleton pattern
   - Same if/elif chain for database types appears 3x in router.py — use a registry dict
-
-  New minor items:
   - Timezone comparison still fragile: .replace(tzinfo=None) works but breaks if schema_updated_at becomes
-    timezone-aware. Consider storing UTC-aware timestamps consistently.
-  - No test for DynamoDB _validate_partiql() injection protection (semicolons, unsupported statements,
-    semicolons inside string literals). This validation code is untested.
+    timezone-aware
 
   ---
   Positives
@@ -228,14 +221,32 @@ PR Review: NoSQL Database Expansion (Phase 14) — Review #3
   ---
   Recommended Priority for Remaining Fixes
 
-  All 4 critical issues have been resolved. Remaining priority for major/minor items:
+  All critical and most major issues have been resolved. Remaining:
 
-  1. M-NEW-1 (ES write detection) — recursive check needed for nested scripts
-  2. M5 (KEYS command) — production safety risk
-  3. M8 (evict error handling) — user-facing 500
-  4. M9 (multi-DB missing params) — silent feature degradation
-  5. M3 (MongoDB nullability) — broken schema inference
-  6. M12-M13 (executor/handler test coverage) — Cassandra, DynamoDB, Redis
-  7. M11 (remaining router tests) — get_cached_or_fresh_schema(), evict_nosql_pool()
-  8. M2 (duplicated schema caching) — DRY violation
-  9. M7 (DynamoDB pagination) — silent truncation
+  1. M10 (ES scheme) — could break local dev setups with HTTP+auth
+  2. M4 (MongoDB write enum) — dead code or missing feature, low risk
+  3. M13 (happy-path handler tests) — improves confidence but not blocking
+  4. M12 (end-to-end executor tests) — best covered by integration tests against Docker
+
+  ---
+  Files Changed in Review #3
+
+  Source fixes:
+  - src/nosql/cassandra/query_executor.py — added _validate_cql() injection protection
+  - src/nosql/elasticsearch/query_executor.py — recursive _contains_script() for nested script detection
+  - src/nosql/redis/query_executor.py — removed KEYS from ALLOWED_READ_COMMANDS
+  - src/nosql/redis/schema_inspector.py — removed KEYS from LLM prompt
+  - src/nosql/dynamodb/query_executor.py — pagination truncation flag via NextToken
+  - src/nosql/base.py — _get_schema() delegates to router.get_cached_or_fresh_schema()
+  - src/nosql/mongodb/schema_inspector.py — missing_count tracking via _extract_field_names()
+  - src/core/connection_tester.py — _sanitize_error() for credential stripping
+  - src/core/multi_db_handler.py — db/chat_session_id params for NoSQL multi-DB path
+  - src/api/endpoints/connections.py — try/except around evict_nosql_pool(), added logging
+  - src/api/endpoints/multi_db_query.py — pass db/chat_session_id to _execute_single_query_task()
+  - frontend/src/components/DatabaseConnectionModal.tsx — removed false encryption claim
+
+  Test additions:
+  - tests/nosql/test_router.py — 5 dispatch tests replacing dead test
+  - tests/nosql/test_security_and_executors.py — 43 new tests (NEW FILE)
+
+  Total: 14 files modified, 170 NoSQL tests passing (was 127)

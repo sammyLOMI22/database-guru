@@ -1,4 +1,5 @@
 """Database connection management endpoints"""
+import logging
 from typing import ClassVar, List, Optional, Set
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,8 @@ from pydantic import BaseModel, Field, model_validator
 from src.api.dependencies import get_db
 from src.database.models import DatabaseConnection
 from src.core.connection_tester import ConnectionTester
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/connections", tags=["connections"])
 
@@ -252,5 +255,8 @@ async def delete_connection(
     )
 
     # Evict from NoSQL client pool if applicable
-    from src.nosql.router import evict_nosql_pool
-    await evict_nosql_pool(connection_id, connection.database_type)
+    try:
+        from src.nosql.router import evict_nosql_pool
+        await evict_nosql_pool(connection_id, connection.database_type)
+    except Exception as e:
+        logger.warning(f"Failed to evict NoSQL pool for connection {connection_id}: {e}")

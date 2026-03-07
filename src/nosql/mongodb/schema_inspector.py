@@ -74,6 +74,13 @@ class MongoSchemaInspector(NoSQLSchemaInspector):
         for doc in samples:
             self._analyze_document(doc, field_info, prefix="")
 
+        # Count missing fields: for each known field, check how many docs lack it
+        all_field_names = set(field_info.keys())
+        for doc in samples:
+            doc_fields = self._extract_field_names(doc, prefix="")
+            for missing_field in all_field_names - doc_fields:
+                field_info[missing_field]["missing_count"] += 1
+
         # Convert to columns format
         columns = []
         for field_name, info in sorted(field_info.items()):
@@ -130,6 +137,16 @@ class MongoSchemaInspector(NoSQLSchemaInspector):
                 # Recurse into nested documents (max 2 levels)
                 if isinstance(value, dict) and prefix.count(".") < 2:
                     self._analyze_document(value, field_info, f"{field_name}.")
+
+    def _extract_field_names(self, doc: Dict, prefix: str) -> Set[str]:
+        """Extract all dot-notation field names from a document (matching _analyze_document logic)."""
+        names: Set[str] = set()
+        for key, value in doc.items():
+            field_name = f"{prefix}{key}" if prefix else key
+            names.add(field_name)
+            if isinstance(value, dict) and prefix.count(".") < 2:
+                names.update(self._extract_field_names(value, f"{field_name}."))
+        return names
 
     def _pick_primary_type(self, types: Set[str]) -> str:
         """Pick the most representative type from a set of observed types."""

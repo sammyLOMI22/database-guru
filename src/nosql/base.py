@@ -238,37 +238,40 @@ class NoSQLHandler(ABC):
         db: Optional[Any],
         trace: Any,
     ) -> Dict[str, Any]:
-        """Get schema from cache or inspect fresh (shared across all handlers)."""
+        """Get schema from cache or inspect fresh (shared across all handlers).
+
+        Delegates to router.get_cached_or_fresh_schema for the actual cache logic
+        and adds trace steps for observability.
+        """
+        from src.nosql.router import get_cached_or_fresh_schema
+
+        # Check if we'll use cache (for trace messaging)
         cached = connection.schema_cache
+        is_cached = False
         if cached and isinstance(cached, dict) and cached.get("tables"):
             updated_at = connection.schema_updated_at
             if updated_at:
                 now = datetime.now(timezone.utc).replace(tzinfo=None)
                 age_seconds = (now - updated_at).total_seconds()
                 if age_seconds < SCHEMA_TTL_SECONDS:
+                    is_cached = True
                     tables = cached.get("tables", {})
                     trace.add_step(
                         "analysis",
                         f"Using cached schema ({len(tables)} collections/tables, {int(age_seconds)}s old)",
                     )
-                    return cached
 
-        trace.add_step("analysis", "Inspecting database schema...")
-        schema_dict = await inspector.get_schema()
-        tables = schema_dict.get("tables", {})
-        trace.add_step(
-            "analysis",
-            f"Found {len(tables)} collections/tables: {', '.join(list(tables.keys())[:10])}",
-        )
+        if not is_cached:
+            trace.add_step("analysis", "Inspecting database schema...")
 
-        # Persist to DatabaseConnection.schema_cache
-        if db:
-            try:
-                connection.schema_cache = schema_dict
-                connection.schema_updated_at = datetime.now(timezone.utc)
-                await db.commit()
-            except Exception as e:
-                logger.warning(f"Failed to cache schema: {e}")
+        schema_dict = await get_cached_or_fresh_schema(connection, inspector, db)
+
+        if not is_cached:
+            tables = schema_dict.get("tables", {})
+            trace.add_step(
+                "analysis",
+                f"Found {len(tables)} collections/tables: {', '.join(list(tables.keys())[:10])}",
+            )
 
         return schema_dict
 
