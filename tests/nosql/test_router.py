@@ -144,20 +144,97 @@ class TestExecuteNoSQLQuery:
         conn.database_type = "mongodb"
 
         mock_handler = AsyncMock()
-        mock_handler.handle.return_value = {"success": True}
+        mock_handler.handle.return_value = {"success": True, "data": []}
 
         with patch(
-            "src.nosql.router.MongoDBHandler",
+            "src.nosql.mongodb.handler.MongoDBHandler",
             return_value=mock_handler,
-            create=True,
         ):
-            with patch("src.nosql.mongodb.handler.MongoDBHandler", return_value=mock_handler):
-                # We need to patch the import inside execute_nosql_query
-                import src.nosql.router as router_mod
-                original = router_mod.execute_nosql_query
+            result = await execute_nosql_query(
+                question="find all users", connection=conn,
+            )
 
-                # Simpler: just call and catch the import
-                # The actual routing logic is tested via the handler tests
+        assert result["success"] is True
+        mock_handler.handle.assert_called_once()
+        call_kwargs = mock_handler.handle.call_args[1]
+        assert call_kwargs["question"] == "find all users"
+        assert call_kwargs["connection"] is conn
+
+    @pytest.mark.asyncio
+    async def test_routes_to_redis(self):
+        conn = MagicMock()
+        conn.database_type = "redis"
+
+        mock_handler = AsyncMock()
+        mock_handler.handle.return_value = {"success": True, "data": []}
+
+        with patch(
+            "src.nosql.redis.handler.RedisHandler",
+            return_value=mock_handler,
+        ):
+            result = await execute_nosql_query(
+                question="get all keys", connection=conn,
+            )
+
+        assert result["success"] is True
+        mock_handler.handle.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_routes_to_cassandra(self):
+        conn = MagicMock()
+        conn.database_type = "cassandra"
+
+        mock_handler = AsyncMock()
+        mock_handler.handle.return_value = {"success": True, "data": []}
+
+        with patch(
+            "src.nosql.cassandra.handler.CassandraHandler",
+            return_value=mock_handler,
+        ):
+            result = await execute_nosql_query(
+                question="query users", connection=conn,
+            )
+
+        assert result["success"] is True
+        mock_handler.handle.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_routes_to_dynamodb(self):
+        conn = MagicMock()
+        conn.database_type = "dynamodb"
+
+        mock_handler = AsyncMock()
+        mock_handler.handle.return_value = {"success": True, "data": []}
+
+        with patch(
+            "src.nosql.dynamodb.handler.DynamoDBHandler",
+            return_value=mock_handler,
+        ):
+            result = await execute_nosql_query(
+                question="list items", connection=conn,
+            )
+
+        assert result["success"] is True
+        mock_handler.handle.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_routes_to_elasticsearch(self):
+        conn = MagicMock()
+        conn.database_type = "elasticsearch"
+
+        mock_handler = AsyncMock()
+        mock_handler.handle.return_value = {"success": True, "data": []}
+
+        with patch(
+            "src.nosql.elasticsearch.handler.ElasticsearchHandler",
+            return_value=mock_handler,
+        ):
+            result = await execute_nosql_query(
+                question="search logs", connection=conn,
+            )
+
+        assert result["success"] is True
+        mock_handler.handle.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_unknown_type_raises(self):

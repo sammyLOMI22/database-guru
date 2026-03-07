@@ -311,7 +311,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
           </div>
           <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-xl text-[11px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-            Credentials are stored encrypted. Region maps to the DynamoDB endpoint.
+            AWS credentials are stored locally. Region maps to the DynamoDB endpoint.
           </div>
         </>
       );

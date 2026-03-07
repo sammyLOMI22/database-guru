@@ -1,11 +1,37 @@
 """Database connection testing utility"""
 import asyncio
+import re
 from typing import Dict, Any
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import create_async_engine
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_error(error: Exception) -> str:
+    """Sanitize error messages to remove credentials and connection strings.
+
+    Database driver exceptions often embed full connection URIs with passwords.
+    This strips them before returning to the API caller.
+    """
+    msg = str(error)
+    # Strip URIs like mongodb://user:pass@host, postgresql://..., redis://..., etc.
+    msg = re.sub(
+        r"[a-zA-Z+]+://[^\s,)\"']+",
+        "<connection-uri-redacted>",
+        msg,
+    )
+    # Strip AWS access keys (AKIA...)
+    msg = re.sub(r"AKIA[0-9A-Z]{16}", "AKIA****", msg)
+    # Strip anything that looks like a secret key or password in key=value pairs
+    msg = re.sub(
+        r"(password|secret_access_key|aws_secret_access_key|passwd|pwd)\s*[=:]\s*\S+",
+        r"\1=****",
+        msg,
+        flags=re.IGNORECASE,
+    )
+    return msg
 
 
 class ConnectionTester:
@@ -62,7 +88,7 @@ class ConnectionTester:
             logger.error(f"Connection test failed: {e}")
             return {
                 "success": False,
-                "message": f"Connection failed: {str(e)}",
+                "message": f"Connection failed: {_sanitize_error(e)}",
             }
 
     async def _test_sqlite(self, database_path: str) -> Dict[str, Any]:
@@ -83,7 +109,7 @@ class ConnectionTester:
         except Exception as e:
             return {
                 "success": False,
-                "message": f"SQLite connection failed: {str(e)}",
+                "message": f"SQLite connection failed: {_sanitize_error(e)}",
             }
 
     async def _test_postgresql(
@@ -107,7 +133,7 @@ class ConnectionTester:
         except Exception as e:
             return {
                 "success": False,
-                "message": f"PostgreSQL connection failed: {str(e)}",
+                "message": f"PostgreSQL connection failed: {_sanitize_error(e)}",
             }
 
     async def _test_mysql(
@@ -135,7 +161,7 @@ class ConnectionTester:
         except Exception as e:
             return {
                 "success": False,
-                "message": f"MySQL connection failed: {str(e)}",
+                "message": f"MySQL connection failed: {_sanitize_error(e)}",
             }
 
     async def _test_mysql_sync(
@@ -159,7 +185,7 @@ class ConnectionTester:
         except Exception as e:
             return {
                 "success": False,
-                "message": f"MySQL connection failed: {str(e)}",
+                "message": f"MySQL connection failed: {_sanitize_error(e)}",
             }
 
     async def _test_duckdb(self, database_path: str) -> Dict[str, Any]:
@@ -186,7 +212,7 @@ class ConnectionTester:
         except Exception as e:
             return {
                 "success": False,
-                "message": f"DuckDB connection failed: {str(e)}",
+                "message": f"DuckDB connection failed: {_sanitize_error(e)}",
             }
 
     async def _test_mongodb(
@@ -222,7 +248,7 @@ class ConnectionTester:
         except Exception as e:
             return {
                 "success": False,
-                "message": f"MongoDB connection failed: {str(e)}",
+                "message": f"MongoDB connection failed: {_sanitize_error(e)}",
             }
 
     async def _test_redis(
@@ -262,7 +288,7 @@ class ConnectionTester:
         except Exception as e:
             return {
                 "success": False,
-                "message": f"Redis connection failed: {str(e)}",
+                "message": f"Redis connection failed: {_sanitize_error(e)}",
             }
 
     async def _test_cassandra(
@@ -301,7 +327,7 @@ class ConnectionTester:
         except Exception as e:
             return {
                 "success": False,
-                "message": f"Cassandra connection failed: {str(e)}",
+                "message": f"Cassandra connection failed: {_sanitize_error(e)}",
             }
 
     async def _test_dynamodb(
@@ -333,7 +359,7 @@ class ConnectionTester:
         except Exception as e:
             return {
                 "success": False,
-                "message": f"DynamoDB connection failed: {str(e)}",
+                "message": f"DynamoDB connection failed: {_sanitize_error(e)}",
             }
 
     async def _test_elasticsearch(
@@ -368,5 +394,5 @@ class ConnectionTester:
         except Exception as e:
             return {
                 "success": False,
-                "message": f"Elasticsearch connection failed: {str(e)}",
+                "message": f"Elasticsearch connection failed: {_sanitize_error(e)}",
             }
