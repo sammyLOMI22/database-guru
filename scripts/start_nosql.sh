@@ -15,13 +15,14 @@ NO_SEED=false
 DB_FILTER=""
 CLEAN=""
 
-for arg in "$@"; do
-    case "$arg" in
+while [ $# -gt 0 ]; do
+    case "$1" in
         --no-seed)  NO_SEED=true ;;
         --clean)    CLEAN="--clean" ;;
-        --db=*)     DB_FILTER="${arg#--db=}" ;;
-        --db)       shift; DB_FILTER="$1" 2>/dev/null || true ;;
+        --db=*)     DB_FILTER="${1#--db=}" ;;
+        --db)       shift; DB_FILTER="${1:?--db requires a value}" ;;
     esac
+    shift
 done
 
 echo "Starting NoSQL services..."

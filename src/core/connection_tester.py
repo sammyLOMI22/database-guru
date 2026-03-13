@@ -299,21 +299,26 @@ class ConnectionTester:
             from cassandra.cluster import Cluster
             from cassandra.auth import PlainTextAuthProvider
 
-            auth = None
-            if username and password:
-                auth = PlainTextAuthProvider(username=username, password=password)
+            def _connect() -> str:
+                auth = None
+                if username and password:
+                    auth = PlainTextAuthProvider(username=username, password=password)
 
-            cluster = Cluster(
-                contact_points=[host or "localhost"],
-                port=port or 9042,
-                auth_provider=auth,
-                connect_timeout=5,
-            )
+                cluster = Cluster(
+                    contact_points=[host or "localhost"],
+                    port=port or 9042,
+                    auth_provider=auth,
+                    connect_timeout=5,
+                )
+                try:
+                    session = cluster.connect(database_name if database_name else None)
+                    release = cluster.metadata.release_version or "unknown"
+                    session.shutdown()
+                    return release
+                finally:
+                    cluster.shutdown()
 
-            session = cluster.connect(database_name if database_name else None)
-            release = cluster.metadata.release_version or "unknown"
-            session.shutdown()
-            cluster.shutdown()
+            release = await asyncio.to_thread(_connect)
 
             return {
                 "success": True,
@@ -371,9 +376,14 @@ class ConnectionTester:
 
             es_host = host or "localhost"
             es_port = port or 9200
-            # Use HTTPS when credentials are provided (typical for production/cloud clusters)
-            scheme = "https" if (username and password) else "http"
-            url = f"{scheme}://{es_host}:{es_port}"
+
+            # Honour an explicit scheme in the host field (e.g. "https://my-cluster").
+            # Default to plain HTTP so both HTTP-with-auth and HTTPS-without-auth work.
+            if es_host.startswith("http://") or es_host.startswith("https://"):
+                url = f"{es_host}:{es_port}"
+            else:
+                url = f"http://{es_host}:{es_port}"
+
             auth = (username, password) if username and password else None
 
             client = AsyncElasticsearch(url, basic_auth=auth, request_timeout=5)

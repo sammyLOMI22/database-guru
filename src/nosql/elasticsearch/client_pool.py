@@ -42,13 +42,16 @@ class ElasticsearchClientPool(NoSQLClientPoolMixin):
 
         host = connection.host or "localhost"
         port = connection.port or 9200
-        # Use HTTPS when credentials are provided (typical for production/cloud clusters)
-        has_auth = bool(connection.username and connection.password_encrypted)
-        scheme = "https" if has_auth else "http"
-        url = f"{scheme}://{host}:{port}"
+
+        # Honour an explicit scheme in the host field (e.g. "https://my-cluster").
+        # Default to plain HTTP so both HTTP-with-auth and HTTPS-without-auth work.
+        if host.startswith("http://") or host.startswith("https://"):
+            url = f"{host}:{port}"
+        else:
+            url = f"http://{host}:{port}"
 
         auth = None
-        if has_auth:
+        if connection.username and connection.password_encrypted:
             auth = (connection.username, connection.password_encrypted)
 
         client = AsyncElasticsearch(
