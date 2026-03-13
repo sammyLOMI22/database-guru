@@ -4,13 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Database Guru is an AI-powered natural language to SQL query assistant. Users ask questions in plain English, and the system generates, executes, and self-corrects SQL queries using local LLMs via Ollama.
+Database Guru is an AI-powered natural language to database query assistant. Users ask questions in plain English, and the system generates, executes, and self-corrects queries using local LLMs via Ollama. Supports both SQL and NoSQL databases with native query generation for each.
 
 **Tech Stack:**
 - Backend: FastAPI + SQLAlchemy 2.0 (async) + Python 3.11+
 - Frontend: React 18 + TypeScript + Vite + Tailwind CSS
 - LLM: Ollama (local, primarily llama3.2:latest)
-- Databases: SQLite for metadata, supports PostgreSQL/MySQL/SQLite/MongoDB/DuckDB for user databases
+- SQL Databases: PostgreSQL, MySQL, SQLite, DuckDB, MSSQL, Oracle
+- NoSQL Databases: MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch
+- File Sources: CSV, Excel (via DuckDB)
+- Metadata: SQLite
 
 ## Development Commands
 
@@ -54,7 +57,7 @@ docker compose down -v                         # Stop + remove volumes
 
 ## Architecture Overview
 
-The system uses a multi-agent architecture with 29+ specialized agents. See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
+The system uses a multi-agent architecture with 35+ specialized agents (including 6 NoSQL handlers). See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
 
 ### Key Agents (Quick Reference)
 | Agent | File | Purpose |
@@ -83,14 +86,25 @@ The system uses a multi-agent architecture with 29+ specialized agents. See [.cl
 | Data Migration Asst. | `src/migration/data_migration_assistant.py` | Batched INSERT SELECT with validation (Phase 20) |
 | Explain Analyzer | `src/guru/explain_analyzer.py` | Deterministic EXPLAIN plan parser, multi-dialect (Phase 22) |
 | Explain Interpreter | `src/guru/explain_interpreter.py` | LLM-powered plan interpretation with fallback (Phase 22) |
+| NoSQL Router | `src/nosql/router.py` | NoSQL dispatch, result normalization (Phase 14) |
+| MongoDB Handler | `src/nosql/mongodb/handler.py` | MQL generation, aggregation, schema inference (Phase 14) |
+| Redis Handler | `src/nosql/redis/handler.py` | Redis command generation, all data types (Phase 14) |
+| Cassandra Handler | `src/nosql/cassandra/handler.py` | CQL generation, partition-aware queries (Phase 14) |
+| DynamoDB Handler | `src/nosql/dynamodb/handler.py` | PartiQL generation, boto3 integration (Phase 14) |
+| Elasticsearch Handler | `src/nosql/elasticsearch/handler.py` | Query DSL generation, aggregations (Phase 14) |
 
 ### Data Flow
 ```
 Natural Language Query → Input Sanitization → Injection Detection
   → Conversational Memory → Tool-Using Agent → Query Planning
-  → SQL Generator → Confidence Scorer → SQL Executor
-  → Result Verification → [If Error: Parallel Corrections]
-  → [If Success: Learn Pattern] → Parallel Analysis (stats/anomalies/correlations)
+  → [SQL Path] SQL Generator → Confidence Scorer → SQL Executor
+      → Result Verification → [If Error: Parallel Corrections / Self-Correction Loop]
+      → [If Success: Learn Pattern]
+  → [NoSQL Path] NoSQL Router → Native Query Generator (MQL/CQL/PartiQL/DSL/Commands) → Executor
+      → [If Error: Non-retryable check → Schema Hints → Correction Learner lookup
+         → Confidence Scorer gate → Self-Correction Loop (up to 3 attempts)]
+      → [If Success: Result Verification → Correction Learner persist]
+  → Parallel Analysis (stats/anomalies/correlations)
   → Tiered Narrative Generation → Return Results
 ```
 
@@ -148,10 +162,11 @@ Key docs in `docs/`:
 | **Guides** | `guides/MULTI_DATABASE_GUIDE.md`, `guides/CONNECTION_POOLING_GUIDE.md`, `guides/DATA_LINEAGE_GUIDE.md`, `guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md`, `guides/FILE_DATA_SOURCE_USER_GUIDE.md` |
 | **Technical** | `technical/PARALLEL_EXECUTION.md`, `technical/SEMANTIC_CACHING.md`, `technical/SQL_GENERATION_PIPELINE.md` |
 | **Modules** | `modules/QUERY_PLANNING_AGENT.md`, `modules/TOOL_USING_AGENT.md` |
-| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/DATA_INSIGHTS_TESTING.md`, `guides/testing/PHASE_22_PERFORMANCE_GURU_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
+| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/DATA_INSIGHTS_TESTING.md`, `guides/testing/PHASE_22_PERFORMANCE_GURU_TESTING.md`, `guides/testing/PHASE_14_NOSQL_EXPANSION_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
 | **Planning** | `planning/FUTURE_PLANS.md`, `planning/MASTER_ROADMAP.md` |
 | **LLM Usage** | `guides/LLM_USAGE_MONITORING_GUIDE.md` |
 | **Data Insights** | `planning/DATA_INSIGHTS_ENHANCEMENT_PLAN.md` |
 | **Migration** | `planning/MIGRATION_TOOLKIT_PROPOSAL.md` |
 | **Performance** | `guides/PERFORMANCE_GURU_GUIDE.md` |
+| **NoSQL** | `planning/NOSQL_EXPANSION_PLAN.md` |
 | **Deployment** | `guides/DOCKER_DEPLOYMENT_GUIDE.md`, `planning/DOCKER_CONTAINERIZATION_PLAN.md` |

@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-AI-powered natural language to SQL query assistant. Ask questions about your database in plain English!
+AI-powered natural language to database query assistant. Ask questions about your databases in plain English — supports SQL and NoSQL databases, CSV/Excel files, and mixed data source queries!
 
 ## 🚀 Quick Start
 
@@ -145,6 +145,7 @@ The demo showcases:
 - 📊 **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance across all agents
 - 🔬 **Data Insights Enhancement (NEW!)** - Tiered narratives by model size, analytics caching, multi-source quality insights, adaptive chart presets
 - 🔄 **Database Migration Toolkit (NEW!)** - Schema diff, migration planner, script generator (up/down/verify SQL), data migration assistant
+- 🗃️ **NoSQL Database Support (NEW!)** - MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch with native query generation and mixed SQL+NoSQL sessions
 
 All with mock data - no database connection needed!
 
@@ -243,7 +244,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Enhanced Connection Management** - Edit connections, loading states, selected connection highlighting
 - ✅ **Context Panel Toggle** - Show/hide conversational memory panel with one click
 - ✅ **Result Verification** - Catches logical errors and suspicious results
-- ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB)
+- ✅ Multiple database support (PostgreSQL, MySQL, SQLite, MongoDB, DuckDB, Redis, Cassandra, DynamoDB, Elasticsearch, MSSQL, Oracle)
 - ✅ **Multi-database queries** - Query multiple databases simultaneously with parallel execution
 - ✅ **Multi-Database Query Validation (NEW!)** - Pre-flight validation shows which databases can answer your query before execution
 - ✅ **Data Lineage & Impact Analysis (NEW!)** - Column-level lineage visualization, schema change impact analysis, and query pattern heatmaps
@@ -258,6 +259,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Data Insights Enhancement (NEW!)** - Tiered narrative prompts (compact/standard/enhanced), analytics caching, multi-source data quality analysis, adaptive chart scoring presets, parallel analysis pipeline with early exit optimization
 - ✅ **Database Migration Toolkit (NEW!)** - Schema diff engine, dependency-aware migration planner, multi-dialect script generator (up.sql/down.sql/verify.sql), data migration assistant with staging table pattern and batched INSERT SELECT
 - ✅ **Performance Guru (NEW!)** - EXPLAIN plan analysis with LLM-powered insights, bottleneck detection, index suggestions with CREATE INDEX SQL, query rewrite recommendations, multi-dialect support (PostgreSQL, MySQL, SQLite, DuckDB), tiered prompts, deterministic fallback
+- ✅ **NoSQL Database Expansion (NEW!)** - Full native query support for MongoDB (MQL), Redis (commands), Cassandra (CQL), DynamoDB (PartiQL), and Elasticsearch (Query DSL) with schema inference, error classification, self-correction, and mixed SQL+NoSQL chat sessions
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
@@ -343,7 +345,7 @@ Total overhead: 15ms (30x faster!)
 **Production Features:**
 - **30x faster** - Connection overhead reduced from 150ms to ~5ms per query
 - **Singleton pattern** - Global pool manager with per-connection isolation
-- **Supported databases** - PostgreSQL, MySQL, SQLite, DuckDB (MongoDB coming soon)
+- **Supported databases** - PostgreSQL, MySQL, SQLite, DuckDB, MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch
 - **Three-tier eviction** - Idle timeout (30 min), max age (2 hours), automatic cleanup
 - **Background cleanup** - Runs every 5 minutes to evict idle pools
 - **Comprehensive metrics** - Active/idle connections, utilization%, wait times, health status
@@ -903,6 +905,7 @@ Database Guru supports querying multiple databases simultaneously! Perfect for:
 - **Migration validation**: Verify data consistency across databases
 - **Multi-tenant analysis**: Query across tenant databases
 - **Hybrid analytics**: Combine PostgreSQL (OLTP) + DuckDB (OLAP)
+- **Mixed SQL + NoSQL**: Query MongoDB alongside PostgreSQL in a single chat session
 
 ### Example Use Cases
 

@@ -202,12 +202,12 @@ class TestConnectionPoolManager:
 
     @pytest.mark.asyncio
     async def test_mongodb_not_implemented(self, pool_manager, mock_mongodb_connection):
-        """Test that MongoDB raises NotImplementedError"""
-        with pytest.raises(NotImplementedError) as exc_info:
+        """Test that MongoDB raises ValueError (NoSQL uses its own client pool)"""
+        with pytest.raises(ValueError) as exc_info:
             await pool_manager.get_pool(mock_mongodb_connection)
 
-        assert "MongoDB" in str(exc_info.value)
-        assert "PostgreSQL, MySQL, SQLite, DuckDB" in str(exc_info.value)
+        assert "mongodb" in str(exc_info.value).lower()
+        assert "src/nosql" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_pooling_disabled_raises_error(self, mock_sqlite_connection):

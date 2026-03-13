@@ -1,0 +1,111 @@
+# NoSQL sample databases for testing Database Guru
+# Usage:
+#   docker compose -f docker-compose.nosql.yml up -d
+#   docker compose -f docker-compose.nosql.yml down
+#   docker compose -f docker-compose.nosql.yml down -v  # remove data
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: dbguru-mongodb
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - nosql-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: dbguru-redis-sample
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - redis-sample-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - nosql-net
+
+  cassandra:
+    image: cassandra:4
+    container_name: dbguru-cassandra
+    ports:
+      - "127.0.0.1:9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: dbguru-test
+      HEAP_NEWSIZE: 128M
+      MAX_HEAP_SIZE: 512M
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'DESCRIBE KEYSPACES'"]
+      interval: 15s
+      timeout: 10s
+      start_period: 60s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - nosql-net
+
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    container_name: dbguru-dynamodb
+    ports:
+      - "127.0.0.1:8001:8000"
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb"]
+    volumes:
+      - dynamodb-data:/home/dynamodblocal/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000 || exit 0"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - nosql-net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: dbguru-elasticsearch
+    ports:
+      - "127.0.0.1:9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - nosql-net
+
+volumes:
+  mongodb-data:
+  redis-sample-data:
+  cassandra-data:
+  dynamodb-data:
+  elasticsearch-data:
+
+networks:
+  nosql-net:
+    driver: bridge

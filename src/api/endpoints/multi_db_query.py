@@ -646,6 +646,8 @@ async def process_multi_database_query(
                         allow_write=request.allow_write,
                         model_used=model_used,
                         row_limit=request.row_limit,
+                        db=db,
+                        chat_session_id=request.chat_session_id,
                     )
                 )
                 task_metadata.append({

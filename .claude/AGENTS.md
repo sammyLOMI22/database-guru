@@ -45,11 +45,13 @@ Main orchestrator for query processing with:
 ### 4. Confidence Scorer
 **File**: `src/llm/confidence_scorer.py`
 
-- Predicts success probability of SQL corrections (0.0-1.0)
+- Predicts success probability of SQL and NoSQL corrections (0.0-1.0)
 - 5 weighted factors: error type (30%), schema match (25%), historical success (20%), complexity (15%), similarity (10%)
 - Auto-skips corrections below 20% confidence
+- **SQL path**: integrated in `SelfCorrectingSQLAgent`
+- **NoSQL path**: integrated in `NoSQLHandler._generate_and_execute_with_retry()` — schema_match factor degrades gracefully to 0.5 (neutral) since SQL extraction doesn't apply; ~75% of scoring works as-is
 
-**Key method**: `score_correction()` - returns `ConfidenceScore` dataclass
+**Key method**: `predict_success_probability()` - returns `ConfidenceScore` dataclass
 
 ### 5. Result Verification Agent
 **File**: `src/llm/result_verification_agent.py`
@@ -57,8 +59,10 @@ Main orchestrator for query processing with:
 - Validates query results for logical correctness
 - Detects empty results, NULL values, extreme values, suspicious counts
 - Triggers re-generation on high-confidence issues
+- **SQL path**: full verification with optional diagnostic queries
+- **NoSQL path**: called with `enable_diagnostics=False` (skips SQL diagnostic queries); data-based checks (empty, nulls, extremes, negative counts) work identically; `COUNT(` check safely returns NO_ISSUE for NoSQL query strings
 
-**Key method**: `verify_result()` - returns `VerificationResult`
+**Key method**: `verify_results()` - returns `VerificationResult`
 
 ### 6. Correction Learner
 **File**: `src/llm/correction_learner.py`
@@ -66,8 +70,10 @@ Main orchestrator for query processing with:
 - Learns from successful corrections for instant future fixes
 - 50% faster recovery on repeated errors
 - Pattern-based matching with fuzzy similarity
+- **SQL path**: integrated in `SelfCorrectingSQLAgent`
+- **NoSQL path**: integrated in `NoSQLHandler._generate_and_execute_with_retry()` — on retry, looks up past corrections by `(error_type, database_type)`; on success after self-correction, persists the pattern. All wrapped in try/except so failures never break queries
 
-**Key methods**: `learn_correction()`, `try_apply_learned_fix()`
+**Key methods**: `learn_from_correction()`, `find_applicable_corrections()`
 
 ### 7. Schema-Aware Fixer
 **File**: `src/llm/schema_aware_fixer.py`

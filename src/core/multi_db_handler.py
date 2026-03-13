@@ -28,6 +28,27 @@ class MultiDatabaseHandler:
     def __init__(self):
         self.schema_inspector = SchemaInspector()
 
+    async def _introspect_nosql_database(self, conn: DatabaseConnection) -> Dict[str, Any]:
+        """Introspect schema for a NoSQL database via its native schema inspector."""
+        from src.nosql.router import get_nosql_inspector, get_cached_or_fresh_schema
+
+        inspector, _ = await get_nosql_inspector(conn)
+        schema_dict = await get_cached_or_fresh_schema(conn, inspector)
+
+        tables_dict = schema_dict.get("tables", {})
+        tables_list = [{"name": name, **info} for name, info in tables_dict.items()]
+
+        logger.info(f"Introspected NoSQL schema for '{conn.name}': {len(tables_list)} collections/indices")
+
+        return {
+            "connection_id": conn.id,
+            "name": conn.name,
+            "database_type": conn.database_type,
+            "database_name": conn.database_name,
+            "tables": tables_list,
+            "table_count": len(tables_list),
+        }
+
     async def _introspect_single_database(self, conn: DatabaseConnection) -> Dict[str, Any]:
         """
         Introspect schema for a single database connection
@@ -39,6 +60,11 @@ class MultiDatabaseHandler:
             Dict with database info and schema, or error info
         """
         try:
+            # Route NoSQL databases to their own schema inspectors
+            from src.nosql.router import is_nosql
+            if is_nosql(conn.database_type):
+                return await self._introspect_nosql_database(conn)
+
             async with UserDatabaseConnector.get_user_db_session(conn) as user_db:
                 # Get schema for this database (with caching)
                 from src.core.schema_cache import SchemaCache
@@ -383,6 +409,20 @@ class MultiDatabaseHandler:
                 lines.append("- For file queries, use: FILE_SOURCE: file_name prefix")
                 lines.append("")
 
+        # Add NoSQL guidance if mixed sources
+        nosql_types = {"mongodb", "redis", "cassandra", "dynamodb", "elasticsearch"}
+        nosql_dbs = [
+            db for db in combined_schema.get("databases", [])
+            if db.get("database_type") in nosql_types and "error" not in db
+        ]
+        if nosql_dbs:
+            lines.append("\n## NoSQL DATA SOURCES")
+            lines.append("These databases use native query languages (NOT SQL).")
+            lines.append("Generate SEPARATE native queries for each NoSQL source.\n")
+            for db in nosql_dbs:
+                lines.append(f"- {db['name']} ({db['database_type']}): Use native {db['database_type']} query syntax")
+            lines.append("")
+
         return "\n".join(lines)
 
     async def validate_multi_database_query(
@@ -575,6 +615,8 @@ class MultiDatabaseHandler:
         allow_write: bool = False,
         model_used: str = "unknown",
         row_limit: int = 100,
+        db: Optional[Any] = None,
+        chat_session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Internal helper method to execute a single database query with self-correction
@@ -589,11 +631,47 @@ class MultiDatabaseHandler:
             combined_schema_data: Full schema data for all databases
             allow_write: Allow write operations
             model_used: LLM model name for tracking
+            db: Optional metadata DB session (for correction learning)
+            chat_session_id: Optional chat session ID (for context)
 
         Returns:
             Dict with execution results and metadata (NOT including QueryHistory record)
         """
         try:
+            # Route NoSQL databases to their own pipeline
+            from src.nosql.router import is_nosql, execute_nosql_query
+
+            if is_nosql(connection.database_type):
+                nosql_result = await execute_nosql_query(
+                    question=question,
+                    connection=connection,
+                    model=model_used,
+                    allow_write=allow_write,
+                    row_limit=row_limit,
+                    db=db,
+                    chat_session_id=chat_session_id,
+                )
+                # Flatten nested result dict to top-level keys so downstream
+                # code (process_multi_database_query) finds data/row_count/
+                # execution_time_ms at the same level as the SQL path.
+                nested = nosql_result.get("result") or {}
+                return {
+                    "success": nosql_result.get("success", False),
+                    "sql": nosql_result.get("sql"),
+                    "data": nested.get("data", []),
+                    "row_count": nested.get("row_count", 0),
+                    "execution_time_ms": nested.get("execution_time_ms", 0),
+                    "connection": connection,
+                    "model_used": model_used,
+                    "database_name": connection.name,
+                    "connection_id": connection.id,
+                    "total_attempts": nosql_result.get("total_attempts", 0),
+                    "attempts": nosql_result.get("attempts", []),
+                    "agent_trace": nosql_result.get("agent_trace"),
+                    "self_corrected": nosql_result.get("self_corrected", False),
+                    "error": nosql_result.get("error"),
+                }
+
             # ALWAYS get full schema directly from database for accurate WHERE validation
             # The combined_schema_data may not have columns in the right format
             db_schema_dict = None
@@ -601,7 +679,7 @@ class MultiDatabaseHandler:
                 schema_data = await self.schema_inspector.get_full_schema(user_db)
                 db_schema_dict = schema_data  # Full schema for WHERE column validation
                 db_schema = self._format_single_db_schema(schema_data)
-                logger.info(f"🔍 [SCHEMA_DEBUG] Got schema for {connection.name} with {len(schema_data.get('tables', {}))} tables, schema_dict is not None: {db_schema_dict is not None}")
+                logger.info(f"[SCHEMA_DEBUG] Got schema for {connection.name} with {len(schema_data.get('tables', {}))} tables, schema_dict is not None: {db_schema_dict is not None}")
 
             # Execute query with self-correction
             exec_result = await self.execute_query_with_self_correction(

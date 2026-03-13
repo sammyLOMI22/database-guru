@@ -75,14 +75,14 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                         NOSQL EXPANSION (Phase 14) - DATA SOURCES                       │
+    │                         NOSQL EXPANSION (Phase 14) - ✅ COMPLETE                        │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    NOSQL DATABASE SUPPORT (Phase 14) - LOW PRIORITY (Deprioritized)      │
+    │                    NOSQL DATABASE SUPPORT (Phase 14) - ✅ COMPLETE                       │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐ │
-    │  │ 14.1        │   │ 14.2        │   │ 14.3        │   │ 14.4        │   │ 14.5        │ │
+    │  │ 14.1 ✅     │   │ 14.2 ✅     │   │ 14.3 ✅     │   │ 14.4 ✅     │   │ 14.5 ✅     │ │
     │  │ MongoDB     │──▶│ Redis       │──▶│ Cassandra   │──▶│ DynamoDB    │──▶│ Elastic-    │ │
     │  │             │   │             │   │             │   │             │   │ search      │ │
     │  │ • MQL gen   │   │ • Commands  │   │ • CQL gen   │   │ • PartiQL   │   │ • Query DSL │ │
@@ -93,9 +93,8 @@
     │  │ ~1,500 lines│   │ ~1,000 lines│   │ ~1,000 lines│   │ ~1,200 lines│   │ ~1,300 lines│ │
     │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘ │
     │                                                                                           │
-    │  Prereq: None (Independent) | Priority: LOW (per PM review) | Est: 6-8 weeks | ~6,000 ln │
-    │  Plan: NOSQL_EXPANSION_PLAN.md                                                           │
-    │  NOTE: SQL + Files (Phase 13) covers ~90% of analytic use cases. NoSQL is niche.         │
+    │  Includes: Frontend connection modal (11 DB types), mixed SQL+NoSQL chat, schema          │
+    │  introspection for all NoSQL types, self-correcting retry loops, 127 tests                │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -589,11 +588,12 @@
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │        NOSQL DATABASE EXPANSION (Phase 14) ◀── LOW (Deprioritized)│
+    │        NOSQL DATABASE EXPANSION (Phase 14) ◀── ✅ COMPLETE        │
     │                                                                   │
     │  • MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch             │
-    │  • SQL + Files covers ~90% of analytic use cases                  │
-    │  • Est: 6-8 weeks | Plan: NOSQL_EXPANSION_PLAN.md                 │
+    │  • Native query gen, schema inference, error classification       │
+    │  • Frontend: 11 DB types, conditional forms, mixed chat sessions  │
+    │  • 127 tests | Plan: NOSQL_EXPANSION_PLAN.md                      │
     └───────────────────────────────────────────────────────────────────┘
 
 
@@ -787,11 +787,9 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - **Phase 20** ✅: Database Migration Toolkit (schema diff, planner, script gen, data migration — 98 tests, 13 endpoints, ~5,676 lines)
 - **Phase 22** ✅: Performance Guru (EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects — 77 tests, 2 endpoints, ~3,282 lines)
 - **Phase 23** ✅: Docker Containerization (Compose profiles, security hardened, least-privilege Postgres, Ollama retry, prompts refactor, CTE lineage support)
+- **Phase 14** ✅: NoSQL Database Expansion (MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch — native query gen, schema inference, error classification, frontend integration, mixed SQL+NoSQL chat — 127 tests)
 - **Table Sorting** ✅: Click-to-sort with smart type detection
 - Plus 10+ earlier phases (see Quick Reference below)
-
-### Deprioritized
-- **NoSQL Expansion (Phase 14)**: Moved to LOW. SQL + Files covers ~90% of analytic use cases per PM review.
 
 ---
 
@@ -810,7 +808,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Performance Guru** | EXPLAIN analysis, LLM interpretation, index suggestions | **Phase 22 ✅ COMPLETE** | ~3,282 lines |
 | **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 17 - MEDIUM** (needs 15+16✅) | ~1,200 lines |
 | **Data Insights** | Tiered narratives, analytics cache, multi-source quality, chart presets, parallel analysis | **Phase 19 ✅ COMPLETE** | ~1,800 lines |
-| **NoSQL Expansion** | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch | **Phase 14 - LOW** (deprioritized) | ~6,000 lines |
+| **NoSQL Expansion** | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch, frontend integration, mixed chat | **Phase 14 ✅ COMPLETE** | ~6,000 lines |
 | **Table UX** | Sorting ✅, Resizing, Export | Sorting complete | ~400 lines remaining |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
@@ -847,8 +845,9 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | Table Sorting | Click-to-sort columns, smart type detection | 24 tests |
 | Migration Toolkit (Phase 20) | Schema diff, migration planner, script generator, data migration | 98 tests |
 | Performance Guru (Phase 22) | EXPLAIN plan analysis, LLM insights, index suggestions, query rewrites, 4 dialects | 77 tests |
+| NoSQL Expansion (Phase 14) | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch — native query gen, schema inference, error classification, frontend integration, mixed SQL+NoSQL chat | 127 tests |
 
-**Total Tests**: 1000+ passing
+**Total Tests**: 1800+ passing
 
 ---
 
@@ -865,7 +864,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | ✅ **COMPLETE** |
 | **Phase 23** | Docker Containerization | None | ~200 lines config | ✅ **COMPLETE** |
 | **Phase 24** | Observability (OpenTelemetry) | Phase 23 ✅ | ~1,300 lines | MEDIUM |
-| **Phase 14** | NoSQL Database Expansion | None | ~6,000 lines | LOW |
+| **Phase 14** | NoSQL Database Expansion | None | ~6,000 lines | ✅ **COMPLETE** |
 
 ---
 

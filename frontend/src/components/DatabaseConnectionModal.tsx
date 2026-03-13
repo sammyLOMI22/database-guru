@@ -19,6 +19,10 @@ interface Props {
   connection?: DatabaseConnection;
 }
 
+const FILE_PATH_TYPES = ['sqlite', 'duckdb'];
+const inputClass = "w-full px-4 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold";
+const labelClass = "text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400";
+
 export default function DatabaseConnectionModal({ isOpen, onClose, onSave, connection }: Props) {
   const [formData, setFormData] = useState<DatabaseConnection>(
     connection || {
@@ -40,46 +44,44 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
 
   // Generate connection string for display
   const getConnectionString = (): string => {
-    if (formData.database_type === 'sqlite') {
-      return `sqlite:///${formData.database_name || '/path/to/database.db'}`;
-    } else if (formData.database_type === 'duckdb') {
-      return `duckdb:///${formData.database_name || '/path/to/database.duckdb'}`;
-    } else if (formData.database_type === 'mongodb') {
-      const user = formData.username || 'username';
-      const pass = formData.password ? '****' : 'password';
-      const host = formData.host || 'localhost';
-      const port = formData.port || 27017;
-      const db = formData.database_name || 'database';
-      return `mongodb://${user}:${pass}@${host}:${port}/${db}`;
-    } else if (formData.database_type === 'mysql') {
-      const user = formData.username || 'username';
-      const pass = formData.password ? '****' : 'password';
-      const host = formData.host || 'localhost';
-      const port = formData.port || 3306;
-      const db = formData.database_name || 'database';
-      return `mysql://${user}:${pass}@${host}:${port}/${db}`;
-    } else if (formData.database_type === 'mssql') {
-      const user = formData.username || 'sa';
-      const pass = formData.password ? '****' : 'password';
-      const host = formData.host || 'localhost';
-      const port = formData.port || 1433;
-      const db = formData.database_name || 'database';
-      return `mssql+pymssql://${user}:${pass}@${host}:${port}/${db}`;
-    } else if (formData.database_type === 'oracle') {
-      const user = formData.username || 'system';
-      const pass = formData.password ? '****' : 'password';
-      const host = formData.host || 'localhost';
-      const port = formData.port || 1521;
-      const svc = formData.database_name || 'ORCL';
-      return `oracle+oracledb://${user}:${pass}@${host}:${port}/?service_name=${svc}`;
-    } else {
-      // PostgreSQL (default)
-      const user = formData.username || 'username';
-      const pass = formData.password ? '****' : 'password';
-      const host = formData.host || 'localhost';
-      const port = formData.port || 5432;
-      const db = formData.database_name || 'database';
-      return `postgresql://${user}:${pass}@${host}:${port}/${db}`;
+    const host = formData.host || 'localhost';
+    const port = formData.port || 5432;
+    const user = formData.username || 'username';
+    const pass = formData.password ? '****' : 'password';
+    const db = formData.database_name || 'database';
+
+    switch (formData.database_type) {
+      case 'sqlite':
+        return `sqlite:///${formData.database_name || '/path/to/database.db'}`;
+      case 'duckdb':
+        return `duckdb:///${formData.database_name || '/path/to/database.duckdb'}`;
+      case 'mongodb':
+        return `mongodb://${user}:${pass}@${host}:${formData.port || 27017}/${db}`;
+      case 'mysql':
+        return `mysql://${user}:${pass}@${host}:${formData.port || 3306}/${db}`;
+      case 'mssql':
+        return `mssql+pymssql://${user}:${pass}@${host}:${formData.port || 1433}/${db}`;
+      case 'oracle':
+        return `oracle+oracledb://${user}:${pass}@${host}:${formData.port || 1521}/?service_name=${formData.database_name || 'ORCL'}`;
+      case 'redis': {
+        const authPart = formData.password ? `:****@` : '';
+        const dbNum = formData.database_name || '0';
+        return `redis://${authPart}${host}:${formData.port || 6379}/${dbNum}`;
+      }
+      case 'cassandra':
+        return `cassandra://${user}:${pass}@${host}:${formData.port || 9042}/${db}`;
+      case 'dynamodb': {
+        const region = formData.host || 'us-east-1';
+        const accessKey = formData.username || 'AKIA...';
+        return `dynamodb://${region} (Access Key: ${accessKey})`;
+      }
+      case 'elasticsearch': {
+        const authStr = formData.username ? `${user}:${pass}@` : '';
+        const esScheme = formData.username ? 'https' : 'http';
+        return `${esScheme}://${authStr}${host}:${formData.port || 9200}`;
+      }
+      default:
+        return `postgresql://${user}:${pass}@${host}:${port}/${db}`;
     }
   };
 
@@ -101,57 +103,84 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
       duckdb: 0,
       mssql: 1433,
       oracle: 1521,
+      redis: 6379,
+      cassandra: 9042,
+      dynamodb: 0,
+      elasticsearch: 9200,
     };
-    setFormData((prev) => ({
-      ...prev,
+
+    const defaults: Partial<DatabaseConnection> = {
       database_type: type,
       port: defaultPorts[type] || 5432,
-    }));
+    };
+
+    // Set sensible defaults per type
+    if (type === 'dynamodb') {
+      defaults.host = 'us-east-1';
+      defaults.database_name = '';
+    } else if (type === 'redis') {
+      defaults.host = 'localhost';
+      defaults.database_name = '0';
+      defaults.username = '';
+    } else if (type === 'elasticsearch') {
+      defaults.host = 'localhost';
+    }
+
+    setFormData((prev) => ({ ...prev, ...defaults }));
     setTestResult(null);
   };
 
   const handleTestConnection = async () => {
     // Validate required fields
     if (!formData.name || !formData.name.trim()) {
-      setTestResult({
-        success: false,
-        message: 'Connection name is required',
-      });
+      setTestResult({ success: false, message: 'Connection name is required' });
       return;
     }
 
-    if (!formData.database_name || !formData.database_name.trim()) {
-      setTestResult({
-        success: false,
-        message: (formData.database_type === 'sqlite' || formData.database_type === 'duckdb')
-          ? 'Database file path is required'
-          : 'Database name is required',
-      });
-      return;
-    }
+    const dbType = formData.database_type;
 
-    // For non-SQLite and non-DuckDB, validate host and port
-    if (formData.database_type !== 'sqlite' && formData.database_type !== 'duckdb') {
+    // Type-specific validation
+    if (dbType === 'dynamodb') {
       if (!formData.host || !formData.host.trim()) {
-        setTestResult({
-          success: false,
-          message: 'Host is required',
-        });
-        return;
-      }
-      if (!formData.port || formData.port <= 0) {
-        setTestResult({
-          success: false,
-          message: 'Valid port number is required',
-        });
+        setTestResult({ success: false, message: 'AWS Region is required' });
         return;
       }
       if (!formData.username || !formData.username.trim()) {
-        setTestResult({
-          success: false,
-          message: 'Username is required',
-        });
+        setTestResult({ success: false, message: 'Access Key ID is required' });
         return;
+      }
+      if (!formData.password || !formData.password.trim()) {
+        setTestResult({ success: false, message: 'Secret Access Key is required' });
+        return;
+      }
+    } else if (FILE_PATH_TYPES.includes(dbType)) {
+      if (!formData.database_name || !formData.database_name.trim()) {
+        setTestResult({ success: false, message: 'Database file path is required' });
+        return;
+      }
+    } else {
+      // Standard validation for host/port types
+      if (!formData.host || !formData.host.trim()) {
+        setTestResult({ success: false, message: 'Host is required' });
+        return;
+      }
+      if (dbType !== 'redis' && (!formData.port || formData.port <= 0)) {
+        setTestResult({ success: false, message: 'Valid port number is required' });
+        return;
+      }
+      // Username required for most types, but optional for redis/elasticsearch
+      if (!['redis', 'elasticsearch'].includes(dbType)) {
+        if (!formData.username || !formData.username.trim()) {
+          setTestResult({ success: false, message: 'Username is required' });
+          return;
+        }
+      }
+      // Database name required for most, but optional for elasticsearch
+      if (!['redis', 'elasticsearch'].includes(dbType)) {
+        if (!formData.database_name || !formData.database_name.trim()) {
+          setTestResult({ success: false, message: 'Database name is required' });
+          return;
+        }
       }
     }
 
@@ -159,22 +188,20 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
     setTestResult(null);
 
     try {
-      // Build request payload, excluding empty fields for SQLite
       const payload: any = {
         name: formData.name.trim(),
         database_type: formData.database_type,
-        database_name: formData.database_name.trim(),
+        database_name: (formData.database_name || '').trim(),
       };
 
-      // Only include host/port/username/password for non-SQLite and non-DuckDB databases
-      if (formData.database_type !== 'sqlite' && formData.database_type !== 'duckdb') {
+      // Include host/port/credentials for non-file-path types
+      if (!FILE_PATH_TYPES.includes(dbType)) {
         payload.host = formData.host || 'localhost';
-        payload.port = formData.port || 5432;
+        payload.port = formData.port || 0;
         payload.username = formData.username || '';
         payload.password = formData.password || '';
       }
 
-      // Call backend to test connection
       const response = await fetch('/api/connections/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -212,6 +239,302 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
     onClose();
   };
 
+  // Render form fields based on database type
+  const renderDynamicFields = () => {
+    const dbType = formData.database_type;
+
+    // --- File-path types (SQLite, DuckDB) ---
+    if (FILE_PATH_TYPES.includes(dbType)) {
+      return (
+        <div className="space-y-3">
+          <label className={labelClass}>Database Target Path *</label>
+          <input
+            type="text"
+            name="database_name"
+            value={formData.database_name}
+            onChange={handleChange}
+            required
+            placeholder={dbType === 'duckdb' ? 'e.g., /data/analytics.duckdb' : 'e.g., /data/local.db'}
+            className={inputClass}
+          />
+          {dbType === 'duckdb' && (
+            <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-xl text-[11px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+              Tip: Use :memory: for an ephemeral in-memory database
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- DynamoDB (AWS-style: region + access key + secret) ---
+    if (dbType === 'dynamodb') {
+      return (
+        <>
+          <div className="space-y-3">
+            <label className={labelClass}>AWS Region *</label>
+            <input
+              type="text"
+              name="host"
+              value={formData.host}
+              onChange={handleChange}
+              required
+              placeholder="e.g., us-east-1"
+              className={inputClass}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <label className={labelClass}>Access Key ID *</label>
+              <input
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                required
+                placeholder="e.g., AKIAIOSFODNN7EXAMPLE"
+                className={inputClass}
+              />
+            </div>
+            <div className="space-y-3">
+              <label className={labelClass}>Secret Access Key *</label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                placeholder="••••••••"
+                className={`${inputClass} font-mono`}
+              />
+            </div>
+          </div>
+          <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-xl text-[11px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+            AWS credentials are stored locally. Region maps to the DynamoDB endpoint.
+          </div>
+        </>
+      );
+    }
+
+    // --- Redis (host + port + optional password + db number) ---
+    if (dbType === 'redis') {
+      return (
+        <>
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="flex-1 space-y-3">
+              <label className={labelClass}>Host Address *</label>
+              <input
+                type="text"
+                name="host"
+                value={formData.host}
+                onChange={handleChange}
+                required
+                placeholder="localhost"
+                className={inputClass}
+              />
+            </div>
+            <div className="w-full md:w-32 space-y-3">
+              <label className={labelClass}>Port *</label>
+              <input
+                type="number"
+                name="port"
+                value={formData.port}
+                onChange={handleChange}
+                required
+                className={`${inputClass} text-center`}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <label className={labelClass}>Password (Optional)</label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Leave empty if no auth"
+                className={`${inputClass} font-mono`}
+              />
+            </div>
+            <div className="space-y-3">
+              <label className={labelClass}>Database Number</label>
+              <input
+                type="text"
+                name="database_name"
+                value={formData.database_name}
+                onChange={handleChange}
+                placeholder="0"
+                className={inputClass}
+              />
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    // --- Elasticsearch (host + port + optional auth) ---
+    if (dbType === 'elasticsearch') {
+      return (
+        <>
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="flex-1 space-y-3">
+              <label className={labelClass}>Host Address *</label>
+              <input
+                type="text"
+                name="host"
+                value={formData.host}
+                onChange={handleChange}
+                required
+                placeholder="localhost"
+                className={inputClass}
+              />
+            </div>
+            <div className="w-full md:w-32 space-y-3">
+              <label className={labelClass}>Port *</label>
+              <input
+                type="number"
+                name="port"
+                value={formData.port}
+                onChange={handleChange}
+                required
+                className={`${inputClass} text-center`}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <label className={labelClass}>Username (Optional)</label>
+              <input
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                placeholder="Leave empty if no auth"
+                className={inputClass}
+              />
+            </div>
+            <div className="space-y-3">
+              <label className={labelClass}>Password (Optional)</label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Leave empty if no auth"
+                className={`${inputClass} font-mono`}
+              />
+            </div>
+          </div>
+          <div className="space-y-3">
+            <label className={labelClass}>Index Pattern (Optional)</label>
+            <input
+              type="text"
+              name="database_name"
+              value={formData.database_name}
+              onChange={handleChange}
+              placeholder="e.g., logs-* (leave empty for all indices)"
+              className={inputClass}
+            />
+          </div>
+        </>
+      );
+    }
+
+    // --- Standard layout (PostgreSQL, MySQL, MSSQL, Oracle, MongoDB, Cassandra) ---
+    return (
+      <>
+        {/* Host and Port */}
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex-1 space-y-3">
+            <label className={labelClass}>
+              {dbType === 'cassandra' ? 'Contact Point *' : 'Host Address *'}
+            </label>
+            <input
+              type="text"
+              name="host"
+              value={formData.host}
+              onChange={handleChange}
+              required
+              placeholder="localhost"
+              className={inputClass}
+            />
+          </div>
+          <div className="w-full md:w-32 space-y-3">
+            <label className={labelClass}>Port *</label>
+            <input
+              type="number"
+              name="port"
+              value={formData.port}
+              onChange={handleChange}
+              required
+              className={`${inputClass} text-center`}
+            />
+          </div>
+        </div>
+
+        {/* Database Name / Service Name / Keyspace */}
+        <div className="space-y-3">
+          <label className={labelClass}>
+            {dbType === 'oracle' ? 'Service Name *'
+              : dbType === 'cassandra' ? 'Keyspace *'
+              : dbType === 'mongodb' ? 'Database Name *'
+              : 'Database Schema Name *'}
+          </label>
+          <input
+            type="text"
+            name="database_name"
+            value={formData.database_name}
+            onChange={handleChange}
+            required
+            placeholder={
+              dbType === 'oracle' ? 'e.g., ORCL or XEPDB1'
+              : dbType === 'cassandra' ? 'e.g., my_keyspace'
+              : dbType === 'mongodb' ? 'e.g., my_database'
+              : 'e.g., app_production'
+            }
+            className={inputClass}
+          />
+          {dbType === 'oracle' && (
+            <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-xl text-[11px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+              Tip: Use the Oracle service name (e.g., ORCL, XEPDB1) — not the SID
+            </div>
+          )}
+        </div>
+
+        {/* Username and Password */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <label className={labelClass}>Authority Username *</label>
+            <input
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              required
+              placeholder="e.g., db_admin"
+              className={inputClass}
+            />
+          </div>
+          <div className="space-y-3">
+            <label className={labelClass}>Authority Secret *</label>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              placeholder="••••••••"
+              className={`${inputClass} font-mono`}
+            />
+          </div>
+        </div>
+      </>
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-xl animate-fadeIn p-4">
       <div className="glass-panel bg-white/5 dark:bg-black/40 rounded-[2.5rem] shadow-2xl border-white/10 max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col relative transition-all duration-500 scale-100 shadow-[0_30px_100px_rgba(0,0,0,0.5)]">
@@ -237,9 +560,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8 bg-transparent flex flex-col">
           {/* Connection Name */}
           <div className="space-y-3">
-            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-              Connection Identifier *
-            </label>
+            <label className={labelClass}>Connection Identifier *</label>
             <input
               type="text"
               name="name"
@@ -247,17 +568,15 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
               onChange={handleChange}
               required
               placeholder="e.g., Production Analytics"
-              className="w-full px-4 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
+              className={inputClass}
             />
           </div>
 
           {/* Database Type */}
           <div className="space-y-4">
-            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-              Select Protocol *
-            </label>
+            <label className={labelClass}>Select Protocol *</label>
             <div className="flex flex-wrap gap-2.5">
-              {['postgresql', 'mysql', 'sqlite', 'mssql', 'oracle', 'mongodb', 'duckdb'].map((type) => (
+              {['postgresql', 'mysql', 'sqlite', 'mssql', 'oracle', 'mongodb', 'duckdb', 'redis', 'cassandra', 'dynamodb', 'elasticsearch'].map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -274,118 +593,12 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
           </div>
 
           {/* Dynamic Fields */}
-          {(formData.database_type === 'sqlite' || formData.database_type === 'duckdb') ? (
-            <div className="space-y-3">
-              <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                Database Target Path *
-              </label>
-              <input
-                type="text"
-                name="database_name"
-                value={formData.database_name}
-                onChange={handleChange}
-                required
-                placeholder={formData.database_type === 'duckdb' ? 'e.g., /data/analytics.duckdb' : 'e.g., /data/local.db'}
-                className="w-full px-4 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
-              />
-              {formData.database_type === 'duckdb' && (
-                <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-xl text-[11px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                  Tip: Use :memory: for an ephemeral in-memory database
-                </div>
-              )}
-            </div>
-          ) : (
-            <>
-              {/* Host and Port */}
-              <div className="flex flex-col md:flex-row gap-6">
-                <div className="flex-1 space-y-3">
-                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Host Address *</label>
-                  <input
-                    type="text"
-                    name="host"
-                    value={formData.host}
-                    onChange={handleChange}
-                    required
-                    placeholder="localhost"
-                    className="w-full px-4 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
-                  />
-                </div>
-                <div className="w-full md:w-32 space-y-3">
-                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Port *</label>
-                  <input
-                    type="number"
-                    name="port"
-                    value={formData.port}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-bold text-center"
-                  />
-                </div>
-              </div>
-
-              {/* Database Name / Service Name */}
-              <div className="space-y-3">
-                <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                  {formData.database_type === 'oracle' ? 'Service Name *' : 'Database Schema Name *'}
-                </label>
-                <input
-                  type="text"
-                  name="database_name"
-                  value={formData.database_name}
-                  onChange={handleChange}
-                  required
-                  placeholder={formData.database_type === 'oracle' ? 'e.g., ORCL or XEPDB1' : 'e.g., app_production'}
-                  className="w-full px-4 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
-                />
-                {formData.database_type === 'oracle' && (
-                  <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-xl text-[11px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                    Tip: Use the Oracle service name (e.g., ORCL, XEPDB1) — not the SID
-                  </div>
-                )}
-              </div>
-
-              {/* Username and Password */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                    Authority Username *
-                  </label>
-                  <input
-                    type="text"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleChange}
-                    required
-                    placeholder="e.g., db_admin"
-                    className="w-full px-4 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                    Authority Secret *
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                    placeholder="••••••••"
-                    className="w-full px-6 py-4 glass-panel bg-white/5 dark:bg-black/10 border-white/5 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-500 font-bold font-mono"
-                  />
-                </div>
-              </div>
-            </>
-          )}
+          {renderDynamicFields()}
 
           {/* Connection String Preview */}
           <div className="border-t border-white/5 pt-8">
             <div className="flex items-center justify-between mb-4">
-              <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                Connection String Protocol
-              </label>
+              <label className={labelClass}>Connection String Protocol</label>
               <button
                 type="button"
                 onClick={() => setShowConnectionString(!showConnectionString)}
