@@ -651,12 +651,25 @@ class MultiDatabaseHandler:
                     db=db,
                     chat_session_id=chat_session_id,
                 )
+                # Flatten nested result dict to top-level keys so downstream
+                # code (process_multi_database_query) finds data/row_count/
+                # execution_time_ms at the same level as the SQL path.
+                nested = nosql_result.get("result") or {}
                 return {
-                    **nosql_result,
+                    "success": nosql_result.get("success", False),
+                    "sql": nosql_result.get("sql"),
+                    "data": nested.get("data", []),
+                    "row_count": nested.get("row_count", 0),
+                    "execution_time_ms": nested.get("execution_time_ms", 0),
                     "connection": connection,
                     "model_used": model_used,
                     "database_name": connection.name,
                     "connection_id": connection.id,
+                    "total_attempts": nosql_result.get("total_attempts", 0),
+                    "attempts": nosql_result.get("attempts", []),
+                    "agent_trace": nosql_result.get("agent_trace"),
+                    "self_corrected": nosql_result.get("self_corrected", False),
+                    "error": nosql_result.get("error"),
                 }
 
             # ALWAYS get full schema directly from database for accurate WHERE validation
