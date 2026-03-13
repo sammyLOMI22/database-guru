@@ -47,7 +47,7 @@ Rules:
 3. Handle key patterns (user:*, order:*, etc.)
 4. For read operations, use GET, HGETALL, LRANGE, SMEMBERS, ZRANGE, etc.
 5. Mark write operations (SET, DEL, LPUSH, etc.) with is_write: true
-6. For pattern-based queries, use SCAN with MATCH patterns
+6. For pattern-based queries, use SCAN with MATCH patterns. Never use KEYS — it blocks the server
 7. Return ONLY one command at a time
 
 Return ONLY valid JSON:

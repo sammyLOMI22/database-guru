@@ -29,7 +29,7 @@ _SYNTAX_PATTERNS = [
     "failed to parse",
     "invalid pipeline",
     "$match requires",
-    "a]ggregation pipeline",
+    "aggregation pipeline",
 ]
 _TYPE_MISMATCH_PATTERNS = [
     "can't convert",

@@ -221,10 +221,11 @@ class ConnectionTester:
         """Test MongoDB connection"""
         try:
             from motor.motor_asyncio import AsyncIOMotorClient
+            from urllib.parse import quote_plus
 
             # Build connection string
             if username and password:
-                connection_string = f"mongodb://{username}:{password}@{host}:{port}/{database_name}"
+                connection_string = f"mongodb://{quote_plus(username)}:{quote_plus(password)}@{host}:{port}/{database_name}"
             else:
                 connection_string = f"mongodb://{host}:{port}/{database_name}"
 

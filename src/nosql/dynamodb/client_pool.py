@@ -65,3 +65,8 @@ class DynamoDBClientPool(NoSQLClientPoolMixin):
         if connection_id in self._sessions:
             self._sessions.pop(connection_id)
             logger.info(f"Evicted DynamoDB session for connection {connection_id}")
+
+    async def close_all(self) -> None:
+        """Close all sessions."""
+        self._sessions.clear()
+        logger.info("Closed all DynamoDB sessions")

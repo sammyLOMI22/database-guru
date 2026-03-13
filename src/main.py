@@ -141,6 +141,19 @@ async def lifespan(app: FastAPI):
         await pool_manager.close_all_pools()
         logger.info("✅ Connection pools closed")
 
+    # Close NoSQL client pools
+    logger.info("Closing NoSQL client pools...")
+    from src.nosql.mongodb.client_pool import MongoClientPool
+    from src.nosql.redis.client_pool import RedisClientPool
+    from src.nosql.cassandra.client_pool import CassandraClientPool
+    from src.nosql.dynamodb.client_pool import DynamoDBClientPool
+    from src.nosql.elasticsearch.client_pool import ElasticsearchClientPool
+
+    for pool_cls in [MongoClientPool, RedisClientPool, CassandraClientPool, DynamoDBClientPool, ElasticsearchClientPool]:
+        if pool_cls._instance is not None:
+            await pool_cls._instance.close_all()
+    logger.info("✅ NoSQL client pools closed")
+
     logger.info("👋 Goodbye!")
 
 

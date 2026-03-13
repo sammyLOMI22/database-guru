@@ -99,9 +99,8 @@ class ElasticsearchQueryExecutor:
         index = query_dsl.get("index", "*")
         body = {k: v for k, v in query_dsl.items() if k != "index" and v is not None}
 
-        # Set default size if not specified
-        if "size" not in body:
-            body["size"] = min(self.max_results, 100)
+        # Enforce max_results server-side regardless of LLM-generated size
+        body["size"] = min(body.get("size", self.max_results), self.max_results, 100)
 
         response = await self.client.search(index=index, body=body)
 
@@ -115,10 +114,17 @@ class ElasticsearchQueryExecutor:
             row.update(self._flatten_source(source))
             rows.append(row)
 
-        # Extract aggregation results
+        # Extract aggregation results (appended alongside hits if both present)
         aggs = response.get("aggregations", {})
-        if aggs and not rows:
-            rows = self._flatten_aggregations(aggs)
+        if aggs:
+            agg_rows = self._flatten_aggregations(aggs)
+            if rows:
+                # Both hits and aggregations — return aggregations as a separate section
+                for agg_row in agg_rows:
+                    agg_row["_type"] = "aggregation"
+                rows.extend(agg_rows)
+            else:
+                rows = agg_rows
 
         return rows
 

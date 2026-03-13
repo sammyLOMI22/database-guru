@@ -250,3 +250,45 @@ PR Review: NoSQL Database Expansion (Phase 14) — Review #3
   - tests/nosql/test_security_and_executors.py — 43 new tests (NEW FILE)
 
   Total: 14 files modified, 170 NoSQL tests passing (was 127)
+Final review
+PR Review: no-sql-database-expansion                                                                                                                                 
+                                                                                                                                                                       
+  81 files | ~11,770 lines added | 8 commits                                                                                                                           
+                                                                                                                                                                       
+  Verdict: Request Changes — 4 blocking issues before merge                                                                                                            
+                                                                                                                                                                       
+  ---                                                                                                                                                                  
+  Blocking Issues                                                                                                                                                      
+                                                                                                                                                                       
+  1. MongoDB credential leak in connection tester (src/core/connection_tester.py:227)                                                                                  
+    - Credentials are not URL-encoded when building the MongoDB URI (unlike the client pool which uses quote_plus). Passwords with @, :, or / will corrupt the URI or  
+  leak in error messages.                                                                                                                                              
+  2. NoSQL client pools not closed on shutdown (src/main.py)
+    - The lifespan handler closes SQL pools but never calls close_all() on any of the 5 NoSQL client pools. Open sockets are left to GC in production.
+  3. Elasticsearch max_results bypass (src/nosql/elasticsearch/query_executor.py:104)
+    - If the LLM generates "size": 10000 in the query DSL, it passes through unmodified. The max_results cap only truncates the Python list, not the server-side scan. 
+  Fix: body["size"] = min(body.get("size", self.max_results), self.max_results).                                                                                       
+  4. Broken regex in MongoDB error classifier (src/nosql/mongodb/error_classifier.py:32)                                                                               
+    - "a]ggregation pipeline" contains a stray ] — this pattern never matches, so aggregation pipeline errors fall through to UNKNOWN instead of SYNTAX_ERROR.
+
+  ---
+  Warnings (fix soon, not blocking)
+
+  - Dead code in base.py: NON_RETRYABLE_ERRORS set is declared but unused (line 22-24). The first_failed_query tracking has a dead pass block (lines 365-367) with
+  misleading comments.
+  - DynamoDB pool missing close_all(): Every other pool implements it; DynamoDB is inconsistent.
+  - ES drops aggregations when hits also return (query_executor.py:119-121): Queries returning both hits and aggregations silently lose the aggregation data.
+  - Duplicated schema TTL check: _get_schema in base.py and get_cached_or_fresh_schema in router.py both compute freshness independently.
+  - Redis prompt improvement: The LLM prompt doesn't explicitly forbid KEYS * — the allowlist blocks it, but the LLM wastes a retry discovering that.
+
+  ---
+  Strengths
+
+  - Clean architecture: The NoSQLHandler base class with pluggable inspector/generator/executor components is well-designed and extensible
+  - Strong security surface: Redis allowlist, CQL/PartiQL injection validators, ES script detection
+  - Good test coverage: 170 test functions across 6 files, including security injection tests
+  - Solid integration: Correction learner, confidence scorer, and result verifier all wired through cleanly
+
+  Vibe Score: 7.5/10 → would be 8.5+ with blocking fixes applied
+
+  The feature is architecturally sound and substantially production-ready. Fix the 4 blocking issues and this is good to merge.

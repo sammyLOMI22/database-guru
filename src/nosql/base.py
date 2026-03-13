@@ -14,13 +14,7 @@ from src.llm.self_correcting_agent import ErrorType
 
 logger = logging.getLogger(__name__)
 
-# Error types that cannot be fixed by regenerating the query
-NON_RETRYABLE_ERRORS: Set[str] = {
-    ErrorType.PERMISSION_DENIED.value,
-    ErrorType.TIMEOUT.value,
-}
-# CONNECTION_ERROR is not in self_correcting_agent.ErrorType but may appear
-# from confidence_scorer's ErrorType — handle by string value too
+# Error types that cannot be fixed by regenerating the query (matched by string value)
 NON_RETRYABLE_ERROR_NAMES: Set[str] = {"connection_error", "permission_denied", "timeout"}
 
 # ── Shared client pool lifecycle management ──────────────────────────────
@@ -245,29 +239,18 @@ class NoSQLHandler(ABC):
         """
         from src.nosql.router import get_cached_or_fresh_schema
 
-        # Check if we'll use cache (for trace messaging)
-        cached = connection.schema_cache
-        is_cached = False
-        if cached and isinstance(cached, dict) and cached.get("tables"):
-            updated_at = connection.schema_updated_at
-            if updated_at:
-                now = datetime.now(timezone.utc).replace(tzinfo=None)
-                age_seconds = (now - updated_at).total_seconds()
-                if age_seconds < SCHEMA_TTL_SECONDS:
-                    is_cached = True
-                    tables = cached.get("tables", {})
-                    trace.add_step(
-                        "analysis",
-                        f"Using cached schema ({len(tables)} collections/tables, {int(age_seconds)}s old)",
-                    )
-
-        if not is_cached:
-            trace.add_step("analysis", "Inspecting database schema...")
-
+        cached_before = connection.schema_cache
         schema_dict = await get_cached_or_fresh_schema(connection, inspector, db)
+        tables = schema_dict.get("tables", {})
 
-        if not is_cached:
-            tables = schema_dict.get("tables", {})
+        if schema_dict is cached_before:
+            updated_at = connection.schema_updated_at
+            age_seconds = (datetime.now(timezone.utc).replace(tzinfo=None) - updated_at).total_seconds() if updated_at else 0
+            trace.add_step(
+                "analysis",
+                f"Using cached schema ({len(tables)} collections/tables, {int(age_seconds)}s old)",
+            )
+        else:
             trace.add_step(
                 "analysis",
                 f"Found {len(tables)} collections/tables: {', '.join(list(tables.keys())[:10])}",
@@ -362,9 +345,6 @@ class NoSQLHandler(ABC):
 
             query_str = generator.query_to_display_string(query)
             last_query_str = query_str
-            if not first_failed_query and attempt_num > 1:
-                # first_failed_query stays as the original failed query
-                pass
             trace.add_step("generation", f"Generated: {query_str[:120]}")
 
             # ── Confidence check on retries ──────────────────────────
@@ -430,7 +410,7 @@ class NoSQLHandler(ABC):
             last_error_type = error_type
 
             # Remember the first failed query for correction learning
-            if attempt_num == 1:
+            if not first_failed_query:
                 first_failed_query = query_str
 
             # ── Non-retryable error check ────────────────────────────
