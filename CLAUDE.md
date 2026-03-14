@@ -57,7 +57,7 @@ docker compose down -v                         # Stop + remove volumes
 
 ## Architecture Overview
 
-The system uses a multi-agent architecture with 35+ specialized agents (including 6 NoSQL handlers). See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
+The system uses a multi-agent architecture with 37+ specialized agents (including 6 NoSQL handlers and auth system). See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
 
 ### Key Agents (Quick Reference)
 | Agent | File | Purpose |
@@ -92,10 +92,14 @@ The system uses a multi-agent architecture with 35+ specialized agents (includin
 | Cassandra Handler | `src/nosql/cassandra/handler.py` | CQL generation, partition-aware queries (Phase 14) |
 | DynamoDB Handler | `src/nosql/dynamodb/handler.py` | PartiQL generation, boto3 integration (Phase 14) |
 | Elasticsearch Handler | `src/nosql/elasticsearch/handler.py` | Query DSL generation, aggregations (Phase 14) |
+| Auth Service | `src/auth/service.py` | JWT auth, bcrypt hashing, user CRUD (Phase 21) |
+| Auth Dependencies | `src/auth/dependencies.py` | get_current_user, get_optional_user, require_admin (Phase 21) |
+| Audit Logger | `src/auth/audit.py` | AuditLog model, never-raising log_action() (Phase 21) |
 
 ### Data Flow
 ```
-Natural Language Query → Input Sanitization → Injection Detection
+Natural Language Query → Auth Check (optional, REQUIRE_AUTH flag)
+  → Input Sanitization → Injection Detection
   → Conversational Memory → Tool-Using Agent → Query Planning
   → [SQL Path] SQL Generator → Confidence Scorer → SQL Executor
       → Result Verification → [If Error: Parallel Corrections / Self-Correction Loop]
@@ -109,7 +113,7 @@ Natural Language Query → Input Sanitization → Injection Detection
 ```
 
 ### Detailed References
-- **[.claude/AGENTS.md](.claude/AGENTS.md)** - All 18 agents with methods and features
+- **[.claude/AGENTS.md](.claude/AGENTS.md)** - All agents with methods and features
 - **[.claude/ARCHITECTURE.md](.claude/ARCHITECTURE.md)** - Architectural patterns (pooling, caching, security)
 - **[.claude/API.md](.claude/API.md)** - All API endpoints by category
 - **[.claude/CODE_LOCATIONS.md](.claude/CODE_LOCATIONS.md)** - Quick lookup for key code locations
@@ -152,6 +156,7 @@ Settings in `src/config/settings.py`:
 - Environment variables from `.env` file
 - Type-safe with Pydantic validation
 - Supports multiple deployment environments
+- Auth settings: `JWT_EXPIRATION_MINUTES` (default 1440), `REQUIRE_AUTH` (default False), `RATE_LIMIT_PER_USER` (200), `RATE_LIMIT_LLM_PER_USER` (30)
 
 ## Documentation
 
@@ -162,11 +167,12 @@ Key docs in `docs/`:
 | **Guides** | `guides/MULTI_DATABASE_GUIDE.md`, `guides/CONNECTION_POOLING_GUIDE.md`, `guides/DATA_LINEAGE_GUIDE.md`, `guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md`, `guides/FILE_DATA_SOURCE_USER_GUIDE.md` |
 | **Technical** | `technical/PARALLEL_EXECUTION.md`, `technical/SEMANTIC_CACHING.md`, `technical/SQL_GENERATION_PIPELINE.md` |
 | **Modules** | `modules/QUERY_PLANNING_AGENT.md`, `modules/TOOL_USING_AGENT.md` |
-| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/DATA_INSIGHTS_TESTING.md`, `guides/testing/PHASE_22_PERFORMANCE_GURU_TESTING.md`, `guides/testing/PHASE_14_NOSQL_EXPANSION_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
+| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/DATA_INSIGHTS_TESTING.md`, `guides/testing/PHASE_22_PERFORMANCE_GURU_TESTING.md`, `guides/testing/PHASE_14_NOSQL_EXPANSION_TESTING.md`, `guides/testing/PHASE_21_SECURITY_AUTH_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
 | **Planning** | `planning/FUTURE_PLANS.md`, `planning/MASTER_ROADMAP.md` |
 | **LLM Usage** | `guides/LLM_USAGE_MONITORING_GUIDE.md` |
 | **Data Insights** | `planning/DATA_INSIGHTS_ENHANCEMENT_PLAN.md` |
 | **Migration** | `planning/MIGRATION_TOOLKIT_PROPOSAL.md` |
 | **Performance** | `guides/PERFORMANCE_GURU_GUIDE.md` |
 | **NoSQL** | `planning/NOSQL_EXPANSION_PLAN.md` |
+| **Security & Auth** | `planning/MASTER_ROADMAP.md` (Phase 21 section) |
 | **Deployment** | `guides/DOCKER_DEPLOYMENT_GUIDE.md`, `planning/DOCKER_CONTAINERIZATION_PLAN.md` |

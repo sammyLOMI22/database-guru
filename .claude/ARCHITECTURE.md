@@ -98,18 +98,35 @@ Intelligent query similarity matching:
 - **Frontend Dashboard** - 5 components for browsing and managing mappings
 - Auto-learns from non-SQL feedback types (column_name, table_name, result_issue)
 
-## Security System (November 2, 2025)
+## Security System (November 2, 2025 / Phase 21 - March 2026)
 
-### Components
+### Prompt Injection Protection
 - `PromptSanitizer` (`src/security/prompt_sanitizer.py`) - Multi-layer prompt injection protection
-
-### Features
 - Input sanitization at API boundary (Pydantic validators)
 - Injection detection (15+ attack patterns)
 - Safe prompt construction with XML-like delimiters
 - Token limits prevent resource exhaustion
 - Security logging for monitoring
 - 29 comprehensive security tests passing
+
+### Authentication & Authorization (Phase 21)
+**Status**: PRODUCTION-READY
+
+#### Components
+- `AuthService` (`src/auth/service.py`) - JWT token creation/validation, bcrypt password hashing, user CRUD
+- `User` model (`src/auth/models.py`) - SQLAlchemy model (id, email, username, hashed_password, is_active, is_admin)
+- Auth dependencies (`src/auth/dependencies.py`) - FastAPI dependencies for auth injection
+- `AuditLog` model (`src/auth/audit.py`) - Audit trail for security-sensitive operations
+
+#### Features
+- **JWT Authentication** - HS256 tokens via python-jose, configurable expiration (default 24hr)
+- **Password Hashing** - bcrypt with automatic salting
+- **Feature Flag** - `REQUIRE_AUTH=False` allows backwards-compatible gradual rollout
+- **Auth Dependencies** - `get_current_user` (401), `get_optional_user` (None if no auth), `require_admin` (403)
+- **Resource Ownership** - `owner_id` FK on ChatSession, DatabaseConnection, FileSource, QueryHistory, MigrationProject
+- **Per-User Rate Limiting** - JWT-based user ID extraction in middleware, IP fallback for unauthenticated
+- **Audit Logging** - Never-raising `log_action()` for create/delete/login events
+- **61 tests** across 4 test files (auth, ownership, rate limiting, audit)
 
 ## File Data Source System (Phase 13 - January 2026)
 **Status**: PRODUCTION-READY
@@ -222,3 +239,5 @@ The system maintains its own metadata database (`database_guru.db`):
 | `llm_usage` | Individual LLM API call records with tokens, cost, timing (Phase 16) |
 | `llm_usage_aggregate` | Pre-computed hourly/daily usage statistics (Phase 16) |
 | `llm_model_config` | Model metadata, capabilities, and cost rates (Phase 16) |
+| `users` | User accounts for JWT authentication (Phase 21) |
+| `audit_logs` | Security audit trail — actions, resources, IP addresses (Phase 21) |

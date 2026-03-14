@@ -125,7 +125,8 @@ class QueryHistory(Base):
     __tablename__ = "query_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(255), index=True, nullable=True)  # Optional user tracking
+    user_id = Column(String(255), index=True, nullable=True)  # Legacy optional user tracking
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Input
     natural_language_query = Column(Text, nullable=False)
@@ -168,6 +169,7 @@ class DatabaseConnection(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, unique=True)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Connection details (encrypted in practice)
     database_type = Column(String(50), nullable=False)  # postgres, mysql, etc.
@@ -272,7 +274,8 @@ class ChatSession(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
-    user_id = Column(String(255), index=True, nullable=True)  # Optional user tracking
+    user_id = Column(String(255), index=True, nullable=True)  # Legacy optional user tracking
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Multi-database support - stores array of connection IDs
     active_connection_ids = Column(JSON, nullable=False, default=list)  # [1, 2, 3]
@@ -330,6 +333,7 @@ class FileSource(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)  # Display name
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # File metadata
     original_filename = Column(String(255), nullable=False)
@@ -523,6 +527,7 @@ class MigrationProject(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Connection references
     source_connection_id = Column(

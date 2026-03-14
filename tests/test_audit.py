@@ -1,0 +1,111 @@
+"""Tests for Phase 21: Audit logging"""
+import pytest
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.auth.audit import AuditLog, log_action, get_audit_logs
+
+
+class TestLogAction:
+    @pytest.mark.asyncio
+    async def test_creates_audit_entry(self):
+        db = AsyncMock(spec=AsyncSession)
+        await log_action(
+            db,
+            action="create",
+            resource_type="connection",
+            resource_id="42",
+            user_id=1,
+            username="alice",
+            ip_address="127.0.0.1",
+        )
+        db.add.assert_called_once()
+        entry = db.add.call_args[0][0]
+        assert isinstance(entry, AuditLog)
+        assert entry.action == "create"
+        assert entry.resource_type == "connection"
+        assert entry.resource_id == "42"
+        assert entry.user_id == 1
+        assert entry.username == "alice"
+
+    @pytest.mark.asyncio
+    async def test_log_action_with_details(self):
+        db = AsyncMock(spec=AsyncSession)
+        details = {"name": "my-db", "type": "postgresql"}
+        await log_action(
+            db, action="delete", resource_type="connection",
+            details=details,
+        )
+        entry = db.add.call_args[0][0]
+        assert entry.details == details
+
+    @pytest.mark.asyncio
+    async def test_log_action_never_raises(self):
+        """Even if DB fails, log_action should not raise."""
+        db = AsyncMock(spec=AsyncSession)
+        db.add.side_effect = RuntimeError("DB down")
+        # Should not raise
+        await log_action(db, action="test", resource_type="test")
+
+    @pytest.mark.asyncio
+    async def test_log_action_without_user(self):
+        db = AsyncMock(spec=AsyncSession)
+        await log_action(
+            db, action="anonymous_action", resource_type="query",
+        )
+        entry = db.add.call_args[0][0]
+        assert entry.user_id is None
+        assert entry.username is None
+
+
+class TestAuditLogModel:
+    def test_audit_log_attributes(self):
+        log = AuditLog(
+            user_id=1,
+            username="alice",
+            action="login",
+            resource_type="user",
+            resource_id="1",
+            ip_address="192.168.1.1",
+        )
+        assert log.action == "login"
+        assert log.resource_type == "user"
+        assert log.ip_address == "192.168.1.1"
+
+    def test_audit_log_nullable_fields(self):
+        log = AuditLog(action="test", resource_type="test")
+        assert log.user_id is None
+        assert log.details is None
+        assert log.ip_address is None
+
+
+class TestGetAuditLogs:
+    @pytest.mark.asyncio
+    async def test_returns_list(self):
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [
+            AuditLog(id=1, action="login", resource_type="user"),
+        ]
+        mock_result.scalars.return_value = mock_scalars
+        db.execute.return_value = mock_result
+
+        logs = await get_audit_logs(db)
+        assert len(logs) == 1
+        assert logs[0].action == "login"
+
+    @pytest.mark.asyncio
+    async def test_filters_by_user_id(self):
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = []
+        mock_result.scalars.return_value = mock_scalars
+        db.execute.return_value = mock_result
+
+        await get_audit_logs(db, user_id=42)
+        # Verify execute was called (filter applied)
+        db.execute.assert_called_once()

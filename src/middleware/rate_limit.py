@@ -1,12 +1,31 @@
 """Rate limiting middleware and dependencies"""
 import logging
 import time
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
 from fastapi import Request, Response, status, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_user_id_from_token(request: Request) -> Optional[str]:
+    """Extract user ID from JWT in Authorization header without full validation.
+
+    This is a lightweight check for rate-limiting purposes only — actual
+    authentication is handled by the dependency layer.
+    """
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header[7:]
+    try:
+        from jose import jwt
+        # Decode without verification — rate limiting just needs the identity
+        payload = jwt.get_unverified_claims(token)
+        return f"user:{payload.get('sub', '')}"
+    except Exception:
+        return None
 
 
 # ============================================================================
@@ -51,7 +70,7 @@ class EndpointRateLimiter:
 
     async def __call__(self, request: Request) -> None:
         """Check rate limit for the request."""
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = _extract_user_id_from_token(request) or (request.client.host if request.client else "unknown")
         now = time.time()
 
         # Periodic cleanup (every 100 requests approximately)
@@ -144,8 +163,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.url.path in exempt_paths or request.url.path.rstrip('/') in exempt_paths:
             return await call_next(request)
 
-        # Get client identifier (IP address)
-        client_ip = request.client.host
+        # Get client identifier (prefer user ID from JWT, fall back to IP)
+        client_ip = _extract_user_id_from_token(request) or request.client.host
 
         # Get current time
         now = time.time()

@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_db
+from src.auth.dependencies import get_optional_user
+from src.auth.models import User
 from src.database.models import ChatSession, ChatMessage, DatabaseConnection, FileSource, QueryHistory
 
 from src.llm.conversational_memory_agent import get_memory_agent
@@ -118,11 +120,21 @@ class ChatMessageResponse(BaseModel):
         from_attributes = True
 
 
+def _check_session_ownership(session: ChatSession, user: Optional[User]) -> None:
+    """Raise 403 if user doesn't own the session (only enforced when authenticated)."""
+    if user and session.owner_id is not None and session.owner_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this session",
+        )
+
+
 # Endpoints
 @router.post("/sessions", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_chat_session(
     session_data: ChatSessionCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Create a new chat session"""
     try:
@@ -161,6 +173,7 @@ async def create_chat_session(
         new_session = ChatSession(
             name=session_data.name,
             user_id=session_data.user_id,
+            owner_id=current_user.id if current_user else None,
             active_connection_ids=session_data.connection_ids,
             active_file_source_ids=session_data.file_source_ids or [],
         )
@@ -210,12 +223,16 @@ async def list_chat_sessions(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """List chat sessions"""
     try:
         query = select(ChatSession).order_by(desc(ChatSession.last_active_at))
 
-        if user_id:
+        # Filter by owner when authenticated
+        if current_user:
+            query = query.where(ChatSession.owner_id == current_user.id)
+        elif user_id:
             query = query.where(ChatSession.user_id == user_id)
 
         query = query.limit(limit).offset(offset)
@@ -273,6 +290,7 @@ async def list_chat_sessions(
 async def get_chat_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Get a specific chat session"""
     try:
@@ -286,6 +304,8 @@ async def get_chat_session(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Chat session {session_id} not found"
             )
+
+        _check_session_ownership(session, current_user)
 
         # Get connection and file source details
         connections = await _build_connection_infos(session, db)
@@ -333,6 +353,7 @@ async def update_chat_session(
     session_id: str,
     update_data: ChatSessionUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Update a chat session"""
     try:
@@ -346,6 +367,8 @@ async def update_chat_session(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Chat session {session_id} not found"
             )
+
+        _check_session_ownership(session, current_user)
 
         # Update fields
         if update_data.name is not None:
@@ -438,6 +461,7 @@ async def update_chat_session(
 async def delete_chat_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Delete a chat session and all associated messages"""
     try:
@@ -451,6 +475,8 @@ async def delete_chat_session(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Chat session {session_id} not found"
             )
+
+        _check_session_ownership(session, current_user)
 
         # Delete all messages first (to avoid FK constraint issues)
         await db.execute(

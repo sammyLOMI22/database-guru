@@ -1,12 +1,15 @@
 """Database connection management endpoints"""
 import logging
 from typing import ClassVar, List, Optional, Set
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from pydantic import BaseModel, Field, model_validator
 
 from src.api.dependencies import get_db
+from src.auth.audit import log_action
+from src.auth.dependencies import get_optional_user
+from src.auth.models import User
 from src.database.models import DatabaseConnection
 from src.core.connection_tester import ConnectionTester
 
@@ -67,13 +70,26 @@ class TestConnectionResponse(BaseModel):
 
 
 @router.get("/", response_model=ConnectionListResponse)
-async def list_connections(db: AsyncSession = Depends(get_db)):
+async def list_connections(
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+):
     """List all database connections (excludes soft-deleted)"""
-    result = await db.execute(
-        select(DatabaseConnection)
-        .where(DatabaseConnection.is_deleted.isnot(True))
-        .order_by(DatabaseConnection.created_at.desc())
-    )
+    query = select(DatabaseConnection).where(
+        DatabaseConnection.is_deleted.isnot(True)
+    ).order_by(DatabaseConnection.created_at.desc())
+
+    # Filter by owner when authenticated
+    if current_user:
+        from sqlalchemy import or_
+        query = query.where(
+            or_(
+                DatabaseConnection.owner_id == current_user.id,
+                DatabaseConnection.owner_id.is_(None),  # Unowned connections visible to all
+            )
+        )
+
+    result = await db.execute(query)
     connections = result.scalars().all()
 
     return ConnectionListResponse(
@@ -97,8 +113,10 @@ async def list_connections(db: AsyncSession = Depends(get_db)):
 
 @router.post("/", response_model=ConnectionResponse, status_code=status.HTTP_201_CREATED)
 async def create_connection(
+    request: Request,
     connection_data: ConnectionCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Create a new database connection"""
 
@@ -123,11 +141,22 @@ async def create_connection(
         # TODO: Encrypt password before storing
         password_encrypted=connection_data.password,  # Store as-is for now
         is_active=False,
+        owner_id=current_user.id if current_user else None,
     )
 
     db.add(new_connection)
     await db.commit()
     await db.refresh(new_connection)
+
+    await log_action(
+        db, action="create", resource_type="connection",
+        resource_id=str(new_connection.id),
+        user_id=current_user.id if current_user else None,
+        username=current_user.username if current_user else None,
+        details={"name": new_connection.name, "database_type": new_connection.database_type},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
 
     return ConnectionResponse(
         id=new_connection.id,
@@ -219,8 +248,10 @@ async def activate_connection(
 
 @router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_connection(
+    request: Request,
     connection_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Soft-delete a database connection.
 
@@ -239,12 +270,28 @@ async def delete_connection(
             detail=f"Connection with id {connection_id} not found",
         )
 
+    # Ownership check
+    if current_user and connection.owner_id is not None and connection.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this connection",
+        )
+
     # Idempotent: already deleted
     if getattr(connection, 'is_deleted', False):
         return
 
     connection.is_deleted = True
     connection.is_active = False
+
+    await log_action(
+        db, action="delete", resource_type="connection",
+        resource_id=str(connection_id),
+        user_id=current_user.id if current_user else None,
+        username=current_user.username if current_user else None,
+        details={"name": connection.name},
+        ip_address=request.client.host if request.client else None,
+    )
     await db.commit()
 
     # Invalidate schema cache for this connection

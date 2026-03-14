@@ -260,6 +260,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Database Migration Toolkit (NEW!)** - Schema diff engine, dependency-aware migration planner, multi-dialect script generator (up.sql/down.sql/verify.sql), data migration assistant with staging table pattern and batched INSERT SELECT
 - ✅ **Performance Guru (NEW!)** - EXPLAIN plan analysis with LLM-powered insights, bottleneck detection, index suggestions with CREATE INDEX SQL, query rewrite recommendations, multi-dialect support (PostgreSQL, MySQL, SQLite, DuckDB), tiered prompts, deterministic fallback
 - ✅ **NoSQL Database Expansion (NEW!)** - Full native query support for MongoDB (MQL), Redis (commands), Cassandra (CQL), DynamoDB (PartiQL), and Elasticsearch (Query DSL) with schema inference, error classification, self-correction, and mixed SQL+NoSQL chat sessions
+- ✅ **Security & Auth Foundation (NEW!)** - JWT authentication (bcrypt + python-jose), resource ownership with `owner_id` FK, per-user rate limiting with JWT-based user ID extraction, audit logging, `REQUIRE_AUTH` feature flag for gradual rollout
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
@@ -836,7 +837,16 @@ database-guru/
 
 ## 🔐 Security
 
-### Production-Grade Security Features (NEW!)
+### Authentication & Authorization (Phase 21)
+
+✅ **JWT Authentication** - Register/login with bcrypt password hashing and JWT tokens (python-jose)
+✅ **Resource Ownership** - `owner_id` FK on all major resources (sessions, connections, files, queries, migrations)
+✅ **Per-User Rate Limiting** - JWT-based user ID extraction with IP fallback for unauthenticated requests
+✅ **Audit Logging** - Never-raising `log_action()` helper tracks security-sensitive operations
+✅ **Feature Flag** - `REQUIRE_AUTH=False` for backwards-compatible gradual rollout
+✅ **Admin Controls** - Admin-only audit log access, `require_admin` dependency
+
+### Prompt Injection Protection
 
 ✅ **Prompt Injection Protection** - Multi-layer defense against malicious prompts
 ✅ **Input Sanitization** - Removes control characters and malicious patterns
@@ -845,22 +855,13 @@ database-guru/
 ✅ **Context Detection Security** - Prevents keyword manipulation exploits
 ✅ **Safe Prompt Construction** - XML-like delimiters with escape protection
 
-### Recent Security Improvements
-
-**November 2, 2025 - Conversational Memory Security Hardening:**
-1. Fixed context detection bug where keywords anywhere triggered context usage
-2. Implemented comprehensive prompt injection protection system
-3. Added multi-layer input sanitization (API → Agent → Prompt)
-4. Deployed 15+ attack pattern detection rules
-5. All 44 security and conversational memory tests passing
-
-⚠️ **Development Only** - This configuration is for local development.
+⚠️ **Development Only** - This configuration is for local development. Auth is optional by default (`REQUIRE_AUTH=False`).
 
 For production deployment, see [docs/technical/SECURITY_POLICY.md](docs/technical/SECURITY_POLICY.md) for:
-- Password encryption
-- Authentication/Authorization
+- JWT secret configuration
+- Enabling mandatory authentication
 - CORS configuration
-- Rate limiting
+- Rate limiting tuning
 - Input validation
 - Prompt injection defenses
 - Auto-learning security controls

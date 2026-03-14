@@ -32,11 +32,16 @@ class TestConnectionSoftDelete:
         mock_result.scalar_one_or_none.return_value = conn
         db.execute.return_value = mock_result
 
+        # Mock request for audit logging
+        mock_request = MagicMock()
+        mock_request.client = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+
         # Mock SchemaCache (imported locally inside delete_connection)
         with patch('src.core.schema_cache.SchemaCache') as mock_cache:
             mock_cache.invalidate_schema = MagicMock()
 
-            await delete_connection(connection_id=1, db=db)
+            await delete_connection(request=mock_request, connection_id=1, db=db, current_user=None)
 
             # Should NOT call db.delete
             db.delete.assert_not_called()
@@ -69,8 +74,13 @@ class TestConnectionSoftDelete:
         mock_result.scalar_one_or_none.return_value = conn
         db.execute.return_value = mock_result
 
+        # Mock request
+        mock_request = MagicMock()
+        mock_request.client = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+
         # Should return without error (204)
-        result = await delete_connection(connection_id=1, db=db)
+        result = await delete_connection(request=mock_request, connection_id=1, db=db, current_user=None)
 
         # Should NOT commit (no changes needed)
         db.commit.assert_not_called()
