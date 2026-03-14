@@ -52,6 +52,7 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting Database Guru...")
 
     settings = Settings()
+    settings.check_jwt_secret()
 
     # Initialize database
     logger.info("📊 Initializing database...")

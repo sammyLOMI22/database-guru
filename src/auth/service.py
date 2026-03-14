@@ -92,7 +92,7 @@ class AuthService:
             hashed_password=self.hash_password(password),
         )
         db.add(user)
-        await db.commit()
+        await db.flush()
         await db.refresh(user)
         logger.info(f"User registered: {username} ({email})")
         return user

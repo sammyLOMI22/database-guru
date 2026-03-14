@@ -1,4 +1,5 @@
 """Rate limiting middleware and dependencies"""
+import hashlib
 import logging
 import time
 from typing import Callable, Dict, Optional
@@ -9,23 +10,21 @@ from starlette.middleware.base import BaseHTTPMiddleware
 logger = logging.getLogger(__name__)
 
 
-def _extract_user_id_from_token(request: Request) -> Optional[str]:
-    """Extract user ID from JWT in Authorization header without full validation.
+def _extract_rate_limit_key(request: Request) -> Optional[str]:
+    """Derive a rate-limit key from the raw Bearer token.
 
-    This is a lightweight check for rate-limiting purposes only — actual
-    authentication is handled by the dependency layer.
+    Uses a hash of the full token so that forged JWTs (with a stolen
+    ``sub`` claim) get their own bucket instead of exhausting the real
+    user's quota.  Actual authentication is handled by the dependency layer.
     """
     auth_header = request.headers.get("authorization", "")
     if not auth_header.startswith("Bearer "):
         return None
     token = auth_header[7:]
-    try:
-        from jose import jwt
-        # Decode without verification — rate limiting just needs the identity
-        payload = jwt.get_unverified_claims(token)
-        return f"user:{payload.get('sub', '')}"
-    except Exception:
+    if not token:
         return None
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
+    return f"tok:{token_hash}"
 
 
 # ============================================================================
@@ -70,7 +69,7 @@ class EndpointRateLimiter:
 
     async def __call__(self, request: Request) -> None:
         """Check rate limit for the request."""
-        client_ip = _extract_user_id_from_token(request) or (request.client.host if request.client else "unknown")
+        client_ip = _extract_rate_limit_key(request) or (request.client.host if request.client else "unknown")
         now = time.time()
 
         # Periodic cleanup (every 100 requests approximately)
@@ -164,7 +163,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Get client identifier (prefer user ID from JWT, fall back to IP)
-        client_ip = _extract_user_id_from_token(request) or request.client.host
+        client_ip = _extract_rate_limit_key(request) or request.client.host
 
         # Get current time
         now = time.time()

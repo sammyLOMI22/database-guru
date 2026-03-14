@@ -4,21 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db
-from src.api.dependencies.common import get_settings
-from src.auth.dependencies import get_current_active_user
+from src.auth.dependencies import get_current_active_user, _get_auth_service
 from src.auth.models import User
 from src.auth.schemas import UserCreate, UserLogin, UserResponse, TokenResponse
 from src.auth.audit import log_action
 from src.auth.service import AuthService
-from src.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-def _get_auth_service(settings: Settings = Depends(get_settings)) -> AuthService:
-    return AuthService(settings)
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)

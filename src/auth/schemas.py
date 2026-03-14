@@ -1,6 +1,5 @@
 """Pydantic schemas for authentication"""
 from datetime import datetime
-from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -38,8 +37,3 @@ class TokenResponse(BaseModel):
     user: UserResponse
 
 
-class UserUpdate(BaseModel):
-    """Request model for updating user profile"""
-    email: Optional[EmailStr] = None
-    username: Optional[str] = Field(None, min_length=3, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")
-    password: Optional[str] = Field(None, min_length=8, max_length=128)

@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from src.middleware.rate_limit import (
-    _extract_user_id_from_token,
+    _extract_rate_limit_key,
     EndpointRateLimiter,
     RateLimitMiddleware,
 )
@@ -21,33 +21,46 @@ def _make_request(auth_header: str = None, client_host: str = "127.0.0.1"):
     return request
 
 
-class TestExtractUserIdFromToken:
+class TestExtractRateLimitKey:
     def test_no_auth_header(self):
         request = _make_request()
-        assert _extract_user_id_from_token(request) is None
+        assert _extract_rate_limit_key(request) is None
 
     def test_non_bearer_header(self):
         request = _make_request(auth_header="Basic abc123")
-        assert _extract_user_id_from_token(request) is None
+        assert _extract_rate_limit_key(request) is None
 
-    def test_valid_jwt_extracts_user_id(self):
+    def test_valid_jwt_returns_token_hash(self):
         from jose import jwt
         token = jwt.encode({"sub": "42", "username": "alice"}, "secret", algorithm="HS256")
         request = _make_request(auth_header=f"Bearer {token}")
-        result = _extract_user_id_from_token(request)
-        assert result == "user:42"
+        result = _extract_rate_limit_key(request)
+        assert result is not None
+        assert result.startswith("tok:")
+        assert len(result) == 20  # "tok:" + 16 hex chars
 
-    def test_invalid_jwt_returns_none(self):
+    def test_invalid_jwt_still_returns_key(self):
+        """Even malformed tokens get their own bucket (not None)."""
         request = _make_request(auth_header="Bearer not.a.valid.jwt")
-        result = _extract_user_id_from_token(request)
-        assert result is None
+        result = _extract_rate_limit_key(request)
+        assert result is not None
+        assert result.startswith("tok:")
 
-    def test_jwt_without_sub_returns_user_empty(self):
+    def test_same_token_same_key(self):
         from jose import jwt
-        token = jwt.encode({"username": "alice"}, "secret", algorithm="HS256")
-        request = _make_request(auth_header=f"Bearer {token}")
-        result = _extract_user_id_from_token(request)
-        assert result == "user:"
+        token = jwt.encode({"sub": "42"}, "secret", algorithm="HS256")
+        req1 = _make_request(auth_header=f"Bearer {token}")
+        req2 = _make_request(auth_header=f"Bearer {token}")
+        assert _extract_rate_limit_key(req1) == _extract_rate_limit_key(req2)
+
+    def test_different_tokens_different_keys(self):
+        """Forged token with same sub gets a different bucket."""
+        from jose import jwt
+        token_real = jwt.encode({"sub": "42"}, "real-secret", algorithm="HS256")
+        token_forged = jwt.encode({"sub": "42"}, "forged-secret", algorithm="HS256")
+        req_real = _make_request(auth_header=f"Bearer {token_real}")
+        req_forged = _make_request(auth_header=f"Bearer {token_forged}")
+        assert _extract_rate_limit_key(req_real) != _extract_rate_limit_key(req_forged)
 
 
 class TestEndpointRateLimiterUserBased:

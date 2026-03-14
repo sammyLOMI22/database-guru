@@ -121,7 +121,7 @@ class TestUserCRUD:
         assert user.username == "testuser"
         assert user.hashed_password.startswith("$2b$")
         db.add.assert_called_once()
-        db.commit.assert_called_once()
+        db.flush.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_register_duplicate_raises(self, auth_service):

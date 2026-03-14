@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from sqlalchemy import Column, Integer, String, DateTime, JSON, Index, Text, select, desc
+from sqlalchemy import Column, Integer, String, DateTime, JSON, Index, select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.connection import Base

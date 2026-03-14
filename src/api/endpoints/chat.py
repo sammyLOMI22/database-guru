@@ -229,9 +229,15 @@ async def list_chat_sessions(
     try:
         query = select(ChatSession).order_by(desc(ChatSession.last_active_at))
 
-        # Filter by owner when authenticated
+        # Filter by owner when authenticated (include unowned sessions)
         if current_user:
-            query = query.where(ChatSession.owner_id == current_user.id)
+            from sqlalchemy import or_
+            query = query.where(
+                or_(
+                    ChatSession.owner_id == current_user.id,
+                    ChatSession.owner_id.is_(None),
+                )
+            )
         elif user_id:
             query = query.where(ChatSession.user_id == user_id)
 
