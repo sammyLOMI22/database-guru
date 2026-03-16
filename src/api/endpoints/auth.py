@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db
-from src.auth.dependencies import get_current_active_user, _get_auth_service
+from src.auth.dependencies import get_current_active_user, get_auth_service
 from src.auth.models import User
 from src.auth.schemas import UserCreate, UserLogin, UserResponse, TokenResponse
 from src.auth.audit import log_action
@@ -20,7 +20,7 @@ async def register(
     request: Request,
     data: UserCreate,
     db: AsyncSession = Depends(get_db),
-    auth_service: AuthService = Depends(_get_auth_service),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Register a new user and return a JWT token."""
     try:
@@ -48,7 +48,7 @@ async def login(
     request: Request,
     data: UserLogin,
     db: AsyncSession = Depends(get_db),
-    auth_service: AuthService = Depends(_get_auth_service),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Authenticate and return a JWT token."""
     user = await auth_service.authenticate(db, data.username, data.password)

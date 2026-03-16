@@ -109,3 +109,74 @@ class TestGetAuditLogs:
         await get_audit_logs(db, user_id=42)
         # Verify execute was called (filter applied)
         db.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_filters_by_action(self):
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = []
+        mock_result.scalars.return_value = mock_scalars
+        db.execute.return_value = mock_result
+
+        await get_audit_logs(db, action="login")
+        db.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_filters_by_resource_type(self):
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = []
+        mock_result.scalars.return_value = mock_scalars
+        db.execute.return_value = mock_result
+
+        await get_audit_logs(db, resource_type="connection")
+        db.execute.assert_called_once()
+
+
+# ── Admin endpoint authorization ──────────────────────────────────
+
+class TestAuditEndpointAuthorization:
+    """Verify admin-only access control on audit log endpoints."""
+
+    @pytest.mark.asyncio
+    async def test_require_admin_rejects_non_admin(self):
+        """Non-admin user gets 403 on require_admin dependency."""
+        from src.auth.dependencies import require_admin
+        from fastapi import HTTPException
+
+        user = MagicMock()
+        user.is_admin = False
+        user.is_active = True
+
+        with pytest.raises(HTTPException) as exc_info:
+            await require_admin(user=user)
+        assert exc_info.value.status_code == 403
+        assert "Admin access required" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_require_admin_allows_admin(self):
+        """Admin user passes require_admin dependency."""
+        from src.auth.dependencies import require_admin
+
+        user = MagicMock()
+        user.is_admin = True
+        user.is_active = True
+
+        result = await require_admin(user=user)
+        assert result == user
+
+
+class TestLogActionRollbackOnFailure:
+    """Verify log_action rolls back on failure to avoid dirty session."""
+
+    @pytest.mark.asyncio
+    async def test_log_action_calls_rollback_on_flush_failure(self):
+        """If flush() fails, log_action should rollback the session."""
+        db = AsyncMock(spec=AsyncSession)
+        db.flush.side_effect = RuntimeError("DB write error")
+
+        await log_action(db, action="test", resource_type="test")
+
+        db.rollback.assert_called_once()

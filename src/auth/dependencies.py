@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
-def _get_auth_service(settings: Settings = Depends(get_settings)) -> AuthService:
+def get_auth_service(settings: Settings = Depends(get_settings)) -> AuthService:
     return AuthService(settings)
 
 
 async def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
-    auth_service: AuthService = Depends(_get_auth_service),
+    auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
     """Require a valid JWT token. Raises 401 if missing/invalid."""
     if token is None:
@@ -50,7 +50,16 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user = await auth_service.get_user_by_id(db, int(user_id))
+    try:
+        uid = int(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = await auth_service.get_user_by_id(db, uid)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -71,12 +80,7 @@ async def get_current_user(
 async def get_current_active_user(
     user: User = Depends(get_current_user),
 ) -> User:
-    """Require an active user."""
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user",
-        )
+    """Require an active user (get_current_user already checks is_active)."""
     return user
 
 
@@ -99,7 +103,7 @@ async def get_optional_user(
             )
         return None
 
-    auth_service = AuthService(settings)
+    auth_service = get_auth_service(settings)
     payload = auth_service.decode_token(token)
     if payload is None:
         if settings.REQUIRE_AUTH:
@@ -120,7 +124,18 @@ async def get_optional_user(
             )
         return None
 
-    user = await auth_service.get_user_by_id(db, int(user_id))
+    try:
+        uid = int(user_id)
+    except (ValueError, TypeError):
+        if settings.REQUIRE_AUTH:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return None
+
+    user = await auth_service.get_user_by_id(db, uid)
     if user is None:
         if settings.REQUIRE_AUTH:
             raise HTTPException(

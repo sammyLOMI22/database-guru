@@ -13,6 +13,9 @@ from src.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
+# Pre-computed dummy hash for constant-time authentication (prevents timing attacks)
+_DUMMY_HASH = bcrypt.hashpw(b"dummy", bcrypt.gensalt()).decode("utf-8")
+
 
 class AuthService:
     """Handles user registration, login, and JWT token management."""
@@ -98,9 +101,14 @@ class AuthService:
         return user
 
     async def authenticate(self, db: AsyncSession, username: str, password: str) -> Optional[User]:
-        """Validate credentials. Returns User or None."""
+        """Validate credentials. Returns User or None.
+
+        Always runs bcrypt comparison to prevent timing-based user enumeration.
+        """
         user = await self.get_user_by_username_or_email(db, username)
-        if not user or not self.verify_password(password, user.hashed_password):
+        hash_to_check = user.hashed_password if user else _DUMMY_HASH
+        password_valid = self.verify_password(password, hash_to_check)
+        if not user or not password_valid:
             return None
         if not user.is_active:
             return None

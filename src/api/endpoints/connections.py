@@ -203,13 +203,9 @@ async def test_connection(connection_data: ConnectionCreate):
 async def activate_connection(
     connection_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Set a connection as the active one"""
-
-    # Deactivate all connections
-    await db.execute(
-        update(DatabaseConnection).values(is_active=False)
-    )
 
     # Activate the selected connection
     result = await db.execute(
@@ -227,6 +223,29 @@ async def activate_connection(
         raise HTTPException(
             status_code=410,
             detail=f"Connection '{connection.name}' has been removed",
+        )
+
+    # Ownership check
+    if current_user and connection.owner_id is not None and connection.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this connection",
+        )
+
+    # Deactivate only connections visible to this user (owned + unowned)
+    if current_user:
+        from sqlalchemy import or_
+        await db.execute(
+            update(DatabaseConnection)
+            .where(or_(
+                DatabaseConnection.owner_id == current_user.id,
+                DatabaseConnection.owner_id.is_(None),
+            ))
+            .values(is_active=False)
+        )
+    else:
+        await db.execute(
+            update(DatabaseConnection).values(is_active=False)
         )
 
     connection.is_active = True

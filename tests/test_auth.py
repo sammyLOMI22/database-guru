@@ -2,7 +2,7 @@
 import pytest
 import pytest_asyncio
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, call
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -183,6 +183,19 @@ class TestUserCRUD:
 
         result = await auth_service.authenticate(db, "nobody", "password")
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_authenticate_nonexistent_user_still_calls_verify(self, auth_service):
+        """Timing attack mitigation: verify_password is called even for non-existent users."""
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        with patch.object(AuthService, 'verify_password', return_value=False) as mock_verify:
+            result = await auth_service.authenticate(db, "nobody", "password")
+            assert result is None
+            mock_verify.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_user_by_id(self, auth_service):

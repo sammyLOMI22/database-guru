@@ -49,6 +49,9 @@ export default function AuthPage({ onLogin, onRegister, onSkip, requireAuth }: A
   const switchMode = () => {
     setMode(mode === 'login' ? 'register' : 'login');
     setError(null);
+    setEmail('');
+    setUsername('');
+    setPassword('');
   };
 
   return (

@@ -16,7 +16,7 @@ interface AuthState {
   isLoading: boolean;
 }
 
-const TOKEN_KEY = 'auth_token';
+export const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
 
 export function useAuth() {
@@ -47,6 +47,15 @@ export function useAuth() {
       });
     // Only run on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Listen for 401 responses from axios interceptor
+  useEffect(() => {
+    const handleExpired = () => {
+      setState({ token: null, user: null, isLoading: false });
+    };
+    window.addEventListener('auth-expired', handleExpired);
+    return () => window.removeEventListener('auth-expired', handleExpired);
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {

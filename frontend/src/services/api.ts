@@ -9,6 +9,7 @@ import type {
   HealthCheckResponse,
   ConversationContextResponse,
 } from '../types/api';
+import { getStoredToken, TOKEN_KEY } from '../hooks/useAuth';
 
 const api = axios.create({
   baseURL: (import.meta as any).env?.VITE_API_URL || '',
@@ -18,7 +19,7 @@ const api = axios.create({
 // Request interceptor — attach auth token and log
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token');
+    const token = getStoredToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -28,12 +29,19 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+// Response interceptor — handle errors and expired tokens
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response) {
       console.error(`[API Error] ${error.response.status}:`, error.response.data);
+
+      // Clear auth state on 401 (expired/invalid token) — skip for login/register
+      if (error.response.status === 401 && error.config?.url && !error.config.url.includes('/auth/')) {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem('auth_user');
+        window.dispatchEvent(new Event('auth-expired'));
+      }
     } else if (error.request) {
       console.error('[API Error] No response received:', error.request);
     } else {
@@ -69,7 +77,7 @@ export const queryAPI = {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      const token = localStorage.getItem('auth_token');
+      const token = getStoredToken();
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }

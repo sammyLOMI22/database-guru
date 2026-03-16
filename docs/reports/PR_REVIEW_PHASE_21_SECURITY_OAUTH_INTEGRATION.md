@@ -140,3 +140,138 @@ Problem: App.tsx probed authAPI.getMe() (always-protected endpoint) to detect RE
   app Settings into the response. This endpoint is already public and rate-limit exempt.
   3. frontend/src/App.tsx — Replaced the authAPI.getMe() probe with settingsAPI.getSettings(), reading
   require_auth from the response. If the fetch fails, it defaults to not requiring auth (safe fallback).
+
+PR Review Summary
+
+  Overall: 6.8/10 — Good foundation, needs 3 fixes before merge
+
+  What's good
+
+  - Clean separation of concerns: service.py, dependencies.py, audit.py, endpoint layer
+  - REQUIRE_AUTH feature flag enables backward-compatible adoption
+  - get_optional_user correctly handles both auth-required and auth-optional modes
+  - Audit logging with never-raising log_action() is well-designed
+  - Solid test coverage: 64 new tests covering password hashing, JWT, user CRUD, schemas, audit, ownership, rate limiting
+  - Migrations are coherent with idempotency guards
+
+  Blocking Issues (fix before merge)
+
+  1. Timing attack in authenticate() — src/auth/service.py:100-104
+  When a user doesn't exist, the function returns immediately (~1ms). When the password is wrong, bcrypt takes ~100ms. This enables user enumeration. Fix:
+  _DUMMY_HASH = AuthService.hash_password("dummy")
+
+  async def authenticate(self, db, username, password):
+      user = await self.get_user_by_username_or_email(db, username)
+      hash_to_check = user.hashed_password if user else _DUMMY_HASH
+      if not self.verify_password(password, hash_to_check) or not user:
+          return None
+      if not user.is_active:
+          return None
+      return user
+
+  2. Unguarded int(user_id) — src/auth/dependencies.py:53,123
+  A malformed sub claim (e.g., "sub": "abc") causes an unhandled ValueError → HTTP 500. Fix:
+  try:
+      uid = int(user_id)
+  except (ValueError, TypeError):
+      raise HTTPException(status_code=401, detail="Invalid token payload")
+
+  3. activate_connection has no ownership check — src/api/endpoints/connections.py:202-244
+  Any authenticated user can activate any connection and globally deactivate all others. This is an authorization bypass. Add current_user dependency and
+  ownership filtering.
+
+  Important Issues (should fix soon)
+
+  - No rate limiting on /api/auth/login and /api/auth/register — the global 100 req/min limit is too lenient for credential endpoints. Apply EndpointRateLimiter
+  with ~5 req/min.
+  - No admin bootstrap mechanism — with REQUIRE_AUTH=True, no one can become admin since /register creates non-admin users. Need a CLI command or env var to seed
+  the first admin.
+  - No logout/token revocation — 24-hour token expiry with no revocation means compromised tokens can't be invalidated. Document this or add a blocklist.
+  - localStorage for JWT storage — vulnerable to XSS. Acceptable for internal tools, but document the trade-off.
+  - Three hardcoded 'auth_token' strings in frontend — useAuth.ts, api.ts request interceptor, and streaming fetch. Extract to a shared constant.
+  - No 401 response interceptor on axios — expired tokens cause unhandled errors instead of redirecting to login.
+
+  Minor Issues
+
+  - Redundant is_active check in get_current_active_user (already checked by get_current_user)
+  - get_optional_user instantiates AuthService(settings) directly instead of using DI
+  - _get_auth_service is private but imported by auth.py endpoint
+  - AuditLog.timestamp uses DateTime without timezone=True
+  - log_action calls flush() but relies on caller to commit() — if caller fails, audit is silently lost
+  - No server-side max on audit log limit parameter
+
+  Test Coverage Gaps
+
+  - No test for connection ownership query filter (most business-critical auth enforcement)
+  - No test for activate_connection authorization
+  - No test for admin endpoint authorization (403 for non-admin)
+  - No test for int(user_id) ValueError path
+
+  Recommendation: Fix the 3 blocking issues, then this is ready to merge. The important issues can be tracked as follow-up work.
+Fix 1: Timing attack in authenticate() — src/auth/service.py                         
+                                                                                       
+  - Added a module-level _DUMMY_HASH computed at import time                           
+  - authenticate() now always runs verify_password() even when the user doesn't exist, 
+  ensuring constant-time response regardless of whether the account exists             
+                                                                                       
+  Fix 2: Unguarded int(user_id) — src/auth/dependencies.py                             
+                                                                                       
+  - Wrapped int(user_id) in try/except in both get_current_user (line 53) and
+  get_optional_user (line 123)
+  - Malformed sub claims now return 401 instead of crashing with 500
+
+  Fix 3: activate_connection ownership — src/api/endpoints/connections.py
+
+  - Added current_user dependency via get_optional_user
+  - Added ownership check: users can only activate connections they own or unowned ones
+  - Scoped the deactivation query: only deactivates connections visible to the current
+  user, not all connections globally
+All 67 backend tests pass and the frontend type-checks cleanly. Here's a summary of all minor fixes applied:                                                    
+                                                                                                                                                                  
+  Backend                                                                                                                                                         
+                                                                                                                                                                  
+  1. Removed redundant is_active check in get_current_active_user (dependencies.py:80-89) — get_current_user already checks this, so the wrapper now just passes  
+  through.                                                                                                                                                        
+  2. Renamed _get_auth_service to get_auth_service (dependencies.py:20) — was private but imported by auth.py endpoint, breaking encapsulation convention. Updated
+   all references in dependencies.py and auth.py.                                                                                                                 
+  3. Used DI consistently in get_optional_user (dependencies.py:111) — was instantiating AuthService(settings) directly instead of using get_auth_service().
+  4. Added timezone=True to AuditLog.timestamp (audit.py:26) — prevents naive datetime issues when reading back from the database.                                
+  5. Added server-side limit bounds on audit endpoints (audit.py:39-40, 56-57) — Query(ge=1, le=1000) prevents unbounded queries that could cause memory spikes.  
+  6. Added db.rollback() in log_action exception handler (audit.py:57-60) — prevents leaving the session dirty if the audit flush fails.                          
+
+  Frontend
+
+  7. Centralized token access via getStoredToken() (api.ts:21,72) — replaced two hardcoded localStorage.getItem('auth_token') calls with the shared helper from
+  useAuth.ts.
+  8. Exported TOKEN_KEY constant (useAuth.ts:19) — used by api.ts instead of a third hardcoded string.
+  9. Added 401 response interceptor (api.ts:38-44) — clears auth state and dispatches auth-expired event when a non-auth endpoint returns 401 (expired token).
+  10. Added auth-expired event listener in useAuth (useAuth.ts:51-56) — hook reacts to interceptor-dispatched events and resets state, redirecting to login.
+  11. Reset form fields on mode switch (AuthPage.tsx:49-52) — switchMode() now clears email, username, and password to prevent stale field values when toggling
+  between login/register.
+  New tests (14 added)                                                                                                                                            
+                                                                                                                                                                  
+  test_ownership.py — Malformed sub claim (4 tests)                                                                                                               
+  - test_get_current_user_non_integer_sub_raises_401 — non-integer sub returns 401, not 500                                                                       
+  - test_get_optional_user_non_integer_sub_require_auth_true — malformed sub with REQUIRE_AUTH=True raises 401                                                    
+  - test_get_optional_user_non_integer_sub_require_auth_false — malformed sub with REQUIRE_AUTH=False returns None                                                
+  - test_get_current_user_missing_sub_raises_401 — token with no sub claim returns 401                                                                            
+
+  test_ownership.py — activate_connection authorization (3 tests)
+  - test_activate_other_users_connection_raises_403 — user can't activate another user's connection
+  - test_activate_own_connection_succeeds — owner can activate their own connection
+  - test_activate_unowned_connection_succeeds — user can activate unowned connections
+
+  test_ownership.py — delete_connection authorization (1 test)
+  - test_delete_other_users_connection_raises_403 — user can't delete another user's connection
+
+  test_audit.py — Admin endpoint authorization (2 tests)
+  - test_require_admin_rejects_non_admin — non-admin gets 403
+  - test_require_admin_allows_admin — admin passes through
+
+  test_audit.py — Audit log filters and rollback (3 tests)
+  - test_filters_by_action — action filter is applied
+  - test_filters_by_resource_type — resource_type filter is applied
+  - test_log_action_calls_rollback_on_flush_failure — dirty session is rolled back on failure
+
+  test_auth.py — Timing attack verification (1 test)
+  - test_authenticate_nonexistent_user_still_calls_verify — confirms verify_password is always called even for non-existent users

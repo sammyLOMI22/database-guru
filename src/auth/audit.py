@@ -23,7 +23,7 @@ class AuditLog(Base):
     resource_id = Column(String(255), nullable=True)
     details = Column(JSON, nullable=True)
     ip_address = Column(String(45), nullable=True)
-    timestamp = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    timestamp = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (
         Index('idx_audit_user_time', 'user_id', 'timestamp'),
@@ -56,6 +56,10 @@ async def log_action(
         await db.flush()
     except Exception as e:
         logger.error(f"Failed to write audit log: {e}")
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
 
 async def get_audit_logs(
