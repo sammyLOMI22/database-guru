@@ -5,23 +5,38 @@ import time
 from typing import Callable, Dict, Optional
 from fastapi import Request, Response, status, HTTPException
 from fastapi.responses import JSONResponse
+from jose import JWTError, jwt
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from src.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
+_settings = Settings()
+
 
 def _extract_rate_limit_key(request: Request) -> Optional[str]:
-    """Derive a rate-limit key from the raw Bearer token.
+    """Derive a rate-limit key from a *validated* Bearer token.
 
-    Uses a hash of the full token so that forged JWTs (with a stolen
-    ``sub`` claim) get their own bucket instead of exhausting the real
-    user's quota.  Actual authentication is handled by the dependency layer.
+    Only uses the token hash as bucket key after verifying the JWT
+    signature.  Invalid or expired tokens fall back to IP-based
+    bucketing so that attackers cannot bypass rate limits by rotating
+    random Bearer values.
     """
     auth_header = request.headers.get("authorization", "")
     if not auth_header.startswith("Bearer "):
         return None
     token = auth_header[7:]
     if not token:
+        return None
+    # Validate JWT signature before trusting the token as a key
+    try:
+        jwt.decode(
+            token,
+            _settings.JWT_SECRET,
+            algorithms=[_settings.JWT_ALGORITHM],
+        )
+    except JWTError:
         return None
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
     return f"tok:{token_hash}"

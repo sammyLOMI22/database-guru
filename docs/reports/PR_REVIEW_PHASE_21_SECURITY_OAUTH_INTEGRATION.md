@@ -108,3 +108,35 @@ CHANGES
   7. get_current_user missing is_active check — Now raises 401 for deactivated users
   8. Unused UserUpdate schema — Removed along with unused Optional import
   9. Unused Text import — Removed from audit.py
+  Summary of changes:                                                      
+  src/middleware/rate_limit.py — _extract_rate_limit_key() now validates the JWT signature via jwt.decode() before
+  using the token hash as a rate-limit bucket key. Invalid, expired, or forged tokens return None, causing both     
+  RateLimitMiddleware and EndpointRateLimiter to fall back to IP-based bucketing. This closes the bypass where      
+  rotating random Bearer values gave each request its own fresh bucket.                                             
+                                                                                                                    
+  tests/test_rate_limit_user.py — Updated tests to match new behavior (invalid/forged tokens → None), added
+  test_wrong_secret_returns_none, test_forged_token_falls_back_to_ip, and test_invalid_token_falls_back_to_ip to
+  verify the fix.
+  fix 2 
+  All 19 tests pass.                                                                                    
+                                                                                                      
+  Summary: In src/auth/dependencies.py, get_optional_user now raises 401 when REQUIRE_AUTH=True for     
+  three previously-silent failure modes:                                                                
+                                                                                                      
+  - Missing sub claim in token payload (line 114-120)                                                   
+  - User not found in database (line 122-128) — e.g. deleted account                                    
+  - Inactive user (line 130-136) — e.g. deactivated account                                             
+                                                                                                        
+  When REQUIRE_AUTH=False, the existing behavior is preserved (returns None for graceful degradation to
+  anonymous). Added two new tests covering the REQUIRE_AUTH=True paths for inactive and missing users.
+Problem: App.tsx probed authAPI.getMe() (always-protected endpoint) to detect REQUIRE_AUTH mode. Since
+   /api/auth/me returns 401 for any unauthenticated user regardless of the REQUIRE_AUTH setting, new    
+  users were always forced to the auth page — breaking gradual-rollout mode.                          
+                                                                        
+  Fix — 3 files:                                                                     
+  1. src/models/schemas.py — Added require_auth: bool = False field to SystemSettingsResponse           
+  (read-only, not persisted to DB).                                                                     
+  2. src/api/endpoints/settings.py — The GET /api/settings/ endpoint now injects REQUIRE_AUTH from the
+  app Settings into the response. This endpoint is already public and rate-limit exempt.
+  3. frontend/src/App.tsx — Replaced the authAPI.getMe() probe with settingsAPI.getSettings(), reading
+  require_auth from the response. If the fetch fails, it defaults to not requiring auth (safe fallback).

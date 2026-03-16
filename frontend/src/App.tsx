@@ -14,7 +14,7 @@ import { LLMUsageDashboard } from './components/dashboard/LLMUsageDashboard';
 import { MigrationPanel } from './components/migration/MigrationPanel';
 import { PerformancePanel } from './components/performance/PerformancePanel';
 import SchemaPanel from './components/SchemaPanel';
-import { healthAPI, authAPI } from './services/api';
+import { healthAPI, settingsAPI } from './services/api';
 import { useDarkMode } from './hooks/useDarkMode';
 import { useAuth } from './hooks/useAuth';
 
@@ -64,13 +64,14 @@ function App() {
       .then(() => setIsHealthy(true))
       .catch(() => setIsHealthy(false));
 
-    // Check if backend requires auth by trying an unauthenticated request.
-    // If we get 401 on a basic endpoint, REQUIRE_AUTH is True.
-    authAPI.getMe().catch((err: any) => {
-      if (err?.response?.status === 401) {
-        setRequireAuth(true);
-      }
-    });
+    // Check if backend requires auth via the public settings endpoint.
+    settingsAPI.getSettings()
+      .then((data: any) => {
+        if (data?.require_auth) {
+          setRequireAuth(true);
+        }
+      })
+      .catch(() => {/* settings fetch failed — default to no auth required */});
 
     // Check URL for demo parameter
     const params = new URLSearchParams(window.location.search);

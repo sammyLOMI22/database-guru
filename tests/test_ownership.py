@@ -143,6 +143,46 @@ class TestOptionalUser:
         result = await get_optional_user(token=token, db=db, settings=settings)
         assert result is None
 
+    @pytest.mark.asyncio
+    async def test_inactive_user_require_auth_true_raises_401(self):
+        """Inactive user with REQUIRE_AUTH=True raises 401, not None."""
+        settings = Settings(REQUIRE_AUTH=True, JWT_SECRET="test-secret-123")
+
+        from src.auth.service import AuthService
+        service = AuthService(settings)
+        token, _ = service.create_access_token(user_id=5, username="alice")
+
+        user = User(id=5, email="a@b.com", username="alice",
+                     hashed_password="x", is_active=False)
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = user
+        db.execute.return_value = mock_result
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_optional_user(token=token, db=db, settings=settings)
+        assert exc_info.value.status_code == 401
+        assert "deactivated" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_missing_user_require_auth_true_raises_401(self):
+        """Deleted user with REQUIRE_AUTH=True raises 401, not None."""
+        settings = Settings(REQUIRE_AUTH=True, JWT_SECRET="test-secret-123")
+
+        from src.auth.service import AuthService
+        service = AuthService(settings)
+        token, _ = service.create_access_token(user_id=999, username="ghost")
+
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_optional_user(token=token, db=db, settings=settings)
+        assert exc_info.value.status_code == 401
+        assert "not found" in exc_info.value.detail
+
 
 # ── get_current_user dependency ───────────────────────────────────
 

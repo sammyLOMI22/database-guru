@@ -112,11 +112,33 @@ async def get_optional_user(
 
     user_id = payload.get("sub")
     if user_id is None:
+        if settings.REQUIRE_AUTH:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         return None
 
     user = await auth_service.get_user_by_id(db, int(user_id))
-    if user and not user.is_active:
+    if user is None:
+        if settings.REQUIRE_AUTH:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         return None
+
+    if not user.is_active:
+        if settings.REQUIRE_AUTH:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User account is deactivated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return None
+
     return user
 
 
