@@ -279,7 +279,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/auth/me
 
 ## Manual Testing: Resource Ownership
 
-> **Important**: By default `REQUIRE_AUTH=False`, so all endpoints work without authentication. To test ownership enforcement, either pass a valid token or set `REQUIRE_AUTH=True` in your `.env`.
+> **Important**: By default `REQUIRE_AUTH=False`, so endpoints allow unauthenticated access. However, ownership is **always enforced**: guests can only see unowned (legacy/guest) sessions, never sessions created by logged-in users. To require authentication on all endpoints, set `REQUIRE_AUTH=True` in your `.env`.
 
 ### Create a session as an authenticated user
 
@@ -299,6 +299,22 @@ curl -s http://localhost:8000/api/sessions/ \
   -H "Authorization: Bearer $TOKEN" \
   | python -m json.tool
 # Expected: only sessions owned by this user (+ unowned sessions)
+```
+
+### Guest cannot see owned sessions
+
+```bash
+# Without a token, list sessions — should only show unowned (legacy/guest) sessions
+curl -s http://localhost:8000/api/chat/sessions/ | python -m json.tool
+# Expected: no sessions with owner_id set
+
+# Try to access an owned session by ID without a token — expect 403
+curl -s http://localhost:8000/api/chat/sessions/<owned-session-id>
+# Expected: 403 "You do not have access to this session"
+
+# Try to read messages from an owned session without a token — expect 403
+curl -s http://localhost:8000/api/chat/sessions/<owned-session-id>/messages
+# Expected: 403
 ```
 
 ### Access another user's session (expect 403)
@@ -434,7 +450,7 @@ When `REQUIRE_AUTH=True`:
 1. **No password reset flow** — users cannot reset forgotten passwords (future work)
 2. **No refresh tokens** — tokens expire after `JWT_EXPIRATION_MINUTES` and users must re-login
 3. **Admin creation is manual** — no self-service admin registration; must update DB directly
-4. **`owner_id` is nullable** — existing resources created before Phase 21 have `owner_id=NULL` and are accessible to all users
+4. **`owner_id` is nullable** — existing resources created before Phase 21 have `owner_id=NULL` and are accessible to all users (both guests and authenticated). Owned sessions (`owner_id` set) are only visible to their owner; guests receive 403
 5. **SQLite FK enforcement** — SQLite does not enforce foreign keys by default, so `owner_id` referential integrity is enforced at the application level
 6. **Audit log is append-only** — there is no endpoint to delete audit log entries
 7. **Rate limit window** — per-user rate limiting uses the same sliding window as IP-based limiting (configured in `RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW_SECONDS`)

@@ -18,11 +18,19 @@ from src.config.settings import Settings
 # ── Ownership check helper ─────────────────────────────────────────
 
 class TestSessionOwnershipCheck:
-    def test_no_user_no_check(self):
-        """Unauthenticated users bypass ownership check."""
+    def test_no_user_unowned_session(self):
+        """Unauthenticated users can access unowned (legacy/guest) sessions."""
+        session = MagicMock(spec=ChatSession)
+        session.owner_id = None
+        _check_session_ownership(session, None)  # Should not raise
+
+    def test_no_user_owned_session_raises_403(self):
+        """Unauthenticated users cannot access owned sessions."""
         session = MagicMock(spec=ChatSession)
         session.owner_id = 42
-        _check_session_ownership(session, None)  # Should not raise
+        with pytest.raises(HTTPException) as exc_info:
+            _check_session_ownership(session, None)
+        assert exc_info.value.status_code == 403
 
     def test_owner_matches(self):
         """Owner accessing own session — allowed."""

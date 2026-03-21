@@ -121,8 +121,15 @@ class ChatMessageResponse(BaseModel):
 
 
 def _check_session_ownership(session: ChatSession, user: Optional[User]) -> None:
-    """Raise 403 if user doesn't own the session (only enforced when authenticated)."""
-    if user and session.owner_id is not None and session.owner_id != user.id:
+    """Raise 403 if user doesn't own the session.
+
+    Rules:
+    - Unowned sessions (owner_id=None, i.e. legacy/guest): accessible to everyone
+    - Owned sessions: accessible only to the owner; guests get 403
+    """
+    if session.owner_id is None:
+        return
+    if user is None or session.owner_id != user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this session",
@@ -229,17 +236,20 @@ async def list_chat_sessions(
     try:
         query = select(ChatSession).order_by(desc(ChatSession.last_active_at))
 
-        # Filter by owner when authenticated (include unowned sessions)
+        # Filter by owner when authenticated (include unowned/legacy sessions)
+        from sqlalchemy import or_
         if current_user:
-            from sqlalchemy import or_
             query = query.where(
                 or_(
                     ChatSession.owner_id == current_user.id,
                     ChatSession.owner_id.is_(None),
                 )
             )
-        elif user_id:
-            query = query.where(ChatSession.user_id == user_id)
+        else:
+            # Guests only see unowned (legacy/guest) sessions
+            query = query.where(ChatSession.owner_id.is_(None))
+            if user_id:
+                query = query.where(ChatSession.user_id == user_id)
 
         query = query.limit(limit).offset(offset)
 
@@ -513,6 +523,7 @@ async def get_chat_messages(
     offset: int = 0,
     order: str = "asc",
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Get messages for a chat session.
 
@@ -524,11 +535,14 @@ async def get_chat_messages(
         session_result = await db.execute(
             select(ChatSession).where(ChatSession.id == session_id)
         )
-        if not session_result.scalar_one_or_none():
+        session = session_result.scalar_one_or_none()
+        if not session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Chat session {session_id} not found"
             )
+
+        _check_session_ownership(session, current_user)
 
         # Get messages with query history SQL via outer join
         order_clause = ChatMessage.created_at.desc() if order == "desc" else ChatMessage.created_at
@@ -572,6 +586,7 @@ async def create_chat_message(
     session_id: str,
     message_data: ChatMessageCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Create a new chat message"""
     try:
@@ -586,6 +601,8 @@ async def create_chat_message(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Chat session {session_id} not found"
             )
+
+        _check_session_ownership(session, current_user)
 
         # Create message
         new_message = ChatMessage(
