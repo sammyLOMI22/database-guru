@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_db
+from src.auth.dependencies import get_optional_user
+from src.auth.models import User
 from src.database.models import ChatSession, ChatMessage, DatabaseConnection, FileSource, QueryHistory
 
 from src.llm.conversational_memory_agent import get_memory_agent
@@ -118,49 +120,96 @@ class ChatMessageResponse(BaseModel):
         from_attributes = True
 
 
+async def _validate_connection_access(
+    connection_ids: List[int], user: Optional[User], db: AsyncSession,
+) -> None:
+    """Verify connection IDs exist, are not deleted, and are accessible to the user.
+
+    Accessible means: unowned (owner_id=None) OR owned by the current user.
+    Guests can only use unowned connections.
+    """
+    if not connection_ids:
+        return
+    result = await db.execute(
+        select(DatabaseConnection).where(
+            DatabaseConnection.id.in_(connection_ids),
+            DatabaseConnection.is_deleted.isnot(True),
+        )
+    )
+    valid_connections = result.scalars().all()
+    if len(valid_connections) != len(connection_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="One or more connection IDs are invalid or deleted",
+        )
+    for conn in valid_connections:
+        if conn.owner_id is not None and (user is None or conn.owner_id != user.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You do not have access to connection {conn.id}",
+            )
+
+
+async def _validate_file_source_access(
+    file_source_ids: List[int], user: Optional[User], db: AsyncSession,
+) -> None:
+    """Verify file source IDs exist, are ready, and are accessible to the user."""
+    if not file_source_ids:
+        return
+    result = await db.execute(
+        select(FileSource).where(
+            FileSource.id.in_(file_source_ids),
+            FileSource.processing_status == 'ready',
+        )
+    )
+    valid_files = result.scalars().all()
+    if len(valid_files) != len(file_source_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="One or more file source IDs are invalid or not ready",
+        )
+    for fs in valid_files:
+        if fs.owner_id is not None and (user is None or fs.owner_id != user.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You do not have access to file source {fs.id}",
+            )
+
+
+def _check_session_ownership(session: ChatSession, user: Optional[User]) -> None:
+    """Raise 403 if user doesn't own the session.
+
+    Rules:
+    - Unowned sessions (owner_id=None, i.e. legacy/guest): accessible to everyone
+    - Owned sessions: accessible only to the owner; guests get 403
+    """
+    if session.owner_id is None:
+        return
+    if user is None or session.owner_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this session",
+        )
+
+
 # Endpoints
 @router.post("/sessions", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_chat_session(
     session_data: ChatSessionCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Create a new chat session"""
     try:
-        # Validate connection IDs if provided
-        if session_data.connection_ids:
-            result = await db.execute(
-                select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(session_data.connection_ids),
-                    DatabaseConnection.is_deleted.isnot(True),
-                )
-            )
-            valid_connections = result.scalars().all()
-
-            if len(valid_connections) != len(session_data.connection_ids):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more connection IDs are invalid or deleted"
-                )
-
-        # Validate file source IDs if provided
-        if session_data.file_source_ids:
-            file_result = await db.execute(
-                select(FileSource).where(
-                    FileSource.id.in_(session_data.file_source_ids),
-                    FileSource.processing_status == 'ready',
-                )
-            )
-            valid_files = file_result.scalars().all()
-            if len(valid_files) != len(session_data.file_source_ids):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more file source IDs are invalid or not ready"
-                )
+        # Validate connection/file ownership before saving
+        await _validate_connection_access(session_data.connection_ids, current_user, db)
+        await _validate_file_source_access(session_data.file_source_ids or [], current_user, db)
 
         # Create new chat session
         new_session = ChatSession(
             name=session_data.name,
             user_id=session_data.user_id,
+            owner_id=current_user.id if current_user else None,
             active_connection_ids=session_data.connection_ids,
             active_file_source_ids=session_data.file_source_ids or [],
         )
@@ -210,13 +259,26 @@ async def list_chat_sessions(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """List chat sessions"""
     try:
         query = select(ChatSession).order_by(desc(ChatSession.last_active_at))
 
-        if user_id:
-            query = query.where(ChatSession.user_id == user_id)
+        # Filter by owner when authenticated (include unowned/legacy sessions)
+        from sqlalchemy import or_
+        if current_user:
+            query = query.where(
+                or_(
+                    ChatSession.owner_id == current_user.id,
+                    ChatSession.owner_id.is_(None),
+                )
+            )
+        else:
+            # Guests only see unowned (legacy/guest) sessions
+            query = query.where(ChatSession.owner_id.is_(None))
+            if user_id:
+                query = query.where(ChatSession.user_id == user_id)
 
         query = query.limit(limit).offset(offset)
 
@@ -273,6 +335,7 @@ async def list_chat_sessions(
 async def get_chat_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Get a specific chat session"""
     try:
@@ -286,6 +349,8 @@ async def get_chat_session(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Chat session {session_id} not found"
             )
+
+        _check_session_ownership(session, current_user)
 
         # Get connection and file source details
         connections = await _build_connection_infos(session, db)
@@ -333,6 +398,7 @@ async def update_chat_session(
     session_id: str,
     update_data: ChatSessionUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Update a chat session"""
     try:
@@ -347,44 +413,18 @@ async def update_chat_session(
                 detail=f"Chat session {session_id} not found"
             )
 
+        _check_session_ownership(session, current_user)
+
         # Update fields
         if update_data.name is not None:
             session.name = update_data.name
 
         if update_data.connection_ids is not None:
-            # Validate connection IDs (exclude soft-deleted)
-            conn_result = await db.execute(
-                select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(update_data.connection_ids),
-                    DatabaseConnection.is_deleted.isnot(True),
-                )
-            )
-            valid_connections = conn_result.scalars().all()
-
-            if len(valid_connections) != len(update_data.connection_ids):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more connection IDs are invalid or deleted"
-                )
-
+            await _validate_connection_access(update_data.connection_ids, current_user, db)
             session.active_connection_ids = update_data.connection_ids
 
         if update_data.file_source_ids is not None:
-            # Validate file source IDs
-            if update_data.file_source_ids:
-                file_result = await db.execute(
-                    select(FileSource).where(
-                        FileSource.id.in_(update_data.file_source_ids),
-                        FileSource.processing_status == 'ready',
-                    )
-                )
-                valid_files = file_result.scalars().all()
-                if len(valid_files) != len(update_data.file_source_ids):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="One or more file source IDs are invalid or not ready"
-                    )
-
+            await _validate_file_source_access(update_data.file_source_ids, current_user, db)
             session.active_file_source_ids = update_data.file_source_ids
 
         session.updated_at = datetime.now(timezone.utc)
@@ -438,6 +478,7 @@ async def update_chat_session(
 async def delete_chat_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Delete a chat session and all associated messages"""
     try:
@@ -451,6 +492,8 @@ async def delete_chat_session(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Chat session {session_id} not found"
             )
+
+        _check_session_ownership(session, current_user)
 
         # Delete all messages first (to avoid FK constraint issues)
         await db.execute(
@@ -481,6 +524,7 @@ async def get_chat_messages(
     offset: int = 0,
     order: str = "asc",
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Get messages for a chat session.
 
@@ -492,11 +536,14 @@ async def get_chat_messages(
         session_result = await db.execute(
             select(ChatSession).where(ChatSession.id == session_id)
         )
-        if not session_result.scalar_one_or_none():
+        session = session_result.scalar_one_or_none()
+        if not session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Chat session {session_id} not found"
             )
+
+        _check_session_ownership(session, current_user)
 
         # Get messages with query history SQL via outer join
         order_clause = ChatMessage.created_at.desc() if order == "desc" else ChatMessage.created_at
@@ -540,6 +587,7 @@ async def create_chat_message(
     session_id: str,
     message_data: ChatMessageCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Create a new chat message"""
     try:
@@ -554,6 +602,8 @@ async def create_chat_message(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Chat session {session_id} not found"
             )
+
+        _check_session_ownership(session, current_user)
 
         # Create message
         new_message = ChatMessage(

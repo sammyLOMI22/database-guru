@@ -2,6 +2,38 @@
 
 Quick reference for finding important code in the Database Guru codebase.
 
+## Security & Auth (Phase 21 - March 2026)
+| Component | Location |
+|-----------|----------|
+| **Auth Module** | |
+| Auth service | `src/auth/service.py` |
+| Password hashing | `src/auth/service.py:hash_password()` |
+| JWT create/decode | `src/auth/service.py:create_access_token()` / `decode_token()` |
+| User model | `src/auth/models.py:User` |
+| Auth schemas | `src/auth/schemas.py` (UserCreate, UserLogin, TokenResponse) |
+| Auth dependencies | `src/auth/dependencies.py` |
+| get_current_user | `src/auth/dependencies.py:get_current_user()` |
+| get_optional_user | `src/auth/dependencies.py:get_optional_user()` |
+| require_admin | `src/auth/dependencies.py:require_admin()` |
+| **Audit Logging** | |
+| AuditLog model | `src/auth/audit.py:AuditLog` |
+| log_action helper | `src/auth/audit.py:log_action()` |
+| **API Endpoints** | |
+| Auth endpoints | `src/api/endpoints/auth.py` (register, login, me) |
+| Audit endpoints | `src/api/endpoints/audit.py` (admin logs, user logs) |
+| **Rate Limiting** | |
+| User ID extraction | `src/middleware/rate_limit.py:_extract_user_id_from_token()` |
+| **Migrations** | |
+| Users table | `alembic/versions/a1b2c3d4e5f6_add_users_table.py` |
+| Owner ID columns | `alembic/versions/b2c3d4e5f6a7_add_owner_id_columns.py` |
+| Audit logs table | `alembic/versions/c3d4e5f6a7b8_add_audit_log_table.py` |
+| **Tests** | |
+| Auth tests | `tests/test_auth.py` (25 tests) |
+| Ownership tests | `tests/test_ownership.py` (13 tests) |
+| Rate limit tests | `tests/test_rate_limit_user.py` (8 tests) |
+| Audit tests | `tests/test_audit.py` (8 tests) |
+| Soft-delete tests | `tests/test_connection_soft_delete.py` (3 tests) |
+
 ## Core Entry Points
 
 | Component | Location |

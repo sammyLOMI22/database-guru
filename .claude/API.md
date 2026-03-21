@@ -282,6 +282,38 @@ Schema diff, migration planning, script generation, and data migration assistanc
 
 ---
 
+## Authentication API (Phase 21)
+**File**: `auth.py`
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/auth/register` | Register new user (email, username, password) |
+| POST | `/api/auth/login` | Login and receive JWT token |
+| GET | `/api/auth/me` | Get current authenticated user info |
+
+### Features
+- **JWT Tokens**: HS256 algorithm with configurable expiration (default 24hr)
+- **Password Hashing**: bcrypt via `python-jose[cryptography]`
+- **Feature Flag**: `REQUIRE_AUTH=False` for backwards-compatible gradual rollout
+- **Dependencies**: `get_current_user` (401 if no token), `get_optional_user` (returns None if unauthenticated), `require_admin` (403 if not admin)
+- **Audit Logging**: Register, login, and failed login events are logged
+
+## Audit Log API (Phase 21)
+**File**: `audit.py`
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/audit/logs` | List audit logs (admin only) |
+| GET | `/api/audit/logs/me` | List current user's audit logs |
+
+### Query Parameters
+```
+GET /api/audit/logs?action=login&resource_type=user&limit=50&offset=0
+GET /api/audit/logs/me?action=create&limit=20
+```
+
+---
+
 ## Performance Guru API (Phase 22)
 
 **Router**: `src/api/endpoints/performance.py`

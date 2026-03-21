@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-this-secret-key"
     JWT_SECRET: str = "change-this-jwt-secret"
     JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRATION_MINUTES: int = 1440  # 24 hours
+    REQUIRE_AUTH: bool = False  # Feature flag: when True, all endpoints require authentication
+
+    # Per-user rate limiting (Phase 21)
+    RATE_LIMIT_PER_USER: int = 200  # Requests per minute for authenticated users
+    RATE_LIMIT_LLM_PER_USER: int = 30  # LLM calls per minute for authenticated users
 
     # Ollama - Auto-detect local or Docker
     OLLAMA_BASE_URL: str = "http://localhost:11434"
@@ -81,6 +87,20 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    def check_jwt_secret(self) -> None:
+        """Warn if JWT secret is still the default. Called at startup."""
+        if self.JWT_SECRET == "change-this-jwt-secret":
+            if self.REQUIRE_AUTH:
+                raise ValueError(
+                    "REQUIRE_AUTH is enabled but JWT_SECRET is still the default. "
+                    "Set a strong, random JWT_SECRET in your .env file."
+                )
+            import logging
+            logging.getLogger(__name__).warning(
+                "JWT_SECRET is set to the default value. "
+                "Set a strong, random JWT_SECRET before enabling authentication."
+            )
 
     @property
     def ollama_url(self) -> str:

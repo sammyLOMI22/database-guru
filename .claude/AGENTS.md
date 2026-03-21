@@ -567,6 +567,41 @@ Tiered prompt templates for EXPLAIN analysis:
 
 ---
 
+## Security & Auth System (Phase 21)
+**Location**: `src/auth/`, `src/api/endpoints/`
+**Added**: March 2026
+
+### 35. Auth Service
+**File**: `src/auth/service.py`
+
+JWT-based authentication with bcrypt password hashing:
+- **Password Hashing**: bcrypt with automatic salting (not passlib — direct bcrypt for Python 3.13 compat)
+- **JWT Tokens**: HS256 via python-jose, configurable expiration
+- **User CRUD**: Register (with duplicate check), authenticate (with active check), get by ID
+
+**Key methods**: `hash_password()`, `verify_password()`, `create_access_token()`, `decode_token()`, `register()`, `authenticate()`
+
+### 36. Auth Dependencies
+**File**: `src/auth/dependencies.py`
+
+FastAPI dependency injection for authentication:
+- `get_current_user` — requires valid JWT, raises 401
+- `get_current_active_user` — requires active user
+- `get_optional_user` — returns User or None based on `REQUIRE_AUTH` setting (backwards compatible)
+- `require_admin` — requires `is_admin=True`, raises 403
+
+### 37. Audit Logger
+**File**: `src/auth/audit.py`
+
+Audit trail for security-sensitive operations:
+- **Never-Raising**: `log_action()` wraps all DB operations in try/except — audit failures never break business logic
+- **Structured**: action, resource_type, resource_id, details JSON, IP address, timestamp
+- **Queryable**: `get_audit_logs()` with filtering by user, action, resource type, date range
+
+**Key methods**: `log_action()`, `get_audit_logs()`
+
+---
+
 ## Tool System
 **Location**: `src/tools/`
 

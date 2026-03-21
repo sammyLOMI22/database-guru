@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: February 27, 2026
+**Last Updated**: March 21, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -203,28 +203,28 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    SECURITY & AUTH FOUNDATION (Phase 21) - CRITICAL                     │
+    │                    SECURITY & AUTH FOUNDATION (Phase 21) - ✅ COMPLETE                   │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │              SECURITY & AUTH FOUNDATION (Phase 21) - CRITICAL PRIORITY                    │
+    │              SECURITY & AUTH FOUNDATION (Phase 21) - ✅ COMPLETE                          │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
-    │  │ 21.1 User   │   │ 21.2 Session│   │ 21.3 Rate   │   │ 21.4 Audit  │                   │
-    │  │ Auth (JWT)  │──▶│ Ownership   │──▶│ Limiting    │──▶│ Logging     │                   │
+    │  │ 21.1 ✅     │   │ 21.2 ✅     │   │ 21.3 ✅     │   │ 21.4 ✅     │                   │
+    │  │ User Auth   │──▶│ Resource    │──▶│ Per-User    │──▶│ Audit       │                   │
+    │  │ (JWT)       │   │ Ownership   │   │ Rate Limit  │   │ Logging     │                   │
     │  │             │   │             │   │             │   │             │                   │
-    │  │ • JWT auth  │   │ • user_id   │   │ • Per-user  │   │ • Action    │                   │
-    │  │ • Login/    │   │   on all    │   │   limits    │   │   trail     │                   │
-    │  │   register  │   │   resources │   │ • Endpoint- │   │ • DML audit │                   │
-    │  │ • Middleware│   │ • 403 on    │   │   specific  │   │ • LLM cost  │                   │
-    │  │ • CSRF      │   │   unauth'd  │   │ • Cost      │   │   controls  │                   │
-    │  │             │   │   access    │   │   controls  │   │             │                   │
-    │  │ ~800 lines  │   │ ~500 lines  │   │ ~400 lines  │   │ ~500 lines  │                   │
+    │  │ • JWT auth  │   │ • owner_id  │   │ • Per-user  │   │ • Action    │                   │
+    │  │ • Login/    │   │   FK on 5   │   │   limits    │   │   trail     │                   │
+    │  │   register  │   │   tables    │   │ • JWT-based │   │ • Never-    │                   │
+    │  │ • bcrypt    │   │ • 403 on    │   │   user ID   │   │   raising   │                   │
+    │  │   hashing   │   │   unauth'd  │   │   extraction│   │   log_action│                   │
+    │  │ • Feature   │   │   access    │   │ • IP        │   │ • Admin +   │                   │
+    │  │   flag      │   │ • Filtering │   │   fallback  │   │   user logs │                   │
     │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
     │                                                                                           │
-    │  Prereq: None | Priority: CRITICAL | Est: 2-3 weeks | ~2,200 lines                      │
-    │  BLOCKS: Phase 18 (Edit Mode), Phase 15 (Enterprise LLMs need cost controls)             │
-    │  Source: PM Review (ROADMAP_FEEDBACK.md) - "Cannot release DML without Auth"             │
+    │  61 tests | 3 Alembic migrations | REQUIRE_AUTH feature flag for gradual rollout          │
+    │  UNBLOCKS: Phase 18 (Edit Mode), Phase 15 (Enterprise LLMs)                              │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -254,16 +254,16 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    PERFORMANCE GURU (Phase 22) - MEDIUM PRIORITY                        │
+    │                    PERFORMANCE GURU (Phase 22) - ✅ COMPLETE                            │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    DEEP EXPLAIN ANALYSIS (Phase 22) - MEDIUM PRIORITY                    │
+    │                    DEEP EXPLAIN ANALYSIS (Phase 22) - ✅ COMPLETE                        │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                                     │
-    │  │ 22.1 Explain│   │ 22.2 LLM    │   │ 22.3 Action │                                     │
-    │  │ Analyzer    │──▶│ Interpreter │──▶│ Advisor     │                                     │
-    │  │             │   │             │   │             │                                     │
+    │  │ 22.1 ✅     │   │ 22.2 ✅     │   │ 22.3 ✅     │                                     │
+    │  │ Explain     │──▶│ LLM        │──▶│ Action      │                                     │
+    │  │ Analyzer    │   │ Interpreter│   │ Advisor     │                                     │
     │  │ • EXPLAIN   │   │ • Parse JSON│   │ • Index     │                                     │
     │  │   ANALYZE   │   │   plans     │   │   suggest   │                                     │
     │  │ • Multi-    │   │ • Identify  │   │ • Rewrite   │                                     │
@@ -273,7 +273,7 @@
     │  │ ~500 lines  │   │ ~400 lines  │   │ ~400 lines  │                                     │
     │  └─────────────┘   └─────────────┘   └─────────────┘                                     │
     │                                                                                           │
-    │  Prereq: None (Independent) | Priority: MEDIUM | Est: 2-3 weeks | ~1,300 lines          │
+    │  77 tests | 2 API endpoints | ~3,282 lines                                               │
     │  Source: FEATURE_SUGGESTIONS_BRAINSTORM.md                                               │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -413,11 +413,11 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                            EDIT MODE & DML (Phase 18) - NEW                             │
+    │                      EDIT MODE & DML (Phase 18) - ⬆️ NEXT UP                            │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                  EDIT MODE & DML OPERATIONS (Phase 18) - MEDIUM PRIORITY                 │
+    │                  EDIT MODE & DML OPERATIONS (Phase 18) - HIGH PRIORITY                   │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
     │  │ 18.1 Core   │   │ 18.2 API &  │   │ 18.3 Inline │   │ 18.4 NL DML │                   │
@@ -432,7 +432,7 @@
     │  │ ~1,000 lines│   │ ~800 lines  │   │ ~1,200 lines│   │ ~1,000 lines│                   │
     │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
     │                                                                                           │
-    │  Prereq: None (Independent) | Priority: MEDIUM | Est: 4-5 weeks | ~4,000 lines          │
+    │  Prereq: Phase 21 ✅ (Auth) | Priority: HIGH | Est: 4-5 weeks | ~4,000 lines             │
     │  Plan: EDIT_MODE_DML_PLAN.md                                                             │
     │                                                                                           │
     │  Key Features:                                                                           │
@@ -475,15 +475,15 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    SECURITY & INFRASTRUCTURE - PROMOTED TO CRITICAL                      │
-    │               (Per PM Review: Required before Phase 18 Edit Mode & Phase 15)             │
+    │                    SECURITY & INFRASTRUCTURE - ✅ DELIVERED                                │
+    │               Phase 21 complete — Phase 18 Edit Mode & Phase 15 are now unblocked        │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
     │   Authorization      │  │   Session Expiration │  │   Rate Limiting      │
     │   System             │  │   (TTL, cleanup)     │  │   (Per-user)         │
-    │   🔴 CRITICAL        │  │   Est: 2 days        │  │   Est: 2-3 days      │
-    │   Blocks Phase 18+15 │  │   MEDIUM priority    │  │   HIGH priority      │
+    │   ✅ Phase 21        │  │   Remaining item     │  │   ✅ Phase 21        │
+    │   JWT + ownership    │  │   Can bundle w/ P18  │  │   Per-user + IP      │
     └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
 ```
 
@@ -567,14 +567,14 @@
     =========================================
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │   SECURITY & AUTH FOUNDATION (Phase 21) ◀── CRITICAL             │
+    │   SECURITY & AUTH FOUNDATION (Phase 21) ◀── ✅ COMPLETE          │
     │                                                                   │
-    │  BLOCKS: Phase 18 (Edit Mode) + Phase 15 (Enterprise LLMs)       │
+    │  UNBLOCKS: Phase 18 (Edit Mode) + Phase 15 (Enterprise LLMs)     │
     │                                                                   │
-    │  • JWT authentication + session ownership                         │
-    │  • Per-user rate limiting + cost controls                         │
-    │  • Audit logging (merges Phase 18 audit needs)                    │
-    │  • Est: 2-3 weeks | ~2,200 lines                                 │
+    │  • JWT auth (bcrypt, python-jose) + resource ownership            │
+    │  • Per-user rate limiting + audit logging                         │
+    │  • REQUIRE_AUTH feature flag for gradual rollout                  │
+    │  • 61 tests | 3 Alembic migrations                               │
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
@@ -601,9 +601,9 @@
     ============================================
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │   EDIT MODE & DML (Phase 18) ◀── HIGH PRIORITY                    │
+    │   EDIT MODE & DML (Phase 18) ◀── HIGH PRIORITY ⬆️ NEXT UP          │
     │                                                                   │
-    │   REQUIRES: Phase 21 (Security & Auth)                            │
+    │   REQUIRES: Phase 21 ✅ (Security & Auth) — UNBLOCKED             │
     │                                                                   │
     │  • Inline editing, INSERT/UPDATE/DELETE, NL DML                   │
     │  • Simulation Mode: dry-run in transaction, show diff, rollback   │
@@ -650,9 +650,9 @@
                      └─────────────────────┘
 
             ┌─────────────────┐
-            │   Phase 21      │
+            │   Phase 21 ✅   │
             │   Security &    │
-            │   Auth (CRIT)   │
+            │   Auth          │
             └────────┬────────┘
                      │
               ┌──────┴──────┐
@@ -712,19 +712,20 @@
 
 ---
 
-## Recommended Next Steps (Updated Feb 14, 2026)
+## Recommended Next Steps (Updated March 21, 2026)
 
 > **Strategic Direction** (per PM Review): Focus on "depth and safety" before "width expansion".
-> Stabilize the foundation (Security/Auth) to support powerful features (Edit Mode, Enterprise LLMs).
+> Security/Auth foundation is now complete — Edit Mode and Enterprise LLMs are unblocked.
 
-### Priority 1: Security & Auth Foundation (Phase 21) - CRITICAL
-**Why**: Prerequisite for Edit Mode (DML) and Enterprise LLM cost controls. Cannot release DELETE/UPDATE without Auth.
-- **21.1 User Auth (JWT)**: Login/register, middleware, CSRF protection
-- **21.2 Session Ownership**: `user_id` on all resources, 403 on unauthorized access
-- **21.3 Rate Limiting**: Per-user limits, endpoint-specific, cost controls
-- **21.4 Audit Logging**: Action trail, DML audit (merged from Phase 18), LLM cost controls
-- Est: 2-3 weeks | ~2,200 lines
-- **Blocks**: Phase 18 (Edit Mode), Phase 15 (Enterprise LLMs need cost controls)
+### Priority 1: Edit Mode & DML (Phase 18) - HIGH ⬆️ NEXT UP
+**Why**: Highest user value feature now unblocked by Phase 21 (Auth). Inline editing, natural language DML.
+- **18.1 Core Backend**: Change tracker, DML generation, audit log, validator
+- **18.2 API & Execution**: DML endpoints, execute with transactions, preview mode
+- **18.3 Inline Editing UI**: Editable cells, add row, delete row, preview diff
+- **18.4 NL DML & Polish**: Natural language to DML ("delete inactive users"), audit viewer
+- **Simulation Mode** (PM idea): Dry-run in transaction, show diff, rollback before commit
+- **Undo Button** (PM idea): Time-travel rollback for actions taken by Guru
+- See: [EDIT_MODE_DML_PLAN.md](EDIT_MODE_DML_PLAN.md)
 
 ### Priority 2: LLM Provider Expansion (Phase 15) - HIGH
 **Why**: Enterprise integration and model flexibility - users can leverage cloud LLMs
@@ -735,34 +736,23 @@
 - See: [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md)
 - Unlocks Phase 17 (Multi-Provider Monitoring) since Phase 16 is now complete
 
-### ~~Priority 3: Migration Toolkit (Phase 20)~~ - ✅ COMPLETE
-Delivered: Schema diff engine, migration planner with topological sort (including existing FKs), script generator (up.sql/down.sql/verify.sql with SQLite recreate support), data migration assistant (staging table pattern, batching). SQL injection protection via `_escape_literal()`. N+1 query fix with `selectinload`. `SchemaDiff.from_dict()` for DRY reconstruction. 98 tests passing, 13 API endpoints, ~5,676 lines.
+### Priority 3: Observability & Monitoring (Phase 24) - MEDIUM
+**Why**: Production readiness — structured logging, distributed tracing, metrics dashboards
+- **Prerequisite**: Phase 23 ✅ (Docker)
+- Structured JSON logging, OpenTelemetry tracing, Prometheus/Grafana, Docker integration
 
-### Priority 4: Edit Mode & DML (Phase 18) - HIGH (blocked by Phase 21)
-**Why**: High user value - inline editing, natural language DML
-- Inline cell editing, add/delete rows, generate & preview scripts
-- **Simulation Mode** (PM idea): Dry-run in transaction, show diff, rollback before commit
-- **Undo Button** (PM idea): Time-travel rollback for actions taken by Guru
-- Transaction support, natural language DML, audit trail
-- See: [EDIT_MODE_DML_PLAN.md](EDIT_MODE_DML_PLAN.md)
-
-### Priority 5: Performance Guru (Phase 22) - MEDIUM
-**Why**: Reading raw EXPLAIN plans is hard; LLM is perfect for this translation layer
-- Run `EXPLAIN ANALYZE` for slow queries, parse JSON execution plans
-- LLM interprets: seq scans, disk spills, join costs
-- Actionable advice: "Create INDEX ON users(email) to change Seq Scan to Index Scan"
-- Multi-dialect support (PostgreSQL, MySQL, SQLite)
-- Source: [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md)
-
-### Priority 6: Multi-Provider Monitoring (Phase 17) - MEDIUM
+### Priority 4: Multi-Provider Monitoring (Phase 17) - MEDIUM
 **Why**: Extend monitoring to all LLM providers with accurate cost tracking
 - **Prerequisite**: Phase 15 (Providers) + Phase 16 ✅ (Monitoring)
 - Native token extraction from OpenAI, Anthropic, Google formats
 - Accurate cost tracking per provider/model, comparison dashboard
 - See: [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md)
 
-### ~~Priority 7: Data Insights Enhancement (Phase 19)~~ - ✅ COMPLETE
-Delivered: Tiered narrative prompts, analytics caching, multi-source quality insights, chart intelligence presets, parallel analysis pipeline. 108 tests passing.
+### Completed Priorities (this cycle)
+- ~~Security & Auth Foundation (Phase 21)~~ - ✅ COMPLETE: JWT auth, resource ownership, per-user rate limiting, audit logging. 61 tests, 3 migrations. Unblocks Phase 18 + Phase 15.
+- ~~Migration Toolkit (Phase 20)~~ - ✅ COMPLETE: Schema diff, migration planner, script gen, data migration. 98 tests, 13 endpoints, ~5,676 lines.
+- ~~Performance Guru (Phase 22)~~ - ✅ COMPLETE: EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects. 77 tests, 2 endpoints, ~3,282 lines.
+- ~~Data Insights Enhancement (Phase 19)~~ - ✅ COMPLETE: Tiered narratives, analytics cache, parallel analysis. 108 tests.
 
 ### Innovation Pipeline (Future evaluation)
 Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md) and [ROADMAP_FEEDBACK.md](ROADMAP_FEEDBACK.md):
@@ -788,6 +778,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - **Phase 22** ✅: Performance Guru (EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects — 77 tests, 2 endpoints, ~3,282 lines)
 - **Phase 23** ✅: Docker Containerization (Compose profiles, security hardened, least-privilege Postgres, Ollama retry, prompts refactor, CTE lineage support)
 - **Phase 14** ✅: NoSQL Database Expansion (MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch — native query gen, schema inference, error classification, frontend integration, mixed SQL+NoSQL chat — 127 tests)
+- **Phase 21** ✅: Security & Auth Foundation (JWT auth, resource ownership, per-user rate limiting, audit logging — 61 tests, 3 migrations)
 - **Table Sorting** ✅: Click-to-sort with smart type detection
 - Plus 10+ earlier phases (see Quick Reference below)
 
@@ -801,11 +792,11 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **LLM Intelligence** | Lineage Narrator, Impact Advisor, Schema Health, Pattern Intel, Lineage Chat | **Phase 12 ✅ COMPLETE** | ~11,266 lines |
 | **Data Sources** | CSV & Excel File Support | **Phase 13 ✅ COMPLETE** | ~2,500 lines |
 | **LLM Monitoring** | Token usage tracking, dashboard, inline stats | **Phase 16 ✅ COMPLETE** | ~1,500 lines |
-| **Security & Auth** | JWT auth, session ownership, rate limiting, audit logging | **Phase 21 - CRITICAL** | ~2,200 lines |
+| **Security & Auth** | JWT auth, resource ownership, per-user rate limiting, audit logging | **Phase 21 ✅ COMPLETE** | ~2,200 lines |
 | **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 15 - HIGH** | ~3,000 lines |
 | **Migration Toolkit** | Schema diff, migration planner, script gen, data migration | **Phase 20 ✅ COMPLETE** | ~5,676 lines |
-| **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, simulation mode, undo | **Phase 18 - HIGH** (needs 21) | ~4,000 lines |
-| **Performance Guru** | EXPLAIN analysis, LLM interpretation, index suggestions | **Phase 22 ✅ COMPLETE** | ~3,282 lines |
+| **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, simulation mode, undo | **Phase 18 - HIGH ⬆️ NEXT** (21 ✅) | ~4,000 lines |
+| **Performance Guru** | EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects | **Phase 22 ✅ COMPLETE** | ~3,282 lines |
 | **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 17 - MEDIUM** (needs 15+16✅) | ~1,200 lines |
 | **Data Insights** | Tiered narratives, analytics cache, multi-source quality, chart presets, parallel analysis | **Phase 19 ✅ COMPLETE** | ~1,800 lines |
 | **NoSQL Expansion** | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch, frontend integration, mixed chat | **Phase 14 ✅ COMPLETE** | ~6,000 lines |
@@ -846,8 +837,9 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | Migration Toolkit (Phase 20) | Schema diff, migration planner, script generator, data migration | 98 tests |
 | Performance Guru (Phase 22) | EXPLAIN plan analysis, LLM insights, index suggestions, query rewrites, 4 dialects | 77 tests |
 | NoSQL Expansion (Phase 14) | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch — native query gen, schema inference, error classification, frontend integration, mixed SQL+NoSQL chat | 127 tests |
+| Security & Auth (Phase 21) | JWT auth (bcrypt + python-jose), resource ownership (owner_id on 5 tables), per-user rate limiting, audit logging, REQUIRE_AUTH feature flag | 61 tests |
 
-**Total Tests**: 1800+ passing
+**Total Tests**: 1860+ passing
 
 ---
 
@@ -855,10 +847,10 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 
 | Phase | Feature | Dependencies | Est. Effort | Priority |
 |-------|---------|--------------|-------------|----------|
-| **Phase 21** | Security & Auth Foundation | None | ~2,200 lines | **CRITICAL** |
+| **Phase 21** | Security & Auth Foundation | None | ~2,200 lines | ✅ **COMPLETE** |
 | **Phase 15** | LLM Provider Expansion | Ideally after 21 | ~3,000 lines | HIGH |
 | **Phase 20** | Migration Toolkit | Phase 11✅ + 12✅ | ~5,676 lines | ✅ **COMPLETE** |
-| **Phase 18** | Edit Mode & DML Operations | Phase 21 | ~4,000 lines | HIGH |
+| **Phase 18** | Edit Mode & DML Operations | Phase 21 ✅ | ~4,000 lines | HIGH |
 | **Phase 22** | Performance Guru (EXPLAIN) | None | ~3,282 lines | ✅ **COMPLETE** |
 | **Phase 17** | Multi-Provider Monitoring | Phase 15 + 16✅ | ~1,200 lines | MEDIUM |
 | **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | ✅ **COMPLETE** |

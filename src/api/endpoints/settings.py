@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.schemas import SystemSettingsResponse, SystemSettingsUpdateRequest
 from src.api.dependencies import get_db
+from src.api.dependencies.common import get_settings
+from src.config.settings import Settings
 from src.database.models import SystemSettings
 
 logger = logging.getLogger(__name__)
@@ -65,7 +67,10 @@ async def get_or_create_settings(db: AsyncSession) -> SystemSettings:
 
 
 @router.get("/", response_model=SystemSettingsResponse)
-async def get_settings(db: AsyncSession = Depends(get_db)):
+async def get_app_settings(
+    db: AsyncSession = Depends(get_db),
+    app_settings: Settings = Depends(get_settings),
+):
     """
     Get current system settings
 
@@ -75,10 +80,13 @@ async def get_settings(db: AsyncSession = Depends(get_db)):
     - Apply mode (immediate/deferred)
     - Test before learning
     - Audit logging settings
+    - require_auth: whether the server requires authentication
     """
     try:
         settings = await get_or_create_settings(db)
-        return settings
+        response = SystemSettingsResponse.model_validate(settings)
+        response.require_auth = app_settings.REQUIRE_AUTH
+        return response
     except Exception as e:
         logger.error(f"Failed to get settings: {e}", exc_info=True)
         raise HTTPException(

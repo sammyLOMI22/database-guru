@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, useEffect, useCallback } from 'react';
 import EnhancedChatInterface from './components/EnhancedChatInterface';
 import Header from './components/Header';
+import AuthPage from './components/AuthPage';
 import { ObservabilityDemo } from './components/ObservabilityDemo';
 import { FeedbackStats } from './components/FeedbackStats';
 import { SettingsPanel } from './components/SettingsPanel';
@@ -13,8 +14,9 @@ import { LLMUsageDashboard } from './components/dashboard/LLMUsageDashboard';
 import { MigrationPanel } from './components/migration/MigrationPanel';
 import { PerformancePanel } from './components/performance/PerformancePanel';
 import SchemaPanel from './components/SchemaPanel';
-import { healthAPI } from './services/api';
+import { healthAPI, settingsAPI } from './services/api';
 import { useDarkMode } from './hooks/useDarkMode';
+import { useAuth } from './hooks/useAuth';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,8 +29,11 @@ const queryClient = new QueryClient({
 
 function App() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { user, isLoading: authLoading, isAuthenticated, login, register, logout } = useAuth();
   const [isHealthy, setIsHealthy] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
+  const [requireAuth, setRequireAuth] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'migration' | 'performance' | 'settings'>('chat');
 
   // Cross-component lineage navigation state
@@ -59,6 +64,15 @@ function App() {
       .then(() => setIsHealthy(true))
       .catch(() => setIsHealthy(false));
 
+    // Check if backend requires auth via the public settings endpoint.
+    settingsAPI.getSettings()
+      .then((data: any) => {
+        if (data?.require_auth) {
+          setRequireAuth(true);
+        }
+      })
+      .catch(() => {/* settings fetch failed — default to no auth required */});
+
     // Check URL for demo parameter
     const params = new URLSearchParams(window.location.search);
     if (params.get('demo') === 'true') {
@@ -75,6 +89,27 @@ function App() {
     );
   }
 
+  // Show loading while verifying stored token
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950">
+        <div className="w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Show auth page when required or user explicitly opened it
+  if ((requireAuth && !isAuthenticated) || (showAuth && !isAuthenticated)) {
+    return (
+      <AuthPage
+        onLogin={async (u, p) => { await login(u, p); setShowAuth(false); }}
+        onRegister={async (e, u, p) => { await register(e, u, p); setShowAuth(false); }}
+        onSkip={requireAuth ? undefined : () => setShowAuth(false)}
+        requireAuth={requireAuth}
+      />
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="flex flex-col h-screen bg-transparent transition-colors duration-500">
@@ -84,6 +119,9 @@ function App() {
           toggleDarkMode={toggleDarkMode}
           activeTab={activeTab}
           onTabChange={(id) => setActiveTab(id as any)}
+          user={user}
+          onLogout={() => { logout(); if (requireAuth) setShowAuth(true); }}
+          onSignIn={() => setShowAuth(true)}
         />
 
         {/* Content Area - Keep all components mounted to preserve state */}

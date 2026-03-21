@@ -1,12 +1,45 @@
 """Rate limiting middleware and dependencies"""
+import hashlib
 import logging
 import time
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
 from fastapi import Request, Response, status, HTTPException
 from fastapi.responses import JSONResponse
+from jose import JWTError, jwt
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from src.config.settings import Settings
+
 logger = logging.getLogger(__name__)
+
+_settings = Settings()
+
+
+def _extract_rate_limit_key(request: Request) -> Optional[str]:
+    """Derive a rate-limit key from a *validated* Bearer token.
+
+    Only uses the token hash as bucket key after verifying the JWT
+    signature.  Invalid or expired tokens fall back to IP-based
+    bucketing so that attackers cannot bypass rate limits by rotating
+    random Bearer values.
+    """
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header[7:]
+    if not token:
+        return None
+    # Validate JWT signature before trusting the token as a key
+    try:
+        jwt.decode(
+            token,
+            _settings.JWT_SECRET,
+            algorithms=[_settings.JWT_ALGORITHM],
+        )
+    except JWTError:
+        return None
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
+    return f"tok:{token_hash}"
 
 
 # ============================================================================
@@ -51,7 +84,7 @@ class EndpointRateLimiter:
 
     async def __call__(self, request: Request) -> None:
         """Check rate limit for the request."""
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = _extract_rate_limit_key(request) or (request.client.host if request.client else "unknown")
         now = time.time()
 
         # Periodic cleanup (every 100 requests approximately)
@@ -144,8 +177,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.url.path in exempt_paths or request.url.path.rstrip('/') in exempt_paths:
             return await call_next(request)
 
-        # Get client identifier (IP address)
-        client_ip = request.client.host
+        # Get client identifier (prefer user ID from JWT, fall back to IP)
+        client_ip = _extract_rate_limit_key(request) or request.client.host
 
         # Get current time
         now = time.time()

@@ -9,27 +9,39 @@ import type {
   HealthCheckResponse,
   ConversationContextResponse,
 } from '../types/api';
+import { getStoredToken, TOKEN_KEY } from '../hooks/useAuth';
 
 const api = axios.create({
   baseURL: (import.meta as any).env?.VITE_API_URL || '',
   timeout: 60000, // 60 seconds for LLM queries
 });
 
-// Request interceptor for logging
+// Request interceptor — attach auth token and log
 api.interceptors.request.use(
   (config) => {
+    const token = getStoredToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+// Response interceptor — handle errors and expired tokens
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response) {
       console.error(`[API Error] ${error.response.status}:`, error.response.data);
+
+      // Clear auth state on 401 (expired/invalid token) — skip for login/register
+      if (error.response.status === 401 && error.config?.url && !error.config.url.includes('/auth/')) {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem('auth_user');
+        window.dispatchEvent(new Event('auth-expired'));
+      }
     } else if (error.request) {
       console.error('[API Error] No response received:', error.request);
     } else {
@@ -62,11 +74,17 @@ export const queryAPI = {
     const url = `${baseURL}/api/query/stream`;
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      const token = getStoredToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(request),
       });
 
@@ -575,6 +593,52 @@ export const filesAPI = {
   async getSessionFiles(sessionId: string): Promise<{ success: boolean; session_id: string; active_file_source_ids: number[]; file_sources: Array<{ id: number; name: string; file_type: string; original_filename: string; row_count?: number; processing_status?: string }> }> {
     const { data } = await api.get(`/api/chat/sessions/${sessionId}/files`);
     return data;
+  },
+};
+
+// ── Authentication API (Phase 21) ────────────────────────────────
+
+export interface AuthRegisterRequest {
+  email: string;
+  username: string;
+  password: string;
+}
+
+export interface AuthLoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthUserResponse {
+  id: number;
+  email: string;
+  username: string;
+  is_active: boolean;
+  is_admin: boolean;
+  created_at: string;
+}
+
+export interface AuthTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  user: AuthUserResponse;
+}
+
+export const authAPI = {
+  async register(data: AuthRegisterRequest): Promise<AuthTokenResponse> {
+    const { data: resp } = await api.post<AuthTokenResponse>('/api/auth/register', data);
+    return resp;
+  },
+
+  async login(data: AuthLoginRequest): Promise<AuthTokenResponse> {
+    const { data: resp } = await api.post<AuthTokenResponse>('/api/auth/login', data);
+    return resp;
+  },
+
+  async getMe(): Promise<AuthUserResponse> {
+    const { data: resp } = await api.get<AuthUserResponse>('/api/auth/me');
+    return resp;
   },
 };
 

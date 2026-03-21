@@ -12,7 +12,7 @@ from src.database.connection import get_db_manager, run_alembic_migrations
 from src.cache.redis_client import get_redis_cache
 from src.core.connection_pool_manager import get_pool_manager_async
 from src.middleware.rate_limit import RateLimitMiddleware
-from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance
+from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance, auth, audit
 from src.core.file_source_session import FileSourceDuckDBSession
 from src.core.file_source_handler import cleanup_expired_files
 
@@ -52,6 +52,7 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting Database Guru...")
 
     settings = Settings()
+    settings.check_jwt_secret()
 
     # Initialize database
     logger.info("📊 Initializing database...")
@@ -203,6 +204,8 @@ app.include_router(files.router, prefix="/api")  # Phase 13: CSV & Excel file su
 app.include_router(llm_usage.router, prefix="/api")  # Phase 16: LLM usage monitoring
 app.include_router(migration.router, prefix="/api")  # Phase 20: Migration Toolkit
 app.include_router(performance.router, prefix="/api")  # Phase 22: Performance Guru
+app.include_router(auth.router, prefix="/api")  # Phase 21: Security & Auth
+app.include_router(audit.router, prefix="/api")  # Phase 21: Audit logging
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,5 +1,6 @@
-import { Database, Sun, Moon } from 'lucide-react';
+import { Database, Sun, Moon, LogIn, LogOut, User } from 'lucide-react';
 import mascot from '../assets/boxer_mascot.png';
+import type { AuthUser } from '../hooks/useAuth';
 
 interface HeaderProps {
   isHealthy: boolean;
@@ -7,6 +8,9 @@ interface HeaderProps {
   toggleDarkMode: () => void;
   activeTab: string;
   onTabChange: (tabId: string) => void;
+  user?: AuthUser | null;
+  onLogout?: () => void;
+  onSignIn?: () => void;
 }
 
 const TABS = [
@@ -23,7 +27,7 @@ const TABS = [
   { id: 'settings', label: 'Config', icon: '⚙️' },
 ];
 
-export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTab, onTabChange }: HeaderProps) {
+export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTab, onTabChange, user, onLogout, onSignIn }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-white/60 dark:bg-gray-900/60 backdrop-blur-2xl border-b border-white/20 dark:border-white/5 px-8 py-3 transition-all duration-500 animate-fadeIn">
       <div className="max-w-[1800px] mx-auto flex items-center justify-between">
@@ -78,6 +82,37 @@ export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTa
           >
             {isDarkMode ? <Sun className="w-4 h-4 animate-spin-slow" /> : <Moon className="w-4 h-4" />}
           </button>
+
+          {/* User Menu */}
+          {!user && onSignIn && (
+            <button
+              onClick={onSignIn}
+              className="flex items-center gap-2 px-3 py-1.5 glass-panel rounded-xl text-xs font-bold tracking-wide text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign in</span>
+            </button>
+          )}
+          {user && (
+            <div className="flex items-center gap-2 px-3 py-1.5 glass-panel rounded-xl">
+              <User className="w-3.5 h-3.5 text-blue-500" />
+              <span className="text-xs font-bold tracking-wide text-gray-700 dark:text-gray-300">
+                {user.username}
+              </span>
+              {user.is_admin && (
+                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                  Admin
+                </span>
+              )}
+              <button
+                onClick={onLogout}
+                className="ml-1 p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                title="Sign out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Database Status */}
           <div className="flex items-center space-x-3 px-3 py-1.5 glass-panel rounded-xl transition-all duration-500 hover:shadow-lg hover:shadow-blue-500/10">

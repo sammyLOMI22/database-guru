@@ -510,6 +510,9 @@ class SystemSettingsResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Server-level auth configuration (read-only, from environment)
+    require_auth: bool = False
+
     class Config:
         from_attributes = True
 
