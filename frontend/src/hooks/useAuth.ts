@@ -23,9 +23,17 @@ export function useAuth() {
   const [state, setState] = useState<AuthState>(() => {
     const token = localStorage.getItem(TOKEN_KEY);
     const userJson = localStorage.getItem(USER_KEY);
+    let user: AuthUser | null = null;
+    if (userJson) {
+      try {
+        user = JSON.parse(userJson);
+      } catch {
+        localStorage.removeItem(USER_KEY);
+      }
+    }
     return {
       token,
-      user: userJson ? JSON.parse(userJson) : null,
+      user,
       isLoading: !!token, // need to verify if we have a stored token
     };
   });

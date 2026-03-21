@@ -18,6 +18,7 @@ from src.config.settings import Settings
 from src.core.schema_inspector import SchemaInspector
 from src.core.user_db_connector import UserDatabaseConnector
 from src.database.models import ConnectionWritePermission, DatabaseConnection
+from src.dml.constants import SAFE_IDENT_RE
 from src.dml.dml_executor import DMLExecutor
 from src.dml.dml_generator import DMLGenerator
 from src.dml.dml_validator import DMLValidator
@@ -202,9 +203,25 @@ async def update_write_permissions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update write permissions for a connection. Requires authentication."""
+    """Update write permissions for a connection.
+
+    Requires authentication. Only the connection owner or an admin can modify
+    permissions. Unowned connections require admin access.
+    """
     connection = await _get_connection(db, connection_id)
     _check_connection_access(connection, current_user)
+
+    # Only the owner or an admin can modify write permissions
+    if connection.owner_id is None and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required to modify permissions on shared connections.",
+        )
+    if connection.owner_id is not None and connection.owner_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the connection owner or an admin can modify permissions.",
+        )
 
     result = await db.execute(
         select(ConnectionWritePermission).where(
@@ -261,6 +278,12 @@ async def get_table_info(
     Used by the frontend to configure edit mode (which columns are
     editable, which are PKs, column types for input validation).
     """
+    if not SAFE_IDENT_RE.match(table_name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid table name: {table_name!r}",
+        )
+
     connection = await _get_connection(db, connection_id)
     _check_connection_access(connection, current_user)
 

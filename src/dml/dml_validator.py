@@ -1,6 +1,5 @@
 """DML validation — checks permissions, safety, and schema constraints (Phase 18)."""
 import logging
-import re
 from typing import List, Optional, Tuple
 
 from sqlalchemy import select
@@ -8,11 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.settings import Settings
 from src.database.models import ConnectionWritePermission, DatabaseConnection
+from src.dml.constants import SAFE_IDENT_RE
 from src.dml.models import ChangeType, RowChangeSchema
 
 logger = logging.getLogger(__name__)
-
-_SAFE_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class DMLValidator:
@@ -107,17 +105,17 @@ class DMLValidator:
 
         # 10. Identifier safety
         for change in changes:
-            if not _SAFE_IDENT_RE.match(change.table_name):
+            if not SAFE_IDENT_RE.match(change.table_name):
                 return False, f"Invalid table name: {change.table_name!r}"
             for col, _ in change.primary_key.items():
-                if not _SAFE_IDENT_RE.match(col):
+                if not SAFE_IDENT_RE.match(col):
                     return False, f"Invalid column name in primary key: {col!r}"
             for cell in change.changes:
-                if not _SAFE_IDENT_RE.match(cell.column):
+                if not SAFE_IDENT_RE.match(cell.column):
                     return False, f"Invalid column name: {cell.column!r}"
             if change.new_row_data:
                 for col in change.new_row_data:
-                    if not _SAFE_IDENT_RE.match(col):
+                    if not SAFE_IDENT_RE.match(col):
                         return False, f"Invalid column name in row data: {col!r}"
 
         return True, None

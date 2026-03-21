@@ -5,9 +5,9 @@ Produces two forms of each statement:
 - parameterized_sql + params: safe for execution via text().bindparams()
 """
 import logging
-import re
 from typing import Any, Dict, List
 
+from src.dml.constants import SAFE_IDENT_RE, SUPPORTED_DIALECTS
 from src.dml.models import (
     ChangeType,
     CellChangeSchema,
@@ -17,15 +17,17 @@ from src.dml.models import (
 
 logger = logging.getLogger(__name__)
 
-# Only allow safe SQL identifiers (letters, digits, underscores)
-_SAFE_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-
 
 class DMLGenerator:
     """Generates dialect-aware, parameterized DML statements."""
 
     def __init__(self, dialect: str = "postgresql"):
         self.dialect = dialect.lower()
+        if self.dialect not in SUPPORTED_DIALECTS:
+            raise ValueError(
+                f"Unsupported dialect: {dialect!r}. "
+                f"Supported: {', '.join(sorted(SUPPORTED_DIALECTS))}"
+            )
         self._param_counter = 0
 
     def generate_statements(
@@ -231,7 +233,7 @@ class DMLGenerator:
             return f"`{identifier}`"
         elif self.dialect == "mssql":
             return f"[{identifier}]"
-        return f'"{identifier}"'
+        raise ValueError(f"Unsupported dialect for quoting: {self.dialect!r}")
 
     def _format_literal(self, value: Any) -> str:
         """Format a value as a SQL literal for display purposes only."""
@@ -256,7 +258,7 @@ class DMLGenerator:
     @staticmethod
     def _validate_identifier(name: str) -> None:
         """Reject identifiers that don't match safe pattern."""
-        if not _SAFE_IDENT_RE.match(name):
+        if not SAFE_IDENT_RE.match(name):
             raise ValueError(
                 f"Unsafe identifier rejected: {name!r}. "
                 "Only letters, digits, and underscores are allowed."

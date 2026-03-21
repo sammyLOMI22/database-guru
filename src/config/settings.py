@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_MINUTES: int = 1440  # 24 hours
     REQUIRE_AUTH: bool = False  # Feature flag: when True, all endpoints require authentication
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"  # Comma-separated allowed origins
 
     # Per-user rate limiting (Phase 21)
     RATE_LIMIT_PER_USER: int = 200  # Requests per minute for authenticated users

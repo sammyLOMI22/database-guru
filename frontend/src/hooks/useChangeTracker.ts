@@ -1,13 +1,7 @@
 // Client-side change tracker for Edit Mode — Phase 18
 import { useCallback, useState } from 'react';
 import type { RowChange, CellChange, ChangeSummary } from '../types/dml';
-
-function hashPK(primaryKey: Record<string, any>): string {
-  return Object.entries(primaryKey)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}=${v}`)
-    .join('|');
-}
+import { hashPK } from '../utils/dmlUtils';
 
 export function useChangeTracker(tableName: string) {
   const [changes, setChanges] = useState<Map<string, RowChange>>(new Map());

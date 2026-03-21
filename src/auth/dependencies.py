@@ -84,6 +84,16 @@ async def get_current_active_user(
     return user
 
 
+def _raise_or_none(require_auth: bool, detail: str) -> None:
+    """Raise 401 if auth is required, otherwise return None (caller returns)."""
+    if require_auth:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
 async def get_optional_user(
     token: Optional[str] = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
@@ -95,63 +105,33 @@ async def get_optional_user(
     When REQUIRE_AUTH is False (default), allows unauthenticated access.
     """
     if token is None:
-        if settings.REQUIRE_AUTH:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        _raise_or_none(settings.REQUIRE_AUTH, "Authentication required")
         return None
 
     auth_service = get_auth_service(settings)
     payload = auth_service.decode_token(token)
     if payload is None:
-        if settings.REQUIRE_AUTH:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        _raise_or_none(settings.REQUIRE_AUTH, "Invalid or expired token")
         return None
 
     user_id = payload.get("sub")
     if user_id is None:
-        if settings.REQUIRE_AUTH:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        _raise_or_none(settings.REQUIRE_AUTH, "Invalid token payload")
         return None
 
     try:
         uid = int(user_id)
     except (ValueError, TypeError):
-        if settings.REQUIRE_AUTH:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        _raise_or_none(settings.REQUIRE_AUTH, "Invalid token payload")
         return None
 
     user = await auth_service.get_user_by_id(db, uid)
     if user is None:
-        if settings.REQUIRE_AUTH:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        _raise_or_none(settings.REQUIRE_AUTH, "User not found")
         return None
 
     if not user.is_active:
-        if settings.REQUIRE_AUTH:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User account is deactivated",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        _raise_or_none(settings.REQUIRE_AUTH, "User account is deactivated")
         return None
 
     return user

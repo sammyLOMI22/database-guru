@@ -46,7 +46,7 @@ class DMLExecutor:
         try:
             async with UserDatabaseConnector.get_user_db_session(connection) as session:
                 if isinstance(session, Session):
-                    total = await asyncio.get_event_loop().run_in_executor(
+                    total = await asyncio.get_running_loop().run_in_executor(
                         None,
                         self._execute_sync,
                         session,

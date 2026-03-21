@@ -1,6 +1,6 @@
 // DML API client — Phase 18
-import axios from 'axios';
-import { getStoredToken } from '../hooks/useAuth';
+// Uses the shared axios instance from api.ts for consistent auth + 401 handling
+import api from './api';
 import type {
   DMLPreviewRequest,
   DMLPreviewResponse,
@@ -10,19 +10,6 @@ import type {
   WritePermissionRequest,
   TableInfo,
 } from '../types/dml';
-
-const api = axios.create({
-  baseURL: (import.meta as any).env?.VITE_API_URL || '',
-  timeout: 30000,
-});
-
-api.interceptors.request.use((config) => {
-  const token = getStoredToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 
 export const dmlAPI = {
   async preview(request: DMLPreviewRequest): Promise<DMLPreviewResponse> {

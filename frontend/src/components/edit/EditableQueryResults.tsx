@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useTableSort } from '../../hooks/useTableSort';
+import { hashPK } from '../../utils/dmlUtils';
 import { SortableTableHeader } from '../SortableTableHeader';
 import { EditableCell } from './EditableCell';
 import { ChangesSummaryBar } from './ChangesSummaryBar';
@@ -62,13 +63,6 @@ export function EditableQueryResults({
       pk[col] = row[col];
     }
     return pk;
-  };
-
-  const hashPK = (pk: Record<string, any>): string => {
-    return Object.entries(pk)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}=${v}`)
-      .join('|');
   };
 
   const toggleRowSelection = (pk: Record<string, any>) => {
@@ -154,7 +148,7 @@ export function EditableQueryResults({
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {paginatedResults.map((row, rowIndex) => {
+            {paginatedResults.map((row) => {
               const pk = buildPK(row);
               const pkHash = hashPK(pk);
               const isDeleted = changeTracker.isRowDeleted(pk);
@@ -162,7 +156,7 @@ export function EditableQueryResults({
 
               return (
                 <tr
-                  key={startIdx + rowIndex}
+                  key={pkHash}
                   className={`transition-colors ${
                     isDeleted
                       ? 'bg-red-500/5'
