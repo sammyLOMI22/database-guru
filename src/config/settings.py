@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     MAX_QUERY_ROWS: int = 1000
     QUERY_TIMEOUT_SECONDS: int = 30
     ALLOW_WRITE_OPERATIONS: bool = False  # Safety: disable writes by default
+    DML_MAX_ROWS_PER_OPERATION: int = 100  # Phase 18: max rows per DML operation
 
     # Connection Pooling (User Databases)
     ENABLE_CONNECTION_POOLING: bool = True  # Feature flag for connection pooling
