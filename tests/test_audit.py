@@ -168,15 +168,22 @@ class TestAuditEndpointAuthorization:
         assert result == user
 
 
-class TestLogActionRollbackOnFailure:
-    """Verify log_action rolls back on failure to avoid dirty session."""
+class TestLogActionSavepointOnFailure:
+    """Verify log_action uses a savepoint so failures don't roll back the caller's transaction."""
 
     @pytest.mark.asyncio
-    async def test_log_action_calls_rollback_on_flush_failure(self):
-        """If flush() fails, log_action should rollback the session."""
+    async def test_log_action_does_not_rollback_main_transaction(self):
+        """If the audit insert fails, the main session transaction is preserved."""
         db = AsyncMock(spec=AsyncSession)
-        db.flush.side_effect = RuntimeError("DB write error")
+        # Simulate begin_nested raising (e.g. missing audit_logs table)
+        nested_ctx = AsyncMock()
+        nested_ctx.__aenter__ = AsyncMock(side_effect=RuntimeError("DB write error"))
+        nested_ctx.__aexit__ = AsyncMock(return_value=False)
+        db.begin_nested.return_value = nested_ctx
 
         await log_action(db, action="test", resource_type="test")
 
-        db.rollback.assert_called_once()
+        # Must NOT call rollback on the main session
+        db.rollback.assert_not_called()
+        # Should have attempted a savepoint
+        db.begin_nested.assert_called_once()

@@ -19,12 +19,13 @@ class TestConnectionSoftDelete:
         """Test that delete_connection sets is_deleted=True instead of db.delete()."""
         from src.api.endpoints.connections import delete_connection
 
-        # Create a mock connection
+        # Create a mock connection (unowned/legacy)
         conn = MagicMock(spec=DatabaseConnection)
         conn.id = 1
         conn.name = "Test DB"
         conn.is_deleted = False
         conn.is_active = True
+        conn.owner_id = None
 
         # Mock database session
         db = AsyncMock(spec=AsyncSession)
@@ -68,6 +69,7 @@ class TestConnectionSoftDelete:
         conn.id = 1
         conn.name = "Already Deleted"
         conn.is_deleted = True
+        conn.owner_id = None
 
         db = AsyncMock(spec=AsyncSession)
         mock_result = MagicMock()

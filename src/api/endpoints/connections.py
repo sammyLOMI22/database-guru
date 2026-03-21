@@ -79,15 +79,17 @@ async def list_connections(
         DatabaseConnection.is_deleted.isnot(True)
     ).order_by(DatabaseConnection.created_at.desc())
 
-    # Filter by owner when authenticated
+    # Filter by owner: authenticated users see own + unowned; guests see only unowned
+    from sqlalchemy import or_
     if current_user:
-        from sqlalchemy import or_
         query = query.where(
             or_(
                 DatabaseConnection.owner_id == current_user.id,
-                DatabaseConnection.owner_id.is_(None),  # Unowned connections visible to all
+                DatabaseConnection.owner_id.is_(None),
             )
         )
+    else:
+        query = query.where(DatabaseConnection.owner_id.is_(None))
 
     result = await db.execute(query)
     connections = result.scalars().all()
@@ -226,7 +228,7 @@ async def activate_connection(
         )
 
     # Ownership check
-    if current_user and connection.owner_id is not None and connection.owner_id != current_user.id:
+    if connection.owner_id is not None and (current_user is None or connection.owner_id != current_user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this connection",
@@ -244,8 +246,11 @@ async def activate_connection(
             .values(is_active=False)
         )
     else:
+        # Guests can only toggle unowned connections
         await db.execute(
-            update(DatabaseConnection).values(is_active=False)
+            update(DatabaseConnection)
+            .where(DatabaseConnection.owner_id.is_(None))
+            .values(is_active=False)
         )
 
     connection.is_active = True
@@ -290,7 +295,7 @@ async def delete_connection(
         )
 
     # Ownership check
-    if current_user and connection.owner_id is not None and connection.owner_id != current_user.id:
+    if connection.owner_id is not None and (current_user is None or connection.owner_id != current_user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this connection",

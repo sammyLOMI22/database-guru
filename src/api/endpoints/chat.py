@@ -120,6 +120,62 @@ class ChatMessageResponse(BaseModel):
         from_attributes = True
 
 
+async def _validate_connection_access(
+    connection_ids: List[int], user: Optional[User], db: AsyncSession,
+) -> None:
+    """Verify connection IDs exist, are not deleted, and are accessible to the user.
+
+    Accessible means: unowned (owner_id=None) OR owned by the current user.
+    Guests can only use unowned connections.
+    """
+    if not connection_ids:
+        return
+    result = await db.execute(
+        select(DatabaseConnection).where(
+            DatabaseConnection.id.in_(connection_ids),
+            DatabaseConnection.is_deleted.isnot(True),
+        )
+    )
+    valid_connections = result.scalars().all()
+    if len(valid_connections) != len(connection_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="One or more connection IDs are invalid or deleted",
+        )
+    for conn in valid_connections:
+        if conn.owner_id is not None and (user is None or conn.owner_id != user.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You do not have access to connection {conn.id}",
+            )
+
+
+async def _validate_file_source_access(
+    file_source_ids: List[int], user: Optional[User], db: AsyncSession,
+) -> None:
+    """Verify file source IDs exist, are ready, and are accessible to the user."""
+    if not file_source_ids:
+        return
+    result = await db.execute(
+        select(FileSource).where(
+            FileSource.id.in_(file_source_ids),
+            FileSource.processing_status == 'ready',
+        )
+    )
+    valid_files = result.scalars().all()
+    if len(valid_files) != len(file_source_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="One or more file source IDs are invalid or not ready",
+        )
+    for fs in valid_files:
+        if fs.owner_id is not None and (user is None or fs.owner_id != user.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You do not have access to file source {fs.id}",
+            )
+
+
 def _check_session_ownership(session: ChatSession, user: Optional[User]) -> None:
     """Raise 403 if user doesn't own the session.
 
@@ -145,36 +201,9 @@ async def create_chat_session(
 ):
     """Create a new chat session"""
     try:
-        # Validate connection IDs if provided
-        if session_data.connection_ids:
-            result = await db.execute(
-                select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(session_data.connection_ids),
-                    DatabaseConnection.is_deleted.isnot(True),
-                )
-            )
-            valid_connections = result.scalars().all()
-
-            if len(valid_connections) != len(session_data.connection_ids):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more connection IDs are invalid or deleted"
-                )
-
-        # Validate file source IDs if provided
-        if session_data.file_source_ids:
-            file_result = await db.execute(
-                select(FileSource).where(
-                    FileSource.id.in_(session_data.file_source_ids),
-                    FileSource.processing_status == 'ready',
-                )
-            )
-            valid_files = file_result.scalars().all()
-            if len(valid_files) != len(session_data.file_source_ids):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more file source IDs are invalid or not ready"
-                )
+        # Validate connection/file ownership before saving
+        await _validate_connection_access(session_data.connection_ids, current_user, db)
+        await _validate_file_source_access(session_data.file_source_ids or [], current_user, db)
 
         # Create new chat session
         new_session = ChatSession(
@@ -391,39 +420,11 @@ async def update_chat_session(
             session.name = update_data.name
 
         if update_data.connection_ids is not None:
-            # Validate connection IDs (exclude soft-deleted)
-            conn_result = await db.execute(
-                select(DatabaseConnection).where(
-                    DatabaseConnection.id.in_(update_data.connection_ids),
-                    DatabaseConnection.is_deleted.isnot(True),
-                )
-            )
-            valid_connections = conn_result.scalars().all()
-
-            if len(valid_connections) != len(update_data.connection_ids):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more connection IDs are invalid or deleted"
-                )
-
+            await _validate_connection_access(update_data.connection_ids, current_user, db)
             session.active_connection_ids = update_data.connection_ids
 
         if update_data.file_source_ids is not None:
-            # Validate file source IDs
-            if update_data.file_source_ids:
-                file_result = await db.execute(
-                    select(FileSource).where(
-                        FileSource.id.in_(update_data.file_source_ids),
-                        FileSource.processing_status == 'ready',
-                    )
-                )
-                valid_files = file_result.scalars().all()
-                if len(valid_files) != len(update_data.file_source_ids):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="One or more file source IDs are invalid or not ready"
-                    )
-
+            await _validate_file_source_access(update_data.file_source_ids, current_user, db)
             session.active_file_source_ids = update_data.file_source_ids
 
         session.updated_at = datetime.now(timezone.utc)

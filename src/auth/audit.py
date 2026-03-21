@@ -43,23 +43,19 @@ async def log_action(
 ) -> None:
     """Write an audit log entry. Never raises — failures are logged and swallowed."""
     try:
-        entry = AuditLog(
-            user_id=user_id,
-            username=username,
-            action=action,
-            resource_type=resource_type,
-            resource_id=str(resource_id) if resource_id is not None else None,
-            details=details,
-            ip_address=ip_address,
-        )
-        db.add(entry)
-        await db.flush()
+        async with db.begin_nested():
+            entry = AuditLog(
+                user_id=user_id,
+                username=username,
+                action=action,
+                resource_type=resource_type,
+                resource_id=str(resource_id) if resource_id is not None else None,
+                details=details,
+                ip_address=ip_address,
+            )
+            db.add(entry)
     except Exception as e:
         logger.error(f"Failed to write audit log: {e}")
-        try:
-            await db.rollback()
-        except Exception:
-            pass
 
 
 async def get_audit_logs(
