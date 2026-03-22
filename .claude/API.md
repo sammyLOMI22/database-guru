@@ -282,6 +282,38 @@ Schema diff, migration planning, script generation, and data migration assistanc
 
 ---
 
+## DML / Edit Mode API (Phase 18 - March 2026)
+**File**: `dml.py`
+
+Inline data editing with preview, execution, and per-connection write permissions.
+
+### DML Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/dml/preview` | Generate and preview DML statements from changes |
+| POST | `/api/dml/execute` | Execute DML changes within a transaction |
+| GET | `/api/dml/permissions/{connection_id}` | Get write permissions for a connection |
+| PUT | `/api/dml/permissions/{connection_id}` | Update write permissions |
+| GET | `/api/dml/table-info/{connection_id}/{table_name}` | Get table columns and primary keys |
+
+### Request/Response Models
+- **DMLPreviewRequest**: connection_id, changes (list of RowChangeSchema), wrap_in_transaction
+- **DMLPreviewResponse**: display SQL, statement list, change count, summary by type
+- **DMLExecuteRequest**: connection_id, changes
+- **ExecutionResult**: success, rows_affected, error_message, executed_sql
+- **WritePermissionRequest**: allow_insert, allow_update, allow_delete, require_where_clause, max_rows_per_operation, allowed_tables
+- **WritePermissionResponse**: Full permission state for a connection
+- **TableInfoResponse**: table_name, primary_key_columns, columns (with type, nullable, default, is_primary_key, is_autoincrement)
+
+### Features
+- **Parameterized SQL**: All generated DML uses named parameters to prevent injection
+- **Transaction Wrapping**: All executions wrapped in a single transaction with rollback on error
+- **Write Permissions**: Per-connection INSERT/UPDATE/DELETE toggles, allowed_tables whitelist, max rows per operation
+- **Validation**: Require WHERE clause enforcement, row limit checks, table name regex validation
+- **Auth Integration**: Uses `get_optional_user` for ownership checks when `REQUIRE_AUTH` is enabled
+
+---
+
 ## Authentication API (Phase 21)
 **File**: `auth.py`
 

@@ -57,7 +57,7 @@ docker compose down -v                         # Stop + remove volumes
 
 ## Architecture Overview
 
-The system uses a multi-agent architecture with 37+ specialized agents (including 6 NoSQL handlers and auth system). See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
+The system uses a multi-agent architecture with 40+ specialized agents (including 6 NoSQL handlers, auth system, and DML pipeline). See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
 
 ### Key Agents (Quick Reference)
 | Agent | File | Purpose |
@@ -95,6 +95,9 @@ The system uses a multi-agent architecture with 37+ specialized agents (includin
 | Auth Service | `src/auth/service.py` | JWT auth, bcrypt hashing, user CRUD (Phase 21) |
 | Auth Dependencies | `src/auth/dependencies.py` | get_current_user, get_optional_user, require_admin (Phase 21) |
 | Audit Logger | `src/auth/audit.py` | AuditLog model, never-raising log_action() (Phase 21) |
+| DML Generator | `src/dml/dml_generator.py` | Parameterized INSERT/UPDATE/DELETE generation (Phase 18) |
+| DML Validator | `src/dml/dml_validator.py` | Safety checks, write permissions, row limits (Phase 18) |
+| DML Executor | `src/dml/dml_executor.py` | Transaction-wrapped DML execution (Phase 18) |
 
 ### Data Flow
 ```
@@ -110,6 +113,8 @@ Natural Language Query → Auth Check (optional, REQUIRE_AUTH flag)
       → [If Success: Result Verification → Correction Learner persist]
   → Parallel Analysis (stats/anomalies/correlations)
   → Tiered Narrative Generation → Return Results
+  → [Edit Mode] Inline Editing → Change Tracker → DML Generator → Validator
+      → Preview → DML Executor (transaction-wrapped)
 ```
 
 ### Detailed References
@@ -175,4 +180,5 @@ Key docs in `docs/`:
 | **Performance** | `guides/PERFORMANCE_GURU_GUIDE.md` |
 | **NoSQL** | `planning/NOSQL_EXPANSION_PLAN.md` |
 | **Security & Auth** | `planning/MASTER_ROADMAP.md` (Phase 21 section) |
+| **Edit Mode & DML** | `planning/PHASE_18_EDIT_MODE_FEATURE_IMP_PLAN.md` |
 | **Deployment** | `guides/DOCKER_DEPLOYMENT_GUIDE.md`, `planning/DOCKER_CONTAINERIZATION_PLAN.md` |

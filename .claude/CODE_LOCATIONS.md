@@ -34,6 +34,33 @@ Quick reference for finding important code in the Database Guru codebase.
 | Audit tests | `tests/test_audit.py` (8 tests) |
 | Soft-delete tests | `tests/test_connection_soft_delete.py` (3 tests) |
 
+## Edit Mode & DML (Phase 18 - March 2026)
+| Component | Location |
+|-----------|----------|
+| **DML Module** | |
+| DML Generator | `src/dml/dml_generator.py` |
+| DML Validator | `src/dml/dml_validator.py` |
+| DML Executor | `src/dml/dml_executor.py` |
+| DML Models | `src/dml/models.py` |
+| DML Constants | `src/dml/constants.py` (SAFE_IDENT_RE) |
+| **API Endpoints** | |
+| DML endpoints | `src/api/endpoints/dml.py` (preview, execute, permissions, table-info) |
+| **Database Models** | |
+| ConnectionWritePermission | `src/database/models.py:ConnectionWritePermission` |
+| **Migrations** | |
+| Write permissions table | `alembic/versions/d4e5f6a7b8c9_add_connection_write_permissions.py` |
+| **Frontend** | |
+| Edit components | `frontend/src/components/edit/` (7 components) |
+| Change tracker hook | `frontend/src/hooks/useChangeTracker.ts` |
+| Edit mode hook | `frontend/src/hooks/useEditMode.ts` |
+| DML execution hook | `frontend/src/hooks/useDMLExecution.ts` |
+| DML API service | `frontend/src/services/dmlApi.ts` |
+| DML types | `frontend/src/types/dml.ts` |
+| **Tests** | |
+| Generator tests | `tests/dml/test_dml_generator.py` |
+| Validator tests | `tests/dml/test_dml_validator.py` |
+| Executor tests | `tests/dml/test_dml_executor.py` |
+
 ## Core Entry Points
 
 | Component | Location |
