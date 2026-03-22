@@ -1,5 +1,5 @@
 // Wraps a single database result with edit mode — Phase 18
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useEditMode } from '../../hooks/useEditMode';
 import { useChangeTracker } from '../../hooks/useChangeTracker';
@@ -7,7 +7,7 @@ import { dmlAPI } from '../../services/dmlApi';
 import { EditModeToggle } from './EditModeToggle';
 import { EditableQueryResults } from './EditableQueryResults';
 import { AddRowForm } from './AddRowForm';
-import type { TableInfo } from '../../types/dml';
+import type { TableInfo, RowChange } from '../../types/dml';
 
 interface EditModeWrapperProps {
   connectionId: number;
@@ -45,6 +45,12 @@ export function EditModeWrapper({
   children,
 }: EditModeWrapperProps) {
   const [showAddRow, setShowAddRow] = useState(false);
+  const [displayResults, setDisplayResults] = useState(results);
+
+  // Sync local state when parent provides new results (e.g. new query)
+  useEffect(() => {
+    setDisplayResults(results);
+  }, [results]);
 
   const tableName = useMemo(() => extractTableName(sql), [sql]);
 
@@ -70,6 +76,40 @@ export function EditModeWrapper({
       : null);
 
   const canEdit = editMode.canEdit && tableName !== null;
+
+  const handleSaveSuccess = useCallback(
+    (savedChanges: RowChange[]) => {
+      setDisplayResults((prev) => {
+        let rows = [...prev];
+        for (const change of savedChanges) {
+          if (change.change_type === 'UPDATE') {
+            rows = rows.map((row) => {
+              const matches = Object.entries(change.primary_key).every(
+                ([col, val]) => row[col] === val
+              );
+              if (!matches) return row;
+              const updated = { ...row };
+              for (const cell of change.changes) {
+                updated[cell.column] = cell.new_value;
+              }
+              return updated;
+            });
+          } else if (change.change_type === 'DELETE') {
+            rows = rows.filter(
+              (row) =>
+                !Object.entries(change.primary_key).every(
+                  ([col, val]) => row[col] === val
+                )
+            );
+          } else if (change.change_type === 'INSERT' && change.new_row_data) {
+            rows = [...rows, { ...change.new_row_data }];
+          }
+        }
+        return rows;
+      });
+    },
+    []
+  );
 
   const handleToggle = () => {
     if (canEdit) {
@@ -99,13 +139,14 @@ export function EditModeWrapper({
       {editMode.isEditMode && tableInfo && editMode.permissions ? (
         <>
           <EditableQueryResults
-            results={results}
+            results={displayResults}
             connectionId={connectionId}
             tableInfo={tableInfo}
             permissions={editMode.permissions}
             changeTracker={changeTracker}
             onPreview={() => {}}
             onAddRow={() => setShowAddRow(true)}
+            onSaveSuccess={handleSaveSuccess}
           />
           <AddRowForm
             isOpen={showAddRow}

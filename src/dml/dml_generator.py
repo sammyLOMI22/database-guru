@@ -133,6 +133,8 @@ class DMLGenerator:
     def _generate_update(self, change: RowChangeSchema) -> DMLStatement | None:
         if not change.changes:
             return None
+        if not change.primary_key:
+            raise ValueError("UPDATE requires a primary key to build a WHERE clause.")
         self._validate_identifier(change.table_name)
 
         params: Dict[str, Any] = {}
@@ -172,6 +174,8 @@ class DMLGenerator:
         )
 
     def _generate_delete(self, change: RowChangeSchema) -> DMLStatement | None:
+        if not change.primary_key:
+            raise ValueError("DELETE requires a primary key to build a WHERE clause.")
         self._validate_identifier(change.table_name)
 
         params: Dict[str, Any] = {}

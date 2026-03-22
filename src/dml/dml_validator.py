@@ -81,15 +81,16 @@ class DMLValidator:
                 if change.table_name not in allowed:
                     return False, f"Table '{change.table_name}' is not in the allowed tables list."
 
-        # 8. WHERE clause requirement
-        if permission.require_where_clause:
-            for change in changes:
-                if change.change_type in (ChangeType.UPDATE, ChangeType.DELETE):
-                    if not change.primary_key:
-                        return False, (
-                            f"{change.change_type.value} requires a WHERE clause "
-                            f"(primary key must be specified)."
-                        )
+        # 8. Primary key requirement for UPDATE/DELETE
+        # Always require a primary key to prevent full-table modifications,
+        # regardless of the require_where_clause setting.
+        for change in changes:
+            if change.change_type in (ChangeType.UPDATE, ChangeType.DELETE):
+                if not change.primary_key:
+                    return False, (
+                        f"{change.change_type.value} requires a primary key "
+                        f"to identify target rows."
+                    )
 
         # 9. Row count limits
         max_rows = permission.max_rows_per_operation

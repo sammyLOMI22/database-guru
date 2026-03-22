@@ -18,6 +18,7 @@ interface EditableQueryResultsProps {
   changeTracker: ReturnType<typeof useChangeTracker>;
   onPreview: () => void;
   onAddRow: () => void;
+  onSaveSuccess: (changes: RowChange[]) => void;
 }
 
 export function EditableQueryResults({
@@ -28,6 +29,7 @@ export function EditableQueryResults({
   changeTracker,
   onPreview,
   onAddRow,
+  onSaveSuccess,
 }: EditableQueryResultsProps) {
   const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
@@ -292,6 +294,7 @@ export function EditableQueryResults({
           summary={changeTracker.getSummary()}
           onPreview={onPreview}
           onDiscard={changeTracker.discardAll}
+          onSaveSuccess={onSaveSuccess}
           connectionId={connectionId}
           changes={changeTracker.getChanges()}
         />

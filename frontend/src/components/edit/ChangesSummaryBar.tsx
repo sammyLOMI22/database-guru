@@ -9,6 +9,7 @@ interface ChangesSummaryBarProps {
   summary: ChangeSummary;
   onPreview: () => void;
   onDiscard: () => void;
+  onSaveSuccess: (changes: RowChange[]) => void;
   connectionId: number;
   changes: RowChange[];
 }
@@ -16,6 +17,7 @@ interface ChangesSummaryBarProps {
 export function ChangesSummaryBar({
   summary,
   onDiscard,
+  onSaveSuccess,
   connectionId,
   changes,
 }: ChangesSummaryBarProps) {
@@ -37,7 +39,8 @@ export function ChangesSummaryBar({
       changes,
     });
     if (result.success) {
-      onDiscard(); // Clear changes on success
+      onSaveSuccess(changes); // Apply changes to displayed data
+      onDiscard(); // Clear change tracker
       setShowPreview(false);
     }
   };

@@ -187,9 +187,10 @@ class TestDMLValidatorPermissions:
 
 class TestDMLValidatorSafety:
     @pytest.mark.asyncio
-    async def test_rejects_update_without_pk_when_required(self):
+    async def test_rejects_update_without_pk(self):
+        """UPDATE without primary key is always rejected, regardless of require_where_clause."""
         conn = _make_connection()
-        perm = _make_permission(require_where_clause=True)
+        perm = _make_permission(require_where_clause=False)
         db = _mock_db(connection=conn, permission=perm)
         validator = DMLValidator()
         change = RowChangeSchema(
@@ -202,7 +203,7 @@ class TestDMLValidatorSafety:
             db, 1, [change], _make_settings()
         )
         assert not is_valid
-        assert "WHERE clause" in error
+        assert "primary key" in error
 
     @pytest.mark.asyncio
     async def test_rejects_too_many_operations(self):
