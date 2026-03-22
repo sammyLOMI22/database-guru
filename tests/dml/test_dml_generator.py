@@ -319,3 +319,32 @@ class TestDMLGeneratorSafety:
         stmts = gen.generate_statements(changes)
         assert "TRUE" in stmts[0].display_sql
         assert "FALSE" in stmts[0].display_sql
+
+
+class TestDMLGeneratorEmptyPKGuards:
+    """Verify generator raises on empty primary_key for UPDATE/DELETE."""
+
+    def test_update_without_pk_raises(self):
+        gen = DMLGenerator(dialect="postgresql")
+        changes = [
+            RowChangeSchema(
+                change_type=ChangeType.UPDATE,
+                table_name="users",
+                primary_key={},
+                changes=[CellChangeSchema(column="name", old_value="a", new_value="b")],
+            )
+        ]
+        with pytest.raises(ValueError, match="primary key"):
+            gen.generate_statements(changes)
+
+    def test_delete_without_pk_raises(self):
+        gen = DMLGenerator(dialect="postgresql")
+        changes = [
+            RowChangeSchema(
+                change_type=ChangeType.DELETE,
+                table_name="users",
+                primary_key={},
+            )
+        ]
+        with pytest.raises(ValueError, match="primary key"):
+            gen.generate_statements(changes)

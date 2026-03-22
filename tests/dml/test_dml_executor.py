@@ -136,6 +136,79 @@ class TestDMLExecutorFailure:
         assert mock_log.call_args.kwargs["action"] == "dml_failed"
 
 
+class TestDMLExecutorDelete:
+    @pytest.mark.asyncio
+    async def test_executes_delete_statement(self):
+        executor = DMLExecutor()
+        metadata_db = AsyncMock(spec=AsyncSession)
+        connection = _make_connection()
+
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock(rowcount=3)
+        mock_session.execute.return_value = mock_result
+
+        stmt = _make_statement(
+            change_type=ChangeType.DELETE,
+            table_name="orders",
+            display_sql='DELETE FROM "orders" WHERE "id" = 42;',
+            parameterized_sql='DELETE FROM "orders" WHERE "id" = :p1',
+            params={"p1": 42},
+        )
+
+        with patch(
+            "src.dml.dml_executor.UserDatabaseConnector"
+        ) as mock_connector, patch("src.dml.dml_executor.log_action") as mock_log:
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__.return_value = mock_session
+            mock_connector.get_user_db_session.return_value = mock_cm
+
+            result = await executor.execute(
+                connection, [stmt], metadata_db, user_id=1, username="alice"
+            )
+
+        assert result.success
+        assert result.rows_affected == 3
+        mock_session.execute.assert_called_once()
+        mock_session.commit.assert_called_once()
+        assert mock_log.call_args.kwargs["action"] == "dml_execute"
+        assert mock_log.call_args.kwargs["details"]["change_type"] == "DELETE"
+
+
+class TestDMLExecutorInsert:
+    @pytest.mark.asyncio
+    async def test_executes_insert_statement(self):
+        executor = DMLExecutor()
+        metadata_db = AsyncMock(spec=AsyncSession)
+        connection = _make_connection()
+
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock(rowcount=1)
+        mock_session.execute.return_value = mock_result
+
+        stmt = _make_statement(
+            change_type=ChangeType.INSERT,
+            table_name="users",
+            display_sql="INSERT INTO \"users\" (\"name\", \"email\") VALUES ('bob', 'bob@test.com');",
+            parameterized_sql='INSERT INTO "users" ("name", "email") VALUES (:p1, :p2)',
+            params={"p1": "bob", "p2": "bob@test.com"},
+        )
+
+        with patch(
+            "src.dml.dml_executor.UserDatabaseConnector"
+        ) as mock_connector, patch("src.dml.dml_executor.log_action") as mock_log:
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__.return_value = mock_session
+            mock_connector.get_user_db_session.return_value = mock_cm
+
+            result = await executor.execute(
+                connection, [stmt], metadata_db, user_id=2, username="bob"
+            )
+
+        assert result.success
+        assert result.rows_affected == 1
+        assert mock_log.call_args.kwargs["details"]["change_type"] == "INSERT"
+
+
 class TestDMLExecutorMultipleStatements:
     @pytest.mark.asyncio
     async def test_multiple_statements_accumulate_rowcount(self):
