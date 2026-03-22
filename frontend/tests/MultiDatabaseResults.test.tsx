@@ -61,6 +61,10 @@ vi.mock('../src/components/visualization/CrossDatabaseChart', () => ({
   CrossDatabaseChart: () => <div data-testid="cross-db-chart">Cross DB Chart</div>,
 }));
 
+vi.mock('../src/components/edit/EditModeWrapper', () => ({
+  EditModeWrapper: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 vi.mock('../src/services/api', () => ({
   feedbackAPI: {
     submitFeedback: vi.fn(),
