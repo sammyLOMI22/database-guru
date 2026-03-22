@@ -109,15 +109,16 @@ class TestDMLValidatorConnectionAccess:
         assert "access" in error.lower()
 
     @pytest.mark.asyncio
-    async def test_rejects_nosql_database(self):
+    async def test_nosql_passes_with_permissions(self):
         conn = _make_connection(database_type="mongodb")
-        db = _mock_db(connection=conn)
+        perm = _make_permission()
+        db = _mock_db(connection=conn, permission=perm)
         validator = DMLValidator()
         is_valid, error = await validator.validate(
             db, 1, [_simple_update()], _make_settings()
         )
-        assert not is_valid
-        assert "NoSQL" in error
+        assert is_valid
+        assert error is None
 
 
 class TestDMLValidatorPermissions:

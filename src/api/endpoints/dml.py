@@ -18,10 +18,12 @@ from src.config.settings import Settings
 from src.core.schema_inspector import SchemaInspector
 from src.core.user_db_connector import UserDatabaseConnector
 from src.database.models import ConnectionWritePermission, DatabaseConnection
-from src.dml.constants import SAFE_IDENT_RE
+from src.dml.constants import NOSQL_SAFE_IDENT_RE, NOSQL_TYPES, SAFE_IDENT_RE
 from src.dml.dml_executor import DMLExecutor
 from src.dml.dml_generator import DMLGenerator
 from src.dml.dml_validator import DMLValidator
+from src.dml.nosql_dml_executor import NoSQLDMLExecutor
+from src.dml.nosql_dml_generator import NoSQLDMLGenerator
 from src.dml.models import (
     DMLExecuteRequest,
     DMLPreviewRequest,
@@ -88,11 +90,16 @@ async def preview_changes(
     connection = await _get_connection(db, request.connection_id)
     _check_connection_access(connection, current_user)
 
-    generator = DMLGenerator(dialect=connection.database_type)
-    statements = generator.generate_statements(request.changes)
-    preview_script = generator.generate_preview_script(
-        request.changes, wrap_in_transaction=request.wrap_in_transaction
-    )
+    if connection.database_type in NOSQL_TYPES:
+        generator = NoSQLDMLGenerator(database_type=connection.database_type)
+        statements = generator.generate_statements(request.changes)
+        preview_script = generator.generate_preview_script(request.changes)
+    else:
+        sql_generator = DMLGenerator(dialect=connection.database_type)
+        statements = sql_generator.generate_statements(request.changes)
+        preview_script = sql_generator.generate_preview_script(
+            request.changes, wrap_in_transaction=request.wrap_in_transaction
+        )
 
     summary = {"INSERT": 0, "UPDATE": 0, "DELETE": 0}
     for change in request.changes:
@@ -133,16 +140,19 @@ async def execute_changes(
             detail=error,
         )
 
-    # Generate parameterized statements
-    generator = DMLGenerator(dialect=connection.database_type)
-    statements = generator.generate_statements(request.changes)
+    # Generate and execute — branch on SQL vs NoSQL
+    is_nosql = connection.database_type in NOSQL_TYPES
+    if is_nosql:
+        gen = NoSQLDMLGenerator(database_type=connection.database_type)
+    else:
+        gen = DMLGenerator(dialect=connection.database_type)
+    statements = gen.generate_statements(request.changes)
 
     if not statements:
         return ExecutionResult(success=True, rows_affected=0)
 
-    # Execute against user database
-    executor = DMLExecutor()
     ip_address = http_request.client.host if http_request.client else None
+    executor = NoSQLDMLExecutor() if is_nosql else DMLExecutor()
     result = await executor.execute(
         connection=connection,
         statements=statements,
@@ -201,18 +211,19 @@ async def update_write_permissions(
     connection_id: int,
     request: WritePermissionRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """Update write permissions for a connection.
 
-    Requires authentication. Only the connection owner or an admin can modify
+    When auth is enabled, only the connection owner or an admin can modify
     permissions. Unowned connections require admin access.
+    When auth is disabled (REQUIRE_AUTH=False), any user can modify permissions.
     """
     connection = await _get_connection(db, connection_id)
     _check_connection_access(connection, current_user)
 
-    # Only the owner or an admin can modify write permissions
-    if connection.owner_id is None and not current_user.is_admin:
+    # When auth is active, enforce ownership / admin on shared connections
+    if current_user is not None and connection.owner_id is None and not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required to modify permissions on shared connections.",
@@ -278,14 +289,19 @@ async def get_table_info(
     Used by the frontend to configure edit mode (which columns are
     editable, which are PKs, column types for input validation).
     """
-    if not SAFE_IDENT_RE.match(table_name):
+    connection = await _get_connection(db, connection_id)
+    _check_connection_access(connection, current_user)
+
+    is_nosql = connection.database_type in NOSQL_TYPES
+    ident_re = NOSQL_SAFE_IDENT_RE if is_nosql else SAFE_IDENT_RE
+    if not ident_re.match(table_name):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid table name: {table_name!r}",
         )
 
-    connection = await _get_connection(db, connection_id)
-    _check_connection_access(connection, current_user)
+    if is_nosql:
+        return await _get_nosql_table_info(connection, table_name)
 
     inspector = SchemaInspector()
 
@@ -315,6 +331,83 @@ async def get_table_info(
                 is_autoincrement=is_auto,
             )
         )
+
+    return TableInfoResponse(
+        table_name=table_name,
+        primary_key_columns=pk_columns,
+        columns=columns,
+    )
+
+
+async def _get_nosql_table_info(
+    connection: DatabaseConnection, table_name: str
+) -> TableInfoResponse:
+    """Get table info for a NoSQL collection/index by inspecting schema."""
+    from src.nosql.router import get_nosql_inspector
+
+    inspector, _ = await get_nosql_inspector(connection)
+    schema = await inspector.get_schema(connection)
+
+    # Each NoSQL inspector returns schema with collections/tables/indices
+    # containing field info. Try to find the requested table.
+    pk_map = {
+        "mongodb": ["_id"],
+        "elasticsearch": ["_id"],
+        "redis": ["key"],
+        "dynamodb": None,  # extracted from schema
+        "cassandra": None,  # extracted from schema
+    }
+
+    db_type = connection.database_type
+    default_pks = pk_map.get(db_type, ["_id"])
+
+    # Try to extract columns from schema
+    columns = []
+    pk_columns = default_pks or []
+
+    # All NoSQL inspectors use "tables" key in their schema dict
+    collections = schema.get("tables", {})
+    if isinstance(collections, dict) and table_name in collections:
+        table_schema = collections[table_name]
+        fields = table_schema if isinstance(table_schema, dict) else {}
+
+        # DynamoDB / Cassandra have key info in schema
+        if db_type == "dynamodb":
+            pk_columns = [
+                k for k, v in fields.items()
+                if isinstance(v, dict) and v.get("key_type")
+            ] or ["pk"]
+        elif db_type == "cassandra":
+            pk_columns = [
+                k for k, v in fields.items()
+                if isinstance(v, dict) and v.get("kind") in ("partition_key", "clustering")
+            ] or ["id"]
+
+        for field_name, field_info in fields.items():
+            ftype = "text"
+            if isinstance(field_info, str):
+                ftype = field_info
+            elif isinstance(field_info, dict):
+                ftype = field_info.get("type", "text")
+            columns.append(
+                TableInfoColumn(
+                    name=field_name,
+                    type=ftype,
+                    nullable=True,
+                    is_primary_key=field_name in pk_columns,
+                )
+            )
+
+    # If no columns found from schema, return minimal info
+    if not columns:
+        columns = [
+            TableInfoColumn(
+                name=pk_columns[0] if pk_columns else "_id",
+                type="text",
+                nullable=False,
+                is_primary_key=True,
+            )
+        ]
 
     return TableInfoResponse(
         table_name=table_name,

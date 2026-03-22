@@ -5,5 +5,11 @@ import re
 # Used by both the generator and validator to prevent injection.
 SAFE_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
+# NoSQL identifiers allow dots and dashes (e.g. MongoDB collections, ES indices).
+NOSQL_SAFE_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.\-]*$")
+
 # Supported SQL dialects for DML generation
 SUPPORTED_DIALECTS = frozenset({"postgresql", "sqlite", "duckdb", "oracle", "mysql", "mssql"})
+
+# NoSQL database types
+NOSQL_TYPES = frozenset({"mongodb", "redis", "cassandra", "dynamodb", "elasticsearch"})

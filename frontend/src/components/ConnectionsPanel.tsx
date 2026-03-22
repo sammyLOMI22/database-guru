@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Database, Plus, Trash2, Check, Circle, Pencil, Loader2 } from 'lucide-react';
+import { Database, Plus, Trash2, Check, Circle, Pencil, Loader2, Shield } from 'lucide-react';
 import DatabaseConnectionModal from './DatabaseConnectionModal';
+import WritePermissionsModal from './WritePermissionsModal';
 
 interface DatabaseConnection {
   id: number;
@@ -22,6 +23,7 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingConnection, setEditingConnection] = useState<DatabaseConnection | undefined>();
   const [loading, setLoading] = useState(false);
+  const [permissionsConn, setPermissionsConn] = useState<DatabaseConnection | null>(null);
 
   // Load connections on mount
   useEffect(() => {
@@ -182,6 +184,16 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          setPermissionsConn(conn);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded transition-all"
+                        title="Write Permissions"
+                      >
+                        <Shield className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleEditConnection(conn);
                         }}
                         className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
@@ -218,13 +230,21 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modals */}
       <DatabaseConnectionModal
         isOpen={isModalOpen}
         onClose={() => !loading && setIsModalOpen(false)}
         onSave={handleSaveConnection}
         connection={editingConnection}
       />
+      {permissionsConn && (
+        <WritePermissionsModal
+          isOpen={!!permissionsConn}
+          onClose={() => setPermissionsConn(null)}
+          connectionId={permissionsConn.id}
+          connectionName={permissionsConn.name}
+        />
+      )}
     </div>
   );
 }

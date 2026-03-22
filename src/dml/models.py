@@ -34,6 +34,7 @@ class DMLStatement(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict)
     change_type: ChangeType
     table_name: str
+    native_operation: Optional[Dict[str, Any]] = None
 
 
 class DMLPreviewRequest(BaseModel):

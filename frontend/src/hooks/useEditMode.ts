@@ -4,23 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import { dmlAPI } from '../services/dmlApi';
 import type { WritePermission } from '../types/dml';
 
-const NOSQL_TYPES = new Set([
-  'mongodb',
-  'redis',
-  'cassandra',
-  'dynamodb',
-  'elasticsearch',
-]);
-
 interface UseEditModeOptions {
   connectionId: number | null;
   databaseType: string | null;
 }
 
-export function useEditMode({ connectionId, databaseType }: UseEditModeOptions) {
+export function useEditMode({ connectionId }: UseEditModeOptions) {
   const [isEditMode, setIsEditMode] = useState(false);
-
-  const isNoSQL = databaseType ? NOSQL_TYPES.has(databaseType) : false;
 
   const {
     data: permissions,
@@ -28,19 +18,19 @@ export function useEditMode({ connectionId, databaseType }: UseEditModeOptions) 
   } = useQuery<WritePermission>({
     queryKey: ['dml-permissions', connectionId],
     queryFn: () => dmlAPI.getPermissions(connectionId!),
-    enabled: connectionId !== null && !isNoSQL,
+    enabled: connectionId !== null,
     staleTime: 30_000,
   });
 
   const canEdit = useMemo(() => {
-    if (!connectionId || isNoSQL || !permissions) return false;
+    if (!connectionId || !permissions) return false;
     return (
       permissions.write_enabled &&
       (permissions.allow_insert ||
         permissions.allow_update ||
         permissions.allow_delete)
     );
-  }, [connectionId, isNoSQL, permissions]);
+  }, [connectionId, permissions]);
 
   const toggleEditMode = useCallback(() => {
     if (canEdit) {
@@ -54,7 +44,6 @@ export function useEditMode({ connectionId, databaseType }: UseEditModeOptions) 
 
   const disabledReason = useMemo((): string | null => {
     if (!connectionId) return 'No active connection';
-    if (isNoSQL) return 'Edit mode is not available for NoSQL databases';
     if (permissionsLoading) return 'Loading permissions...';
     if (!permissions?.write_enabled) return 'Write permissions not configured for this connection';
     if (
@@ -64,7 +53,7 @@ export function useEditMode({ connectionId, databaseType }: UseEditModeOptions) 
     )
       return 'No write operations are allowed on this connection';
     return null;
-  }, [connectionId, isNoSQL, permissionsLoading, permissions]);
+  }, [connectionId, permissionsLoading, permissions]);
 
   return {
     isEditMode,
@@ -74,6 +63,5 @@ export function useEditMode({ connectionId, databaseType }: UseEditModeOptions) 
     toggleEditMode,
     exitEditMode,
     disabledReason,
-    isNoSQL,
   };
 }
