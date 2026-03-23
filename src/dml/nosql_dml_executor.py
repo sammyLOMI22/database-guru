@@ -106,29 +106,48 @@ async def _execute_mongodb(
     client, db = await pool.get_client(connection)
 
     total = 0
-    async with await client.start_session() as session:
-        async with session.start_transaction():
-            for stmt in statements:
-                op = stmt.native_operation or {}
-                method = op.get("method")
-                collection = db[op["collection"]]
 
-                if method == "insert_one":
-                    doc = _mongo_convert_id(op["document"])
-                    await collection.insert_one(doc, session=session)
-                    total += 1
-                elif method == "update_one":
-                    filt = _mongo_convert_id(op["filter"])
-                    result = await collection.update_one(
-                        filt, op["update"], session=session
-                    )
-                    total += result.modified_count
-                elif method == "delete_one":
-                    filt = _mongo_convert_id(op["filter"])
-                    result = await collection.delete_one(filt, session=session)
-                    total += result.deleted_count
-                else:
-                    raise ValueError(f"Unknown MongoDB DML method: {method}")
+    async def _run_ops(session=None):
+        nonlocal total
+        for stmt in statements:
+            op = stmt.native_operation or {}
+            method = op.get("method")
+            collection = db[op["collection"]]
+            kwargs = {"session": session} if session else {}
+
+            if method == "insert_one":
+                doc = _mongo_convert_id(op["document"])
+                await collection.insert_one(doc, **kwargs)
+                total += 1
+            elif method == "update_one":
+                filt = _mongo_convert_id(op["filter"])
+                result = await collection.update_one(
+                    filt, op["update"], **kwargs
+                )
+                total += result.modified_count
+            elif method == "delete_one":
+                filt = _mongo_convert_id(op["filter"])
+                result = await collection.delete_one(filt, **kwargs)
+                total += result.deleted_count
+            else:
+                raise ValueError(f"Unknown MongoDB DML method: {method}")
+
+    # Try transactional execution (requires replica set); fall back to
+    # non-transactional on standalone instances.
+    try:
+        async with await client.start_session() as session:
+            async with session.start_transaction():
+                await _run_ops(session)
+    except Exception as tx_err:
+        err_name = type(tx_err).__name__
+        if "ConfigurationError" in err_name or "transaction" in str(tx_err).lower():
+            logger.warning(
+                "MongoDB transactions not supported (standalone?), executing without transaction: %s", tx_err
+            )
+            total = 0
+            await _run_ops()
+        else:
+            raise
 
     return total
 
@@ -190,7 +209,10 @@ async def _execute_dynamodb(
         for stmt in statements:
             op = stmt.native_operation or {}
             partiql = op["partiql"]
-            resp = await client.execute_statement(Statement=partiql)
+            kwargs = {"Statement": partiql}
+            if op.get("parameters"):
+                kwargs["Parameters"] = op["parameters"]
+            resp = await client.execute_statement(**kwargs)
             # DynamoDB doesn't return affected count for writes, count 1 per statement
             total += 1
 

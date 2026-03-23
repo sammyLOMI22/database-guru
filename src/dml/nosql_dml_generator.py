@@ -161,7 +161,7 @@ def _cql_val(v: Any) -> str:
     if v is None:
         return "null"
     if isinstance(v, str):
-        return f"'{v}'"
+        return f"'{v.replace(chr(39), chr(39)+chr(39))}'"
     return str(v)
 
 
@@ -178,24 +178,44 @@ def _dynamodb_generate(change: RowChangeSchema) -> DMLStatement:
             f"'{k}': {_partiql_val(v)}" for k, v in doc.items()
         )
         display = f"INSERT INTO {quoted_table} VALUE {{{val_str}}}"
-        native = {"partiql": display}
+        # Use ? placeholders for safe parameterized execution
+        param_val_str = ", ".join(f"'{k}': ?" for k in doc)
+        parameterized = f"INSERT INTO {quoted_table} VALUE {{{param_val_str}}}"
+        native = {
+            "partiql": parameterized,
+            "parameters": [_partiql_typed(v) for v in doc.values()],
+        }
 
     elif change.change_type == ChangeType.UPDATE:
-        sets = " SET ".join(
+        sets = ", ".join(
             f"{c.column} = {_partiql_val(c.new_value)}" for c in change.changes
         )
         where = " AND ".join(
             f"{k} = {_partiql_val(v)}" for k, v in change.primary_key.items()
         )
         display = f"UPDATE {quoted_table} SET {sets} WHERE {where}"
-        native = {"partiql": display}
+        param_sets = ", ".join(f"{c.column} = ?" for c in change.changes)
+        param_where = " AND ".join(f"{k} = ?" for k in change.primary_key)
+        parameterized = f"UPDATE {quoted_table} SET {param_sets} WHERE {param_where}"
+        native = {
+            "partiql": parameterized,
+            "parameters": (
+                [_partiql_typed(c.new_value) for c in change.changes]
+                + [_partiql_typed(v) for v in change.primary_key.values()]
+            ),
+        }
 
     else:  # DELETE
         where = " AND ".join(
             f"{k} = {_partiql_val(v)}" for k, v in change.primary_key.items()
         )
         display = f"DELETE FROM {quoted_table} WHERE {where}"
-        native = {"partiql": display}
+        param_where = " AND ".join(f"{k} = ?" for k in change.primary_key)
+        parameterized = f"DELETE FROM {quoted_table} WHERE {param_where}"
+        native = {
+            "partiql": parameterized,
+            "parameters": [_partiql_typed(v) for v in change.primary_key.values()],
+        }
 
     return DMLStatement(
         display_sql=display,
@@ -217,6 +237,19 @@ def _partiql_val(v: Any) -> str:
     return f"'{v}'"
 
 
+def _partiql_typed(v: Any) -> Dict[str, Any]:
+    """Convert a Python value to a DynamoDB typed parameter dict."""
+    if v is None:
+        return {"NULL": True}
+    if isinstance(v, bool):
+        return {"BOOL": v}
+    if isinstance(v, int):
+        return {"N": str(v)}
+    if isinstance(v, float):
+        return {"N": str(v)}
+    return {"S": str(v)}
+
+
 # ── Elasticsearch ──────────────────────────────────────────────────
 
 
@@ -227,14 +260,15 @@ def _elasticsearch_generate(change: RowChangeSchema) -> DMLStatement:
     if change.change_type == ChangeType.INSERT:
         doc = change.new_row_data or {}
         display = f"POST /{index}/_doc\n{json.dumps(doc, indent=2, default=str)}"
+        body = {k: v for k, v in doc.items() if k != "_id"}
         native = {
             "method": "index",
             "index": index,
-            "body": doc,
+            "body": body,
         }
-        # If new_row_data has _id, use it
+        # If new_row_data has _id, use it as the document ID
         if doc.get("_id"):
-            native["id"] = str(doc.pop("_id"))
+            native["id"] = str(doc["_id"])
 
     elif change.change_type == ChangeType.UPDATE:
         updates = {c.column: c.new_value for c in change.changes}
