@@ -217,9 +217,12 @@ class TestGetNoSQLTableInfo:
         mock_inspector.get_schema.return_value = {
             "tables": {
                 "users": {
-                    "name": "string",
-                    "_id": "ObjectId",
-                    "email": "string",
+                    "columns": [
+                        {"name": "_id", "type": "ObjectId", "nullable": False},
+                        {"name": "name", "type": "string", "nullable": True},
+                        {"name": "email", "type": "string", "nullable": True},
+                    ],
+                    "row_count": 42,
                 }
             }
         }
@@ -242,9 +245,12 @@ class TestGetNoSQLTableInfo:
         mock_inspector.get_schema.return_value = {
             "tables": {
                 "Orders": {
-                    "order_id": {"type": "S", "key_type": "HASH"},
-                    "sort_key": {"type": "S", "key_type": "RANGE"},
-                    "amount": {"type": "N"},
+                    "columns": [
+                        {"name": "order_id", "type": "string", "nullable": False, "kind": "hash"},
+                        {"name": "sort_key", "type": "string", "nullable": False, "kind": "range"},
+                        {"name": "amount", "type": "number", "nullable": True, "kind": "regular"},
+                    ],
+                    "row_count": 100,
                 }
             }
         }
@@ -262,9 +268,12 @@ class TestGetNoSQLTableInfo:
         mock_inspector.get_schema.return_value = {
             "tables": {
                 "events": {
-                    "event_id": {"type": "uuid", "kind": "partition_key"},
-                    "ts": {"type": "timestamp", "kind": "clustering"},
-                    "data": {"type": "text"},
+                    "columns": [
+                        {"name": "event_id", "type": "uuid", "nullable": True, "kind": "partition_key"},
+                        {"name": "ts", "type": "timestamp", "nullable": True, "kind": "clustering"},
+                        {"name": "data", "type": "text", "nullable": True, "kind": "regular"},
+                    ],
+                    "row_count": 0,
                 }
             }
         }
@@ -296,11 +305,17 @@ class TestGetNoSQLTableInfo:
         mock_inspector = AsyncMock()
         mock_inspector.get_schema.return_value = {
             "tables": {
-                "user:1": {"name": "string", "age": "string"}
+                "user:*": {
+                    "columns": [
+                        {"name": "key", "type": "string", "nullable": False},
+                        {"name": "value", "type": "hash", "nullable": False},
+                    ],
+                    "row_count": 5,
+                }
             }
         }
         conn = _make_connection("redis")
         with patch("src.nosql.router.get_nosql_inspector", new_callable=AsyncMock, return_value=(mock_inspector, None)):
-            result = await _get_nosql_table_info(conn, "user:1")
+            result = await _get_nosql_table_info(conn, "user:*")
 
         assert "key" in result.primary_key_columns

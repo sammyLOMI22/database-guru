@@ -93,3 +93,31 @@ PR Review: NoSQL DML Support (Latest Commit)
   Should fix: Items 1, 5, 6, 9.                                                                                                         
                   
   Nice to have: Items 7, 8, 10, 11, 12.
+
+  Codex:
+  1. High: src/api/endpoints/dml.py:342 is written against the wrong schema shape. It treats schema["tables"][name] as a {field_name:
+     field_info} map and iterates fields.items() (src/api/endpoints/dml.py:368-399), but every real inspector returns {"columns": [...],
+     "row_count": ...} instead (src/nosql/mongodb/schema_inspector.py:95-98, src/nosql/dynamodb/schema_inspector.py:104-108, src/nosql/
+     cassandra/schema_inspector.py:40-48, src/nosql/elasticsearch/schema_inspector.py:42-49, src/nosql/redis/schema_inspector.py:67-88).
+     In production this will produce bogus columns like columns/row_count, and DynamoDB/Cassandra PK extraction will never see kind/
+     key_type, so NoSQL edit mode cannot build correct PK metadata.
+  2. High: Redis DML is blocked by the identifier regex. The NoSQL regex only allows letters, digits, _, ., and - (src/dml/
+     constants.py:8-9), and both validation and table-info enforce it (src/dml/dml_validator.py:102-116, src/api/endpoints/dml.py:295-
+     300). Real Redis keys/patterns here are colon-delimited and may contain * (src/nosql/redis/schema_inspector.py:90-107), so requests
+     like user:1 or user:* will be rejected before execution. That makes the Redis DML path effectively unusable.
+  3. High: the frontend never enables edit mode for MongoDB, Redis, or Elasticsearch results. extractTableName() only understands
+     SELECT ... FROM ... SQL (frontend/src/components/edit/EditModeWrapper.tsx:21-38), and edit mode is gated on that parse succeeding
+     (frontend/src/components/edit/EditModeWrapper.tsx:55-78). But the displayed NoSQL queries are db.collection.find(...), raw Redis
+     commands, and GET /index/_search (src/nosql/mongodb/mql_generator.py:196-230, src/nosql/redis/command_generator.py:182-184, src/
+     nosql/elasticsearch/query_dsl_generator.py:118-122). So the branch adds backend NoSQL DML support that the UI cannot reach for 3/5
+     NoSQL backends.
+  4. Medium: the NoSQL table-info tests validate a schema format that production never returns, so they would not catch finding #1. The
+     tests mock {"tables": {"users": {"name": "string", ...}}} and similar flat field maps (tests/dml/test_nosql_dml_executor.py:212-
+     306), while the real inspectors all return a columns array. The current coverage therefore gives false confidence around the most
+     fragile part of the NoSQL DML integration.
+
+  Assumptions:
+
+  - I focused on reviewable correctness issues and did not inspect every frontend component outside the edit-mode path.
+  - I could not run the test suite locally because pytest is not installed in this environment (python3 -m pytest --version failed with
+    No module named pytest).

@@ -365,36 +365,36 @@ async def _get_nosql_table_info(
     columns = []
     pk_columns = default_pks or []
 
-    # All NoSQL inspectors use "tables" key in their schema dict
+    # All NoSQL inspectors return {"tables": {name: {"columns": [...], "row_count": N}}}
     collections = schema.get("tables", {})
     if isinstance(collections, dict) and table_name in collections:
         table_schema = collections[table_name]
-        fields = table_schema if isinstance(table_schema, dict) else {}
+        col_list = table_schema.get("columns", []) if isinstance(table_schema, dict) else []
 
-        # DynamoDB / Cassandra have key info in schema
+        # DynamoDB: columns with kind == "hash" or "range" are keys
         if db_type == "dynamodb":
             pk_columns = [
-                k for k, v in fields.items()
-                if isinstance(v, dict) and v.get("key_type")
+                c["name"] for c in col_list
+                if isinstance(c, dict) and c.get("kind") in ("hash", "range")
             ] or ["pk"]
+        # Cassandra: columns with kind == "partition_key" or "clustering" are keys
         elif db_type == "cassandra":
             pk_columns = [
-                k for k, v in fields.items()
-                if isinstance(v, dict) and v.get("kind") in ("partition_key", "clustering")
+                c["name"] for c in col_list
+                if isinstance(c, dict) and c.get("kind") in ("partition_key", "clustering")
             ] or ["id"]
 
-        for field_name, field_info in fields.items():
-            ftype = "text"
-            if isinstance(field_info, str):
-                ftype = field_info
-            elif isinstance(field_info, dict):
-                ftype = field_info.get("type", "text")
+        for col in col_list:
+            if not isinstance(col, dict):
+                continue
+            col_name = col.get("name", "")
+            col_type = col.get("type", "text")
             columns.append(
                 TableInfoColumn(
-                    name=field_name,
-                    type=ftype,
-                    nullable=True,
-                    is_primary_key=field_name in pk_columns,
+                    name=col_name,
+                    type=col_type,
+                    nullable=col.get("nullable", True),
+                    is_primary_key=col_name in pk_columns,
                 )
             )
 

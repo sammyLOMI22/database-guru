@@ -18,20 +18,39 @@ interface EditModeWrapperProps {
 }
 
 /**
- * Parse a simple "SELECT ... FROM table_name ..." to extract the table name.
- * Returns null for JOINs, subqueries, or unparseable SQL.
+ * Extract the target table/collection name from a query string.
+ * Supports SQL (SELECT ... FROM ...), MongoDB (db.collection.find/aggregate/...),
+ * Elasticsearch (GET /index/_search), and Redis key patterns.
+ * Returns null for JOINs, subqueries, or unparseable queries.
  */
 function extractTableName(sql: string): string | null {
   if (!sql) return null;
   const normalized = sql.replace(/\s+/g, ' ').trim();
 
+  // MongoDB: db.collection.find(...) / db.collection.aggregate(...) etc.
+  const mongoMatch = normalized.match(
+    /^db\.([A-Za-z_]\w*)\.(?:find|findOne|aggregate|countDocuments|distinct)\s*\(/
+  );
+  if (mongoMatch) return mongoMatch[1];
+
+  // Elasticsearch: GET /index/_search
+  const esMatch = normalized.match(/^GET\s+\/([A-Za-z_][\w.\-]*)\/_(search|count)/i);
+  if (esMatch) return esMatch[1];
+
+  // Redis: HGETALL key, GET key, etc. — extract the key as table name
+  const redisMatch = normalized.match(
+    /^(HGETALL|HGET|GET|MGET|SMEMBERS|LRANGE|ZRANGE|TYPE|TTL)\s+(\S+)/i
+  );
+  if (redisMatch) return redisMatch[2];
+
+  // SQL / CQL / PartiQL: SELECT ... FROM table_name
   // Reject JOINs and subqueries
   if (/\bJOIN\b/i.test(normalized)) return null;
   if (/\(\s*SELECT\b/i.test(normalized)) return null;
 
   // Match: FROM table_name (with optional schema prefix)
   const match = normalized.match(
-    /\bFROM\s+(?:["'`\[]?(\w+)["'`\]]?\.)?["'`\[]?(\w+)["'`\]]?/i
+    /\bFROM\s+(?:["'`\[]?(\w+)["'`\]]?\.)?["'`\[]?([\w:.\-]+)["'`\]]?/i
   );
   if (!match) return null;
   return match[2]; // table name without schema
