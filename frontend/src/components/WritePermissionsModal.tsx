@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Loader2, Shield, ShieldCheck } from 'lucide-react';
 import { dmlAPI } from '../services/dmlApi';
 import type { WritePermission, WritePermissionRequest } from '../types/dml';
@@ -39,6 +39,25 @@ export default function WritePermissionsModal({ isOpen, onClose, connectionId, c
   const [allowDelete, setAllowDelete] = useState(false);
   const [requireWhere, setRequireWhere] = useState(true);
   const [maxRows, setMaxRows] = useState(100);
+  const [allowedTables, setAllowedTables] = useState<string[] | null>(null);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Close on Escape key
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onClose();
+    },
+    [onClose, saving]
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    document.addEventListener('keydown', handleKeyDown);
+    // Focus the panel for keyboard accessibility
+    panelRef.current?.focus();
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, handleKeyDown]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -53,6 +72,7 @@ export default function WritePermissionsModal({ isOpen, onClose, connectionId, c
         setAllowDelete(perms.allow_delete);
         setRequireWhere(perms.require_where_clause);
         setMaxRows(perms.max_rows_per_operation);
+        setAllowedTables(perms.allowed_tables);
       })
       .catch(() => {
         // No permissions yet — defaults are fine
@@ -75,6 +95,7 @@ export default function WritePermissionsModal({ isOpen, onClose, connectionId, c
         allow_delete: allowDelete,
         require_where_clause: requireWhere,
         max_rows_per_operation: maxRows,
+        allowed_tables: allowedTables,
       };
       await dmlAPI.updatePermissions(connectionId, request);
       setSuccess(true);
@@ -88,8 +109,15 @@ export default function WritePermissionsModal({ isOpen, onClose, connectionId, c
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-xl animate-fadeIn p-4">
-      <div className="glass-panel bg-white/5 dark:bg-black/40 rounded-[2rem] shadow-2xl border-white/10 max-w-lg w-full overflow-hidden relative shadow-[0_30px_100px_rgba(0,0,0,0.5)]">
+    <div
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-xl animate-fadeIn p-4"
+      onClick={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}
+    >
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className="glass-panel bg-white/5 dark:bg-black/40 rounded-[2rem] shadow-2xl border-white/10 max-w-lg w-full overflow-hidden relative shadow-[0_30px_100px_rgba(0,0,0,0.5)] outline-none"
+      >
         {/* Glow */}
         <div className="absolute top-0 left-0 w-48 h-48 bg-emerald-500/5 blur-[80px] -ml-24 -mt-24 pointer-events-none" />
 

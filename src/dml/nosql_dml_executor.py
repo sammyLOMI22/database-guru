@@ -178,9 +178,22 @@ async def _execute_cassandra(
     loop = asyncio.get_running_loop()
 
     def _run_batch():
-        from cassandra.query import BatchStatement, ConsistencyLevel
+        from cassandra.query import BatchStatement, BatchType, ConsistencyLevel
 
-        batch = BatchStatement(consistency_level=ConsistencyLevel.LOCAL_QUORUM)
+        # Use UNLOGGED batch when statements span multiple tables to avoid
+        # the coordinator-level overhead of logged cross-partition batches.
+        tables = {s.table_name for s in statements}
+        batch_type = BatchType.UNLOGGED if len(tables) > 1 else BatchType.LOGGED
+        if len(tables) > 1:
+            logger.info(
+                "Cassandra batch spans %d tables — using UNLOGGED batch",
+                len(tables),
+            )
+
+        batch = BatchStatement(
+            batch_type=batch_type,
+            consistency_level=ConsistencyLevel.LOCAL_QUORUM,
+        )
         for stmt in statements:
             op = stmt.native_operation or {}
             cql = op["cql"]
@@ -275,17 +288,29 @@ async def _execute_redis(
 
         if command == "HSET":
             pipe.hset(op["key"], mapping=op["mapping"])
-            total += 1
         elif command == "HDEL":
             pipe.hdel(op["key"], *op["fields"])
-            total += 1
         elif command == "DEL":
             pipe.delete(op["key"])
-            total += 1
         else:
             raise ValueError(f"Unknown Redis DML command: {command}")
 
-    await pipe.execute()
+    results = await pipe.execute()
+
+    # Check each result for errors — pipeline wraps per-command failures
+    errors = []
+    for i, res in enumerate(results):
+        if isinstance(res, Exception):
+            errors.append(f"Command {i + 1}: {res}")
+        else:
+            total += 1
+
+    if errors:
+        raise RuntimeError(
+            f"{len(errors)} of {len(results)} Redis commands failed: "
+            + "; ".join(errors)
+        )
+
     return total
 
 
