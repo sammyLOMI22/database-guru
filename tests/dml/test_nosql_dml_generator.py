@@ -138,7 +138,11 @@ class TestDynamoDBDMLGenerator:
         stmts = self._gen().generate_statements(changes)
         s = stmts[0]
         assert 'INSERT INTO "Users"' in s.display_sql
-        assert s.native_operation["partiql"].startswith('INSERT INTO "Users"')
+        # Native operation uses parameterized PartiQL
+        assert "?" in s.native_operation["partiql"]
+        assert s.native_operation["parameters"] == [
+            {"S": "user1"}, {"S": "Alice"},
+        ]
 
     def test_update(self):
         changes = [
@@ -154,6 +158,29 @@ class TestDynamoDBDMLGenerator:
         assert 'UPDATE "Users"' in s.display_sql
         assert "SET name" in s.display_sql
         assert "WHERE pk" in s.display_sql
+        # Parameterized native with ? placeholders
+        assert "?" in s.native_operation["partiql"]
+        assert s.native_operation["parameters"] == [
+            {"S": "Bob"}, {"S": "user1"},
+        ]
+
+    def test_update_display_uses_comma_separated_sets(self):
+        """Multiple SET columns should be comma-separated, not repeated SET keywords."""
+        changes = [
+            RowChangeSchema(
+                change_type=ChangeType.UPDATE,
+                table_name="Users",
+                primary_key={"pk": "u1"},
+                changes=[
+                    CellChangeSchema(column="name", new_value="Bob"),
+                    CellChangeSchema(column="age", new_value=30),
+                ],
+            )
+        ]
+        stmts = self._gen().generate_statements(changes)
+        # "SET name = 'Bob', age = 30" — not "SET name = 'Bob' SET age = 30"
+        assert "SET name" in stmts[0].display_sql
+        assert ", age" in stmts[0].display_sql
 
     def test_delete(self):
         changes = [
@@ -166,6 +193,23 @@ class TestDynamoDBDMLGenerator:
         stmts = self._gen().generate_statements(changes)
         s = stmts[0]
         assert 'DELETE FROM "Users"' in s.display_sql
+        assert "?" in s.native_operation["partiql"]
+        assert s.native_operation["parameters"] == [{"S": "user1"}]
+
+    def test_insert_typed_parameters(self):
+        """Verify different value types produce correct DynamoDB typed params."""
+        changes = [
+            RowChangeSchema(
+                change_type=ChangeType.INSERT,
+                table_name="Items",
+                new_row_data={"id": 42, "active": True, "label": None},
+            )
+        ]
+        stmts = self._gen().generate_statements(changes)
+        params = stmts[0].native_operation["parameters"]
+        assert params[0] == {"N": "42"}
+        assert params[1] == {"BOOL": True}
+        assert params[2] == {"NULL": True}
 
 
 # ── Elasticsearch ──────────────────────────────────────────────────
@@ -281,6 +325,48 @@ class TestRedisDMLGenerator:
         s = stmts[0]
         assert "DEL user:1" in s.display_sql
         assert s.native_operation["command"] == "DEL"
+
+
+# ── Elasticsearch regression: no input mutation ───────────────────
+
+
+class TestElasticsearchNoMutation:
+    def test_insert_with_id_does_not_mutate_input(self):
+        """Ensure _id is not popped from the original new_row_data."""
+        gen = NoSQLDMLGenerator(database_type="elasticsearch")
+        row_data = {"_id": "doc99", "name": "Alice"}
+        changes = [
+            RowChangeSchema(
+                change_type=ChangeType.INSERT,
+                table_name="users",
+                new_row_data=row_data,
+            )
+        ]
+        stmts = gen.generate_statements(changes)
+        # _id should be used as the doc id but NOT removed from original
+        assert row_data.get("_id") == "doc99"
+        assert stmts[0].native_operation["id"] == "doc99"
+        # body should not contain _id
+        assert "_id" not in stmts[0].native_operation["body"]
+
+
+# ── CQL escaping ──────────────────────────────────────────────────
+
+
+class TestCQLEscaping:
+    def test_single_quote_in_value_is_escaped(self):
+        gen = NoSQLDMLGenerator(database_type="cassandra")
+        changes = [
+            RowChangeSchema(
+                change_type=ChangeType.UPDATE,
+                table_name="users",
+                primary_key={"id": 1},
+                changes=[CellChangeSchema(column="name", new_value="O'Brien")],
+            )
+        ]
+        stmts = gen.generate_statements(changes)
+        # Display should have escaped quote
+        assert "O''Brien" in stmts[0].display_sql
 
 
 # ── Unsupported type ───────────────────────────────────────────────

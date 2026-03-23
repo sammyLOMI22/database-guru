@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.dml.models import ChangeType, DMLStatement, ExecutionResult
 from src.dml import nosql_dml_executor
-from src.dml.nosql_dml_executor import NoSQLDMLExecutor
+from src.dml.nosql_dml_executor import NoSQLDMLExecutor, _execute_mongodb, _execute_redis, _execute_cassandra, _execute_dynamodb, _execute_elasticsearch
 
 
 def _make_stmt(
@@ -183,3 +183,124 @@ class TestAuditLogging:
         with p:
             result = await NoSQLDMLExecutor().execute(_make_connection("mongodb"), [stmt], metadata_db)
         assert "insertOne" in result.executed_sql
+
+
+# ── Import smoke test ─────────────────────────────────────────────
+
+
+class TestExecutorImports:
+    """Verify all per-DB executor functions are importable and callable."""
+
+    def test_all_executors_are_async_callables(self):
+        import asyncio
+        for fn in [_execute_mongodb, _execute_redis, _execute_cassandra, _execute_dynamodb, _execute_elasticsearch]:
+            assert callable(fn)
+            assert asyncio.iscoroutinefunction(fn)
+
+    def test_registry_matches_exports(self):
+        assert set(nosql_dml_executor._EXECUTORS.keys()) == {
+            "mongodb", "redis", "cassandra", "dynamodb", "elasticsearch",
+        }
+
+
+# ── _get_nosql_table_info tests ───────────────────────────────────
+
+
+class TestGetNoSQLTableInfo:
+    """Test the _get_nosql_table_info helper from the DML endpoint module."""
+
+    @pytest.mark.asyncio
+    async def test_mongodb_table_info_from_schema(self):
+        from src.api.endpoints.dml import _get_nosql_table_info
+
+        mock_inspector = AsyncMock()
+        mock_inspector.get_schema.return_value = {
+            "tables": {
+                "users": {
+                    "name": "string",
+                    "_id": "ObjectId",
+                    "email": "string",
+                }
+            }
+        }
+        conn = _make_connection("mongodb")
+        with patch("src.nosql.router.get_nosql_inspector", new_callable=AsyncMock, return_value=(mock_inspector, None)):
+            result = await _get_nosql_table_info(conn, "users")
+
+        assert result.table_name == "users"
+        assert "_id" in result.primary_key_columns
+        assert len(result.columns) == 3
+        # _id should be marked as PK
+        id_col = next(c for c in result.columns if c.name == "_id")
+        assert id_col.is_primary_key is True
+
+    @pytest.mark.asyncio
+    async def test_dynamodb_extracts_key_columns(self):
+        from src.api.endpoints.dml import _get_nosql_table_info
+
+        mock_inspector = AsyncMock()
+        mock_inspector.get_schema.return_value = {
+            "tables": {
+                "Orders": {
+                    "order_id": {"type": "S", "key_type": "HASH"},
+                    "sort_key": {"type": "S", "key_type": "RANGE"},
+                    "amount": {"type": "N"},
+                }
+            }
+        }
+        conn = _make_connection("dynamodb")
+        with patch("src.nosql.router.get_nosql_inspector", new_callable=AsyncMock, return_value=(mock_inspector, None)):
+            result = await _get_nosql_table_info(conn, "Orders")
+
+        assert set(result.primary_key_columns) == {"order_id", "sort_key"}
+
+    @pytest.mark.asyncio
+    async def test_cassandra_extracts_partition_keys(self):
+        from src.api.endpoints.dml import _get_nosql_table_info
+
+        mock_inspector = AsyncMock()
+        mock_inspector.get_schema.return_value = {
+            "tables": {
+                "events": {
+                    "event_id": {"type": "uuid", "kind": "partition_key"},
+                    "ts": {"type": "timestamp", "kind": "clustering"},
+                    "data": {"type": "text"},
+                }
+            }
+        }
+        conn = _make_connection("cassandra")
+        with patch("src.nosql.router.get_nosql_inspector", new_callable=AsyncMock, return_value=(mock_inspector, None)):
+            result = await _get_nosql_table_info(conn, "events")
+
+        assert set(result.primary_key_columns) == {"event_id", "ts"}
+
+    @pytest.mark.asyncio
+    async def test_missing_table_returns_minimal_info(self):
+        from src.api.endpoints.dml import _get_nosql_table_info
+
+        mock_inspector = AsyncMock()
+        mock_inspector.get_schema.return_value = {"tables": {}}
+        conn = _make_connection("mongodb")
+        with patch("src.nosql.router.get_nosql_inspector", new_callable=AsyncMock, return_value=(mock_inspector, None)):
+            result = await _get_nosql_table_info(conn, "nonexistent")
+
+        # Should return minimal info with _id as default PK
+        assert len(result.columns) == 1
+        assert result.columns[0].name == "_id"
+        assert result.columns[0].is_primary_key is True
+
+    @pytest.mark.asyncio
+    async def test_redis_uses_key_as_pk(self):
+        from src.api.endpoints.dml import _get_nosql_table_info
+
+        mock_inspector = AsyncMock()
+        mock_inspector.get_schema.return_value = {
+            "tables": {
+                "user:1": {"name": "string", "age": "string"}
+            }
+        }
+        conn = _make_connection("redis")
+        with patch("src.nosql.router.get_nosql_inspector", new_callable=AsyncMock, return_value=(mock_inspector, None)):
+            result = await _get_nosql_table_info(conn, "user:1")
+
+        assert "key" in result.primary_key_columns
