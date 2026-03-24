@@ -184,16 +184,6 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setPermissionsConn(conn);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded transition-all"
-                        title="Write Permissions"
-                      >
-                        <Shield className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
                           handleEditConnection(conn);
                         }}
                         className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
@@ -213,6 +203,16 @@ export default function ConnectionsPanel({ onConnectionSelect, selectedConnectio
                       </button>
                     </div>
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPermissionsConn(conn);
+                    }}
+                    className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all w-full justify-center"
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    Write Permissions
+                  </button>
                 </div>
               );
             })}
