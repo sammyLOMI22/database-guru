@@ -132,3 +132,81 @@ def get_provider_registry(security_level: Optional[str] = None) -> ProviderRegis
     elif security_level is not None:
         _registry.security_level = security_level
     return _registry
+
+
+def initialize_registry_from_settings() -> ProviderRegistry:
+    """Create and populate the provider registry from application settings.
+
+    Registers Ollama (always) and any enabled providers (OpenAI, LM Studio, vLLM).
+    Called at application startup.
+    """
+    from src.config.settings import Settings
+    from src.llm.providers.ollama import OllamaProvider
+
+    settings = Settings()
+    registry = get_provider_registry(security_level=settings.DATA_SECURITY_LEVEL)
+
+    # Ollama is always registered (default local provider)
+    registry.register(OllamaProvider(
+        base_url=settings.OLLAMA_BASE_URL,
+        default_model=settings.OLLAMA_MODEL,
+    ))
+
+    # OpenAI (cloud_public)
+    if settings.OPENAI_ENABLED and settings.OPENAI_API_KEY:
+        from src.llm.providers.openai_provider import OpenAIProvider
+        registry.register(OpenAIProvider(
+            api_key=settings.OPENAI_API_KEY,
+            default_model=settings.OPENAI_DEFAULT_MODEL,
+            org_id=settings.OPENAI_ORG_ID,
+            base_url=settings.OPENAI_BASE_URL,
+        ))
+        logger.info("OpenAI provider registered")
+
+    # LM Studio (local)
+    if settings.LM_STUDIO_ENABLED:
+        from src.llm.providers.lm_studio import LMStudioProvider
+        registry.register(LMStudioProvider(
+            base_url=settings.LM_STUDIO_BASE_URL,
+            default_model=settings.LM_STUDIO_DEFAULT_MODEL,
+        ))
+        logger.info("LM Studio provider registered")
+
+    # vLLM (local)
+    if settings.VLLM_ENABLED:
+        from src.llm.providers.vllm import VLLMProvider
+        registry.register(VLLMProvider(
+            base_url=settings.VLLM_BASE_URL,
+            default_model=settings.VLLM_DEFAULT_MODEL,
+            api_key=settings.VLLM_API_KEY,
+        ))
+        logger.info("vLLM provider registered")
+
+    # Azure OpenAI (cloud_private)
+    if (settings.AZURE_OPENAI_ENABLED
+            and settings.AZURE_OPENAI_ENDPOINT
+            and settings.AZURE_OPENAI_API_KEY
+            and settings.AZURE_OPENAI_DEPLOYMENT_NAME):
+        from src.llm.providers.azure_openai import AzureOpenAIProvider
+        registry.register(AzureOpenAIProvider(
+            endpoint=settings.AZURE_OPENAI_ENDPOINT,
+            api_key=settings.AZURE_OPENAI_API_KEY,
+            deployment_name=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
+            api_version=settings.AZURE_OPENAI_API_VERSION,
+        ))
+        logger.info("Azure OpenAI provider registered")
+
+    # Anthropic (cloud_public)
+    if settings.ANTHROPIC_ENABLED and settings.ANTHROPIC_API_KEY:
+        from src.llm.providers.anthropic import AnthropicProvider
+        registry.register(AnthropicProvider(
+            api_key=settings.ANTHROPIC_API_KEY,
+            default_model=settings.ANTHROPIC_DEFAULT_MODEL,
+        ))
+        logger.info("Anthropic provider registered")
+
+    logger.info(
+        f"Provider registry initialized: {registry.list_available()} "
+        f"(security_level={registry.security_level})"
+    )
+    return registry

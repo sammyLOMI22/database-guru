@@ -7,7 +7,20 @@ from src.llm.providers.base import (
     ModelInfo,
 )
 from src.llm.providers.types import ChatMessage, ProviderConfig
-from src.llm.providers.registry import ProviderRegistry, get_provider_registry
+from src.llm.providers.registry import (
+    ProviderRegistry,
+    get_provider_registry,
+    initialize_registry_from_settings,
+    ProviderNotFoundError,
+    DataSecurityError,
+)
+from src.llm.providers.ollama import OllamaProvider
+from src.llm.providers.openai_compat import OpenAICompatibleProvider
+from src.llm.providers.openai_provider import OpenAIProvider
+from src.llm.providers.lm_studio import LMStudioProvider
+from src.llm.providers.vllm import VLLMProvider
+from src.llm.providers.azure_openai import AzureOpenAIProvider
+from src.llm.providers.anthropic import AnthropicProvider
 
 __all__ = [
     "BaseLLMProvider",
@@ -19,4 +32,14 @@ __all__ = [
     "ProviderConfig",
     "ProviderRegistry",
     "get_provider_registry",
+    "initialize_registry_from_settings",
+    "ProviderNotFoundError",
+    "DataSecurityError",
+    "OllamaProvider",
+    "OpenAICompatibleProvider",
+    "OpenAIProvider",
+    "LMStudioProvider",
+    "VLLMProvider",
+    "AzureOpenAIProvider",
+    "AnthropicProvider",
 ]

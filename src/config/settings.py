@@ -27,10 +27,43 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_USER: int = 200  # Requests per minute for authenticated users
     RATE_LIMIT_LLM_PER_USER: int = 30  # LLM calls per minute for authenticated users
 
+    # LLM Provider Security
+    DATA_SECURITY_LEVEL: str = "local_only"  # local_only | cloud_private | unrestricted
+
     # Ollama - Auto-detect local or Docker
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2:latest"  # Default model
     OLLAMA_ALLOW_MODEL_SELECTION: bool = True  # Allow users to choose models
+
+    # OpenAI (cloud_public)
+    OPENAI_ENABLED: bool = False
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_ORG_ID: Optional[str] = None
+    OPENAI_DEFAULT_MODEL: str = "gpt-4o"
+    OPENAI_BASE_URL: str = "https://api.openai.com"
+
+    # LM Studio (local)
+    LM_STUDIO_ENABLED: bool = False
+    LM_STUDIO_BASE_URL: str = "http://localhost:1234"
+    LM_STUDIO_DEFAULT_MODEL: str = "default"
+
+    # vLLM (local)
+    VLLM_ENABLED: bool = False
+    VLLM_BASE_URL: str = "http://localhost:8000"
+    VLLM_DEFAULT_MODEL: str = "default"
+    VLLM_API_KEY: Optional[str] = None
+
+    # Azure OpenAI (cloud_private)
+    AZURE_OPENAI_ENABLED: bool = False
+    AZURE_OPENAI_ENDPOINT: Optional[str] = None  # https://<resource>.openai.azure.com
+    AZURE_OPENAI_API_KEY: Optional[str] = None
+    AZURE_OPENAI_API_VERSION: str = "2024-02-15-preview"
+    AZURE_OPENAI_DEPLOYMENT_NAME: Optional[str] = None
+
+    # Anthropic (cloud_public)
+    ANTHROPIC_ENABLED: bool = False
+    ANTHROPIC_API_KEY: Optional[str] = None
+    ANTHROPIC_DEFAULT_MODEL: str = "claude-sonnet-4-20250514"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
