@@ -205,6 +205,30 @@ def initialize_registry_from_settings() -> ProviderRegistry:
         ))
         logger.info("Anthropic provider registered")
 
+    # Google Vertex AI (cloud_private)
+    if settings.GOOGLE_VERTEX_ENABLED and settings.GOOGLE_VERTEX_PROJECT_ID:
+        from src.llm.providers.google_vertex import GoogleVertexProvider
+        registry.register(GoogleVertexProvider(
+            project_id=settings.GOOGLE_VERTEX_PROJECT_ID,
+            region=settings.GOOGLE_VERTEX_REGION,
+            default_model=settings.GOOGLE_VERTEX_DEFAULT_MODEL,
+            api_key=settings.GOOGLE_VERTEX_API_KEY,
+        ))
+        logger.info("Google Vertex AI provider registered")
+
+    # AWS Bedrock (cloud_private)
+    if settings.AWS_BEDROCK_ENABLED:
+        from src.llm.providers.aws_bedrock import AWSBedrockProvider
+        registry.register(AWSBedrockProvider(
+            region=settings.AWS_BEDROCK_REGION,
+            default_model=settings.AWS_BEDROCK_DEFAULT_MODEL,
+            access_key_id=settings.AWS_BEDROCK_ACCESS_KEY_ID,
+            secret_access_key=settings.AWS_BEDROCK_SECRET_ACCESS_KEY,
+            session_token=settings.AWS_BEDROCK_SESSION_TOKEN,
+            profile_name=settings.AWS_BEDROCK_PROFILE_NAME,
+        ))
+        logger.info("AWS Bedrock provider registered")
+
     logger.info(
         f"Provider registry initialized: {registry.list_available()} "
         f"(security_level={registry.security_level})"

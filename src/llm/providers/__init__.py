@@ -21,6 +21,8 @@ from src.llm.providers.lm_studio import LMStudioProvider
 from src.llm.providers.vllm import VLLMProvider
 from src.llm.providers.azure_openai import AzureOpenAIProvider
 from src.llm.providers.anthropic import AnthropicProvider
+from src.llm.providers.google_vertex import GoogleVertexProvider
+from src.llm.providers.aws_bedrock import AWSBedrockProvider
 
 __all__ = [
     "BaseLLMProvider",
@@ -42,4 +44,6 @@ __all__ = [
     "VLLMProvider",
     "AzureOpenAIProvider",
     "AnthropicProvider",
+    "GoogleVertexProvider",
+    "AWSBedrockProvider",
 ]

@@ -66,6 +66,22 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: Optional[str] = None
     ANTHROPIC_DEFAULT_MODEL: str = "claude-sonnet-4-20250514"
 
+    # Google Vertex AI (cloud_private)
+    GOOGLE_VERTEX_ENABLED: bool = False
+    GOOGLE_VERTEX_PROJECT_ID: Optional[str] = None
+    GOOGLE_VERTEX_REGION: str = "us-central1"
+    GOOGLE_VERTEX_DEFAULT_MODEL: str = "gemini-2.5-flash"
+    GOOGLE_VERTEX_API_KEY: Optional[str] = None  # Optional: direct API key (otherwise uses ADC)
+
+    # AWS Bedrock (cloud_private)
+    AWS_BEDROCK_ENABLED: bool = False
+    AWS_BEDROCK_REGION: str = "us-east-1"
+    AWS_BEDROCK_DEFAULT_MODEL: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    AWS_BEDROCK_ACCESS_KEY_ID: Optional[str] = None
+    AWS_BEDROCK_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_BEDROCK_SESSION_TOKEN: Optional[str] = None
+    AWS_BEDROCK_PROFILE_NAME: Optional[str] = None
+
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
     CACHE_TTL: int = 3600

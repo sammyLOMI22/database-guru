@@ -375,6 +375,9 @@ class TestInitializeRegistry:
             s.AZURE_OPENAI_API_VERSION = "2024-02-15-preview"
             s.ANTHROPIC_ENABLED = False
             s.ANTHROPIC_API_KEY = None
+            s.GOOGLE_VERTEX_ENABLED = False
+            s.GOOGLE_VERTEX_PROJECT_ID = None
+            s.AWS_BEDROCK_ENABLED = False
 
             registry = initialize_registry_from_settings()
             assert "ollama" in registry.list_available()
@@ -406,6 +409,9 @@ class TestInitializeRegistry:
             s.AZURE_OPENAI_API_VERSION = "2024-02-15-preview"
             s.ANTHROPIC_ENABLED = False
             s.ANTHROPIC_API_KEY = None
+            s.GOOGLE_VERTEX_ENABLED = False
+            s.GOOGLE_VERTEX_PROJECT_ID = None
+            s.AWS_BEDROCK_ENABLED = False
 
             registry = initialize_registry_from_settings()
             available = sorted(registry.list_available())
@@ -429,6 +435,9 @@ class TestInitializeRegistry:
             s.AZURE_OPENAI_API_VERSION = "2024-02-15-preview"
             s.ANTHROPIC_ENABLED = False
             s.ANTHROPIC_API_KEY = None
+            s.GOOGLE_VERTEX_ENABLED = False
+            s.GOOGLE_VERTEX_PROJECT_ID = None
+            s.AWS_BEDROCK_ENABLED = False
 
             registry = initialize_registry_from_settings()
             assert "openai" not in registry.list_available()
@@ -451,6 +460,9 @@ class TestInitializeRegistry:
             s.AZURE_OPENAI_API_VERSION = "2024-02-15-preview"
             s.ANTHROPIC_ENABLED = False
             s.ANTHROPIC_API_KEY = None
+            s.GOOGLE_VERTEX_ENABLED = False
+            s.GOOGLE_VERTEX_PROJECT_ID = None
+            s.AWS_BEDROCK_ENABLED = False
 
             registry = initialize_registry_from_settings()
             assert registry.security_level == "cloud_private"
