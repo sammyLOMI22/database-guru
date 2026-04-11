@@ -29,6 +29,7 @@ class Settings(BaseSettings):
 
     # LLM Provider Security
     DATA_SECURITY_LEVEL: str = "local_only"  # local_only | cloud_private | unrestricted
+    LLM_ENCRYPTION_KEY: Optional[str] = None  # Fernet key for encrypting API keys at rest
 
     # Ollama - Auto-detect local or Docker
     OLLAMA_BASE_URL: str = "http://localhost:11434"

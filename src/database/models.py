@@ -21,6 +21,7 @@ class LLMUsage(Base):
     agent_type = Column(String(50), nullable=False, index=True)
     agent_name = Column(String(100))
     provider = Column(String(50), default="ollama", index=True)
+    data_locality = Column(String(20), nullable=True)  # local, cloud_private, cloud_public
     model_name = Column(String(100), nullable=False, index=True)
     llm_method = Column(String(20), nullable=False)  # 'generate', 'chat', 'embeddings'
 
@@ -116,6 +117,37 @@ class LLMModelConfig(Base):
     is_default = Column(Boolean, default=False)
 
     notes = Column(Text)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class LLMProviderConfig(Base):
+    """Stored configuration for LLM providers (API keys encrypted)."""
+    __tablename__ = "llm_provider_configs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    provider_name = Column(String(50), nullable=False, unique=True)
+    enabled = Column(Boolean, default=False)
+    data_locality = Column(String(20), nullable=False)  # local, cloud_private, cloud_public
+    api_key_encrypted = Column(Text)  # Fernet-encrypted API key
+    endpoint = Column(Text)
+    default_model = Column(String(100))
+    extra_config = Column(JSON)  # Provider-specific settings
+
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class LLMTaskRouting(Base):
+    """Per-task provider and model routing configuration."""
+    __tablename__ = "llm_task_routing"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_type = Column(String(50), nullable=False, unique=True)  # sql_generation, narratives, etc.
+    primary_provider = Column(String(50), nullable=False)
+    primary_model = Column(String(100))
+    fallback_chain = Column(JSON)  # Ordered list: [{"provider": "ollama", "model": "llama3.2"}]
+
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

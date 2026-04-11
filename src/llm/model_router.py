@@ -1,8 +1,8 @@
 """Per-Task Model Router
 
-Routes LLM tasks to appropriate models based on task type and user configuration.
-This enables using specialized models (like duckdb-nsql for SQL) while using
-general-purpose models for other tasks (like narratives).
+Routes LLM tasks to appropriate models and providers based on task type
+and user configuration. Supports per-task provider routing with fallback
+chains that respect data security levels.
 
 Usage:
     router = await get_model_router(db_session)
@@ -10,12 +10,18 @@ Usage:
     timeout = router.get_timeout_for_task(TaskType.SQL_GENERATION)
     model_size = router.get_model_size(TaskType.SQL_GENERATION)
 
-Part of: Small Model Optimization Phase
+    # Provider routing (Phase 15)
+    provider_name = router.get_provider_for_task(TaskType.SQL_GENERATION)
+    response = await router.execute_with_fallback(
+        TaskType.SQL_GENERATION, prompt="SELECT ...", messages=[...]
+    )
+
+Part of: Small Model Optimization Phase + Phase 15 LLM Provider Expansion
 """
 import logging
 from enum import Enum
-from typing import Optional, Dict, Any
-from dataclasses import dataclass
+from typing import Optional, Dict, Any, List
+from dataclasses import dataclass, field
 
 from src.config.settings import Settings
 
@@ -54,9 +60,14 @@ class TaskConfig:
     model: str
     timeout: int
     task_type: TaskType
+    provider: Optional[str] = None  # Phase 15: provider name (None = use default)
+    fallback_chain: list[dict] = field(default_factory=list)  # [{provider, model}]
 
     def __repr__(self) -> str:
-        return f"TaskConfig(task={self.task_type.value}, model={self.model}, timeout={self.timeout}s)"
+        parts = f"task={self.task_type.value}, model={self.model}, timeout={self.timeout}s"
+        if self.provider:
+            parts += f", provider={self.provider}"
+        return f"TaskConfig({parts})"
 
 
 class ModelRouter:
@@ -104,13 +115,19 @@ class ModelRouter:
                 Expected keys:
                 - model_sql_generation, model_narratives, etc.
                 - timeout_sql_generation, timeout_narratives, etc.
+                - provider_sql_generation, provider_narratives, etc. (Phase 15)
+                - fallback_sql_generation, etc. (Phase 15, list of {provider, model})
         """
         self.settings = settings or Settings()
         self.model_settings = model_settings or {}
         self._default_model = self.settings.OLLAMA_MODEL
+        self._default_provider: Optional[str] = self.model_settings.get(
+            "default_provider", "ollama"
+        )
 
         logger.info(
             f"ModelRouter initialized: default_model={self._default_model}, "
+            f"default_provider={self._default_provider}, "
             f"per_task_config={bool(model_settings)}"
         )
 
@@ -161,6 +178,24 @@ class ModelRouter:
 
         return self.DEFAULT_TIMEOUTS.get(task, 30)
 
+    def get_provider_for_task(self, task: TaskType) -> Optional[str]:
+        """Get the configured provider name for a task, or None for default."""
+        key = f"provider_{task.value}"
+        provider = self.model_settings.get(key)
+        if provider:
+            logger.debug(f"Using per-task provider for {task.value}: {provider}")
+            return provider
+        return self._default_provider
+
+    def get_fallback_chain(self, task: TaskType) -> list[dict]:
+        """Get the fallback chain for a task.
+
+        Returns list of {provider, model} dicts in priority order.
+        """
+        key = f"fallback_{task.value}"
+        chain = self.model_settings.get(key)
+        return chain if isinstance(chain, list) else []
+
     def get_config_for_task(self, task: TaskType) -> TaskConfig:
         """
         Get the complete configuration for a specific task.
@@ -169,12 +204,14 @@ class ModelRouter:
             task: The type of LLM task
 
         Returns:
-            TaskConfig with model and timeout
+            TaskConfig with model, timeout, provider, and fallback chain
         """
         return TaskConfig(
             model=self.get_model_for_task(task),
             timeout=self.get_timeout_for_task(task),
-            task_type=task
+            task_type=task,
+            provider=self.get_provider_for_task(task),
+            fallback_chain=self.get_fallback_chain(task),
         )
 
     def is_per_task_configured(self, task: TaskType) -> bool:
@@ -217,19 +254,111 @@ class ModelRouter:
         """Get configurations for all task types."""
         return {task: self.get_config_for_task(task) for task in TaskType}
 
+    async def execute_with_fallback(
+        self,
+        task: TaskType,
+        prompt: Optional[str] = None,
+        messages: Optional[list] = None,
+        **kwargs,
+    ) -> "LLMResponse":
+        """Execute an LLM call with automatic fallback through the chain.
+
+        Tries the primary provider first, then each fallback in order.
+        Respects data security levels — a fallback that violates the
+        security level is skipped (never falls "up" to a less-secure tier).
+
+        Args:
+            task: Task type for routing.
+            prompt: Plain text prompt (for generate-style calls).
+            messages: Chat messages list (for chat-style calls).
+            **kwargs: Additional arguments passed to the provider.
+
+        Returns:
+            LLMResponse from the first successful provider.
+
+        Raises:
+            Exception: If all providers in the chain fail.
+        """
+        from src.llm.providers.registry import (
+            get_provider_registry,
+            DataSecurityError,
+            ProviderNotFoundError,
+        )
+        from src.llm.providers.base import LLMResponse
+
+        config = self.get_config_for_task(task)
+        registry = get_provider_registry()
+
+        # Build ordered list: primary + fallbacks
+        attempts: list[tuple[str, Optional[str]]] = [
+            (config.provider or self._default_provider or "ollama", config.model)
+        ]
+        for fb in config.fallback_chain:
+            if isinstance(fb, dict):
+                attempts.append((fb.get("provider", "ollama"), fb.get("model")))
+
+        last_error: Optional[Exception] = None
+
+        for provider_name, model in attempts:
+            try:
+                provider = registry.get(provider_name, enforce_security=True)
+            except (ProviderNotFoundError, DataSecurityError) as e:
+                logger.warning(
+                    f"Skipping provider {provider_name!r} for task {task.value}: {e}"
+                )
+                last_error = e
+                continue
+
+            try:
+                use_model = model or provider.default_model
+                if messages:
+                    response = await provider.chat(
+                        messages=messages,
+                        model=use_model,
+                        **kwargs,
+                    )
+                elif prompt:
+                    response = await provider.generate(
+                        prompt=prompt,
+                        model=use_model,
+                        **kwargs,
+                    )
+                else:
+                    raise ValueError("Either prompt or messages must be provided")
+
+                logger.info(
+                    f"Task {task.value} completed via provider {provider_name!r} "
+                    f"(model={use_model})"
+                )
+                return response
+
+            except Exception as e:
+                logger.warning(
+                    f"Provider {provider_name!r} failed for task {task.value}: {e}"
+                )
+                last_error = e
+                continue
+
+        raise last_error or RuntimeError(
+            f"No providers available for task {task.value}"
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert router configuration to dictionary for debugging/logging."""
         return {
             "default_model": self._default_model,
+            "default_provider": self._default_provider,
             "default_model_size": self.get_model_size().value,
             "default_model_family": self.get_model_family().value,
             "tasks": {
                 task.value: {
                     "model": self.get_model_for_task(task),
+                    "provider": self.get_provider_for_task(task),
                     "timeout": self.get_timeout_for_task(task),
                     "is_custom": self.is_per_task_configured(task),
                     "model_size": self.get_model_size(task).value,
                     "model_family": self.get_model_family(task).value,
+                    "fallback_chain": self.get_fallback_chain(task),
                 }
                 for task in TaskType
             }
@@ -314,6 +443,24 @@ async def get_model_router(db_session=None) -> ModelRouter:
         except Exception as e:
             logger.warning(f"Failed to load model settings from database: {e}")
             # Fall back to defaults
+
+        # Phase 15: Load per-task provider routing from LLMTaskRouting table
+        try:
+            from sqlalchemy import select
+            from src.database.models import LLMTaskRouting
+
+            result = await db_session.execute(select(LLMTaskRouting))
+            routes = result.scalars().all()
+            for route in routes:
+                model_settings[f"provider_{route.task_type}"] = route.primary_provider
+                if route.primary_model:
+                    model_settings[f"model_{route.task_type}"] = route.primary_model
+                if route.fallback_chain:
+                    model_settings[f"fallback_{route.task_type}"] = route.fallback_chain
+            if routes:
+                logger.debug(f"Loaded {len(routes)} task routing rules from database")
+        except Exception as e:
+            logger.warning(f"Failed to load task routing from database: {e}")
 
     # Always create a fresh router with current settings
     _model_router = ModelRouter(settings, model_settings)

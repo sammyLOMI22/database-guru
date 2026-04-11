@@ -12,7 +12,7 @@ from src.database.connection import get_db_manager, run_alembic_migrations
 from src.cache.redis_client import get_redis_cache
 from src.core.connection_pool_manager import get_pool_manager_async
 from src.middleware.rate_limit import RateLimitMiddleware
-from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance, auth, audit, dml
+from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance, auth, audit, dml, llm_providers
 from src.core.file_source_session import FileSourceDuckDBSession
 from src.core.file_source_handler import cleanup_expired_files
 
@@ -79,6 +79,17 @@ async def lifespan(app: FastAPI):
         logger.info("✅ LLM model configs seeded")
     except Exception as e:
         logger.warning(f"Failed to seed LLM model configs: {e}")
+
+    # Initialize LLM provider registry (Phase 15)
+    try:
+        from src.llm.providers.registry import initialize_registry_from_settings
+        provider_registry = initialize_registry_from_settings()
+        logger.info(
+            f"✅ LLM provider registry ready: {provider_registry.list_available()} "
+            f"(security_level={provider_registry.security_level})"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to initialize LLM provider registry: {e}")
 
     logger.info("✅ Database ready")
 
@@ -207,6 +218,7 @@ app.include_router(performance.router, prefix="/api")  # Phase 22: Performance G
 app.include_router(auth.router, prefix="/api")  # Phase 21: Security & Auth
 app.include_router(audit.router, prefix="/api")  # Phase 21: Audit logging
 app.include_router(dml.router, prefix="/api")  # Phase 18: Edit Mode & DML
+app.include_router(llm_providers.router, prefix="/api")  # Phase 15: LLM Provider Management
 
 if __name__ == "__main__":
     import uvicorn
