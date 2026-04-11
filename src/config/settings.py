@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_MINUTES: int = 1440  # 24 hours
     REQUIRE_AUTH: bool = False  # Feature flag: when True, all endpoints require authentication
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"  # Comma-separated allowed origins
 
     # Per-user rate limiting (Phase 21)
     RATE_LIMIT_PER_USER: int = 200  # Requests per minute for authenticated users
@@ -39,6 +40,7 @@ class Settings(BaseSettings):
     MAX_QUERY_ROWS: int = 1000
     QUERY_TIMEOUT_SECONDS: int = 30
     ALLOW_WRITE_OPERATIONS: bool = False  # Safety: disable writes by default
+    DML_MAX_ROWS_PER_OPERATION: int = 100  # Phase 18: max rows per DML operation
 
     # Connection Pooling (User Databases)
     ENABLE_CONNECTION_POOLING: bool = True  # Feature flag for connection pooling

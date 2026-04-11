@@ -413,37 +413,33 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                      EDIT MODE & DML (Phase 18) - ⬆️ NEXT UP                            │
+    │                      EDIT MODE & DML (Phase 18) - ✅ COMPLETE                            │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                  EDIT MODE & DML OPERATIONS (Phase 18) - HIGH PRIORITY                   │
+    │              EDIT MODE & DML OPERATIONS (Phase 18) - ✅ COMPLETE                          │
     │                                                                                           │
-    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
-    │  │ 18.1 Core   │   │ 18.2 API &  │   │ 18.3 Inline │   │ 18.4 NL DML │                   │
-    │  │ Backend     │──▶│ Execution   │──▶│ Editing UI  │──▶│ & Polish    │                   │
-    │  │             │   │             │   │             │   │             │                   │
-    │  │ • Change    │   │ • DML       │   │ • Editable  │   │ • Natural   │                   │
-    │  │   tracker   │   │   endpoints │   │   cells     │   │   language  │                   │
-    │  │ • DML gen   │   │ • Execute   │   │ • Add row   │   │   to DML    │                   │
-    │  │ • Audit log │   │   w/ Tx     │   │ • Delete    │   │ • Audit     │                   │
-    │  │ • Validator │   │ • Preview   │   │ • Preview   │   │   viewer    │                   │
-    │  │             │   │             │   │             │   │             │                   │
-    │  │ ~1,000 lines│   │ ~800 lines  │   │ ~1,200 lines│   │ ~1,000 lines│                   │
-    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                                     │
+    │  │ 18.1 ✅     │   │ 18.2 ✅     │   │ 18.3 ✅     │                                     │
+    │  │ Core        │──▶│ API &       │──▶│ Inline      │                                     │
+    │  │ Backend     │   │ Execution   │   │ Editing UI  │                                     │
+    │  │             │   │             │   │             │                                     │
+    │  │ • DML       │   │ • 5 REST    │   │ • Editable  │                                     │
+    │  │   generator │   │   endpoints │   │   cells     │                                     │
+    │  │ • DML       │   │ • Preview   │   │ • Add row   │                                     │
+    │  │   validator │   │   mode      │   │ • Delete    │                                     │
+    │  │ • DML       │   │ • Execute   │   │   confirm   │                                     │
+    │  │   executor  │   │   w/ Tx     │   │ • Changes   │                                     │
+    │  │ • Change    │   │ • Write     │   │   summary   │                                     │
+    │  │   tracker   │   │   perms     │   │ • DML       │                                     │
+    │  │             │   │ • Table     │   │   preview   │                                     │
+    │  │             │   │   info      │   │             │                                     │
+    │  │ ~640 lines  │   │ ~320 lines  │   │ ~1,070 lines│                                     │
+    │  └─────────────┘   └─────────────┘   └─────────────┘                                     │
     │                                                                                           │
-    │  Prereq: Phase 21 ✅ (Auth) | Priority: HIGH | Est: 4-5 weeks | ~4,000 lines             │
-    │  Plan: EDIT_MODE_DML_PLAN.md                                                             │
-    │                                                                                           │
-    │  Key Features:                                                                           │
-    │  • Inline cell editing in query results                                                  │
-    │  • Add new rows with schema-aware forms                                                  │
-    │  • Delete rows with confirmation                                                         │
-    │  • Generate & preview INSERT/UPDATE/DELETE scripts                                       │
-    │  • Transaction support with rollback                                                     │
-    │  • Natural language DML ("delete inactive users")                                        │
-    │  • Complete audit trail                                                                  │
-    │  • Per-connection write permissions                                                      │
+    │  40 tests | 5 API endpoints | ~2,450 lines (backend + frontend)                         │
+    │  Per-connection write permissions (INSERT/UPDATE/DELETE toggles)                          │
+    │  Plan: PHASE_18_EDIT_MODE_FEATURE_IMP_PLAN.md                                            │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -476,7 +472,7 @@
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                    SECURITY & INFRASTRUCTURE - ✅ DELIVERED                                │
-    │               Phase 21 complete — Phase 18 Edit Mode & Phase 15 are now unblocked        │
+    │         Phase 21 + Phase 18 complete — Phase 15 (Enterprise LLMs) now unblocked          │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
@@ -601,14 +597,13 @@
     ============================================
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │   EDIT MODE & DML (Phase 18) ◀── HIGH PRIORITY ⬆️ NEXT UP          │
+    │   EDIT MODE & DML (Phase 18) ◀── ✅ COMPLETE                        │
     │                                                                   │
-    │   REQUIRES: Phase 21 ✅ (Security & Auth) — UNBLOCKED             │
+    │   REQUIRES: Phase 21 ✅ (Security & Auth) — DELIVERED              │
     │                                                                   │
-    │  • Inline editing, INSERT/UPDATE/DELETE, NL DML                   │
-    │  • Simulation Mode: dry-run in transaction, show diff, rollback   │
-    │  • Undo Button: time-travel rollback for Guru actions             │
-    │  • Est: 4-5 weeks | Plan: EDIT_MODE_DML_PLAN.md                   │
+    │  • DML generator/validator/executor, inline editing UI            │
+    │  • Preview mode, per-connection write permissions                 │
+    │  • 40 tests | 5 API endpoints | ~2,450 lines                     │
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
@@ -658,7 +653,7 @@
               ┌──────┴──────┐
               ▼             ▼
     ┌─────────────┐  ┌─────────────┐
-    │  Phase 18   │  │  Phase 15   │
+    │  Phase 18 ✅│  │  Phase 15   │
     │  Edit Mode  │  │  LLM Provs  │
     │  & DML      │  │  (cost ctrl)│
     └─────────────┘  └─────────────┘
@@ -715,19 +710,9 @@
 ## Recommended Next Steps (Updated March 21, 2026)
 
 > **Strategic Direction** (per PM Review): Focus on "depth and safety" before "width expansion".
-> Security/Auth foundation is now complete — Edit Mode and Enterprise LLMs are unblocked.
+> Security/Auth foundation and Edit Mode are now complete — Enterprise LLMs are unblocked.
 
-### Priority 1: Edit Mode & DML (Phase 18) - HIGH ⬆️ NEXT UP
-**Why**: Highest user value feature now unblocked by Phase 21 (Auth). Inline editing, natural language DML.
-- **18.1 Core Backend**: Change tracker, DML generation, audit log, validator
-- **18.2 API & Execution**: DML endpoints, execute with transactions, preview mode
-- **18.3 Inline Editing UI**: Editable cells, add row, delete row, preview diff
-- **18.4 NL DML & Polish**: Natural language to DML ("delete inactive users"), audit viewer
-- **Simulation Mode** (PM idea): Dry-run in transaction, show diff, rollback before commit
-- **Undo Button** (PM idea): Time-travel rollback for actions taken by Guru
-- See: [EDIT_MODE_DML_PLAN.md](EDIT_MODE_DML_PLAN.md)
-
-### Priority 2: LLM Provider Expansion (Phase 15) - HIGH
+### Priority 1: LLM Provider Expansion (Phase 15) - HIGH
 **Why**: Enterprise integration and model flexibility - users can leverage cloud LLMs
 - **15.1 Provider Abstraction**: Unified interface, registry, refactor Ollama
 - **15.2 Azure OpenAI**: Enterprise-first cloud provider with deployment support
@@ -736,12 +721,12 @@
 - See: [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md)
 - Unlocks Phase 17 (Multi-Provider Monitoring) since Phase 16 is now complete
 
-### Priority 3: Observability & Monitoring (Phase 24) - MEDIUM
+### Priority 2: Observability & Monitoring (Phase 24) - MEDIUM
 **Why**: Production readiness — structured logging, distributed tracing, metrics dashboards
 - **Prerequisite**: Phase 23 ✅ (Docker)
 - Structured JSON logging, OpenTelemetry tracing, Prometheus/Grafana, Docker integration
 
-### Priority 4: Multi-Provider Monitoring (Phase 17) - MEDIUM
+### Priority 3: Multi-Provider Monitoring (Phase 17) - MEDIUM
 **Why**: Extend monitoring to all LLM providers with accurate cost tracking
 - **Prerequisite**: Phase 15 (Providers) + Phase 16 ✅ (Monitoring)
 - Native token extraction from OpenAI, Anthropic, Google formats
@@ -749,6 +734,7 @@
 - See: [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md)
 
 ### Completed Priorities (this cycle)
+- ~~Edit Mode & DML (Phase 18)~~ - ✅ COMPLETE: DML generator/validator/executor, inline editing UI, per-connection write permissions, preview mode. 40 tests, 5 endpoints, ~2,450 lines.
 - ~~Security & Auth Foundation (Phase 21)~~ - ✅ COMPLETE: JWT auth, resource ownership, per-user rate limiting, audit logging. 61 tests, 3 migrations. Unblocks Phase 18 + Phase 15.
 - ~~Migration Toolkit (Phase 20)~~ - ✅ COMPLETE: Schema diff, migration planner, script gen, data migration. 98 tests, 13 endpoints, ~5,676 lines.
 - ~~Performance Guru (Phase 22)~~ - ✅ COMPLETE: EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects. 77 tests, 2 endpoints, ~3,282 lines.
@@ -779,6 +765,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - **Phase 23** ✅: Docker Containerization (Compose profiles, security hardened, least-privilege Postgres, Ollama retry, prompts refactor, CTE lineage support)
 - **Phase 14** ✅: NoSQL Database Expansion (MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch — native query gen, schema inference, error classification, frontend integration, mixed SQL+NoSQL chat — 127 tests)
 - **Phase 21** ✅: Security & Auth Foundation (JWT auth, resource ownership, per-user rate limiting, audit logging — 61 tests, 3 migrations)
+- **Phase 18** ✅: Edit Mode & DML Operations (DML generator/validator/executor, inline editing UI, per-connection write permissions, preview mode — 40 tests, 5 endpoints, ~2,450 lines)
 - **Table Sorting** ✅: Click-to-sort with smart type detection
 - Plus 10+ earlier phases (see Quick Reference below)
 
@@ -795,7 +782,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Security & Auth** | JWT auth, resource ownership, per-user rate limiting, audit logging | **Phase 21 ✅ COMPLETE** | ~2,200 lines |
 | **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 15 - HIGH** | ~3,000 lines |
 | **Migration Toolkit** | Schema diff, migration planner, script gen, data migration | **Phase 20 ✅ COMPLETE** | ~5,676 lines |
-| **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, simulation mode, undo | **Phase 18 - HIGH ⬆️ NEXT** (21 ✅) | ~4,000 lines |
+| **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, preview mode, write permissions | **Phase 18 ✅ COMPLETE** | ~2,450 lines |
 | **Performance Guru** | EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects | **Phase 22 ✅ COMPLETE** | ~3,282 lines |
 | **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 17 - MEDIUM** (needs 15+16✅) | ~1,200 lines |
 | **Data Insights** | Tiered narratives, analytics cache, multi-source quality, chart presets, parallel analysis | **Phase 19 ✅ COMPLETE** | ~1,800 lines |
@@ -838,8 +825,9 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | Performance Guru (Phase 22) | EXPLAIN plan analysis, LLM insights, index suggestions, query rewrites, 4 dialects | 77 tests |
 | NoSQL Expansion (Phase 14) | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch — native query gen, schema inference, error classification, frontend integration, mixed SQL+NoSQL chat | 127 tests |
 | Security & Auth (Phase 21) | JWT auth (bcrypt + python-jose), resource ownership (owner_id on 5 tables), per-user rate limiting, audit logging, REQUIRE_AUTH feature flag | 61 tests |
+| Edit Mode & DML (Phase 18) | DML generator/validator/executor, inline cell editing, add/delete rows, preview mode, per-connection write permissions, 5 API endpoints | 40 tests |
 
-**Total Tests**: 1860+ passing
+**Total Tests**: 1900+ passing
 
 ---
 
@@ -850,7 +838,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Phase 21** | Security & Auth Foundation | None | ~2,200 lines | ✅ **COMPLETE** |
 | **Phase 15** | LLM Provider Expansion | Ideally after 21 | ~3,000 lines | HIGH |
 | **Phase 20** | Migration Toolkit | Phase 11✅ + 12✅ | ~5,676 lines | ✅ **COMPLETE** |
-| **Phase 18** | Edit Mode & DML Operations | Phase 21 ✅ | ~4,000 lines | HIGH |
+| **Phase 18** | Edit Mode & DML Operations | Phase 21 ✅ | ~2,450 lines | ✅ **COMPLETE** |
 | **Phase 22** | Performance Guru (EXPLAIN) | None | ~3,282 lines | ✅ **COMPLETE** |
 | **Phase 17** | Multi-Provider Monitoring | Phase 15 + 16✅ | ~1,200 lines | MEDIUM |
 | **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | ✅ **COMPLETE** |
@@ -872,7 +860,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) - LLM Provider Expansion (Phase 15)
 - [LLM_USAGE_MONITORING_PLAN.md](LLM_USAGE_MONITORING_PLAN.md) - LLM Usage Monitoring (Phase 16) ✅
 - [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md) - Multi-Provider Monitoring (Phase 17)
-- [EDIT_MODE_DML_PLAN.md](EDIT_MODE_DML_PLAN.md) - Edit Mode & DML Operations (Phase 18)
+- [PHASE_18_EDIT_MODE_FEATURE_IMP_PLAN.md](PHASE_18_EDIT_MODE_FEATURE_IMP_PLAN.md) - Edit Mode & DML Operations (Phase 18) ✅
 - [DATA_INSIGHTS_ENHANCEMENT_PLAN.md](DATA_INSIGHTS_ENHANCEMENT_PLAN.md) - Data Insights Enhancement (Phase 19)
 - [MIGRATION_TOOLKIT_PROPOSAL.md](MIGRATION_TOOLKIT_PROPOSAL.md) - Database Migration Toolkit (Phase 20)
 - [DOCKER_CONTAINERIZATION_PLAN.md](DOCKER_CONTAINERIZATION_PLAN.md) - Docker Containerization (Phase 23)
@@ -881,7 +869,18 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 
 ---
 
-**Updated**: February 27, 2026
+**Updated**: March 21, 2026
+- **Phase 18 ✅ COMPLETE**: Edit Mode & DML Operations
+  - 18.1: DML Generator — parameterized INSERT/UPDATE/DELETE with multi-dialect support
+  - 18.2: DML Validator — safety checks (require WHERE clause, row limits, allowed tables)
+  - 18.3: DML Executor — transaction-wrapped execution with rollback on error
+  - 18.1-18.3 Backend: ~640 lines across generator, validator, executor, models, constants
+  - API: 5 endpoints (preview, execute, get/update permissions, table-info)
+  - Frontend: EditableQueryResults, EditableCell, AddRowForm, DeleteConfirmation, ChangesSummaryBar, DMLPreviewPanel, EditModeToggle, EditModeWrapper (~1,070 lines)
+  - Hooks: useChangeTracker, useEditMode, useDMLExecution
+  - Per-connection write permissions with INSERT/UPDATE/DELETE toggles and allowed_tables
+  - ConnectionWritePermission model + Alembic migration
+  - 40 tests (generator, validator, executor)
 - **Phase 22 ✅ COMPLETE**: Performance Guru
   - 22.1: Explain Analyzer — deterministic EXPLAIN plan parser for PostgreSQL, MySQL, SQLite, DuckDB
   - 22.2: Explain Interpreter — LLM-powered plan interpretation with tiered prompts (compact/standard/enhanced)

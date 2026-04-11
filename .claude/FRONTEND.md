@@ -252,6 +252,47 @@ frontend/src/
 | `getRecent(limit)` | Fetch recent call records |
 | `getSessionUsage(sessionId)` | Fetch per-session usage |
 
+## Edit Mode & DML UI (Phase 18 - March 2026)
+**Location**: `frontend/src/components/edit/`
+
+### Components
+| Component | Lines | Purpose |
+|-----------|-------|---------|
+| `EditableQueryResults.tsx` | ~301 | Main container: wraps query results table with edit mode controls |
+| `EditableCell.tsx` | ~121 | Inline cell editing with click-to-edit, blur-to-save |
+| `AddRowForm.tsx` | ~163 | Schema-aware form for inserting new rows with type hints |
+| `DeleteConfirmation.tsx` | ~80 | Confirmation dialog before row deletion |
+| `ChangesSummaryBar.tsx` | ~119 | Floating bar showing pending INSERT/UPDATE/DELETE counts |
+| `DMLPreviewPanel.tsx` | ~117 | SQL preview panel with generated statements |
+| `EditModeToggle.tsx` | ~45 | Toggle button to enter/exit edit mode |
+| `EditModeWrapper.tsx` | ~122 | Wrapper that adds edit controls around results |
+| **Total** | **~1,068** | |
+
+### Hooks
+| Hook | Lines | Purpose |
+|------|-------|---------|
+| `useChangeTracker.ts` | ~169 | Tracks cell edits, row additions, row deletions as structured changes |
+| `useEditMode.ts` | ~79 | Edit mode toggle state, permission checks against write permissions |
+| `useDMLExecution.ts` | ~21 | Preview and execute DML API calls |
+
+### Services & Types
+- **API Service** (`services/dmlApi.ts`):
+
+| Method | Purpose |
+|--------|---------|
+| `previewChanges(request)` | Generate DML preview from pending changes |
+| `executeChanges(request)` | Execute DML within transaction |
+| `getPermissions(connectionId)` | Get write permission state |
+| `updatePermissions(connectionId, request)` | Update write permissions |
+| `getTableInfo(connectionId, tableName)` | Get columns and primary keys |
+
+- **Types** (`types/dml.ts`): `ChangeType`, `CellChange`, `RowChange`, `DMLStatement`, `DMLPreviewResponse`, `ExecutionResult`, `WritePermission`, `TableInfo`
+- **Utilities** (`utils/dmlUtils.ts`): Helper functions for DML operations
+
+### Integration Points
+- `MultiDatabaseResults.tsx`: Updated to show edit mode toggle and pass edit state
+- `App.tsx`: Routes edit mode state through component tree
+
 ## Performance Guru UI (Phase 22)
 **Location**: `frontend/src/components/performance/`
 

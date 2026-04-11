@@ -1,5 +1,4 @@
 """Rate limiting middleware and dependencies"""
-import hashlib
 import logging
 import time
 from typing import Callable, Dict, Optional
@@ -29,17 +28,20 @@ def _extract_rate_limit_key(request: Request) -> Optional[str]:
     token = auth_header[7:]
     if not token:
         return None
-    # Validate JWT signature before trusting the token as a key
+    # Validate JWT and extract stable user identity
     try:
-        jwt.decode(
+        payload = jwt.decode(
             token,
             _settings.JWT_SECRET,
             algorithms=[_settings.JWT_ALGORITHM],
         )
     except JWTError:
         return None
-    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
-    return f"tok:{token_hash}"
+    # Key by the stable user ID from the token, not the token itself
+    sub = payload.get("sub")
+    if not sub:
+        return None
+    return f"user:{sub}"
 
 
 # ============================================================================

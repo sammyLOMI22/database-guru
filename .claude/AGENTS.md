@@ -602,6 +602,98 @@ Audit trail for security-sensitive operations:
 
 ---
 
+## Edit Mode & DML System (Phase 18)
+**Location**: `src/dml/`, `src/api/endpoints/dml.py`
+**Added**: March 2026
+
+### 38. DML Generator
+**File**: `src/dml/dml_generator.py`
+
+Generates parameterized DML statements from structured change descriptions:
+- **INSERT**: Builds parameterized INSERT with all column values
+- **UPDATE**: Builds SET clause from cell changes with primary key WHERE clause
+- **DELETE**: Builds DELETE with primary key WHERE clause
+- **Parameterized SQL**: All statements use named parameters (`:param_name`) to prevent SQL injection
+- **Display SQL**: Human-readable version with inline values for preview
+
+**Key methods**: `generate()`, `_generate_insert()`, `_generate_update()`, `_generate_delete()`
+
+**Output**: `DMLPreviewResponse` with display SQL, statement list, change count, summary
+
+### 39. DML Validator
+**File**: `src/dml/dml_validator.py`
+
+Safety checks before DML execution:
+- **Write Permission Check**: Validates per-connection INSERT/UPDATE/DELETE permissions
+- **Require WHERE Clause**: Enforces WHERE clause on UPDATE/DELETE (configurable)
+- **Row Limit Check**: Enforces max_rows_per_operation per connection
+- **Allowed Tables Check**: Restricts DML to whitelisted tables (if configured)
+- **Table Name Validation**: Regex check against `SAFE_IDENT_RE` to prevent injection
+
+**Key methods**: `validate()` — returns list of error strings (empty = valid)
+
+### 40. DML Executor
+**File**: `src/dml/dml_executor.py`
+
+Executes DML statements against user databases:
+- **Transaction Wrapping**: All statements execute within a single transaction
+- **Rollback on Error**: Any failure rolls back entire batch
+- **Row Count Tracking**: Reports total rows affected
+- **Sync/Async Support**: Handles both sync (DuckDB) and async (PostgreSQL, MySQL, SQLite) sessions
+
+**Key methods**: `execute()` — returns `ExecutionResult` with success, rows_affected, error_message
+
+### DML API Endpoints
+**File**: `src/api/endpoints/dml.py`
+
+5 REST endpoints:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/dml/preview` | POST | Generate and preview DML statements |
+| `/api/dml/execute` | POST | Execute DML changes with transaction wrapping |
+| `/api/dml/permissions/{connection_id}` | GET | Get write permissions for connection |
+| `/api/dml/permissions/{connection_id}` | PUT | Update write permissions |
+| `/api/dml/table-info/{connection_id}/{table_name}` | GET | Get table columns and primary keys |
+
+### DML Models
+**File**: `src/dml/models.py`
+
+- `ChangeType`: INSERT / UPDATE / DELETE enum
+- `CellChangeSchema`: Single cell change (column, old_value, new_value)
+- `RowChangeSchema`: Row-level change with change_type, table_name, primary_key, changes
+- `DMLStatement`: Generated SQL with display and parameterized forms
+- `WritePermissionRequest/Response`: Per-connection write permission settings
+- `TableInfoColumn/Response`: Column metadata with primary key and autoincrement flags
+
+### Frontend Components
+**Location**: `frontend/src/components/edit/`
+
+| Component | Purpose |
+|-----------|---------|
+| `EditableQueryResults.tsx` | Main container: wraps query results with edit mode |
+| `EditableCell.tsx` | Inline cell editing with click-to-edit |
+| `AddRowForm.tsx` | Schema-aware form for inserting new rows |
+| `DeleteConfirmation.tsx` | Confirmation dialog before row deletion |
+| `ChangesSummaryBar.tsx` | Floating bar showing pending changes count |
+| `DMLPreviewPanel.tsx` | SQL preview panel with syntax highlighting |
+| `EditModeToggle.tsx` | Toggle button to enter/exit edit mode |
+| `EditModeWrapper.tsx` | Wrapper that adds edit controls to results |
+
+### Frontend Hooks
+| Hook | File | Purpose |
+|------|------|---------|
+| `useChangeTracker` | `hooks/useChangeTracker.ts` | Tracks cell edits, row additions/deletions |
+| `useEditMode` | `hooks/useEditMode.ts` | Edit mode state, permission checks |
+| `useDMLExecution` | `hooks/useDMLExecution.ts` | Preview and execute DML calls |
+
+### Frontend Services & Types
+- **API Service**: `services/dmlApi.ts` — preview, execute, permissions, tableInfo methods
+- **Types**: `types/dml.ts` — TypeScript interfaces mirroring backend models
+- **Utilities**: `utils/dmlUtils.ts` — helper functions
+
+---
+
 ## Tool System
 **Location**: `src/tools/`
 

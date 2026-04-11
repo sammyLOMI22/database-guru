@@ -47,13 +47,11 @@ class TestExtractRateLimitKey:
         request = _make_request(auth_header="Basic abc123")
         assert _extract_rate_limit_key(request) is None
 
-    def test_valid_jwt_returns_token_hash(self):
+    def test_valid_jwt_returns_user_key(self):
         token = _make_token({"sub": "42", "username": "alice"})
         request = _make_request(auth_header=f"Bearer {token}")
         result = _extract_rate_limit_key(request)
-        assert result is not None
-        assert result.startswith("tok:")
-        assert len(result) == 20  # "tok:" + 16 hex chars
+        assert result == "user:42"
 
     def test_invalid_jwt_returns_none(self):
         """Invalid tokens must fall back to IP (return None)."""

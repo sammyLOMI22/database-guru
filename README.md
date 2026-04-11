@@ -146,6 +146,8 @@ The demo showcases:
 - 🔬 **Data Insights Enhancement (NEW!)** - Tiered narratives by model size, analytics caching, multi-source quality insights, adaptive chart presets
 - 🔄 **Database Migration Toolkit (NEW!)** - Schema diff, migration planner, script generator (up/down/verify SQL), data migration assistant
 - 🗃️ **NoSQL Database Support (NEW!)** - MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch with native query generation and mixed SQL+NoSQL sessions
+- ✏️ **Edit Mode & DML (NEW!)** - Inline cell editing, add/delete rows, preview INSERT/UPDATE/DELETE scripts, per-connection write permissions
+- 🔐 **Security & Auth (NEW!)** - JWT authentication, resource ownership, per-user rate limiting, audit logging
 
 All with mock data - no database connection needed!
 
@@ -261,6 +263,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Performance Guru (NEW!)** - EXPLAIN plan analysis with LLM-powered insights, bottleneck detection, index suggestions with CREATE INDEX SQL, query rewrite recommendations, multi-dialect support (PostgreSQL, MySQL, SQLite, DuckDB), tiered prompts, deterministic fallback
 - ✅ **NoSQL Database Expansion (NEW!)** - Full native query support for MongoDB (MQL), Redis (commands), Cassandra (CQL), DynamoDB (PartiQL), and Elasticsearch (Query DSL) with schema inference, error classification, self-correction, and mixed SQL+NoSQL chat sessions
 - ✅ **Security & Auth Foundation (NEW!)** - JWT authentication (bcrypt + python-jose), resource ownership with `owner_id` FK, per-user rate limiting with JWT-based user ID extraction, audit logging, `REQUIRE_AUTH` feature flag for gradual rollout
+- ✅ **Edit Mode & DML Operations (NEW!)** - Inline cell editing in query results, add new rows with schema-aware forms, delete rows with confirmation, preview INSERT/UPDATE/DELETE scripts before execution, per-connection write permissions (INSERT/UPDATE/DELETE toggles, allowed tables, row limits), transaction-wrapped execution with rollback
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection

@@ -18,6 +18,7 @@ import { CrossDatabaseChart } from './visualization/CrossDatabaseChart';
 import { ChartRecommendation, ChartType } from '../utils/chartUtils';
 import { analyzeData } from '../utils/chartIntelligence';
 import { detectCrossDbComparison } from '../utils/crossDbUtils';
+import { EditModeWrapper } from './edit/EditModeWrapper';
 
 interface MultiDatabaseResultsProps {
   results: DatabaseQueryResult[];
@@ -466,7 +467,13 @@ export default function MultiDatabaseResults({
                           </div>
                         </div>
 
-                        {/* Conditional Chart or Table rendering */}
+                        {/* Conditional Chart, Editable Table, or Read-only Table rendering */}
+                        <EditModeWrapper
+                          connectionId={result.connection_id}
+                          databaseType={result.database_type}
+                          sql={result.sql}
+                          results={result.results}
+                        >
                         {viewModes[result.connection_id] === 'chart' &&
                           chartRecommendations[result.connection_id]?.chartType !== 'table' ? (
                           <ChartVisualization
@@ -582,6 +589,7 @@ export default function MultiDatabaseResults({
                             })()}
                           </div>
                         )}
+                        </EditModeWrapper>
                       </div>
                     ) : (
                       <p className="text-sm text-gray-500 dark:text-gray-400 italic">No results returned</p>

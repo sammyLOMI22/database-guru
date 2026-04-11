@@ -87,3 +87,4 @@ scripts/dump.rdb
 .services.pid
 .mcp.json
 docker/nginx/local.env.docker
+.codex/

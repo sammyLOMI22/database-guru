@@ -52,11 +52,21 @@ Detailed documentation for architectural patterns and systems in Database Guru.
 
 ### Components
 - `SQLExecutor` (`src/core/executor.py`) - Executes SQL with timeout protection and row limits
+- `DMLExecutor` (`src/dml/dml_executor.py`) - Executes INSERT/UPDATE/DELETE within transactions (Phase 18)
 
 ### Features
 - Default: 1000 row limit, 30 second timeout
 - Handles both async and sync database sessions
 - Automatic truncation with warnings
+
+### DML Safety (Phase 18)
+- **Per-connection write permissions**: INSERT/UPDATE/DELETE individually toggled, allowed_tables whitelist
+- **Parameterized SQL**: All DML uses named parameters (`:param`) to prevent injection
+- **Table name validation**: Regex check (`SAFE_IDENT_RE`) blocks injection via table names
+- **Require WHERE clause**: Enforced on UPDATE/DELETE by default (configurable per-connection)
+- **Row limits**: Max rows per operation configurable per connection (default 100)
+- **Transaction wrapping**: All DML executes in a single transaction with full rollback on error
+- **Auth integration**: Write permission checks respect `REQUIRE_AUTH` and resource ownership
 
 ## Caching & Performance
 
@@ -241,3 +251,4 @@ The system maintains its own metadata database (`database_guru.db`):
 | `llm_model_config` | Model metadata, capabilities, and cost rates (Phase 16) |
 | `users` | User accounts for JWT authentication (Phase 21) |
 | `audit_logs` | Security audit trail — actions, resources, IP addresses (Phase 21) |
+| `connection_write_permissions` | Per-connection DML permissions (INSERT/UPDATE/DELETE toggles, allowed tables, row limits) (Phase 18) |

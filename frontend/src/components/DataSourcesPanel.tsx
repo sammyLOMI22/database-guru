@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Database, FileSpreadsheet, Plus, Trash2, Check, Circle, Pencil, Loader2, Upload, Eye } from 'lucide-react';
+import { Database, FileSpreadsheet, Plus, Trash2, Check, Circle, Pencil, Loader2, Upload, Eye, Shield } from 'lucide-react';
 import DatabaseConnectionModal from './DatabaseConnectionModal';
+import WritePermissionsModal from './WritePermissionsModal';
 import FileUploadModal from './FileUploadModal';
 import FilePreviewPanel from './FilePreviewPanel';
 import type { FileSource } from '../types/api';
@@ -41,6 +42,7 @@ export default function DataSourcesPanel({
   const [isFileModalOpen, setIsFileModalOpen] = useState(false);
   const [previewFileId, setPreviewFileId] = useState<number | null>(null);
   const [editingConnection, setEditingConnection] = useState<DatabaseConnection | undefined>();
+  const [permissionsConn, setPermissionsConn] = useState<DatabaseConnection | null>(null);
   const [loading, setLoading] = useState(false);
   const [sessionFileIds, setSessionFileIds] = useState<number[]>([]);
 
@@ -321,6 +323,16 @@ export default function DataSourcesPanel({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              setPermissionsConn(conn);
+                            }}
+                            className="p-1 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded transition-all"
+                            title="Write Permissions"
+                          >
+                            <Shield className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleEditConnection(conn);
                             }}
                             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
@@ -524,6 +536,15 @@ export default function DataSourcesPanel({
           </div>
         </div>,
         document.body,
+      )}
+
+      {permissionsConn && (
+        <WritePermissionsModal
+          isOpen={!!permissionsConn}
+          onClose={() => setPermissionsConn(null)}
+          connectionId={permissionsConn.id}
+          connectionName={permissionsConn.name}
+        />
       )}
     </div>
   );

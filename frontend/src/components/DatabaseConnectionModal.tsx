@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Loader2, Shield } from 'lucide-react';
+import { dmlAPI } from '../services/dmlApi';
 
 interface DatabaseConnection {
   id?: number;
@@ -39,6 +40,27 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [showConnectionString, setShowConnectionString] = useState(false);
+
+  // Write permissions state
+  const [allowInsert, setAllowInsert] = useState(false);
+  const [allowUpdate, setAllowUpdate] = useState(false);
+  const [allowDelete, setAllowDelete] = useState(false);
+  const [requireWhere, setRequireWhere] = useState(true);
+  const [maxRows, setMaxRows] = useState(100);
+
+  // Load existing write permissions when editing
+  useEffect(() => {
+    if (!isOpen || !connection?.id) return;
+    dmlAPI.getPermissions(connection.id)
+      .then((perms) => {
+        setAllowInsert(perms.allow_insert);
+        setAllowUpdate(perms.allow_update);
+        setAllowDelete(perms.allow_delete);
+        setRequireWhere(perms.require_where_clause);
+        setMaxRows(perms.max_rows_per_operation);
+      })
+      .catch(() => { /* no permissions yet */ });
+  }, [isOpen, connection?.id]);
 
   if (!isOpen) return null;
 
@@ -233,9 +255,26 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);
+
+    // Save write permissions if editing an existing connection
+    const connId = connection?.id;
+    if (connId && (allowInsert || allowUpdate || allowDelete)) {
+      try {
+        await dmlAPI.updatePermissions(connId, {
+          allow_insert: allowInsert,
+          allow_update: allowUpdate,
+          allow_delete: allowDelete,
+          require_where_clause: requireWhere,
+          max_rows_per_operation: maxRows,
+          allowed_tables: null,
+        });
+      } catch {
+        // permissions save is best-effort here
+      }
+    }
     onClose();
   };
 
@@ -594,6 +633,57 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
 
           {/* Dynamic Fields */}
           {renderDynamicFields()}
+
+          {/* Write Permissions */}
+          <div className="border-t border-white/5 pt-8">
+            <div className="flex items-center gap-3 mb-6">
+              <Shield className="w-5 h-5 text-emerald-500" />
+              <label className={labelClass}>Write Permissions (Edit Mode)</label>
+            </div>
+            {!connection?.id && (
+              <p className="text-[11px] text-amber-500 font-bold mb-4">Save the connection first, then edit it to configure write permissions.</p>
+            )}
+            <div className={`space-y-3 ${!connection?.id ? 'opacity-40 pointer-events-none' : ''}`}>
+              {[
+                { label: 'Allow Insert', desc: 'Add new rows', checked: allowInsert, onChange: setAllowInsert },
+                { label: 'Allow Update', desc: 'Edit existing rows', checked: allowUpdate, onChange: setAllowUpdate },
+                { label: 'Allow Delete', desc: 'Remove rows', checked: allowDelete, onChange: setAllowDelete },
+              ].map(({ label, desc, checked, onChange }) => (
+                <div key={label} className="flex items-center justify-between p-4 glass-panel rounded-xl">
+                  <div>
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">{label}</span>
+                    <p className="text-[11px] text-gray-500">{desc}</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={checked}
+                    onClick={() => onChange(!checked)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer ${checked ? 'bg-emerald-600' : 'bg-gray-600'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              ))}
+              {(allowInsert || allowUpdate || allowDelete) && (
+                <div className="flex items-center justify-between p-4 glass-panel rounded-xl mt-3">
+                  <div>
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">Require WHERE clause</span>
+                    <p className="text-[11px] text-gray-500">Prevent unscoped updates/deletes</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={requireWhere}
+                    onClick={() => setRequireWhere(!requireWhere)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer ${requireWhere ? 'bg-emerald-600' : 'bg-gray-600'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${requireWhere ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Connection String Preview */}
           <div className="border-t border-white/5 pt-8">

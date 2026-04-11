@@ -581,3 +581,34 @@ class MigrationProject(Base):
         Index('idx_migration_status', 'status'),
         CheckConstraint("status IN ('draft', 'planned', 'scripted')", name='ck_migration_status'),
     )
+
+
+class ConnectionWritePermission(Base):
+    """Per-connection write permissions for Edit Mode (Phase 18)."""
+    __tablename__ = "connection_write_permissions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    connection_id = Column(
+        Integer,
+        ForeignKey("database_connections.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+    )
+
+    # Granular DML permissions
+    allow_insert = Column(Boolean, default=False)
+    allow_update = Column(Boolean, default=False)
+    allow_delete = Column(Boolean, default=False)
+
+    # Safety settings
+    require_where_clause = Column(Boolean, default=True)
+    max_rows_per_operation = Column(Integer, default=100)
+    allowed_tables = Column(JSON, nullable=True)  # null = all tables
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
+                        onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationship
+    connection = relationship("DatabaseConnection", backref="write_permission")
