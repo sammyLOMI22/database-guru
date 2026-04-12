@@ -182,8 +182,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in Settings().CORS_ORIGINS.split(",") if o.strip()],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Add rate limiting middleware

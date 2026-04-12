@@ -12,6 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db
 from src.api.dependencies.common import get_settings
+from src.auth.audit import log_action
+from src.auth.dependencies import require_admin
+from src.auth.models import User
 from src.config.settings import Settings
 from src.services.provider_config_service import ProviderConfigService
 
@@ -129,6 +132,7 @@ async def upsert_provider(
     provider_name: str,
     body: ProviderConfigRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
     service: ProviderConfigService = Depends(_get_config_service),
 ) -> dict[str, Any]:
     config = await service.upsert_config(
@@ -141,6 +145,13 @@ async def upsert_provider(
         default_model=body.default_model,
         extra_config=body.extra_config,
     )
+    await log_action(
+        db, action="provider_config_update", resource_type="llm_provider",
+        resource_id=provider_name, user_id=current_user.id,
+        username=current_user.username,
+        details={"enabled": body.enabled, "data_locality": body.data_locality,
+                 "has_api_key": body.api_key is not None},
+    )
     await db.commit()
     logger.info(f"Provider config updated: {provider_name}")
     return config
@@ -150,6 +161,7 @@ async def upsert_provider(
 async def delete_provider(
     provider_name: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
     service: ProviderConfigService = Depends(_get_config_service),
 ) -> dict[str, str]:
     deleted = await service.delete_config(db, provider_name)
@@ -158,30 +170,44 @@ async def delete_provider(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Provider {provider_name!r} not configured",
         )
+    await log_action(
+        db, action="provider_config_delete", resource_type="llm_provider",
+        resource_id=provider_name, user_id=current_user.id,
+        username=current_user.username,
+    )
     await db.commit()
     logger.info(f"Provider config deleted: {provider_name}")
     return {"status": "deleted", "provider": provider_name}
 
 
 @router.post("/{provider_name}/test", summary="Test provider connectivity")
-async def test_provider(provider_name: str) -> ProviderTestResponse:
+async def test_provider(
+    provider_name: str,
+    current_user: User = Depends(require_admin),
+) -> ProviderTestResponse:
     """Test connectivity to a provider using a synthetic prompt.
 
     Uses a safe, non-data-bearing prompt so no schema or query data is sent.
     """
     from src.llm.providers.registry import (
         get_provider_registry,
+        DataSecurityError,
         ProviderNotFoundError,
     )
 
     registry = get_provider_registry()
 
     try:
-        provider = registry.get(provider_name, enforce_security=False)
+        provider = registry.get(provider_name)
     except ProviderNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Provider {provider_name!r} is not registered in the runtime",
+        )
+    except DataSecurityError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
         )
 
     health = await provider.health_check()
@@ -198,17 +224,23 @@ async def list_provider_models(provider_name: str) -> list[ProviderModelInfo]:
     """List models available from a provider."""
     from src.llm.providers.registry import (
         get_provider_registry,
+        DataSecurityError,
         ProviderNotFoundError,
     )
 
     registry = get_provider_registry()
 
     try:
-        provider = registry.get(provider_name, enforce_security=False)
+        provider = registry.get(provider_name)
     except ProviderNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Provider {provider_name!r} is not registered",
+        )
+    except DataSecurityError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
         )
 
     try:
@@ -244,6 +276,7 @@ async def list_routing(
 async def upsert_routing(
     body: TaskRoutingRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
     service: ProviderConfigService = Depends(_get_config_service),
 ) -> dict[str, Any]:
     route = await service.upsert_routing(
@@ -252,6 +285,13 @@ async def upsert_routing(
         primary_provider=body.primary_provider,
         primary_model=body.primary_model,
         fallback_chain=body.fallback_chain,
+    )
+    await log_action(
+        db, action="routing_update", resource_type="llm_routing",
+        resource_id=body.task_type, user_id=current_user.id,
+        username=current_user.username,
+        details={"primary_provider": body.primary_provider,
+                 "primary_model": body.primary_model},
     )
     await db.commit()
     logger.info(f"Task routing updated: {body.task_type} -> {body.primary_provider}")
@@ -262,6 +302,7 @@ async def upsert_routing(
 async def delete_routing(
     task_type: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
     service: ProviderConfigService = Depends(_get_config_service),
 ) -> dict[str, str]:
     deleted = await service.delete_routing(db, task_type)
@@ -270,6 +311,11 @@ async def delete_routing(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No routing rule for task {task_type!r}",
         )
+    await log_action(
+        db, action="routing_delete", resource_type="llm_routing",
+        resource_id=task_type, user_id=current_user.id,
+        username=current_user.username,
+    )
     await db.commit()
     return {"status": "deleted", "task_type": task_type}
 

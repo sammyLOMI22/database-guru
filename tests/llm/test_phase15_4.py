@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 from datetime import datetime
 
+from cryptography.fernet import Fernet
 from src.llm.model_router import ModelRouter, TaskType, TaskConfig
 from src.services.provider_config_service import ProviderConfigService, generate_encryption_key
 from src.llm.providers.base import DataLocality, LLMResponse
@@ -282,13 +283,13 @@ class TestProviderConfigServiceEncryption:
         decrypted = svc.decrypt_key(encrypted)
         assert decrypted == "sk-test-key-123"
 
-    def test_encrypt_no_key_returns_plaintext(self):
+    def test_encrypt_no_key_raises_error(self):
         settings = MagicMock()
         settings.LLM_ENCRYPTION_KEY = None
         svc = ProviderConfigService(settings)
 
-        result = svc.encrypt_key("sk-test")
-        assert result == "sk-test"
+        with pytest.raises(ValueError, match="LLM_ENCRYPTION_KEY is not configured"):
+            svc.encrypt_key("sk-test")
 
     def test_decrypt_no_key_returns_plaintext(self):
         settings = MagicMock()
@@ -347,9 +348,11 @@ class TestProviderConfigServiceEncryption:
 class TestProviderConfigServiceCRUD:
     """Test CRUD operations with mocked DB session."""
 
-    def _make_service(self):
+    _TEST_FERNET_KEY = Fernet.generate_key().decode()
+
+    def _make_service(self, with_encryption=False):
         settings = MagicMock()
-        settings.LLM_ENCRYPTION_KEY = None
+        settings.LLM_ENCRYPTION_KEY = self._TEST_FERNET_KEY if with_encryption else None
         return ProviderConfigService(settings)
 
     @pytest.mark.asyncio
@@ -392,7 +395,7 @@ class TestProviderConfigServiceCRUD:
 
     @pytest.mark.asyncio
     async def test_upsert_config_creates_new(self):
-        svc = self._make_service()
+        svc = self._make_service(with_encryption=True)
         db = AsyncMock()
 
         # First query returns None (not found)

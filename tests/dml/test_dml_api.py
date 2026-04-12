@@ -128,7 +128,7 @@ class TestPreviewEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["change_count"] == 1
-        assert "UPDATE" in data["sql"]
+        assert "UPDATE" in data["preview_sql"]
         assert data["summary"]["UPDATE"] == 1
 
     def test_preview_insert(self):
@@ -151,7 +151,7 @@ class TestPreviewEndpoint:
 
         assert response.status_code == 200
         data = response.json()
-        assert "INSERT" in data["sql"]
+        assert "INSERT" in data["preview_sql"]
         assert data["summary"]["INSERT"] == 1
 
     def test_preview_delete(self):
@@ -173,7 +173,7 @@ class TestPreviewEndpoint:
 
         assert response.status_code == 200
         data = response.json()
-        assert "DELETE" in data["sql"]
+        assert "DELETE" in data["preview_sql"]
         assert data["summary"]["DELETE"] == 1
 
     def test_preview_404_for_missing_connection(self):
@@ -315,7 +315,7 @@ class TestExecuteEndpoint:
             "table_name": "users",
             "primary_key": {"id": 1},
             "changes": [{"column": "name", "old_value": "a", "new_value": "b"}],
-        }], ExecutionResult(success=True, rows_affected=1, executed_sql="UPDATE ..."))
+        }], ExecutionResult(success=True, rows_affected=1, display_sql="UPDATE ..."))
 
         assert response.status_code == 200
         data = response.json()
@@ -336,7 +336,7 @@ class TestExecuteEndpoint:
             "primary_key": {},
             "changes": [],
             "new_row_data": {"name": "Bob", "email": "bob@test.com"},
-        }], ExecutionResult(success=True, rows_affected=1, executed_sql="INSERT ..."))
+        }], ExecutionResult(success=True, rows_affected=1, display_sql="INSERT ..."))
 
         assert response.status_code == 200
         assert response.json()["success"] is True
@@ -354,7 +354,7 @@ class TestExecuteEndpoint:
             "table_name": "orders",
             "primary_key": {"id": 42},
             "changes": [],
-        }], ExecutionResult(success=True, rows_affected=3, executed_sql="DELETE ..."))
+        }], ExecutionResult(success=True, rows_affected=3, display_sql="DELETE ..."))
 
         assert response.status_code == 200
         data = response.json()

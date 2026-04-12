@@ -98,7 +98,9 @@ class TestDMLValidatorConnectionAccess:
         assert "not found" in error
 
     @pytest.mark.asyncio
-    async def test_rejects_wrong_owner(self):
+    async def test_rejects_no_write_permissions(self):
+        """Ownership is enforced by the API layer; the validator checks
+        write-permission records next."""
         conn = _make_connection(owner_id=5)
         db = _mock_db(connection=conn)
         validator = DMLValidator()
@@ -106,7 +108,7 @@ class TestDMLValidatorConnectionAccess:
             db, 1, [_simple_update()], _make_settings(), user_id=99
         )
         assert not is_valid
-        assert "access" in error.lower()
+        assert "write permissions" in error.lower()
 
     @pytest.mark.asyncio
     async def test_nosql_passes_with_permissions(self):

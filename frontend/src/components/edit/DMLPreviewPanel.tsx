@@ -19,13 +19,13 @@ export function DMLPreviewPanel({
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(preview.sql);
+    await navigator.clipboard.writeText(preview.preview_sql);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownload = () => {
-    const blob = new Blob([preview.sql], { type: 'text/sql' });
+    const blob = new Blob([preview.preview_sql], { type: 'text/sql' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -64,7 +64,7 @@ export function DMLPreviewPanel({
         {/* SQL preview */}
         <div className="flex-1 overflow-auto p-6">
           <pre className="text-sm font-mono text-gray-300 whitespace-pre-wrap bg-black/30 rounded-xl p-4 border border-white/5">
-            {preview.sql}
+            {preview.preview_sql}
           </pre>
         </div>
 

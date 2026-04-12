@@ -62,7 +62,7 @@ class WritePermissionRequest(BaseModel):
 
 class DMLPreviewResponse(BaseModel):
     """Response for DML preview."""
-    sql: str
+    preview_sql: str = Field(description="Human-readable SQL for display only — NOT safe for execution.")
     change_count: int
     summary: Dict[str, int]
     statements: List[DMLStatement]
@@ -73,7 +73,7 @@ class ExecutionResult(BaseModel):
     success: bool
     rows_affected: int = 0
     error_message: Optional[str] = None
-    executed_sql: Optional[str] = None
+    display_sql: Optional[str] = Field(default=None, description="Human-readable SQL — NOT safe for execution.")
 
 
 class WritePermissionResponse(BaseModel):

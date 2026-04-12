@@ -1,5 +1,6 @@
 """Provider registry — central lookup for all configured LLM providers."""
 import logging
+import threading
 from typing import Optional
 
 from src.llm.providers.base import (
@@ -122,16 +123,18 @@ class ProviderRegistry:
 
 # Global registry instance
 _registry: Optional[ProviderRegistry] = None
+_registry_lock = threading.Lock()
 
 
 def get_provider_registry(security_level: Optional[str] = None) -> ProviderRegistry:
-    """Get or create the global provider registry."""
+    """Get or create the global provider registry (thread-safe)."""
     global _registry
-    if _registry is None:
-        _registry = ProviderRegistry(security_level=security_level or "local_only")
-    elif security_level is not None:
-        _registry.security_level = security_level
-    return _registry
+    with _registry_lock:
+        if _registry is None:
+            _registry = ProviderRegistry(security_level=security_level or "local_only")
+        elif security_level is not None:
+            _registry.security_level = security_level
+        return _registry
 
 
 def initialize_registry_from_settings() -> ProviderRegistry:

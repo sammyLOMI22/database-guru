@@ -37,10 +37,17 @@ class ProviderConfigService:
             )
 
     def encrypt_key(self, plaintext: str) -> str:
-        """Encrypt an API key for storage."""
+        """Encrypt an API key for storage.
+
+        Raises ValueError if no encryption key is configured — API keys
+        must never be stored as plaintext.
+        """
         if self._fernet:
             return self._fernet.encrypt(plaintext.encode()).decode()
-        return plaintext
+        raise ValueError(
+            "Cannot store API key: LLM_ENCRYPTION_KEY is not configured. "
+            "Set a Fernet encryption key before saving provider API keys."
+        )
 
     def decrypt_key(self, ciphertext: str) -> Optional[str]:
         """Decrypt a stored API key."""

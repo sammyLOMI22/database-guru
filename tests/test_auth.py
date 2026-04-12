@@ -213,20 +213,20 @@ class TestUserCRUD:
 
 class TestSchemas:
     def test_user_create_valid(self):
-        u = UserCreate(email="test@example.com", username="testuser", password="password123")
+        u = UserCreate(email="test@example.com", username="testuser", password="StrongPass123!")
         assert u.email == "test@example.com"
 
     def test_user_create_invalid_email(self):
         with pytest.raises(Exception):
-            UserCreate(email="not-an-email", username="testuser", password="password123")
+            UserCreate(email="not-an-email", username="testuser", password="StrongPass123!")
 
     def test_user_create_short_username(self):
         with pytest.raises(Exception):
-            UserCreate(email="a@b.com", username="ab", password="password123")
+            UserCreate(email="a@b.com", username="ab", password="StrongPass123!")
 
     def test_user_create_invalid_username_chars(self):
         with pytest.raises(Exception):
-            UserCreate(email="a@b.com", username="test user!", password="password123")
+            UserCreate(email="a@b.com", username="test user!", password="StrongPass123!")
 
     def test_user_create_short_password(self):
         with pytest.raises(Exception):

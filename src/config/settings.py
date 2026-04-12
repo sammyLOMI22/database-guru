@@ -141,17 +141,25 @@ class Settings(BaseSettings):
         case_sensitive = True
 
     def check_jwt_secret(self) -> None:
-        """Warn if JWT secret is still the default. Called at startup."""
+        """Reject the default JWT secret at startup.
+
+        Login/register endpoints are always available regardless of
+        REQUIRE_AUTH, so a well-known secret allows token forgery and
+        ownership-bypass attacks even when auth is "off".
+        """
         if self.JWT_SECRET == "change-this-jwt-secret":
-            if self.REQUIRE_AUTH:
-                raise ValueError(
-                    "REQUIRE_AUTH is enabled but JWT_SECRET is still the default. "
+            if self.ENVIRONMENT == "development":
+                import logging
+                logging.getLogger(__name__).warning(
+                    "JWT_SECRET is set to the default value. "
+                    "This is only acceptable in development. "
                     "Set a strong, random JWT_SECRET in your .env file."
                 )
-            import logging
-            logging.getLogger(__name__).warning(
-                "JWT_SECRET is set to the default value. "
-                "Set a strong, random JWT_SECRET before enabling authentication."
+                return
+            raise ValueError(
+                "JWT_SECRET is still the default value. "
+                "Set a strong, random JWT_SECRET in your .env file "
+                "before running in non-development environments."
             )
 
     @property

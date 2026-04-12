@@ -1,13 +1,34 @@
 """Pydantic schemas for authentication"""
+import re
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+
+# Passwords that satisfy length/complexity but are still trivially guessable.
+_COMMON_PASSWORDS = frozenset({
+    "password123", "password1234", "admin12345", "letmein1234",
+    "welcome1234", "changeme123", "qwerty12345", "abc12345678",
+})
 
 
 class UserCreate(BaseModel):
     """Request model for user registration"""
     email: EmailStr
     username: str = Field(..., min_length=3, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")
-    password: str = Field(..., min_length=8, max_length=128)
+    password: str = Field(..., min_length=12, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit.")
+        if v.lower() in _COMMON_PASSWORDS:
+            raise ValueError("This password is too common. Please choose a stronger one.")
+        return v
 
 
 class UserLogin(BaseModel):

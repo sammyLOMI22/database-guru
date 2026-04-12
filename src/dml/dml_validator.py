@@ -43,12 +43,10 @@ class DMLValidator:
         if not connection:
             return False, f"Connection {connection_id} not found or has been deleted."
 
-        # 3. Ownership check
-        if connection.owner_id is not None:
-            if user_id is None:
-                return False, "Authentication required to modify data on owned connections."
-            if connection.owner_id != user_id:
-                return False, "You do not have access to this connection."
+        # 3. Ownership check is enforced by the API layer
+        # (_check_connection_access in dml.py) before the validator runs.
+        # Do not duplicate it here — callers outside the API must handle
+        # access control themselves.
 
         is_nosql = connection.database_type in NOSQL_TYPES
 

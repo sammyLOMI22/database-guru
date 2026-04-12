@@ -230,13 +230,18 @@ class DMLGenerator:
         return f"p{self._param_counter}"
 
     def _quote(self, identifier: str) -> str:
-        """Quote an identifier based on dialect."""
+        """Quote an identifier based on dialect.
+
+        Handles schema-qualified names (e.g. "public.users") by quoting
+        each part individually.
+        """
+        parts = identifier.split(".", 1)
         if self.dialect in ("postgresql", "sqlite", "duckdb", "oracle"):
-            return f'"{identifier}"'
+            return ".".join(f'"{p}"' for p in parts)
         elif self.dialect == "mysql":
-            return f"`{identifier}`"
+            return ".".join(f"`{p}`" for p in parts)
         elif self.dialect == "mssql":
-            return f"[{identifier}]"
+            return ".".join(f"[{p}]" for p in parts)
         raise ValueError(f"Unsupported dialect for quoting: {self.dialect!r}")
 
     def _format_literal(self, value: Any) -> str:
@@ -265,5 +270,5 @@ class DMLGenerator:
         if not SAFE_IDENT_RE.match(name):
             raise ValueError(
                 f"Unsafe identifier rejected: {name!r}. "
-                "Only letters, digits, and underscores are allowed."
+                "Only letters, digits, underscores, and optional schema.table notation are allowed."
             )

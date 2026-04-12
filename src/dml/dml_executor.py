@@ -77,7 +77,7 @@ class DMLExecutor:
             return ExecutionResult(
                 success=True,
                 rows_affected=total,
-                executed_sql=display_sql,
+                display_sql=display_sql,
             )
 
         except Exception as e:
@@ -104,7 +104,7 @@ class DMLExecutor:
                 success=False,
                 rows_affected=0,
                 error_message=str(e),
-                executed_sql=display_sql,
+                display_sql=display_sql,
             )
 
     async def _execute_async(
@@ -118,7 +118,7 @@ class DMLExecutor:
             result = await session.execute(
                 text(stmt.parameterized_sql), stmt.params
             )
-            total_affected += result.rowcount
+            total_affected += max(0, result.rowcount)
         await session.commit()
         return total_affected
 
@@ -134,7 +134,7 @@ class DMLExecutor:
                 result = session.execute(
                     text(stmt.parameterized_sql), stmt.params
                 )
-                total_affected += result.rowcount
+                total_affected += max(0, result.rowcount)
             session.commit()
             return total_affected
         except Exception:
