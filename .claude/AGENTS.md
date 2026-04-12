@@ -161,17 +161,40 @@ Generates human-readable narratives from query results with advanced analysis:
 
 ### 13. Model Router
 **File**: `src/llm/model_router.py`
-**Added**: January 2, 2026
+**Added**: January 2, 2026 (Updated April 2026 — Phase 15 provider routing)
 
-Routes LLM tasks to appropriate models based on task type and user configuration:
+Routes LLM tasks to appropriate models and providers based on task type and user configuration:
 - SQL Generation: Use specialized SQL models (duckdb-nsql, sqlcoder)
 - Narratives: Use general-purpose models (llama3.2, gemma)
 - Query Planning: Use reasoning-capable models
 - Error Correction: Use code-focused models
+- Per-task provider routing with fallback chains (Phase 15)
 
 **Per-Task Timeouts**: Configurable timeout per task type (SQL: 30s, Narratives: 15s, Planning: 20s, Correction: 15s)
 
-**Key methods**: `get_model_for_task()`, `get_timeout_for_task()`, `get_config_for_task()`
+**Key methods**: `get_model_for_task()`, `get_timeout_for_task()`, `get_config_for_task()`, `get_provider_for_task()`, `get_fallback_chain()`, `execute_with_fallback()`
+
+### 13b. Provider Registry
+**File**: `src/llm/providers/registry.py`
+**Added**: April 2026 (Phase 15)
+
+Central registry for all LLM providers with data security enforcement:
+- Registers providers at startup from settings and DB configs
+- Enforces `DATA_SECURITY_LEVEL` (local_only/cloud_private/unrestricted) on provider access
+- Health check all registered providers
+
+**Key methods**: `register()`, `get()`, `list_available()`, `list_allowed()`, `health_check_all()`
+
+### 13c. Tracked LLM Client
+**File**: `src/llm/tracked_client.py`
+**Added**: April 2026 (Phase 15)
+
+Provider-agnostic wrapper that adds usage tracking to any `BaseLLMProvider`:
+- Same `generate()`/`chat()` signature as original OllamaClient
+- Automatic token tracking via `llm_usage_tracker.track_call()` context manager
+- Legacy dict conversion for backward compatibility
+
+**Key methods**: `generate()`, `chat()`, `health_check()`, `list_models()`, `embeddings()`
 
 ### 14. Query Template Engine
 **File**: `src/llm/query_templates.py`

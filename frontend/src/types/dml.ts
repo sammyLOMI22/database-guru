@@ -66,7 +66,7 @@ export interface DMLPreviewRequest {
 }
 
 export interface DMLPreviewResponse {
-  sql: string;
+  preview_sql: string;
   change_count: number;
   summary: { INSERT: number; UPDATE: number; DELETE: number };
   statements: DMLStatement[];
@@ -81,7 +81,7 @@ export interface DMLExecuteResponse {
   success: boolean;
   rows_affected: number;
   error_message?: string;
-  executed_sql?: string;
+  display_sql?: string;
 }
 
 export interface ChangeSummary {

@@ -182,7 +182,7 @@ class TestAuditLogging:
         p, _ = _patch_executor("mongodb")
         with p:
             result = await NoSQLDMLExecutor().execute(_make_connection("mongodb"), [stmt], metadata_db)
-        assert "insertOne" in result.executed_sql
+        assert "insertOne" in result.display_sql
 
 
 # ── Import smoke test ─────────────────────────────────────────────

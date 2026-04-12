@@ -1,4 +1,5 @@
 """Rate limiting middleware and dependencies"""
+import asyncio
 import logging
 import time
 from typing import Callable, Dict, Optional
@@ -12,6 +13,20 @@ from src.config.settings import Settings
 logger = logging.getLogger(__name__)
 
 _settings = Settings()
+
+
+def get_client_ip(request: Request) -> str:
+    """Extract the real client IP, respecting reverse-proxy headers."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        # First entry is the original client; proxies append theirs.
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    if request.client:
+        return request.client.host
+    return "unknown"
 
 
 def _extract_rate_limit_key(request: Request) -> Optional[str]:
@@ -74,6 +89,7 @@ class EndpointRateLimiter:
         self.calls = calls
         self.period = period
         self._clients: Dict[str, Dict] = {}
+        self._lock = asyncio.Lock()
 
     def _cleanup_old_entries(self, now: float) -> None:
         """Remove expired client entries to prevent memory growth."""
@@ -86,60 +102,62 @@ class EndpointRateLimiter:
 
     async def __call__(self, request: Request) -> None:
         """Check rate limit for the request."""
-        client_ip = _extract_rate_limit_key(request) or (request.client.host if request.client else "unknown")
+        client_ip = _extract_rate_limit_key(request) or get_client_ip(request)
         now = time.time()
 
-        # Periodic cleanup (every 100 requests approximately)
-        if len(self._clients) > 100:
-            self._cleanup_old_entries(now)
+        async with self._lock:
+            # Periodic cleanup (every 100 requests approximately)
+            if len(self._clients) > 100:
+                self._cleanup_old_entries(now)
 
-        # Initialize client record
-        if client_ip not in self._clients:
-            self._clients[client_ip] = {"calls": [], "blocked_until": 0}
+            # Initialize client record
+            if client_ip not in self._clients:
+                self._clients[client_ip] = {"calls": [], "blocked_until": 0}
 
-        client_data = self._clients[client_ip]
+            client_data = self._clients[client_ip]
 
-        # Check if blocked
-        if client_data["blocked_until"] > now:
-            retry_after = int(client_data["blocked_until"] - now)
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Rate limit exceeded for this endpoint. "
-                       f"Maximum {self.calls} requests per {self.period} seconds. "
-                       f"Retry after {retry_after} seconds.",
-                headers={"Retry-After": str(retry_after)},
-            )
+            # Check if blocked
+            if client_data["blocked_until"] > now:
+                retry_after = int(client_data["blocked_until"] - now)
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Rate limit exceeded for this endpoint. "
+                           f"Maximum {self.calls} requests per {self.period} seconds. "
+                           f"Retry after {retry_after} seconds.",
+                    headers={"Retry-After": str(retry_after)},
+                )
 
-        # Clean old calls
-        client_data["calls"] = [
-            t for t in client_data["calls"] if t > now - self.period
-        ]
+            # Clean old calls
+            client_data["calls"] = [
+                t for t in client_data["calls"] if t > now - self.period
+            ]
 
-        # Check limit
-        if len(client_data["calls"]) >= self.calls:
-            oldest = min(client_data["calls"])
-            client_data["blocked_until"] = oldest + self.period
-            retry_after = int(client_data["blocked_until"] - now)
+            # Check limit
+            if len(client_data["calls"]) >= self.calls:
+                oldest = min(client_data["calls"])
+                client_data["blocked_until"] = oldest + self.period
+                retry_after = int(client_data["blocked_until"] - now)
 
-            logger.warning(
-                f"Endpoint rate limit exceeded for {client_ip}: "
-                f"{self.calls}/{self.period}s"
-            )
+                logger.warning(
+                    f"Endpoint rate limit exceeded for {client_ip}: "
+                    f"{self.calls}/{self.period}s"
+                )
 
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Rate limit exceeded for this endpoint. "
-                       f"Maximum {self.calls} requests per {self.period} seconds. "
-                       f"Retry after {retry_after} seconds.",
-                headers={"Retry-After": str(retry_after)},
-            )
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Rate limit exceeded for this endpoint. "
+                           f"Maximum {self.calls} requests per {self.period} seconds. "
+                           f"Retry after {retry_after} seconds.",
+                    headers={"Retry-After": str(retry_after)},
+                )
 
-        # Record this call
-        client_data["calls"].append(now)
+            # Record this call
+            client_data["calls"].append(now)
 
 
 # Pre-configured limiters for different endpoint types
 llm_rate_limiter = EndpointRateLimiter(calls=20, period=60)  # 20 LLM calls/min
+auth_rate_limiter = EndpointRateLimiter(calls=5, period=60)  # 5 login/register attempts/min
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -180,7 +198,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Get client identifier (prefer user ID from JWT, fall back to IP)
-        client_ip = _extract_rate_limit_key(request) or request.client.host
+        client_ip = _extract_rate_limit_key(request) or get_client_ip(request)
 
         # Get current time
         now = time.time()

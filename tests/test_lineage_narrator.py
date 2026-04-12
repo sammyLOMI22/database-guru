@@ -403,7 +403,7 @@ class TestGetLineageNarrator:
     @pytest.mark.asyncio
     async def test_get_narrator_without_db(self):
         """Test getting narrator without database session."""
-        with patch("src.llm.ollama_client.get_ollama_client") as mock_get_client:
+        with patch("src.llm.get_llm_client") as mock_get_client:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 
@@ -415,7 +415,7 @@ class TestGetLineageNarrator:
     @pytest.mark.asyncio
     async def test_get_narrator_with_model_override(self):
         """Test getting narrator with model override."""
-        with patch("src.llm.ollama_client.get_ollama_client") as mock_get_client:
+        with patch("src.llm.get_llm_client") as mock_get_client:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 

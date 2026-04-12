@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-AI-powered natural language to database query assistant. Ask questions about your databases in plain English — supports SQL and NoSQL databases, CSV/Excel files, and mixed data source queries!
+AI-powered natural language to database query assistant. Ask questions about your databases in plain English — supports 8 LLM providers, SQL and NoSQL databases, CSV/Excel files, and mixed data source queries!
 
 ## 🚀 Quick Start
 
@@ -40,7 +40,7 @@ See [Docker Deployment Guide](docs/guides/DOCKER_DEPLOYMENT_GUIDE.md) for all op
 #### Prerequisites
 - Python 3.11+
 - Node.js 18+
-- Ollama (for local LLM)
+- LLM Provider: Ollama (default local), or cloud providers (OpenAI, Azure, Anthropic, etc.)
 - Redis (optional, for persistent caching - uses in-memory fallback if not available)
 
 #### One-Command Startup
@@ -264,6 +264,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **NoSQL Database Expansion (NEW!)** - Full native query support for MongoDB (MQL), Redis (commands), Cassandra (CQL), DynamoDB (PartiQL), and Elasticsearch (Query DSL) with schema inference, error classification, self-correction, and mixed SQL+NoSQL chat sessions
 - ✅ **Security & Auth Foundation (NEW!)** - JWT authentication (bcrypt + python-jose), resource ownership with `owner_id` FK, per-user rate limiting with JWT-based user ID extraction, audit logging, `REQUIRE_AUTH` feature flag for gradual rollout
 - ✅ **Edit Mode & DML Operations (NEW!)** - Inline cell editing in query results, add new rows with schema-aware forms, delete rows with confirmation, preview INSERT/UPDATE/DELETE scripts before execution, per-connection write permissions (INSERT/UPDATE/DELETE toggles, allowed tables, row limits), transaction-wrapped execution with rollback
+- ✅ **Multi-Provider LLM Support (NEW!)** - 8 LLM providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Google Vertex AI, AWS Bedrock, LM Studio, vLLM) with Local/Frontier toggle, data security enforcement (local_only/cloud_private/unrestricted), per-task provider routing with fallback chains, Fernet-encrypted API key storage, provider health checks, and frontend provider management UI with color-coded locality badges
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
@@ -787,7 +788,7 @@ curl -X POST http://localhost:8000/api/llm/usage/configs/seed
 **Backend:**
 - FastAPI (Python)
 - SQLAlchemy 2.0 (async)
-- Ollama (local LLM)
+- Multi-provider LLM (Ollama default, + OpenAI, Azure, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM)
 - SQLite for metadata
 - Parallel execution with `asyncio.gather()`
 
@@ -2347,9 +2348,10 @@ MIT License - See LICENSE file
 Built with:
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [React](https://react.dev/)
-- [Ollama](https://ollama.ai/)
+- [Ollama](https://ollama.ai/) (default LLM provider)
 - [SQLAlchemy](https://www.sqlalchemy.org/)
 - [Tailwind CSS](https://tailwindcss.com/)
+- [OpenAI](https://openai.com/), [Anthropic](https://anthropic.com/), [Google Vertex AI](https://cloud.google.com/vertex-ai), [AWS Bedrock](https://aws.amazon.com/bedrock/) (optional cloud LLM providers)
 
 ---
 

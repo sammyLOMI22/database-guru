@@ -64,7 +64,7 @@ class NoSQLDMLExecutor:
             return ExecutionResult(
                 success=True,
                 rows_affected=total,
-                executed_sql=display_sql,
+                display_sql=display_sql,
             )
 
         except Exception as e:
@@ -90,7 +90,7 @@ class NoSQLDMLExecutor:
                 success=False,
                 rows_affected=0,
                 error_message=str(e),
-                executed_sql=display_sql,
+                display_sql=display_sql,
             )
 
 
@@ -180,13 +180,14 @@ async def _execute_cassandra(
     def _run_batch():
         from cassandra.query import BatchStatement, BatchType, ConsistencyLevel
 
-        # Use UNLOGGED batch when statements span multiple tables to avoid
-        # the coordinator-level overhead of logged cross-partition batches.
+        # LOGGED batches provide atomicity across partitions/tables (with
+        # coordinator overhead).  UNLOGGED is an optimisation only safe for
+        # writes within a single partition on one table.
         tables = {s.table_name for s in statements}
-        batch_type = BatchType.UNLOGGED if len(tables) > 1 else BatchType.LOGGED
+        batch_type = BatchType.LOGGED if len(tables) > 1 else BatchType.UNLOGGED
         if len(tables) > 1:
             logger.info(
-                "Cassandra batch spans %d tables — using UNLOGGED batch",
+                "Cassandra batch spans %d tables — using LOGGED batch for atomicity",
                 len(tables),
             )
 

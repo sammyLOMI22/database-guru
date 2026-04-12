@@ -106,7 +106,7 @@ async def preview_changes(
         summary[change.change_type.value] += 1
 
     return DMLPreviewResponse(
-        sql=preview_script,
+        preview_sql=preview_script,
         change_count=len(request.changes),
         summary=summary,
         statements=statements,

@@ -9,6 +9,7 @@
  */
 import { useState, useEffect } from 'react';
 import { Cpu, Clock, Zap, MessageSquare, GitBranch, AlertTriangle, Info, RefreshCw, FileText, Activity, MessageCircle } from 'lucide-react';
+import { llmProviderApi } from '../services/llmProviderApi';
 
 interface ModelConfig {
   model_sql_generation: string | null;
@@ -43,7 +44,15 @@ interface AvailableModel {
   name: string;
   modified_at: string;
   size: number;
+  provider?: string; // e.g. "ollama", "openai"
+  dataLocality?: string; // "local", "cloud_private", "cloud_public"
 }
+
+const LOCALITY_LABEL: Record<string, string> = {
+  local: '● LOCAL',
+  cloud_private: '◐ PRIVATE CLOUD',
+  cloud_public: '○ CLOUD',
+};
 
 interface ModelConfigPanelProps {
   config: ModelConfig;
@@ -158,11 +167,49 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
     try {
       setLoadingModels(true);
       setModelsError(null);
+
+      // Fetch local Ollama models
       const baseURL = (import.meta as any).env?.VITE_API_URL || '';
-      const response = await fetch(`${baseURL}/api/models/details`);
-      if (!response.ok) throw new Error('Failed to fetch models');
-      const data = await response.json();
-      setAvailableModels(data.models || []);
+      const ollamaResponse = await fetch(`${baseURL}/api/models/details`);
+      let ollamaModels: AvailableModel[] = [];
+      if (ollamaResponse.ok) {
+        const data = await ollamaResponse.json();
+        ollamaModels = (data.models || []).map((m: AvailableModel) => ({
+          ...m,
+          provider: 'ollama',
+          dataLocality: 'local',
+        }));
+      }
+
+      // Fetch models from other registered providers
+      let providerModels: AvailableModel[] = [];
+      try {
+        const registry = await llmProviderApi.getRegistry();
+        const otherProviders = registry.providers.filter(
+          (p) => p.name !== 'ollama' && p.allowed
+        );
+        const modelResults = await Promise.allSettled(
+          otherProviders.map(async (p) => {
+            const models = await llmProviderApi.listModels(p.name);
+            return models.map((m) => ({
+              name: m.name,
+              modified_at: m.modified_at || '',
+              size: 0,
+              provider: p.name,
+              dataLocality: p.data_locality,
+            }));
+          })
+        );
+        for (const result of modelResults) {
+          if (result.status === 'fulfilled') {
+            providerModels = providerModels.concat(result.value);
+          }
+        }
+      } catch {
+        // Registry not available — only show Ollama models
+      }
+
+      setAvailableModels([...ollamaModels, ...providerModels]);
     } catch (err) {
       setModelsError(err instanceof Error ? err.message : 'Failed to load models');
       setAvailableModels([]);
@@ -321,19 +368,12 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
                 <label className="block text-[11px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-gray-400 mb-2">
                   Model
                 </label>
-                <select
+                <ModelSelect
                   value={currentModel || ''}
-                  onChange={(e) => handleModelChange(task.modelKey, e.target.value)}
+                  onChange={(val) => handleModelChange(task.modelKey, val)}
                   disabled={disabled || loadingModels}
-                  className="w-full glass-panel rounded-lg px-3 py-2 text-xs font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 border-white/10 bg-transparent appearance-none cursor-pointer disabled:opacity-50"
-                >
-                  <option value="">Default (system model)</option>
-                  {availableModels.map((model) => (
-                    <option key={model.name} value={model.name}>
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
+                  models={availableModels}
+                />
                 <p className="text-[11px] font-medium text-gray-400 mt-1">{task.hint}</p>
               </div>
 
@@ -580,6 +620,127 @@ export function ModelConfigPanel({ config, onChange, disabled = false }: ModelCo
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+// ── Custom Model Select with locality badges ──
+
+const LOCALITY_DOT_COLOR: Record<string, string> = {
+  local: 'bg-emerald-500',
+  cloud_private: 'bg-blue-500',
+  cloud_public: 'bg-amber-500',
+};
+
+const LOCALITY_TEXT_COLOR: Record<string, string> = {
+  local: 'text-emerald-500',
+  cloud_private: 'text-blue-400',
+  cloud_public: 'text-amber-500',
+};
+
+function ModelSelect({
+  value,
+  onChange,
+  disabled,
+  models,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  disabled: boolean;
+  models: AvailableModel[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  const selected = models.find((m) => m.name === value);
+  const providers = [...new Set(models.map((m) => m.provider || 'ollama'))];
+  const hasMultipleProviders = providers.length > 1;
+
+  const displayLabel = selected
+    ? selected.name
+    : value || 'Default (system model)';
+
+  const selectedLocality = selected?.dataLocality || 'local';
+
+  return (
+    <div className="relative">
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={() => !disabled && setOpen(!open)}
+        disabled={disabled}
+        className="w-full glass-panel rounded-lg px-3 py-2 text-xs font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 border-white/10 bg-transparent cursor-pointer disabled:opacity-50 flex items-center gap-2 text-left"
+      >
+        {selected && hasMultipleProviders && (
+          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${LOCALITY_DOT_COLOR[selectedLocality] || 'bg-gray-400'}`} />
+        )}
+        <span className="flex-1 truncate">{displayLabel}</span>
+        <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <>
+          {/* Backdrop */}
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+
+          <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto glass-panel rounded-lg border border-white/10 shadow-xl shadow-black/30 py-1">
+            {/* Default option */}
+            <button
+              type="button"
+              onClick={() => { onChange(''); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 transition-colors flex items-center gap-2 ${
+                !value ? 'text-blue-400 font-semibold' : 'text-gray-400'
+              }`}
+            >
+              Default (system model)
+            </button>
+
+            {providers.map((provider) => {
+              const providerModels = models.filter((m) => (m.provider || 'ollama') === provider);
+              const firstModel = providerModels[0];
+              const locality = firstModel?.dataLocality || 'local';
+              const localityLabel = LOCALITY_LABEL[locality] || '';
+
+              return (
+                <div key={provider}>
+                  {/* Group header */}
+                  {hasMultipleProviders && (
+                    <div className="px-3 py-1.5 flex items-center gap-2 border-t border-white/5 mt-1">
+                      <span className={`w-1.5 h-1.5 rounded-full ${LOCALITY_DOT_COLOR[locality] || 'bg-gray-400'}`} />
+                      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500">
+                        {provider}
+                      </span>
+                      <span className={`text-[8px] font-bold uppercase tracking-widest ml-auto ${LOCALITY_TEXT_COLOR[locality] || 'text-gray-500'}`}>
+                        {localityLabel}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Model options */}
+                  {providerModels.map((model) => (
+                    <button
+                      key={`${provider}:${model.name}`}
+                      type="button"
+                      onClick={() => { onChange(model.name); setOpen(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 transition-colors flex items-center gap-2 ${
+                        value === model.name ? 'text-blue-400 font-semibold' : 'text-gray-300'
+                      }`}
+                    >
+                      {hasMultipleProviders && (
+                        <span className={`w-1 h-1 rounded-full flex-shrink-0 ${LOCALITY_DOT_COLOR[model.dataLocality || 'local'] || 'bg-gray-400'}`} />
+                      )}
+                      <span className="truncate">{model.name}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }

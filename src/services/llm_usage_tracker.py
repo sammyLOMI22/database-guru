@@ -78,6 +78,7 @@ class LLMUsageTracker:
         chat_message_id: Optional[int] = None,
         agent_name: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        data_locality: Optional[str] = None,
     ):
         """
         Context manager to track an LLM call.
@@ -102,6 +103,7 @@ class LLMUsageTracker:
             agent_name=agent_name,
             metadata=metadata,
             start_time=start_time,
+            data_locality=data_locality,
         )
 
         try:
@@ -118,7 +120,7 @@ class _TrackingContext:
 
     def __init__(self, tracker, db, agent_type, model_name, llm_method, prompt,
                  provider, query_history_id, chat_session_id, chat_message_id,
-                 agent_name, metadata, start_time):
+                 agent_name, metadata, start_time, data_locality=None):
         self.tracker = tracker
         self.db = db
         self.agent_type = agent_type
@@ -132,6 +134,7 @@ class _TrackingContext:
         self.agent_name = agent_name
         self.metadata = metadata or {}
         self.start_time = start_time
+        self.data_locality = data_locality
 
         self.response_text: Optional[str] = None
         self.provider_response: Optional[dict] = None
@@ -185,6 +188,7 @@ class _TrackingContext:
             agent_type=self.agent_type,
             agent_name=self.agent_name,
             provider=self.provider,
+            data_locality=self.data_locality,
             model_name=self.model_name,
             llm_method=self.llm_method,
             input_tokens=input_tokens,

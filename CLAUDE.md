@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Database Guru is an AI-powered natural language to database query assistant. Users ask questions in plain English, and the system generates, executes, and self-corrects queries using local LLMs via Ollama. Supports both SQL and NoSQL databases with native query generation for each.
+Database Guru is an AI-powered natural language to database query assistant. Users ask questions in plain English, and the system generates, executes, and self-corrects queries using LLMs. Supports 8 LLM providers (local and cloud), both SQL and NoSQL databases with native query generation for each.
 
 **Tech Stack:**
 - Backend: FastAPI + SQLAlchemy 2.0 (async) + Python 3.11+
 - Frontend: React 18 + TypeScript + Vite + Tailwind CSS
-- LLM: Ollama (local, primarily llama3.2:latest)
+- LLM Providers: Ollama (default local), OpenAI, Azure OpenAI, Anthropic, Google Vertex AI, AWS Bedrock, LM Studio, vLLM
 - SQL Databases: PostgreSQL, MySQL, SQLite, DuckDB, MSSQL, Oracle
 - NoSQL Databases: MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch
 - File Sources: CSV, Excel (via DuckDB)
@@ -70,7 +70,10 @@ The system uses a multi-agent architecture with 40+ specialized agents (includin
 | File Source Handler | `src/core/file_source_handler.py` | CSV/Excel file processing (Phase 13) |
 | File Source Session | `src/core/file_source_session.py` | DuckDB session for file queries |
 | Result Narrator | `src/llm/result_narrator.py` | Human-readable insights, tiered prompts, parallel analysis (Phase 19) |
-| Model Router | `src/llm/model_router.py` | Per-task model selection |
+| Model Router | `src/llm/model_router.py` | Per-task model + provider selection, fallback chains (Phase 15) |
+| Provider Registry | `src/llm/providers/registry.py` | Multi-provider registration, security enforcement (Phase 15) |
+| Tracked LLM Client | `src/llm/tracked_client.py` | Provider-agnostic LLM wrapper with usage tracking (Phase 15) |
+| Provider Config Service | `src/services/provider_config_service.py` | Encrypted API key storage, provider CRUD (Phase 15) |
 | SQL Lineage Parser | `src/lineage/sql_lineage_parser.py` | Column-level lineage |
 | Lineage Narrator | `src/lineage/lineage_narrator.py` | LLM-powered lineage explanations (Phase 12.1) |
 | Impact Advisor | `src/lineage/impact_advisor.py` | Migration plans & SQL patches (Phase 12.2) |
@@ -137,7 +140,7 @@ Natural Language Query → Auth Check (optional, REQUIRE_AUTH flag)
 ### Testing Strategy
 - Use `pytest` with async support (`pytest-asyncio`)
 - Mock database connections with in-memory SQLite
-- Mock Ollama LLM responses for deterministic tests
+- Mock LLM provider responses for deterministic tests
 - Test markers: `@pytest.mark.asyncio`, `@pytest.mark.integration`, `@pytest.mark.slow`
 
 ### Common Issues
@@ -162,6 +165,7 @@ Settings in `src/config/settings.py`:
 - Type-safe with Pydantic validation
 - Supports multiple deployment environments
 - Auth settings: `JWT_EXPIRATION_MINUTES` (default 1440), `REQUIRE_AUTH` (default False), `RATE_LIMIT_PER_USER` (200), `RATE_LIMIT_LLM_PER_USER` (30)
+- LLM Provider settings: `DATA_SECURITY_LEVEL` (default `local_only`), per-provider `*_ENABLED`/`*_API_KEY`/`*_DEFAULT_MODEL` flags for OpenAI, Azure, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM
 
 ## Documentation
 
@@ -172,7 +176,7 @@ Key docs in `docs/`:
 | **Guides** | `guides/MULTI_DATABASE_GUIDE.md`, `guides/CONNECTION_POOLING_GUIDE.md`, `guides/DATA_LINEAGE_GUIDE.md`, `guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md`, `guides/FILE_DATA_SOURCE_USER_GUIDE.md` |
 | **Technical** | `technical/PARALLEL_EXECUTION.md`, `technical/SEMANTIC_CACHING.md`, `technical/SQL_GENERATION_PIPELINE.md` |
 | **Modules** | `modules/QUERY_PLANNING_AGENT.md`, `modules/TOOL_USING_AGENT.md` |
-| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/DATA_INSIGHTS_TESTING.md`, `guides/testing/PHASE_22_PERFORMANCE_GURU_TESTING.md`, `guides/testing/PHASE_14_NOSQL_EXPANSION_TESTING.md`, `guides/testing/PHASE_21_SECURITY_AUTH_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
+| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/DATA_INSIGHTS_TESTING.md`, `guides/testing/PHASE_22_PERFORMANCE_GURU_TESTING.md`, `guides/testing/PHASE_14_NOSQL_EXPANSION_TESTING.md`, `guides/testing/PHASE_21_SECURITY_AUTH_TESTING.md`, `guides/testing/PHASE_15_LLM_PROVIDER_EXPANSION_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
 | **Planning** | `planning/FUTURE_PLANS.md`, `planning/MASTER_ROADMAP.md` |
 | **LLM Usage** | `guides/LLM_USAGE_MONITORING_GUIDE.md` |
 | **Data Insights** | `planning/DATA_INSIGHTS_ENHANCEMENT_PLAN.md` |
@@ -181,4 +185,5 @@ Key docs in `docs/`:
 | **NoSQL** | `planning/NOSQL_EXPANSION_PLAN.md` |
 | **Security & Auth** | `planning/MASTER_ROADMAP.md` (Phase 21 section) |
 | **Edit Mode & DML** | `planning/PHASE_18_EDIT_MODE_FEATURE_IMP_PLAN.md` |
+| **LLM Providers** | `planning/LLM_PROVIDER_EXPANSION_PLAN.md` |
 | **Deployment** | `guides/DOCKER_DEPLOYMENT_GUIDE.md`, `planning/DOCKER_CONTAINERIZATION_PLAN.md` |

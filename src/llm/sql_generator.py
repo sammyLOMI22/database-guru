@@ -3,7 +3,7 @@ import logging
 import re
 from typing import Optional, Dict, Any, List, TYPE_CHECKING
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.llm.ollama_client import OllamaClient, get_ollama_client
+from src.llm.tracked_client import TrackedLLMClient
 
 # Avoid circular import
 if TYPE_CHECKING:
@@ -231,12 +231,16 @@ class SQLGenerator:
     def __init__(
         self,
         settings: Optional[Settings] = None,
-        ollama_client: Optional[OllamaClient] = None,
+        ollama_client: Optional[TrackedLLMClient] = None,
         llm_cache: Optional[LLMCache] = None,
         use_llm_cache: bool = True,
     ):
         self.settings = settings or Settings()
-        self.ollama = ollama_client or get_ollama_client(self.settings)
+        if ollama_client:
+            self.ollama = ollama_client
+        else:
+            from src.llm import get_llm_client
+            self.ollama = get_llm_client(task_type="sql_generation")
         self.validator = SQLValidator()
         self.llm_cache = llm_cache
         self.use_llm_cache = use_llm_cache

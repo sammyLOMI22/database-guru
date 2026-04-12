@@ -618,11 +618,13 @@ Return ONLY the JSON object."""
 
 async def get_migration_planner(db=None, model=None) -> MigrationPlanner:
     """Factory function to create a MigrationPlanner instance."""
-    from src.llm.ollama_client import get_ollama_client
+    from src.llm import get_llm_client
     from src.llm.model_router import get_model_router, TaskType
 
-    client = get_ollama_client()
     router = await get_model_router(db) if db else None
+
+    provider_name = router.get_provider_for_task(TaskType.MIGRATION_PLANNER) if router else None
+    client = get_llm_client(provider_name)
 
     timeout = router.get_timeout_for_task(TaskType.MIGRATION_PLANNER) if router else 30.0
     resolved_model = model or (router.get_model_for_task(TaskType.MIGRATION_PLANNER) if router else None)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Save, RotateCcw, Info } from 'lucide-react';
 import { ModelConfigPanel } from './ModelConfigPanel';
+import { LLMProviderSettings } from './LLMProviderSettings';
 
 interface SystemSettings {
   id: number;
@@ -236,6 +237,15 @@ export function SettingsPanel() {
 
         {/* Settings Form */}
         <div className="p-8 space-y-10">
+          {/* LLM Provider Management (Phase 15) */}
+          <div className="space-y-6">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white flex items-center gap-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              LLM Providers
+            </h3>
+            <LLMProviderSettings />
+          </div>
+
           {/* Query Quality Section */}
           <div className="space-y-6">
             <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white flex items-center gap-3">

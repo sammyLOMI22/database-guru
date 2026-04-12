@@ -381,7 +381,7 @@ class TestMongoDBHandler:
         conn.schema_cache = None
 
         with patch("src.nosql.mongodb.handler.MongoClientPool.get_instance", return_value=mock_pool), \
-             patch("src.nosql.mongodb.handler.get_ollama_client", return_value=mock_ollama), \
+             patch("src.nosql.mongodb.handler.get_llm_client", return_value=mock_ollama), \
              patch("src.nosql.mongodb.handler.MongoSchemaInspector") as MockInspector:
 
             mock_inspector = AsyncMock()

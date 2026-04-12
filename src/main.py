@@ -12,7 +12,7 @@ from src.database.connection import get_db_manager, run_alembic_migrations
 from src.cache.redis_client import get_redis_cache
 from src.core.connection_pool_manager import get_pool_manager_async
 from src.middleware.rate_limit import RateLimitMiddleware
-from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance, auth, audit, dml
+from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance, auth, audit, dml, llm_providers
 from src.core.file_source_session import FileSourceDuckDBSession
 from src.core.file_source_handler import cleanup_expired_files
 
@@ -58,18 +58,36 @@ async def lifespan(app: FastAPI):
     logger.info("📊 Initializing database...")
     db_manager = get_db_manager(settings)
 
+    await db_manager.initialize_async()
+    await db_manager.create_tables_async()
+
     # Run Alembic migrations (skip if entrypoint already handled them)
+    # Runs AFTER create_tables_async() so baseline tables exist for index migrations.
+    # On a fresh DB, tables are created by ORM and we stamp alembic to head.
     if os.environ.get("MIGRATIONS_HANDLED") != "1":
         try:
             run_alembic_migrations()
         except Exception as e:
-            logger.error(f"Alembic migrations failed: {e}")
-            raise
+            logger.warning(f"Alembic migrations skipped ({e}), stamping head")
+            try:
+                from alembic.config import Config as AlembicConfig
+                from alembic import command as alembic_command
+                alembic_cfg = AlembicConfig(
+                    os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
+                )
+                alembic_command.stamp(alembic_cfg, "head")
+                logger.info("Alembic stamped to head")
+            except Exception as stamp_err:
+                logger.warning(f"Failed to stamp alembic head: {stamp_err}")
     else:
         logger.info("Migrations already handled by entrypoint, skipping")
 
-    await db_manager.initialize_async()
-    await db_manager.create_tables_async()
+    # Re-apply logging config — alembic's fileConfig() disables all existing
+    # loggers and resets the root logger to WARNING, suppressing all subsequent
+    # INFO messages from the application.
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', force=True)
+    for name in logging.Logger.manager.loggerDict:
+        logging.getLogger(name).disabled = False
 
     # Seed default LLM model configs for cost tracking (Phase 16)
     try:
@@ -79,6 +97,21 @@ async def lifespan(app: FastAPI):
         logger.info("✅ LLM model configs seeded")
     except Exception as e:
         logger.warning(f"Failed to seed LLM model configs: {e}")
+
+    # Initialize LLM provider registry (Phase 15)
+    # Use rebuild_registry_from_db so that DB-persisted provider configs
+    # (API keys, endpoints, enabled flags) take effect at startup — not just
+    # env-based defaults.
+    try:
+        from src.llm.providers.registry import rebuild_registry_from_db
+        async with db_manager.get_async_session() as db:
+            provider_registry = await rebuild_registry_from_db(db, settings)
+        logger.info(
+            f"✅ LLM provider registry ready: {provider_registry.list_available()} "
+            f"(security_level={provider_registry.security_level})"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to initialize LLM provider registry: {e}")
 
     logger.info("✅ Database ready")
 
@@ -171,8 +204,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in Settings().CORS_ORIGINS.split(",") if o.strip()],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Add rate limiting middleware
@@ -207,6 +240,7 @@ app.include_router(performance.router, prefix="/api")  # Phase 22: Performance G
 app.include_router(auth.router, prefix="/api")  # Phase 21: Security & Auth
 app.include_router(audit.router, prefix="/api")  # Phase 21: Audit logging
 app.include_router(dml.router, prefix="/api")  # Phase 18: Edit Mode & DML
+app.include_router(llm_providers.router, prefix="/api")  # Phase 15: LLM Provider Management
 
 if __name__ == "__main__":
     import uvicorn

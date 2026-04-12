@@ -342,7 +342,9 @@ Quick reference for finding important code in the Database Guru codebase.
 | Session usage badge | `frontend/src/components/SessionUsageBadge.tsx` |
 | API service | `frontend/src/services/llmUsageApi.ts` |
 | **Agent Integration** | |
-| Ollama client tracking | `src/llm/ollama_client.py` |
+| LLM client factory | `src/llm/__init__.py:get_llm_client()` |
+| Tracked LLM client | `src/llm/tracked_client.py` |
+| Ollama client (legacy shim) | `src/llm/ollama_client.py` |
 | Self-correcting agent | `src/llm/self_correcting_agent.py` |
 | Query planning agent | `src/llm/query_planning_agent.py` |
 | Result narrator | `src/llm/result_narrator.py` |
@@ -455,3 +457,41 @@ Quick reference for finding important code in the Database Guru codebase.
 | Analyzer tests | `tests/test_explain_analyzer.py` (355+ tests) |
 | Interpreter tests | `tests/test_explain_interpreter.py` (374+ tests) |
 | API tests | `tests/test_performance_api.py` (257+ tests) |
+
+## LLM Provider Expansion (Phase 15 - April 2026)
+| Component | Location |
+|-----------|----------|
+| **Provider Abstraction** | |
+| Base provider ABC | `src/llm/providers/base.py` (BaseLLMProvider, DataLocality, LLMResponse) |
+| Provider registry | `src/llm/providers/registry.py` (ProviderRegistry, initialize_registry_from_settings) |
+| Tracked LLM client | `src/llm/tracked_client.py` (TrackedLLMClient) |
+| Client factory | `src/llm/__init__.py:get_llm_client()` |
+| Ollama shim | `src/llm/ollama_client.py` (backward-compatible OllamaClient alias) |
+| **Provider Implementations** | |
+| Ollama | `src/llm/providers/ollama.py` (LOCAL) |
+| OpenAI-compatible base | `src/llm/providers/openai_compat.py` |
+| OpenAI | `src/llm/providers/openai_provider.py` (CLOUD_PUBLIC) |
+| Azure OpenAI | `src/llm/providers/azure_openai.py` (CLOUD_PRIVATE) |
+| Anthropic | `src/llm/providers/anthropic.py` (CLOUD_PUBLIC) |
+| Google Vertex AI | `src/llm/providers/google_vertex.py` (CLOUD_PRIVATE) |
+| AWS Bedrock | `src/llm/providers/aws_bedrock.py` (CLOUD_PRIVATE) |
+| LM Studio | `src/llm/providers/lm_studio.py` (LOCAL) |
+| vLLM | `src/llm/providers/vllm.py` (LOCAL) |
+| **API & Config** | |
+| Provider API endpoints | `src/api/endpoints/llm_providers.py` (8 endpoints) |
+| Provider config service | `src/services/provider_config_service.py` (Fernet encryption) |
+| Model router (provider) | `src/llm/model_router.py:get_provider_for_task()`, `execute_with_fallback()` |
+| DB models | `src/database/models.py:LLMProviderConfig`, `LLMTaskRouting` |
+| Settings | `src/config/settings.py` (DATA_SECURITY_LEVEL, per-provider flags) |
+| **Frontend** | |
+| Provider settings panel | `frontend/src/components/LLMProviderSettings.tsx` |
+| Provider card | `frontend/src/components/ProviderCard.tsx` |
+| Task routing config | `frontend/src/components/TaskRoutingConfig.tsx` |
+| Provider API client | `frontend/src/services/llmProviderApi.ts` |
+| Model locality badges | `frontend/src/components/ModelConfigPanel.tsx:ModelSelect` |
+| **Tests** | |
+| Provider abstraction | `tests/llm/test_tracked_client.py` |
+| OpenAI-compat providers | `tests/llm/test_openai_compat.py` |
+| Azure + Anthropic | `tests/llm/test_azure_anthropic.py` |
+| Vertex + Bedrock | `tests/llm/test_vertex_bedrock.py` |
+| Router + config + API | `tests/llm/test_phase15_4.py` |

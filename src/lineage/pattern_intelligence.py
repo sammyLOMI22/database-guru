@@ -921,11 +921,13 @@ async def get_pattern_intelligence_agent(
     Returns:
         Configured PatternIntelligenceAgent instance
     """
-    from src.llm.ollama_client import get_ollama_client
+    from src.llm import get_llm_client
     from src.llm.model_router import get_model_router, TaskType
 
-    client = get_ollama_client()
     router = await get_model_router(db) if db else None
+
+    provider_name = router.get_provider_for_task(TaskType.PATTERN_INTELLIGENCE) if router else None
+    client = get_llm_client(provider_name)
 
     # Get timeout from router or use default
     timeout = 20.0

@@ -802,7 +802,7 @@ class TestGetSchemaHealthAnalyzer:
     @pytest.mark.asyncio
     async def test_get_analyzer_without_db(self):
         """Test factory without database session."""
-        with patch("src.llm.ollama_client.get_ollama_client") as mock_get_client:
+        with patch("src.llm.get_llm_client") as mock_get_client:
             mock_get_client.return_value = MagicMock()
 
             analyzer = await get_schema_health_analyzer()
@@ -813,7 +813,7 @@ class TestGetSchemaHealthAnalyzer:
     @pytest.mark.asyncio
     async def test_get_analyzer_with_model_override(self):
         """Test factory with model override."""
-        with patch("src.llm.ollama_client.get_ollama_client") as mock_get_client:
+        with patch("src.llm.get_llm_client") as mock_get_client:
             mock_get_client.return_value = MagicMock()
 
             analyzer = await get_schema_health_analyzer(model="custom-model")

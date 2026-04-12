@@ -27,10 +27,60 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_USER: int = 200  # Requests per minute for authenticated users
     RATE_LIMIT_LLM_PER_USER: int = 30  # LLM calls per minute for authenticated users
 
+    # LLM Provider Security
+    DATA_SECURITY_LEVEL: str = "local_only"  # local_only | cloud_private | unrestricted
+    LLM_ENCRYPTION_KEY: Optional[str] = None  # Fernet key for encrypting API keys at rest
+
     # Ollama - Auto-detect local or Docker
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2:latest"  # Default model
     OLLAMA_ALLOW_MODEL_SELECTION: bool = True  # Allow users to choose models
+
+    # OpenAI (cloud_public)
+    OPENAI_ENABLED: bool = False
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_ORG_ID: Optional[str] = None
+    OPENAI_DEFAULT_MODEL: str = "gpt-4o"
+    OPENAI_BASE_URL: str = "https://api.openai.com"
+
+    # LM Studio (local)
+    LM_STUDIO_ENABLED: bool = False
+    LM_STUDIO_BASE_URL: str = "http://localhost:1234"
+    LM_STUDIO_DEFAULT_MODEL: str = "default"
+
+    # vLLM (local)
+    VLLM_ENABLED: bool = False
+    VLLM_BASE_URL: str = "http://localhost:8000"
+    VLLM_DEFAULT_MODEL: str = "default"
+    VLLM_API_KEY: Optional[str] = None
+
+    # Azure OpenAI (cloud_private)
+    AZURE_OPENAI_ENABLED: bool = False
+    AZURE_OPENAI_ENDPOINT: Optional[str] = None  # https://<resource>.openai.azure.com
+    AZURE_OPENAI_API_KEY: Optional[str] = None
+    AZURE_OPENAI_API_VERSION: str = "2024-02-15-preview"
+    AZURE_OPENAI_DEPLOYMENT_NAME: Optional[str] = None
+
+    # Anthropic (cloud_public)
+    ANTHROPIC_ENABLED: bool = False
+    ANTHROPIC_API_KEY: Optional[str] = None
+    ANTHROPIC_DEFAULT_MODEL: str = "claude-sonnet-4-20250514"
+
+    # Google Vertex AI (cloud_private)
+    GOOGLE_VERTEX_ENABLED: bool = False
+    GOOGLE_VERTEX_PROJECT_ID: Optional[str] = None
+    GOOGLE_VERTEX_REGION: str = "us-central1"
+    GOOGLE_VERTEX_DEFAULT_MODEL: str = "gemini-2.5-flash"
+    GOOGLE_VERTEX_API_KEY: Optional[str] = None  # Optional: direct API key (otherwise uses ADC)
+
+    # AWS Bedrock (cloud_private)
+    AWS_BEDROCK_ENABLED: bool = False
+    AWS_BEDROCK_REGION: str = "us-east-1"
+    AWS_BEDROCK_DEFAULT_MODEL: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    AWS_BEDROCK_ACCESS_KEY_ID: Optional[str] = None
+    AWS_BEDROCK_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_BEDROCK_SESSION_TOKEN: Optional[str] = None
+    AWS_BEDROCK_PROFILE_NAME: Optional[str] = None
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
@@ -91,17 +141,25 @@ class Settings(BaseSettings):
         case_sensitive = True
 
     def check_jwt_secret(self) -> None:
-        """Warn if JWT secret is still the default. Called at startup."""
+        """Reject the default JWT secret at startup.
+
+        Login/register endpoints are always available regardless of
+        REQUIRE_AUTH, so a well-known secret allows token forgery and
+        ownership-bypass attacks even when auth is "off".
+        """
         if self.JWT_SECRET == "change-this-jwt-secret":
-            if self.REQUIRE_AUTH:
-                raise ValueError(
-                    "REQUIRE_AUTH is enabled but JWT_SECRET is still the default. "
+            if self.ENVIRONMENT == "development":
+                import logging
+                logging.getLogger(__name__).warning(
+                    "JWT_SECRET is set to the default value. "
+                    "This is only acceptable in development. "
                     "Set a strong, random JWT_SECRET in your .env file."
                 )
-            import logging
-            logging.getLogger(__name__).warning(
-                "JWT_SECRET is set to the default value. "
-                "Set a strong, random JWT_SECRET before enabling authentication."
+                return
+            raise ValueError(
+                "JWT_SECRET is still the default value. "
+                "Set a strong, random JWT_SECRET in your .env file "
+                "before running in non-development environments."
             )
 
     @property
