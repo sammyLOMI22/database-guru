@@ -99,28 +99,27 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                         LLM PROVIDER EXPANSION (Phase 15)                               │
+    │                    LLM PROVIDER EXPANSION (Phase 15) ✅ COMPLETE                        │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    MULTI-PROVIDER LLM SUPPORT (Phase 15) - HIGH PRIORITY                 │
+    │                    MULTI-PROVIDER LLM SUPPORT (Phase 15) ✅ COMPLETE                     │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
-    │  │ 15.1 Provider│   │ 15.2 Azure  │   │ 15.3-15.6   │   │ 15.7-15.9   │                  │
-    │  │ Abstraction │──▶│ OpenAI      │──▶│ More        │──▶│ Router &    │                   │
-    │  │             │   │             │   │ Providers   │   │ Frontend    │                   │
-    │  │ • Base class│   │ • Enterprise│   │             │   │             │                   │
-    │  │ • Registry  │   │   support   │   │ • OpenAI    │   │ • Multi-    │                   │
-    │  │ • Refactor  │   │ • Deployment│   │ • Anthropic │   │   provider  │                   │
-    │  │   Ollama    │   │   models    │   │ • Vertex AI │   │   routing   │                   │
-    │  │             │   │ • Azure Auth│   │ • Bedrock   │   │ • Fallback  │                   │
-    │  │ ~600 lines  │   │ ~500 lines  │   │ • LM Studio │   │ • Config UI │                   │
-    │  └─────────────┘   └─────────────┘   │ • vLLM      │   │             │                   │
-    │                                       │ ~1,700 lines│   │ ~1,200 lines│                   │
-    │                                       └─────────────┘   └─────────────┘                   │
+    │  │ 15.1 Provider│   │ 15.2 OpenAI │   │ 15.3 Azure+ │   │ 15.4 Router │                  │
+    │  │ Abstraction │──▶│ Compat      │──▶│ Anthropic   │──▶│ DB + API    │                   │
+    │  │ ✅          │   │ ✅          │   │ ✅          │   │ ✅          │                   │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                                     │
+    │  │ 15.5 Vertex │   │ 15.6 Front- │   │ 15.7 Caller │                                    │
+    │  │ + Bedrock   │──▶│ end UI      │──▶│ Migration   │                                    │
+    │  │ ✅          │   │ ✅          │   │ ✅          │                                    │
+    │  └─────────────┘   └─────────────┘   └─────────────┘                                     │
     │                                                                                           │
-    │  Prereq: None (Independent) | Priority: HIGH | Est: 3-4 weeks | ~3,000 lines            │
-    │  Plan: LLM_PROVIDER_EXPANSION_PLAN.md                                                    │
+    │  8 providers: Ollama, OpenAI, Azure OpenAI, Anthropic, Vertex AI, Bedrock,               │
+    │  LM Studio, vLLM. Data security enforcement (local/cloud_private/cloud_public).          │
+    │  Frontend: Local/Frontier toggle, provider cards, per-task routing, model badges.         │
+    │  220 tests | 8 API endpoints | ~4,000 lines                                              │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -472,7 +471,7 @@
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                    SECURITY & INFRASTRUCTURE - ✅ DELIVERED                                │
-    │         Phase 21 + Phase 18 complete — Phase 15 (Enterprise LLMs) now unblocked          │
+    │         Phase 21 + Phase 18 + Phase 15 complete — Phase 17 (Multi-Provider Mon.) unblocked│
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
@@ -565,7 +564,7 @@
     ┌───────────────────────────────────────────────────────────────────┐
     │   SECURITY & AUTH FOUNDATION (Phase 21) ◀── ✅ COMPLETE          │
     │                                                                   │
-    │  UNBLOCKS: Phase 18 (Edit Mode) + Phase 15 (Enterprise LLMs)     │
+    │  UNBLOCKS: Phase 18 ✅ (Edit Mode) + Phase 15 ✅ (Enterprise LLMs)│
     │                                                                   │
     │  • JWT auth (bcrypt, python-jose) + resource ownership            │
     │  • Per-user rate limiting + audit logging                         │
@@ -574,13 +573,16 @@
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │        LLM PROVIDER EXPANSION (Phase 15) ◀── HIGH PRIORITY        │
+    │        LLM PROVIDER EXPANSION (Phase 15) ◀── ✅ COMPLETE          │
     │                                                                   │
-    │  • Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock            │
-    │  • Local alternatives: LM Studio, vLLM                            │
-    │  • Multi-provider routing with automatic fallback                 │
-    │  • Est: 3-4 weeks | Plan: LLM_PROVIDER_EXPANSION_PLAN.md          │
-    │  • NOTE: Ideally after Phase 21 (Auth) for cost controls          │
+    │  • 8 providers: Ollama, OpenAI, Azure OpenAI, Anthropic,          │
+    │    Vertex AI, Bedrock, LM Studio, vLLM                            │
+    │  • Provider abstraction (BaseLLMProvider ABC + TrackedLLMClient)   │
+    │  • ProviderRegistry with data security enforcement                │
+    │  • Local/Frontier toggle UI, per-task routing, fallback chains     │
+    │  • Fernet-encrypted API key storage, provider health checks       │
+    │  • Frontend: provider cards, config modals, model locality badges │
+    │  • 220 tests | 8 API endpoints | ~4,000 lines                     │
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
@@ -609,7 +611,7 @@
     ┌───────────────────────────────────────────────────────────────────┐
     │   MULTI-PROVIDER MONITORING (Phase 17) ◀── MEDIUM PRIORITY        │
     │                                                                   │
-    │   REQUIRES: Phase 15 (Providers) + Phase 16 ✅ (Monitoring)       │
+    │   REQUIRES: Phase 15 ✅ (Providers) + Phase 16 ✅ (Monitoring)    │
     │                                                                   │
     │  • Native token counts from OpenAI, Anthropic, Google, etc.       │
     │  • Accurate cost tracking per provider/model                      │
@@ -630,7 +632,7 @@
     └───────────────────────────────────────────────────────────────────┘
 
             ┌─────────────────┐          ┌─────────────────┐
-            │   Phase 15      │          │   Phase 16 ✅   │
+            │   Phase 15 ✅   │          │   Phase 16 ✅   │
             │   Provider      │          │   Usage         │
             │   Expansion     │          │   Monitoring    │
             └────────┬────────┘          └────────┬────────┘
@@ -653,7 +655,7 @@
               ┌──────┴──────┐
               ▼             ▼
     ┌─────────────┐  ┌─────────────┐
-    │  Phase 18 ✅│  │  Phase 15   │
+    │  Phase 18 ✅│  │  Phase 15 ✅│
     │  Edit Mode  │  │  LLM Provs  │
     │  & DML      │  │  (cost ctrl)│
     └─────────────┘  └─────────────┘
@@ -707,33 +709,25 @@
 
 ---
 
-## Recommended Next Steps (Updated March 21, 2026)
+## Recommended Next Steps (Updated April 11, 2026)
 
 > **Strategic Direction** (per PM Review): Focus on "depth and safety" before "width expansion".
-> Security/Auth foundation and Edit Mode are now complete — Enterprise LLMs are unblocked.
+> Security/Auth, Edit Mode, and Enterprise LLMs are now complete — Multi-Provider Monitoring is unblocked.
 
-### Priority 1: LLM Provider Expansion (Phase 15) - HIGH
-**Why**: Enterprise integration and model flexibility - users can leverage cloud LLMs
-- **15.1 Provider Abstraction**: Unified interface, registry, refactor Ollama
-- **15.2 Azure OpenAI**: Enterprise-first cloud provider with deployment support
-- **15.3-15.6 Additional Providers**: OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM
-- **15.7-15.9 Enhanced Routing**: Multi-provider routing, fallback chains, frontend config UI
-- See: [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md)
-- Unlocks Phase 17 (Multi-Provider Monitoring) since Phase 16 is now complete
+### Priority 1: Multi-Provider Monitoring (Phase 17) - HIGH
+**Why**: Extend monitoring to all LLM providers with accurate cost tracking
+- **Prerequisite**: Phase 15 ✅ (Providers) + Phase 16 ✅ (Monitoring) — both complete
+- Native token extraction from OpenAI, Anthropic, Google formats
+- Accurate cost tracking per provider/model, comparison dashboard
+- See: [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md)
 
 ### Priority 2: Observability & Monitoring (Phase 24) - MEDIUM
 **Why**: Production readiness — structured logging, distributed tracing, metrics dashboards
 - **Prerequisite**: Phase 23 ✅ (Docker)
 - Structured JSON logging, OpenTelemetry tracing, Prometheus/Grafana, Docker integration
 
-### Priority 3: Multi-Provider Monitoring (Phase 17) - MEDIUM
-**Why**: Extend monitoring to all LLM providers with accurate cost tracking
-- **Prerequisite**: Phase 15 (Providers) + Phase 16 ✅ (Monitoring)
-- Native token extraction from OpenAI, Anthropic, Google formats
-- Accurate cost tracking per provider/model, comparison dashboard
-- See: [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md)
-
 ### Completed Priorities (this cycle)
+- ~~LLM Provider Expansion (Phase 15)~~ - ✅ COMPLETE: 8 providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM), provider abstraction + registry, data security enforcement (local/cloud_private/cloud_public), Local/Frontier toggle UI, per-task routing, fallback chains, Fernet-encrypted API keys, frontend provider management. 220 tests, 8 endpoints, ~4,000 lines.
 - ~~Edit Mode & DML (Phase 18)~~ - ✅ COMPLETE: DML generator/validator/executor, inline editing UI, per-connection write permissions, preview mode. 40 tests, 5 endpoints, ~2,450 lines.
 - ~~Security & Auth Foundation (Phase 21)~~ - ✅ COMPLETE: JWT auth, resource ownership, per-user rate limiting, audit logging. 61 tests, 3 migrations. Unblocks Phase 18 + Phase 15.
 - ~~Migration Toolkit (Phase 20)~~ - ✅ COMPLETE: Schema diff, migration planner, script gen, data migration. 98 tests, 13 endpoints, ~5,676 lines.
@@ -765,6 +759,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - **Phase 23** ✅: Docker Containerization (Compose profiles, security hardened, least-privilege Postgres, Ollama retry, prompts refactor, CTE lineage support)
 - **Phase 14** ✅: NoSQL Database Expansion (MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch — native query gen, schema inference, error classification, frontend integration, mixed SQL+NoSQL chat — 127 tests)
 - **Phase 21** ✅: Security & Auth Foundation (JWT auth, resource ownership, per-user rate limiting, audit logging — 61 tests, 3 migrations)
+- **Phase 15** ✅: LLM Provider Expansion (8 providers, provider abstraction + registry, data security enforcement, Local/Frontier toggle UI, per-task routing, fallback chains, Fernet-encrypted API keys — 220 tests, 8 endpoints, ~4,000 lines)
 - **Phase 18** ✅: Edit Mode & DML Operations (DML generator/validator/executor, inline editing UI, per-connection write permissions, preview mode — 40 tests, 5 endpoints, ~2,450 lines)
 - **Table Sorting** ✅: Click-to-sort with smart type detection
 - Plus 10+ earlier phases (see Quick Reference below)
@@ -780,11 +775,11 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Data Sources** | CSV & Excel File Support | **Phase 13 ✅ COMPLETE** | ~2,500 lines |
 | **LLM Monitoring** | Token usage tracking, dashboard, inline stats | **Phase 16 ✅ COMPLETE** | ~1,500 lines |
 | **Security & Auth** | JWT auth, resource ownership, per-user rate limiting, audit logging | **Phase 21 ✅ COMPLETE** | ~2,200 lines |
-| **LLM Integration** | Azure OpenAI, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM | **Phase 15 - HIGH** | ~3,000 lines |
+| **LLM Integration** | 8 providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM), data security, provider routing | **Phase 15 ✅ COMPLETE** | ~4,000 lines |
 | **Migration Toolkit** | Schema diff, migration planner, script gen, data migration | **Phase 20 ✅ COMPLETE** | ~5,676 lines |
 | **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, preview mode, write permissions | **Phase 18 ✅ COMPLETE** | ~2,450 lines |
 | **Performance Guru** | EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects | **Phase 22 ✅ COMPLETE** | ~3,282 lines |
-| **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 17 - MEDIUM** (needs 15+16✅) | ~1,200 lines |
+| **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 17 - HIGH** (needs 15✅+16✅) | ~1,200 lines |
 | **Data Insights** | Tiered narratives, analytics cache, multi-source quality, chart presets, parallel analysis | **Phase 19 ✅ COMPLETE** | ~1,800 lines |
 | **NoSQL Expansion** | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch, frontend integration, mixed chat | **Phase 14 ✅ COMPLETE** | ~6,000 lines |
 | **Table UX** | Sorting ✅, Resizing, Export | Sorting complete | ~400 lines remaining |
@@ -826,8 +821,9 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | NoSQL Expansion (Phase 14) | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch — native query gen, schema inference, error classification, frontend integration, mixed SQL+NoSQL chat | 127 tests |
 | Security & Auth (Phase 21) | JWT auth (bcrypt + python-jose), resource ownership (owner_id on 5 tables), per-user rate limiting, audit logging, REQUIRE_AUTH feature flag | 61 tests |
 | Edit Mode & DML (Phase 18) | DML generator/validator/executor, inline cell editing, add/delete rows, preview mode, per-connection write permissions, 5 API endpoints | 40 tests |
+| LLM Provider Expansion (Phase 15) | 8 providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM), provider abstraction + registry, data security enforcement (Local/Frontier), per-task routing with fallback chains, Fernet-encrypted API keys, frontend provider management UI | 220 tests |
 
-**Total Tests**: 1900+ passing
+**Total Tests**: 2100+ passing
 
 ---
 
@@ -836,11 +832,11 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | Phase | Feature | Dependencies | Est. Effort | Priority |
 |-------|---------|--------------|-------------|----------|
 | **Phase 21** | Security & Auth Foundation | None | ~2,200 lines | ✅ **COMPLETE** |
-| **Phase 15** | LLM Provider Expansion | Ideally after 21 | ~3,000 lines | HIGH |
+| **Phase 15** | LLM Provider Expansion | Phase 21 ✅ | ~4,000 lines | ✅ **COMPLETE** |
 | **Phase 20** | Migration Toolkit | Phase 11✅ + 12✅ | ~5,676 lines | ✅ **COMPLETE** |
 | **Phase 18** | Edit Mode & DML Operations | Phase 21 ✅ | ~2,450 lines | ✅ **COMPLETE** |
 | **Phase 22** | Performance Guru (EXPLAIN) | None | ~3,282 lines | ✅ **COMPLETE** |
-| **Phase 17** | Multi-Provider Monitoring | Phase 15 + 16✅ | ~1,200 lines | MEDIUM |
+| **Phase 17** | Multi-Provider Monitoring | Phase 15✅ + 16✅ | ~1,200 lines | HIGH |
 | **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | ✅ **COMPLETE** |
 | **Phase 23** | Docker Containerization | None | ~200 lines config | ✅ **COMPLETE** |
 | **Phase 24** | Observability (OpenTelemetry) | Phase 23 ✅ | ~1,300 lines | MEDIUM |
@@ -857,7 +853,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - [LINEAGE_INTELLIGENCE_PLAN.md](LINEAGE_INTELLIGENCE_PLAN.md) - LLM-Powered Lineage Intelligence (Phase 12)
 - [CSV_EXCEL_SUPPORT_PLAN.md](CSV_EXCEL_SUPPORT_PLAN.md) - CSV & Excel File Support (Phase 13) ✅
 - [NOSQL_EXPANSION_PLAN.md](NOSQL_EXPANSION_PLAN.md) - NoSQL Database Expansion (Phase 14)
-- [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) - LLM Provider Expansion (Phase 15)
+- [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) - LLM Provider Expansion (Phase 15) ✅
 - [LLM_USAGE_MONITORING_PLAN.md](LLM_USAGE_MONITORING_PLAN.md) - LLM Usage Monitoring (Phase 16) ✅
 - [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md) - Multi-Provider Monitoring (Phase 17)
 - [PHASE_18_EDIT_MODE_FEATURE_IMP_PLAN.md](PHASE_18_EDIT_MODE_FEATURE_IMP_PLAN.md) - Edit Mode & DML Operations (Phase 18) ✅
@@ -869,7 +865,17 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 
 ---
 
-**Updated**: March 21, 2026
+**Updated**: April 11, 2026
+- **Phase 15 ✅ COMPLETE**: LLM Provider Expansion
+  - 15.1: Provider Abstraction — BaseLLMProvider ABC, DataLocality enum, ProviderRegistry, TrackedLLMClient wrapper
+  - 15.2: OpenAI-Compatible Providers — OpenAI, LM Studio, vLLM via shared httpx base class
+  - 15.3: Azure OpenAI + Anthropic — deployment-based URLs, Messages API with content blocks
+  - 15.4: Enhanced Model Router + DB + API — ProviderConfigService with Fernet encryption, 8 REST endpoints, execute_with_fallback()
+  - 15.5: Google Vertex AI + AWS Bedrock — REST/ADC for Vertex, boto3 Converse API for Bedrock
+  - 15.6: Frontend UI — Local/Frontier toggle, provider cards, config modals, per-task routing grid, ModelSelect with locality badges
+  - 15.7: Caller Migration — all 16 callers migrated from get_ollama_client() to get_llm_client()
+  - 220 tests | 8 API endpoints | ~4,000 lines across 21 new files + 31 modified
+
 - **Phase 18 ✅ COMPLETE**: Edit Mode & DML Operations
   - 18.1: DML Generator — parameterized INSERT/UPDATE/DELETE with multi-dialect support
   - 18.2: DML Validator — safety checks (require WHERE clause, row limits, allowed tables)

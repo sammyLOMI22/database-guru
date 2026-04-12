@@ -252,6 +252,42 @@ frontend/src/
 | `getRecent(limit)` | Fetch recent call records |
 | `getSessionUsage(sessionId)` | Fetch per-session usage |
 
+## LLM Provider Management UI (Phase 15 - April 2026)
+**Location**: `frontend/src/components/` and `frontend/src/services/`
+
+### Components
+| Component | Purpose |
+|-----------|---------|
+| `LLMProviderSettings.tsx` | Main panel: Local/Frontier toggle, provider cards, config modal |
+| `ProviderCard.tsx` | Individual provider card with locality badge, status dot, test/configure buttons |
+| `TaskRoutingConfig.tsx` | Collapsible per-task routing grid (11 task types, provider dropdowns) |
+| `ModelConfigPanel.tsx` (enhanced) | Custom `ModelSelect` with color-coded locality badges per model |
+| `services/llmProviderApi.ts` | Full API client (TypeScript interfaces for all provider endpoints) |
+
+### Key UI Patterns
+- **Local/Frontier Toggle**: Segmented control — emerald for Local, blue-gradient for Frontier
+- **Confirmation Dialog**: Required when switching to Frontier mode (data leaves network warning)
+- **Locality Badges**: `LOCAL` (emerald), `PRIVATE CLOUD` (blue), `FRONTIER` (amber) on provider cards
+- **Model Locality Dots**: `● LOCAL` (emerald), `◐ PRIVATE CLOUD` (blue), `○ CLOUD` (amber) in model dropdowns
+- **Status Dots**: emerald=connected, red=unreachable, gray=unknown
+- **Task Routing**: Amber left-border for tasks routed to frontier providers
+- **API Key Masking**: Show/hide toggle with masked display
+
+### API Service (`services/llmProviderApi.ts`)
+| Method | Purpose |
+|--------|---------|
+| `listConfigs()` | List all provider configs |
+| `getRegistry()` | Get runtime registry state |
+| `getConfig(name)` | Get single provider config |
+| `upsertConfig(name, config)` | Create/update provider config |
+| `deleteConfig(name)` | Remove provider config |
+| `testProvider(name)` | Test provider connectivity |
+| `listModels(name)` | List available models |
+| `listRouting()` | Get task routing rules |
+| `upsertRouting(rule)` | Create/update routing rule |
+| `deleteRouting(taskType)` | Delete routing rule |
+| `healthCheckAll()` | Health check all providers |
+
 ## Edit Mode & DML UI (Phase 18 - March 2026)
 **Location**: `frontend/src/components/edit/`
 

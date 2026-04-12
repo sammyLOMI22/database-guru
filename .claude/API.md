@@ -240,6 +240,36 @@ GET /api/llm/usage/recent?limit=50&agent_type=sql_generator&model_name=qwen2.5-c
 - **SessionUsageSummaryResponse**: Per-session breakdown with by_agent map
 - **LLMUsageResponse**: Individual call records with full details
 
+## LLM Provider API (Phase 15 - April 2026)
+**File**: `llm_providers.py`
+
+Manage LLM providers, test connectivity, configure per-task routing, and store encrypted API keys.
+
+### Provider Management
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/llm-providers/` | List all provider configs with registry status |
+| GET | `/api/llm-providers/registry` | Runtime registry state with security_level |
+| GET | `/api/llm-providers/{name}/config` | Get provider config |
+| PUT | `/api/llm-providers/{name}/config` | Update provider config (encrypts API key) |
+| DELETE | `/api/llm-providers/{name}/config` | Remove provider config |
+| POST | `/api/llm-providers/{name}/test` | Test provider connectivity (synthetic prompt) |
+| GET | `/api/llm-providers/{name}/models` | List available models for provider |
+| GET | `/api/llm-providers/health/all` | Health check all registered providers |
+
+### Task Routing
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/llm-providers/routing/tasks` | Get all task→provider routing rules |
+| PUT | `/api/llm-providers/routing/tasks` | Create/update task routing rule |
+| DELETE | `/api/llm-providers/routing/tasks/{task_type}` | Delete task routing rule |
+
+### Key Concepts
+- **Data Security Levels**: `local_only` (default), `cloud_private`, `unrestricted` — controls which providers can be used
+- **Data Locality**: Each provider classified as `local`, `cloud_private`, or `cloud_public`
+- **API Key Encryption**: Fernet symmetric encryption at rest via `LLM_ENCRYPTION_KEY`
+- **Test Endpoint**: Uses synthetic prompt ("Hello, respond with OK") — never sends real data
+
 ## Migration Toolkit API (Phase 20 - February 2026)
 **File**: `migration.py`
 

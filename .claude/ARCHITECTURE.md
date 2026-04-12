@@ -178,6 +178,48 @@ uploads/
 - Query planning considers both database and file sources
 - DuckDB session ensures all file tables are loaded before query execution
 
+## LLM Provider Expansion (Phase 15 - April 2026)
+**Status**: PRODUCTION-READY
+
+### Architecture
+- `BaseLLMProvider` ABC — common interface for all providers (`generate()`, `chat()`, `health_check()`, `list_models()`)
+- `DataLocality` enum — `LOCAL`, `CLOUD_PRIVATE`, `CLOUD_PUBLIC` classification per provider
+- `ProviderRegistry` — central lookup with data security enforcement (`DATA_SECURITY_LEVEL` setting)
+- `TrackedLLMClient` — wraps any provider with LLM usage tracking (backward-compatible with OllamaClient signature)
+- `get_llm_client()` — factory function, replaces `get_ollama_client()` across all callers
+
+### Provider Hierarchy
+```
+BaseLLMProvider (ABC)
+├── OllamaProvider (LOCAL)
+├── OpenAICompatibleProvider (httpx)
+│   ├── OpenAIProvider (CLOUD_PUBLIC)
+│   ├── LMStudioProvider (LOCAL)
+│   └── VLLMProvider (LOCAL)
+├── AzureOpenAIProvider (CLOUD_PRIVATE)
+├── AnthropicProvider (CLOUD_PUBLIC)
+├── GoogleVertexProvider (CLOUD_PRIVATE)
+└── AWSBedrockProvider (CLOUD_PRIVATE)
+```
+
+### Data Security Enforcement
+- **`DATA_SECURITY_LEVEL`** setting: `local_only` (default), `cloud_private`, `unrestricted`
+- Registry blocks provider access when locality exceeds security level
+- Fallback chains never "fall up" to a less-secure tier
+- Frontend shows confirmation dialog for Frontier mode, amber/red warnings per locality
+- Test endpoint uses synthetic prompt — never sends real schema data
+
+### Provider Configuration
+- `LLMProviderConfig` DB table — stores encrypted API keys (Fernet), endpoints, models
+- `LLMTaskRouting` DB table — per-task provider routing overrides
+- Env vars take priority over DB config (resolution: env > database > default)
+- `ProviderConfigService` handles CRUD with encryption/decryption
+
+### Model Router Integration
+- `ModelRouter.get_provider_for_task()` — looks up configured provider per task type
+- `ModelRouter.execute_with_fallback()` — tries primary provider, then fallback chain
+- `TaskConfig` dataclass extended with `provider` and `fallback_chain` fields
+
 ## LLM Usage Monitoring (Phase 16 - February 2026)
 **Status**: PRODUCTION-READY
 
@@ -201,7 +243,7 @@ uploads/
 
 ### Tracked Agents
 All LLM-calling agents are instrumented:
-- SQL Generator (via `ollama_client.py`)
+- SQL Generator (via `TrackedLLMClient`)
 - Self-Correcting Agent
 - Query Planning Agent
 - Result Narrator
