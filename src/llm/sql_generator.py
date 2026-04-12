@@ -240,7 +240,7 @@ class SQLGenerator:
             self.ollama = ollama_client
         else:
             from src.llm import get_llm_client
-            self.ollama = get_llm_client()
+            self.ollama = get_llm_client(task_type="sql_generation")
         self.validator = SQLValidator()
         self.llm_cache = llm_cache
         self.use_llm_cache = use_llm_cache

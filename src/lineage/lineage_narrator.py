@@ -495,21 +495,23 @@ async def get_lineage_narrator(
     """Get a configured LineageNarrator instance."""
     from src.llm import get_llm_client
 
-    client = get_llm_client()
-
     # Try to get model router
     model_router = None
     timeout = 15.0
+    provider_name = None
 
     if db_session:
         try:
             from src.llm.model_router import get_model_router, TaskType
             model_router = await get_model_router(db_session)
             timeout = model_router.get_timeout_for_task(TaskType.LINEAGE_NARRATIVE)
+            provider_name = model_router.get_provider_for_task(TaskType.LINEAGE_NARRATIVE)
             if not model:
                 model = model_router.get_model_for_task(TaskType.LINEAGE_NARRATIVE)
         except (ImportError, AttributeError):
             pass  # Model router not available or missing task type
+
+    client = get_llm_client(provider_name)
 
     return LineageNarrator(
         ollama_client=client,

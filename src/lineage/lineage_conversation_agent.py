@@ -1089,16 +1089,17 @@ async def get_lineage_conversation_agent(
     Uses the ModelRouter to get the configured model for LINEAGE_CONVERSATION task
     from the settings panel.
     """
-    client = get_llm_client()
     model = model_override
     timeout = timeout_override or 15.0
+    provider_name = None
 
-    # Load model and timeout from router if db session is available
+    # Load model, timeout, and provider from router if db session is available
     if db is not None:
         try:
             from src.llm.model_router import get_model_router, TaskType
 
             router = await get_model_router(db)
+            provider_name = router.get_provider_for_task(TaskType.LINEAGE_CONVERSATION)
             if not model:
                 model = router.get_model_for_task(TaskType.LINEAGE_CONVERSATION)
             if not timeout_override:
@@ -1106,6 +1107,8 @@ async def get_lineage_conversation_agent(
             logger.info(f"LineageConversationAgent using model={model}, timeout={timeout}s")
         except (ImportError, AttributeError) as e:
             logger.warning(f"Could not load model router settings: {e}")
+
+    client = get_llm_client(provider_name)
 
     return LineageConversationAgent(
         client=client,

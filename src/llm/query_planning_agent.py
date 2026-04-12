@@ -257,7 +257,7 @@ class QueryPlanningAgent:
             self.ollama = ollama_client
         else:
             from src.llm import get_llm_client
-            self.ollama = get_llm_client()
+            self.ollama = get_llm_client(task_type="query_planning")
         self.enable_planning = enable_planning
         self.complexity_threshold = complexity_threshold
         self.db_session = db_session

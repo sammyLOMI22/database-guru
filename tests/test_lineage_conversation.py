@@ -470,7 +470,7 @@ class TestGetLineageConversationAgent:
 
             agent = await get_lineage_conversation_agent(model_override="llama3.2")
 
-            mock_get_client.assert_called_once_with()
+            mock_get_client.assert_called_once_with(None)
             assert agent is not None
             assert agent.model == "llama3.2"
 

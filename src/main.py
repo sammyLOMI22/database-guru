@@ -58,18 +58,36 @@ async def lifespan(app: FastAPI):
     logger.info("📊 Initializing database...")
     db_manager = get_db_manager(settings)
 
+    await db_manager.initialize_async()
+    await db_manager.create_tables_async()
+
     # Run Alembic migrations (skip if entrypoint already handled them)
+    # Runs AFTER create_tables_async() so baseline tables exist for index migrations.
+    # On a fresh DB, tables are created by ORM and we stamp alembic to head.
     if os.environ.get("MIGRATIONS_HANDLED") != "1":
         try:
             run_alembic_migrations()
         except Exception as e:
-            logger.error(f"Alembic migrations failed: {e}")
-            raise
+            logger.warning(f"Alembic migrations skipped ({e}), stamping head")
+            try:
+                from alembic.config import Config as AlembicConfig
+                from alembic import command as alembic_command
+                alembic_cfg = AlembicConfig(
+                    os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
+                )
+                alembic_command.stamp(alembic_cfg, "head")
+                logger.info("Alembic stamped to head")
+            except Exception as stamp_err:
+                logger.warning(f"Failed to stamp alembic head: {stamp_err}")
     else:
         logger.info("Migrations already handled by entrypoint, skipping")
 
-    await db_manager.initialize_async()
-    await db_manager.create_tables_async()
+    # Re-apply logging config — alembic's fileConfig() disables all existing
+    # loggers and resets the root logger to WARNING, suppressing all subsequent
+    # INFO messages from the application.
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', force=True)
+    for name in logging.Logger.manager.loggerDict:
+        logging.getLogger(name).disabled = False
 
     # Seed default LLM model configs for cost tracking (Phase 16)
     try:

@@ -68,6 +68,7 @@ def _get_config_service(settings: Settings = Depends(get_settings)) -> ProviderC
 @router.get("/", summary="List all provider configurations")
 async def list_providers(
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
     service: ProviderConfigService = Depends(_get_config_service),
 ) -> list[dict[str, Any]]:
     """List all configured LLM providers with masked API keys."""
@@ -92,7 +93,9 @@ async def list_providers(
 
 
 @router.get("/registry", summary="List providers from active registry")
-async def list_registry_providers() -> dict[str, Any]:
+async def list_registry_providers(
+    _: User = Depends(require_admin),
+) -> dict[str, Any]:
     """List all providers currently registered in the runtime registry."""
     from src.llm.providers.registry import get_provider_registry
     registry = get_provider_registry()
@@ -116,6 +119,7 @@ async def list_registry_providers() -> dict[str, Any]:
 async def get_provider(
     provider_name: str,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
     service: ProviderConfigService = Depends(_get_config_service),
 ) -> dict[str, Any]:
     config = await service.get_config(db, provider_name)
@@ -153,6 +157,14 @@ async def upsert_provider(
                  "has_api_key": body.api_key is not None},
     )
     await db.commit()
+
+    # Rebuild runtime registry so DB config takes effect immediately
+    try:
+        from src.llm.providers.registry import rebuild_registry_from_db
+        await rebuild_registry_from_db(db, service._settings)
+    except Exception as e:
+        logger.warning(f"Failed to rebuild registry after config update: {e}")
+
     logger.info(f"Provider config updated: {provider_name}")
     return config
 
@@ -176,6 +188,14 @@ async def delete_provider(
         username=current_user.username,
     )
     await db.commit()
+
+    # Rebuild runtime registry so deletion takes effect immediately
+    try:
+        from src.llm.providers.registry import rebuild_registry_from_db
+        await rebuild_registry_from_db(db, service._settings)
+    except Exception as e:
+        logger.warning(f"Failed to rebuild registry after config delete: {e}")
+
     logger.info(f"Provider config deleted: {provider_name}")
     return {"status": "deleted", "provider": provider_name}
 
@@ -220,7 +240,10 @@ async def test_provider(
 
 
 @router.get("/{provider_name}/models", summary="List available models")
-async def list_provider_models(provider_name: str) -> list[ProviderModelInfo]:
+async def list_provider_models(
+    provider_name: str,
+    _: User = Depends(require_admin),
+) -> list[ProviderModelInfo]:
     """List models available from a provider."""
     from src.llm.providers.registry import (
         get_provider_registry,
@@ -253,9 +276,9 @@ async def list_provider_models(provider_name: str) -> list[ProviderModelInfo]:
 
     return [
         ProviderModelInfo(
-            name=m.get("name", m.get("id", "unknown")),
-            size=m.get("size"),
-            modified_at=m.get("modified_at"),
+            name=m.name,
+            size=m.size,
+            modified_at=None,
         )
         for m in models
     ]
@@ -267,6 +290,7 @@ async def list_provider_models(provider_name: str) -> list[ProviderModelInfo]:
 @router.get("/routing/tasks", summary="Get all task routing rules")
 async def list_routing(
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
     service: ProviderConfigService = Depends(_get_config_service),
 ) -> list[dict[str, Any]]:
     return await service.list_routing(db)
@@ -324,7 +348,9 @@ async def delete_routing(
 
 
 @router.get("/health/all", summary="Health check all registered providers")
-async def health_check_all() -> list[dict[str, Any]]:
+async def health_check_all(
+    _: User = Depends(require_admin),
+) -> list[dict[str, Any]]:
     """Run health checks on all registered providers."""
     from src.llm.providers.registry import get_provider_registry
 

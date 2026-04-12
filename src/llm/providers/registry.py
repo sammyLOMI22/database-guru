@@ -237,3 +237,124 @@ def initialize_registry_from_settings() -> ProviderRegistry:
         f"(security_level={registry.security_level})"
     )
     return registry
+
+
+# -- Provider name → class + constructor kwargs mapping --
+
+_PROVIDER_FACTORIES: dict[str, tuple[str, str, dict]] = {
+    # name → (module_path, class_name, default_kwargs)
+    "ollama": ("src.llm.providers.ollama", "OllamaProvider", {}),
+    "openai": ("src.llm.providers.openai_provider", "OpenAIProvider", {}),
+    "anthropic": ("src.llm.providers.anthropic", "AnthropicProvider", {}),
+    "azure_openai": ("src.llm.providers.azure_openai", "AzureOpenAIProvider", {}),
+    "google_vertex": ("src.llm.providers.google_vertex", "GoogleVertexProvider", {}),
+    "aws_bedrock": ("src.llm.providers.aws_bedrock", "AWSBedrockProvider", {}),
+    "lm_studio": ("src.llm.providers.lm_studio", "LMStudioProvider", {}),
+    "vllm": ("src.llm.providers.vllm", "VLLMProvider", {}),
+}
+
+# Maps DB config fields → provider constructor kwargs per provider
+_PROVIDER_KWARG_MAP: dict[str, dict[str, str]] = {
+    "ollama": {"endpoint": "base_url", "default_model": "default_model"},
+    "openai": {"api_key": "api_key", "endpoint": "base_url", "default_model": "default_model"},
+    "anthropic": {"api_key": "api_key", "default_model": "default_model"},
+    "azure_openai": {"api_key": "api_key", "endpoint": "endpoint", "default_model": "default_model"},
+    "google_vertex": {"api_key": "api_key", "default_model": "default_model"},
+    "aws_bedrock": {"default_model": "default_model"},
+    "lm_studio": {"endpoint": "base_url", "default_model": "default_model"},
+    "vllm": {"api_key": "api_key", "endpoint": "base_url", "default_model": "default_model"},
+}
+
+
+async def rebuild_registry_from_db(db, settings=None) -> ProviderRegistry:
+    """Rebuild the provider registry by merging env-based defaults with DB configs.
+
+    Called after provider config mutations so that saved configs take effect
+    at runtime without restarting the application.
+
+    Steps:
+    1. Re-initialise from env settings (baseline).
+    2. Layer on any enabled DB-stored provider configs, overriding or adding
+       providers as needed.
+    """
+    import importlib
+    from sqlalchemy import select
+    from src.database.models import LLMProviderConfig
+
+    if settings is None:
+        from src.config.settings import Settings
+        settings = Settings()
+
+    # Step 1: rebuild baseline from env
+    registry = initialize_registry_from_settings()
+
+    # Step 2: overlay DB-stored configs
+    try:
+        from src.services.provider_config_service import ProviderConfigService
+        config_service = ProviderConfigService(settings)
+
+        result = await db.execute(
+            select(LLMProviderConfig).where(LLMProviderConfig.enabled == True)  # noqa: E712
+        )
+        db_configs = result.scalars().all()
+
+        for cfg in db_configs:
+            name = cfg.provider_name
+            factory = _PROVIDER_FACTORIES.get(name)
+            if factory is None:
+                logger.warning(f"No provider factory for {name!r}, skipping DB config")
+                continue
+
+            # If the provider is already registered from env with the same name,
+            # and the DB config has overrides, re-register with DB values.
+            kwarg_map = _PROVIDER_KWARG_MAP.get(name, {})
+            kwargs: dict[str, str] = {}
+
+            # Decrypt API key if stored
+            if cfg.api_key_encrypted:
+                decrypted = config_service.decrypt_key(cfg.api_key_encrypted)
+                if decrypted and "api_key" in kwarg_map:
+                    kwargs[kwarg_map["api_key"]] = decrypted
+
+            if cfg.endpoint and "endpoint" in kwarg_map:
+                kwargs[kwarg_map["endpoint"]] = cfg.endpoint
+
+            if cfg.default_model and "default_model" in kwarg_map:
+                kwargs[kwarg_map["default_model"]] = cfg.default_model
+
+            # Extra config passthrough (e.g. deployment_name for Azure, project_id for Vertex)
+            if cfg.extra_config and isinstance(cfg.extra_config, dict):
+                kwargs.update(cfg.extra_config)
+
+            # Only re-register if we have meaningful overrides or provider is not yet registered
+            if kwargs or name not in registry.list_available():
+                try:
+                    module = importlib.import_module(factory[0])
+                    cls = getattr(module, factory[1])
+                    provider = cls(**kwargs)
+                    registry.register(provider)
+                    logger.info(f"Provider {name!r} registered/updated from DB config")
+                except Exception as e:
+                    logger.warning(f"Failed to register provider {name!r} from DB: {e}")
+
+        # Also handle disabled providers — unregister if DB explicitly disables
+        result_disabled = await db.execute(
+            select(LLMProviderConfig).where(LLMProviderConfig.enabled == False)  # noqa: E712
+        )
+        for cfg in result_disabled.scalars().all():
+            if cfg.provider_name in registry.list_available() and cfg.provider_name != "ollama":
+                registry.unregister(cfg.provider_name)
+                logger.info(f"Provider {cfg.provider_name!r} unregistered (disabled in DB)")
+
+    except Exception as e:
+        logger.error(f"Failed to rebuild registry from DB: {e}")
+
+    # Invalidate model router so it picks up new providers
+    from src.llm.model_router import invalidate_model_router
+    invalidate_model_router()
+
+    logger.info(
+        f"Provider registry rebuilt: {registry.list_available()} "
+        f"(security_level={registry.security_level})"
+    )
+    return registry

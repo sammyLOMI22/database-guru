@@ -100,6 +100,7 @@ class TrackedLLMClient:
                     chat_session_id=chat_session_id,
                     chat_message_id=chat_message_id,
                     agent_name=agent_name,
+                    data_locality=self._provider.data_locality.value,
                 ) as tracking:
                     llm_response = await self._provider.generate(
                         prompt=prompt,
@@ -169,6 +170,7 @@ class TrackedLLMClient:
                     chat_session_id=chat_session_id,
                     chat_message_id=chat_message_id,
                     agent_name=agent_name,
+                    data_locality=self._provider.data_locality.value,
                 ) as tracking:
                     llm_response = await self._provider.chat(
                         messages=messages,
