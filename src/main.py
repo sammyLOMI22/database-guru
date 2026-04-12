@@ -99,9 +99,13 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Failed to seed LLM model configs: {e}")
 
     # Initialize LLM provider registry (Phase 15)
+    # Use rebuild_registry_from_db so that DB-persisted provider configs
+    # (API keys, endpoints, enabled flags) take effect at startup — not just
+    # env-based defaults.
     try:
-        from src.llm.providers.registry import initialize_registry_from_settings
-        provider_registry = initialize_registry_from_settings()
+        from src.llm.providers.registry import rebuild_registry_from_db
+        async with db_manager.get_async_session() as db:
+            provider_registry = await rebuild_registry_from_db(db, settings)
         logger.info(
             f"✅ LLM provider registry ready: {provider_registry.list_available()} "
             f"(security_level={provider_registry.security_level})"
