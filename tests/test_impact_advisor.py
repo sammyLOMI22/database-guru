@@ -388,7 +388,7 @@ class TestGetImpactAdvisor:
     @pytest.mark.asyncio
     async def test_get_advisor_without_db(self):
         """Test getting advisor without database session."""
-        with patch("src.llm.ollama_client.get_ollama_client") as mock_get_client:
+        with patch("src.llm.get_llm_client") as mock_get_client:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 
@@ -400,7 +400,7 @@ class TestGetImpactAdvisor:
     @pytest.mark.asyncio
     async def test_get_advisor_with_model_override(self):
         """Test getting advisor with model override."""
-        with patch("src.llm.ollama_client.get_ollama_client") as mock_get_client:
+        with patch("src.llm.get_llm_client") as mock_get_client:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 

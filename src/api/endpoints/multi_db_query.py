@@ -26,7 +26,7 @@ from src.core.schema_inspector import SchemaInspector
 from src.core.executor import SQLExecutor
 from src.llm.self_correcting_agent import AgentTrace
 from src.llm.result_narrator import ResultNarrator
-from src.llm.ollama_client import OllamaClient
+from src.llm import get_llm_client
 from src.llm.multi_db_query_validator import (
     QueryCapability,
     DatabaseQueryAssessment,
@@ -1014,7 +1014,7 @@ async def process_multi_database_query(
             try:
                 # Initialize Ollama client and narrator
                 logger.info("Initializing Ollama client for narrative generation...")
-                ollama_client = OllamaClient(settings=settings)
+                ollama_client = get_llm_client()
                 # Use the user-selected model from the request, not the default
                 if request.model:
                     ollama_client.model = request.model

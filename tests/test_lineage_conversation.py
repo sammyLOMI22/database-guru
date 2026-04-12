@@ -451,7 +451,7 @@ class TestGetLineageConversationAgent:
     @pytest.mark.asyncio
     async def test_get_agent_without_db(self):
         """Test creating agent without database session."""
-        with patch("src.lineage.lineage_conversation_agent.get_ollama_client") as mock_get_client:
+        with patch("src.lineage.lineage_conversation_agent.get_llm_client") as mock_get_client:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 
@@ -464,7 +464,7 @@ class TestGetLineageConversationAgent:
     @pytest.mark.asyncio
     async def test_get_agent_with_model_override(self):
         """Test creating agent with model override."""
-        with patch("src.lineage.lineage_conversation_agent.get_ollama_client") as mock_get_client:
+        with patch("src.lineage.lineage_conversation_agent.get_llm_client") as mock_get_client:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 
@@ -477,7 +477,7 @@ class TestGetLineageConversationAgent:
     @pytest.mark.asyncio
     async def test_get_agent_with_timeout_override(self):
         """Test creating agent with timeout override."""
-        with patch("src.lineage.lineage_conversation_agent.get_ollama_client") as mock_get_client:
+        with patch("src.lineage.lineage_conversation_agent.get_llm_client") as mock_get_client:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 
@@ -488,7 +488,7 @@ class TestGetLineageConversationAgent:
     @pytest.mark.asyncio
     async def test_get_agent_with_db_uses_router(self):
         """Test creating agent with db session loads settings from model router."""
-        with patch("src.lineage.lineage_conversation_agent.get_ollama_client") as mock_get_client:
+        with patch("src.lineage.lineage_conversation_agent.get_llm_client") as mock_get_client:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 

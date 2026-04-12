@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import DatabaseConnection
-from src.llm.ollama_client import get_ollama_client
+from src.llm import get_llm_client
 from src.llm.self_correcting_agent import AgentTrace
 from src.nosql.base import NoSQLHandler
 from src.nosql.cassandra.client_pool import CassandraClientPool
@@ -47,7 +47,7 @@ class CassandraHandler(NoSQLHandler):
             schema_dict = await self._get_schema(connection, inspector, db, trace)
             schema_str = inspector.format_schema_for_llm(schema_dict)
 
-            ollama = get_ollama_client()
+            ollama = get_llm_client()
             if not ollama.client:
                 await ollama.initialize()
 

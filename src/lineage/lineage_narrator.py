@@ -493,9 +493,9 @@ async def get_lineage_narrator(
     model: Optional[str] = None,
 ) -> LineageNarrator:
     """Get a configured LineageNarrator instance."""
-    from src.llm.ollama_client import get_ollama_client
+    from src.llm import get_llm_client
 
-    client = get_ollama_client()
+    client = get_llm_client()
 
     # Try to get model router
     model_router = None

@@ -24,7 +24,7 @@ from enum import Enum
 if TYPE_CHECKING:
     from src.llm.quality_profile import QualityProfile
 
-from src.llm.ollama_client import OllamaClient, get_ollama_client
+from src.llm.tracked_client import TrackedLLMClient
 from src.config.settings import Settings
 from src.core.schema_validator import SchemaValidator, SchemaValidationError
 from src.core.location_mapper import LocationMapper
@@ -237,7 +237,7 @@ class QueryPlanningAgent:
     def __init__(
         self,
         settings: Optional[Settings] = None,
-        ollama_client: Optional[OllamaClient] = None,
+        ollama_client: Optional[TrackedLLMClient] = None,
         enable_planning: bool = True,
         complexity_threshold: QueryComplexity = QueryComplexity.MODERATE,
         db_session: Optional[AsyncSession] = None
@@ -247,13 +247,17 @@ class QueryPlanningAgent:
 
         Args:
             settings: Settings instance
-            ollama_client: Optional OllamaClient instance
+            ollama_client: Optional TrackedLLMClient instance
             enable_planning: Whether to enable query planning (can disable for simple queries)
             complexity_threshold: Minimum complexity level to trigger planning
             db_session: Optional database session for applying learned mappings
         """
         self.settings = settings or Settings()
-        self.ollama = ollama_client or get_ollama_client(self.settings)
+        if ollama_client:
+            self.ollama = ollama_client
+        else:
+            from src.llm import get_llm_client
+            self.ollama = get_llm_client()
         self.enable_planning = enable_planning
         self.complexity_threshold = complexity_threshold
         self.db_session = db_session

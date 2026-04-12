@@ -567,7 +567,7 @@ class TestGetPatternIntelligenceAgent:
     @pytest.mark.asyncio
     async def test_get_agent_without_db(self):
         """Test factory without database session."""
-        with patch("src.llm.ollama_client.get_ollama_client") as mock_get_client:
+        with patch("src.llm.get_llm_client") as mock_get_client:
             mock_get_client.return_value = MagicMock()
 
             agent = await get_pattern_intelligence_agent()
@@ -578,7 +578,7 @@ class TestGetPatternIntelligenceAgent:
     @pytest.mark.asyncio
     async def test_get_agent_with_model_override(self):
         """Test factory with model override."""
-        with patch("src.llm.ollama_client.get_ollama_client") as mock_get_client:
+        with patch("src.llm.get_llm_client") as mock_get_client:
             mock_get_client.return_value = MagicMock()
 
             agent = await get_pattern_intelligence_agent(model="custom-model")

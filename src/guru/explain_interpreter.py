@@ -360,10 +360,10 @@ class ExplainInterpreter:
 
 async def get_explain_interpreter(db=None, model: Optional[str] = None) -> ExplainInterpreter:
     """Create an ExplainInterpreter with the standard agent setup."""
-    from src.llm.ollama_client import get_ollama_client
+    from src.llm import get_llm_client
     from src.llm.model_router import get_model_router, TaskType
 
-    client = get_ollama_client()
+    client = get_llm_client()
     router = await get_model_router(db) if db else None
 
     timeout = 25.0

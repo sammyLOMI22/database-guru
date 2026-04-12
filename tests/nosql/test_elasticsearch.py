@@ -370,7 +370,7 @@ class TestElasticsearchHandler:
         conn.schema_cache = None
 
         with patch("src.nosql.elasticsearch.handler.ElasticsearchClientPool.get_instance", return_value=mock_pool), \
-             patch("src.nosql.elasticsearch.handler.get_ollama_client", return_value=mock_ollama), \
+             patch("src.nosql.elasticsearch.handler.get_llm_client", return_value=mock_ollama), \
              patch("src.nosql.elasticsearch.handler.ElasticsearchSchemaInspector") as MockInspector:
 
             mock_inspector = AsyncMock()

@@ -17,7 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 
 from src.database.models import QueryHistory, DatabaseConnection, SystemSettings
-from src.llm.ollama_client import OllamaClient, get_ollama_client
+from src.llm.tracked_client import TrackedLLMClient
+from src.llm import get_llm_client
 from src.llm.model_router import ModelRouter, TaskType
 from src.security.prompt_sanitizer import sanitize_question_for_prompt
 
@@ -190,7 +191,7 @@ class LineageConversationAgent:
 
     def __init__(
         self,
-        client: OllamaClient,
+        client: TrackedLLMClient,
         timeout_seconds: float = 15.0,
         model: Optional[str] = None,
     ):
@@ -1088,7 +1089,7 @@ async def get_lineage_conversation_agent(
     Uses the ModelRouter to get the configured model for LINEAGE_CONVERSATION task
     from the settings panel.
     """
-    client = get_ollama_client()
+    client = get_llm_client()
     model = model_override
     timeout = timeout_override or 15.0
 
