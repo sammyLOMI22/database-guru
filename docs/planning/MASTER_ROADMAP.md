@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: March 21, 2026
+**Last Updated**: April 12, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -150,27 +150,27 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                   MULTI-PROVIDER MONITORING (Phase 17)                                  │
+    │                   MULTI-PROVIDER MONITORING (Phase 17) - ✅ COMPLETE                    │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │               MULTI-PROVIDER MONITORING INTEGRATION (Phase 17) - MEDIUM PRIORITY         │
+    │               MULTI-PROVIDER MONITORING (Phase 17) - ✅ COMPLETE                         │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
-    │  │ 17.1 Token  │   │ 17.2 Base   │   │ 17.3 API &  │   │ 17.4 Dash-  │                   │
-    │  │ Extractors  │──▶│ Provider    │──▶│ Schema      │──▶│ board       │                   │
-    │  │             │   │ Updates     │   │ Updates     │   │ Widgets     │                   │
-    │  │             │   │             │   │             │   │             │                   │
-    │  │ • Per-      │   │ • Enrich    │   │ • /by-      │   │ • Cost by   │                   │
-    │  │   provider  │   │   response  │   │   provider  │   │   provider  │                   │
-    │  │   formats   │   │ • Native    │   │ • /cost-    │   │ • Provider  │                   │
-    │  │ • Pricing   │   │   tokens    │   │   summary   │   │   compare   │                   │
-    │  │   data      │   │ • Cost calc │   │ • Provider  │   │ • Cost      │                   │
-    │  │             │   │             │   │   column    │   │   trends    │                   │
-    │  │ ~300 lines  │   │ ~200 lines  │   │ ~300 lines  │   │ ~400 lines  │                   │
+    │  │ 17.1 ✅     │   │ 17.2 ✅     │   │ 17.3 ✅     │   │ 17.4 ✅     │                   │
+    │  │ Token       │──▶│ Provider    │──▶│ API &       │──▶│ Dashboard   │                   │
+    │  │ Extractors  │   │ Updates     │   │ Schema      │   │ Widgets     │                   │
+    │  │             │   │             │   │ Updates     │   │             │                   │
+    │  │ • 6 provider│   │ • User-     │   │ • /cost-    │   │ • Cost by   │                   │
+    │  │   formats   │   │   managed   │   │   summary   │   │   provider  │                   │
+    │  │ • Vertex AI │   │   pricing   │   │ • /provider │   │ • Provider  │                   │
+    │  │ • Bedrock   │   │ • Upsert/   │   │   -compare  │   │   compare   │                   │
+    │  │ • LM Studio │   │   delete    │   │ • /model-   │   │ • Model     │                   │
+    │  │ • vLLM      │   │   configs   │   │   configs   │   │   pricing   │                   │
+    │  │ ~100 lines  │   │ ~200 lines  │   │ ~350 lines  │   │ ~450 lines  │                   │
     │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
     │                                                                                           │
-    │  Prereq: Phase 15 + Phase 16 | Priority: MEDIUM | Est: 1-2 weeks | ~1,200 lines         │
+    │  29 tests | 7 new API endpoints | ~1,373 lines                                           │
     │  Plan: MULTI_PROVIDER_MONITORING_INTEGRATION.md                                          │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -471,7 +471,7 @@
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                    SECURITY & INFRASTRUCTURE - ✅ DELIVERED                                │
-    │         Phase 21 + Phase 18 + Phase 15 complete — Phase 17 (Multi-Provider Mon.) unblocked│
+    │         Phase 21 + Phase 18 + Phase 15 + Phase 17 complete                                │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
@@ -609,14 +609,16 @@
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
-    │   MULTI-PROVIDER MONITORING (Phase 17) ◀── MEDIUM PRIORITY        │
+    │   MULTI-PROVIDER MONITORING (Phase 17) ✅ COMPLETE                 │
     │                                                                   │
     │   REQUIRES: Phase 15 ✅ (Providers) + Phase 16 ✅ (Monitoring)    │
     │                                                                   │
-    │  • Native token counts from OpenAI, Anthropic, Google, etc.       │
-    │  • Accurate cost tracking per provider/model                      │
-    │  • Provider performance comparison dashboard                      │
-    │  • Est: 1-2 weeks | Plan: MULTI_PROVIDER_MONITORING_INTEGRATION.md│
+    │  • Native tokens from 6 providers (Ollama, OpenAI, Anthropic,     │
+    │    Azure, Google Vertex, AWS Bedrock, LM Studio, vLLM)            │
+    │  • User-managed model pricing (CRUD admin API)                    │
+    │  • Cost summary, provider comparison, unpriced model detection    │
+    │  • Model pricing manager UI, cost-by-provider chart               │
+    │  • 29 tests | 7 new endpoints | ~1,373 lines                     │
     └───────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────┐
@@ -641,7 +643,7 @@
                                 │
                                 ▼
                      ┌─────────────────────┐
-                     │     Phase 17        │
+                     │     Phase 17 ✅     │
                      │   Multi-Provider    │
                      │     Monitoring      │
                      └─────────────────────┘
@@ -709,24 +711,18 @@
 
 ---
 
-## Recommended Next Steps (Updated April 11, 2026)
+## Recommended Next Steps (Updated April 12, 2026)
 
 > **Strategic Direction** (per PM Review): Focus on "depth and safety" before "width expansion".
-> Security/Auth, Edit Mode, and Enterprise LLMs are now complete — Multi-Provider Monitoring is unblocked.
+> Security/Auth, Edit Mode, Enterprise LLMs, and Multi-Provider Monitoring are now complete.
 
-### Priority 1: Multi-Provider Monitoring (Phase 17) - HIGH
-**Why**: Extend monitoring to all LLM providers with accurate cost tracking
-- **Prerequisite**: Phase 15 ✅ (Providers) + Phase 16 ✅ (Monitoring) — both complete
-- Native token extraction from OpenAI, Anthropic, Google formats
-- Accurate cost tracking per provider/model, comparison dashboard
-- See: [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md)
-
-### Priority 2: Observability & Monitoring (Phase 24) - MEDIUM
+### Priority 1: Observability & Monitoring (Phase 24) - MEDIUM
 **Why**: Production readiness — structured logging, distributed tracing, metrics dashboards
 - **Prerequisite**: Phase 23 ✅ (Docker)
 - Structured JSON logging, OpenTelemetry tracing, Prometheus/Grafana, Docker integration
 
 ### Completed Priorities (this cycle)
+- ~~Multi-Provider Monitoring (Phase 17)~~ - ✅ COMPLETE: Native token extraction for 6 provider formats (Ollama, OpenAI/Azure/LM Studio/vLLM, Anthropic, Google Vertex, AWS Bedrock), user-managed model pricing (CRUD admin API), cost summary with daily breakdown, provider performance comparison by agent type, unpriced model detection, ModelPricingManager UI. 29 tests, 7 new endpoints, ~1,373 lines.
 - ~~LLM Provider Expansion (Phase 15)~~ - ✅ COMPLETE: 8 providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM), provider abstraction + registry, data security enforcement (local/cloud_private/cloud_public), Local/Frontier toggle UI, per-task routing, fallback chains, Fernet-encrypted API keys, frontend provider management. 220 tests, 8 endpoints, ~4,000 lines.
 - ~~Edit Mode & DML (Phase 18)~~ - ✅ COMPLETE: DML generator/validator/executor, inline editing UI, per-connection write permissions, preview mode. 40 tests, 5 endpoints, ~2,450 lines.
 - ~~Security & Auth Foundation (Phase 21)~~ - ✅ COMPLETE: JWT auth, resource ownership, per-user rate limiting, audit logging. 61 tests, 3 migrations. Unblocks Phase 18 + Phase 15.
@@ -753,6 +749,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - **Phase 12** ✅: Lineage Intelligence (5 agents, 151 tests, ~11,266 lines)
 - **Phase 13** ✅: CSV & Excel File Support (50+ tests)
 - **Phase 16** ✅: LLM Usage Monitoring (9 endpoints, full dashboard)
+- **Phase 17** ✅: Multi-Provider Monitoring (native token extraction for 6 provider formats, user-managed model pricing, cost summary, provider comparison — 29 tests, 7 new endpoints, ~1,373 lines)
 - **Phase 19** ✅: Data Insights Enhancement (tiered narratives, analytics cache, multi-source quality, chart presets, parallel analysis — 108 tests)
 - **Phase 20** ✅: Database Migration Toolkit (schema diff, planner, script gen, data migration — 98 tests, 13 endpoints, ~5,676 lines)
 - **Phase 22** ✅: Performance Guru (EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects — 77 tests, 2 endpoints, ~3,282 lines)
@@ -779,7 +776,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Migration Toolkit** | Schema diff, migration planner, script gen, data migration | **Phase 20 ✅ COMPLETE** | ~5,676 lines |
 | **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, preview mode, write permissions | **Phase 18 ✅ COMPLETE** | ~2,450 lines |
 | **Performance Guru** | EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects | **Phase 22 ✅ COMPLETE** | ~3,282 lines |
-| **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison | **Phase 17 - HIGH** (needs 15✅+16✅) | ~1,200 lines |
+| **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison, model pricing admin | **Phase 17 ✅ COMPLETE** | ~1,373 lines |
 | **Data Insights** | Tiered narratives, analytics cache, multi-source quality, chart presets, parallel analysis | **Phase 19 ✅ COMPLETE** | ~1,800 lines |
 | **NoSQL Expansion** | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch, frontend integration, mixed chat | **Phase 14 ✅ COMPLETE** | ~6,000 lines |
 | **Table UX** | Sorting ✅, Resizing, Export | Sorting complete | ~400 lines remaining |
@@ -822,6 +819,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | Security & Auth (Phase 21) | JWT auth (bcrypt + python-jose), resource ownership (owner_id on 5 tables), per-user rate limiting, audit logging, REQUIRE_AUTH feature flag | 61 tests |
 | Edit Mode & DML (Phase 18) | DML generator/validator/executor, inline cell editing, add/delete rows, preview mode, per-connection write permissions, 5 API endpoints | 40 tests |
 | LLM Provider Expansion (Phase 15) | 8 providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM), provider abstraction + registry, data security enforcement (Local/Frontier), per-task routing with fallback chains, Fernet-encrypted API keys, frontend provider management UI | 220 tests |
+| Multi-Provider Monitoring (Phase 17) | Native token extraction for 6 provider formats, user-managed model pricing (CRUD), cost summary with daily breakdown, provider comparison by agent type, unpriced model detection, ModelPricingManager UI | 29 tests |
 
 **Total Tests**: 2100+ passing
 
@@ -836,7 +834,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Phase 20** | Migration Toolkit | Phase 11✅ + 12✅ | ~5,676 lines | ✅ **COMPLETE** |
 | **Phase 18** | Edit Mode & DML Operations | Phase 21 ✅ | ~2,450 lines | ✅ **COMPLETE** |
 | **Phase 22** | Performance Guru (EXPLAIN) | None | ~3,282 lines | ✅ **COMPLETE** |
-| **Phase 17** | Multi-Provider Monitoring | Phase 15✅ + 16✅ | ~1,200 lines | HIGH |
+| **Phase 17** | Multi-Provider Monitoring | Phase 15✅ + 16✅ | ~1,373 lines | ✅ **COMPLETE** |
 | **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | ✅ **COMPLETE** |
 | **Phase 23** | Docker Containerization | None | ~200 lines config | ✅ **COMPLETE** |
 | **Phase 24** | Observability (OpenTelemetry) | Phase 23 ✅ | ~1,300 lines | MEDIUM |
@@ -855,7 +853,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - [NOSQL_EXPANSION_PLAN.md](NOSQL_EXPANSION_PLAN.md) - NoSQL Database Expansion (Phase 14)
 - [LLM_PROVIDER_EXPANSION_PLAN.md](LLM_PROVIDER_EXPANSION_PLAN.md) - LLM Provider Expansion (Phase 15) ✅
 - [LLM_USAGE_MONITORING_PLAN.md](LLM_USAGE_MONITORING_PLAN.md) - LLM Usage Monitoring (Phase 16) ✅
-- [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md) - Multi-Provider Monitoring (Phase 17)
+- [MULTI_PROVIDER_MONITORING_INTEGRATION.md](MULTI_PROVIDER_MONITORING_INTEGRATION.md) - Multi-Provider Monitoring (Phase 17) ✅
 - [PHASE_18_EDIT_MODE_FEATURE_IMP_PLAN.md](PHASE_18_EDIT_MODE_FEATURE_IMP_PLAN.md) - Edit Mode & DML Operations (Phase 18) ✅
 - [DATA_INSIGHTS_ENHANCEMENT_PLAN.md](DATA_INSIGHTS_ENHANCEMENT_PLAN.md) - Data Insights Enhancement (Phase 19)
 - [MIGRATION_TOOLKIT_PROPOSAL.md](MIGRATION_TOOLKIT_PROPOSAL.md) - Database Migration Toolkit (Phase 20)
@@ -865,7 +863,8 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 
 ---
 
-**Updated**: April 11, 2026
+**Updated**: April 12, 2026
+- **Phase 17 ✅ COMPLETE**: Multi-Provider Monitoring
 - **Phase 15 ✅ COMPLETE**: LLM Provider Expansion
   - 15.1: Provider Abstraction — BaseLLMProvider ABC, DataLocality enum, ProviderRegistry, TrackedLLMClient wrapper
   - 15.2: OpenAI-Compatible Providers — OpenAI, LM Studio, vLLM via shared httpx base class

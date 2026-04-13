@@ -80,7 +80,8 @@ The system uses a multi-agent architecture with 40+ specialized agents (includin
 | Schema Health Analyzer | `src/lineage/schema_health_analyzer.py` | Database design quality (Phase 12.3) |
 | Pattern Intelligence | `src/lineage/pattern_intelligence.py` | Query pattern insights (Phase 12.4) |
 | Lineage Conversation | `src/lineage/lineage_conversation_agent.py` | Natural language Q&A (Phase 12.5) |
-| LLM Usage Tracker | `src/services/llm_usage_tracker.py` | Token & cost tracking (Phase 16) |
+| LLM Usage Tracker | `src/services/llm_usage_tracker.py` | Token & cost tracking, 6 provider formats (Phase 16/17) |
+| LLM Cost Service | `src/services/llm_cost_service.py` | User-managed model pricing, cost calculation (Phase 16/17) |
 | Narrative Tiers | `src/llm/prompts/narrative_tiers.py` | Model-size-aware prompt templates (Phase 19) |
 | Analytics Cache | `src/services/analytics_cache.py` | Two-tier stats/pattern cache (Phase 19) |
 | Schema Comparator | `src/migration/schema_comparator.py` | DB-to-DB schema diff engine (Phase 20) |
@@ -176,7 +177,7 @@ Key docs in `docs/`:
 | **Guides** | `guides/MULTI_DATABASE_GUIDE.md`, `guides/CONNECTION_POOLING_GUIDE.md`, `guides/DATA_LINEAGE_GUIDE.md`, `guides/LINEAGE_INTELLIGENCE_USER_GUIDE.md`, `guides/FILE_DATA_SOURCE_USER_GUIDE.md` |
 | **Technical** | `technical/PARALLEL_EXECUTION.md`, `technical/SEMANTIC_CACHING.md`, `technical/SQL_GENERATION_PIPELINE.md` |
 | **Modules** | `modules/QUERY_PLANNING_AGENT.md`, `modules/TOOL_USING_AGENT.md` |
-| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/DATA_INSIGHTS_TESTING.md`, `guides/testing/PHASE_22_PERFORMANCE_GURU_TESTING.md`, `guides/testing/PHASE_14_NOSQL_EXPANSION_TESTING.md`, `guides/testing/PHASE_21_SECURITY_AUTH_TESTING.md`, `guides/testing/PHASE_15_LLM_PROVIDER_EXPANSION_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
+| **Testing** | `guides/testing/LINEAGE_INTELLIGENCE_TESTING.md`, `guides/testing/DATA_INSIGHTS_TESTING.md`, `guides/testing/PHASE_22_PERFORMANCE_GURU_TESTING.md`, `guides/testing/PHASE_14_NOSQL_EXPANSION_TESTING.md`, `guides/testing/PHASE_21_SECURITY_AUTH_TESTING.md`, `guides/testing/PHASE_15_LLM_PROVIDER_EXPANSION_TESTING.md`, `guides/testing/PHASE_17_MULTI_PROVIDER_MONITORING_TESTING.md`, `guides/testing/TESTING_GUIDE.md` |
 | **Planning** | `planning/FUTURE_PLANS.md`, `planning/MASTER_ROADMAP.md` |
 | **LLM Usage** | `guides/LLM_USAGE_MONITORING_GUIDE.md` |
 | **Data Insights** | `planning/DATA_INSIGHTS_ENHANCEMENT_PLAN.md` |

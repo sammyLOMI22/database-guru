@@ -401,7 +401,12 @@ Natural language Q&A about schema and lineage:
 Centralized service for tracking all LLM API calls across every agent:
 - **Context Manager API**: `async with tracker.track_call(...)` wraps any LLM call
 - **Token Estimation**: tiktoken (cl100k_base) with char-count fallback
-- **Native Token Extraction**: Reads token counts from Ollama, OpenAI, Anthropic, Azure responses
+- **Native Token Extraction**: Reads token counts from 6 provider formats:
+  - Ollama (`prompt_eval_count`/`eval_count`)
+  - OpenAI/Azure/LM Studio/vLLM (`usage.prompt_tokens`/`completion_tokens`)
+  - Anthropic (`usage.input_tokens`/`output_tokens`)
+  - Google Vertex AI (`usageMetadata.promptTokenCount`/`candidatesTokenCount`)
+  - AWS Bedrock (`usage.inputTokens`/`outputTokens`)
 - **Automatic Cost Calculation**: Uses `LLMCostService` for per-model cost estimation
 - **Error Tracking**: Captures failures and error messages
 
@@ -413,9 +418,11 @@ Centralized service for tracking all LLM API calls across every agent:
 Manages model configurations and calculates costs:
 - **Model Config Lookup**: Exact match then fuzzy match (e.g., "llama3:latest" → "llama3")
 - **Cost Calculation**: Per-1M-token pricing for input and output
-- **Default Configs**: Seeds Ollama ($0), GPT-4o ($5/$15), GPT-3.5 ($0.50/$1.50), Claude 3.5 ($3/$15)
+- **User-Managed Pricing**: CRUD API for model pricing configs (no hardcoded defaults)
+- **Unpriced Model Detection**: Finds models in usage records without pricing config
+- **Upsert/Delete**: Create, update, or remove model pricing configurations
 
-**Key methods**: `calculate_cost()`, `get_model_config()`, `ensure_default_configs()`
+**Key methods**: `calculate_cost()`, `get_model_config()`, `get_all_configs()`, `get_unpriced_models()`, `upsert_model_config()`, `delete_model_config()`
 
 ### 28. LLM Usage Aggregator
 **File**: `src/services/llm_usage_aggregator.py`

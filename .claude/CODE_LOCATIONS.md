@@ -322,11 +322,12 @@ Quick reference for finding important code in the Database Guru codebase.
 | Usage tracker | `src/services/llm_usage_tracker.py` |
 | Track call context mgr | `src/services/llm_usage_tracker.py:track_call()` |
 | Token estimation | `src/services/llm_usage_tracker.py:estimate_tokens()` |
+| Token extraction (6 providers) | `src/services/llm_usage_tracker.py:extract_tokens()` |
 | Cost service | `src/services/llm_cost_service.py` |
 | Cost calculation | `src/services/llm_cost_service.py:calculate_cost()` |
 | Usage aggregator | `src/services/llm_usage_aggregator.py` |
 | **API Endpoints** | |
-| Usage API | `src/api/endpoints/llm_usage.py` (9 endpoints) |
+| Usage API | `src/api/endpoints/llm_usage.py` (16 endpoints) |
 | Stats endpoint | `src/api/endpoints/llm_usage.py:get_usage_stats()` |
 | Session endpoint | `src/api/endpoints/llm_usage.py:get_session_usage()` |
 | **Database Models** | |
@@ -336,8 +337,10 @@ Quick reference for finding important code in the Database Guru codebase.
 | Migration | `alembic/versions/f451a46c49e1_add_llm_usage_tables.py` |
 | **Schemas** | |
 | Response schemas | `src/models/schemas.py` (LLMUsageResponse, LLMUsageStatsResponse, etc.) |
+| Phase 17 schemas | `src/models/schemas.py` (ModelConfigResponse, CostSummaryResponse, ProviderComparisonResponse, etc.) |
 | **Frontend Components** | |
 | Usage dashboard | `frontend/src/components/dashboard/LLMUsageDashboard.tsx` |
+| Model pricing manager | `frontend/src/components/dashboard/ModelPricingManager.tsx` |
 | Session usage summary | `frontend/src/components/UsageSummary.tsx` |
 | Session usage badge | `frontend/src/components/SessionUsageBadge.tsx` |
 | API service | `frontend/src/services/llmUsageApi.ts` |
@@ -352,6 +355,31 @@ Quick reference for finding important code in the Database Guru codebase.
 | Unit tests | `tests/unit/test_llm_usage_tracker.py` |
 | Extended tests | `tests/test_llm_usage_extended.py` |
 | Integration tests | `tests/integration/test_usage_tracking_integration.py` |
+| Multi-provider tests | `tests/test_multi_provider_monitoring.py` (29 tests) |
+
+## Multi-Provider Monitoring (Phase 17 - April 2026)
+| Component | Location |
+|-----------|----------|
+| **Backend** | |
+| Token extraction (6 formats) | `src/services/llm_usage_tracker.py:extract_tokens()` |
+| Model config CRUD | `src/services/llm_cost_service.py` (get_all_configs, upsert, delete) |
+| Unpriced model detection | `src/services/llm_cost_service.py:get_unpriced_models()` |
+| Cost summary endpoint | `src/api/endpoints/llm_usage.py:get_cost_summary()` |
+| Provider comparison endpoint | `src/api/endpoints/llm_usage.py:get_provider_comparison()` |
+| Model config endpoints | `src/api/endpoints/llm_usage.py` (list, upsert, delete model-configs) |
+| Unpriced models endpoint | `src/api/endpoints/llm_usage.py:list_unpriced_models()` |
+| **Schemas** | |
+| ModelConfigResponse | `src/models/schemas.py:ModelConfigResponse` |
+| ModelConfigCreateRequest | `src/models/schemas.py:ModelConfigCreateRequest` |
+| UnpricedModelResponse | `src/models/schemas.py:UnpricedModelResponse` |
+| CostSummaryResponse | `src/models/schemas.py:CostSummaryResponse` |
+| ProviderComparisonResponse | `src/models/schemas.py:ProviderComparisonResponse` |
+| **Frontend** | |
+| Model pricing manager | `frontend/src/components/dashboard/ModelPricingManager.tsx` (~294 lines) |
+| Dashboard updates | `frontend/src/components/dashboard/LLMUsageDashboard.tsx` (cost summary, provider comparison) |
+| API service extensions | `frontend/src/services/llmUsageApi.ts` (getCostSummary, getProviderComparison, model config CRUD) |
+| **Tests** | |
+| Multi-provider tests | `tests/test_multi_provider_monitoring.py` (29 tests) |
 
 ## Database Migration Toolkit (Phase 20 - February 2026)
 | Component | Location |

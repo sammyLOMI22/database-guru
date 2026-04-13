@@ -213,23 +213,34 @@ frontend/src/
 - `ExcelSheetsResponse`: Available sheets
 - `FileUploadOptions`: Upload configuration
 
-### LLM Usage Monitoring UI Components (Phase 16 - February 2026)
+### LLM Usage Monitoring UI Components (Phase 16 + Phase 17)
 | Component | Lines | Purpose |
 |-----------|-------|---------|
-| `dashboard/LLMUsageDashboard.tsx` | ~384 | Full usage monitoring dashboard |
+| `dashboard/LLMUsageDashboard.tsx` | ~545 | Full usage monitoring dashboard with cost summary and provider comparison |
+| `dashboard/ModelPricingManager.tsx` | ~294 | Model pricing CRUD admin panel (Phase 17) |
 | `UsageSummary.tsx` | ~133 | Per-session expandable usage summary |
 | `SessionUsageBadge.tsx` | ~64 | Inline token/cost badge in chat header |
-| `services/llmUsageApi.ts` | ~82 | API service layer (7 methods) |
-| **Total** | **~663** | |
+| `services/llmUsageApi.ts` | ~168 | API service layer (13 methods) |
+| **Total** | **~1,204** | |
 
 **LLMUsageDashboard Features**:
 - Time range selector (1-90 days)
 - 4 stat cards: Total Calls, Total Tokens, Avg Response Time, Est. Cost
 - Usage by Agent breakdown (bar chart)
 - Usage by Model breakdown (pie chart)
-- Usage by Provider breakdown
+- Cost by Provider chart with total cost display (Phase 17)
+- Cost summary with daily breakdown (Phase 17)
+- Provider performance comparison by agent type (Phase 17)
 - Time series chart (hourly/daily granularity)
 - Recent LLM Calls table with filtering
+
+**ModelPricingManager Features** (Phase 17):
+- List all model pricing configurations in a table
+- Inline editing of existing configs (click to edit)
+- Add new pricing config with form
+- Delete pricing configs
+- Unpriced model alerts with quick-add button
+- Fields: model_name, provider, display_name, cost per 1M input/output tokens
 
 **UsageSummary Features**:
 - Expandable panel showing session-level stats
@@ -251,6 +262,12 @@ frontend/src/
 | `getTimeSeries(days, granularity)` | Fetch time series data |
 | `getRecent(limit)` | Fetch recent call records |
 | `getSessionUsage(sessionId)` | Fetch per-session usage |
+| `getCostSummary(days)` | Fetch cost summary with daily breakdown (Phase 17) |
+| `getProviderComparison(days)` | Fetch provider comparison by agent type (Phase 17) |
+| `getModelConfigs()` | List all model pricing configs (Phase 17) |
+| `getUnpricedModels()` | List models without pricing (Phase 17) |
+| `upsertModelConfig(config)` | Create/update model pricing (Phase 17) |
+| `deleteModelConfig(modelName)` | Delete model pricing (Phase 17) |
 
 ## LLM Provider Management UI (Phase 15 - April 2026)
 **Location**: `frontend/src/components/` and `frontend/src/services/`
