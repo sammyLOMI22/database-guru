@@ -7,8 +7,9 @@ import {
   Activity, Zap, MessageSquare, Clock, Shield, Database,
   BarChart2, PieChart as PieChartIcon, TrendingUp, Calendar
 } from 'lucide-react';
-import { llmUsageApi, LLMUsageStats, LLMUsageByAgent, LLMUsageTimeSeries, LLMUsageRecord } from '../../services/llmUsageApi';
+import { llmUsageApi, LLMUsageStats, LLMUsageByAgent, LLMUsageTimeSeries, LLMUsageRecord, CostSummary, ProviderComparison } from '../../services/llmUsageApi';
 import { formatNumber, formatCurrency } from '../../utils/formatUtils';
+import { ModelPricingManager } from './ModelPricingManager';
 
 export const LLMUsageDashboard: React.FC = () => {
   const [timeRange, setTimeRange] = useState<number>(7);
@@ -18,18 +19,22 @@ export const LLMUsageDashboard: React.FC = () => {
   const [byProvider, setByProvider] = useState<any[]>([]);
   const [timeseries, setTimeseries] = useState<LLMUsageTimeSeries[]>([]);
   const [recentCalls, setRecentCalls] = useState<LLMUsageRecord[]>([]);
+  const [costSummary, setCostSummary] = useState<CostSummary | null>(null);
+  const [providerComparison, setProviderComparison] = useState<ProviderComparison | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [statsData, agentData, modelData, providerData, tsData, recentData] = await Promise.all([
+      const [statsData, agentData, modelData, providerData, tsData, recentData, costData, comparisonData] = await Promise.all([
         llmUsageApi.getStats(timeRange),
         llmUsageApi.getByAgent(timeRange),
         llmUsageApi.getByModel(timeRange),
         llmUsageApi.getByProvider(timeRange),
         llmUsageApi.getTimeSeries(timeRange, timeRange > 2 ? 'day' : 'hour'),
-        llmUsageApi.getRecent(50)
+        llmUsageApi.getRecent(50),
+        llmUsageApi.getCostSummary(timeRange),
+        llmUsageApi.getProviderComparison(timeRange),
       ]);
 
       setStats(statsData);
@@ -38,6 +43,8 @@ export const LLMUsageDashboard: React.FC = () => {
       setByProvider(providerData);
       setTimeseries(tsData);
       setRecentCalls(recentData);
+      setCostSummary(costData);
+      setProviderComparison(comparisonData);
     } catch (error) {
       console.error('Error fetching usage data:', error);
     } finally {
@@ -227,24 +234,36 @@ export const LLMUsageDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Provider Breakdown */}
+        {/* Cost by Provider */}
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 shadow-xl">
           <h3 className="font-semibold text-white mb-6 flex items-center gap-2">
             <Database className="w-4 h-4 text-blue-400" />
-            Tokens by Provider
+            Cost by Provider
+            {costSummary && (
+              <span className="ml-auto text-amber-400 font-mono text-sm">
+                {formatCurrency(costSummary.total_cost_usd)}
+              </span>
+            )}
           </h3>
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byProvider} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                <XAxis type="number" stroke="#94a3b8" fontSize={12} />
-                <YAxis dataKey="provider" type="category" stroke="#94a3b8" fontSize={10} width={80} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
-                />
-                <Bar dataKey="total_tokens" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {byProvider.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={byProvider} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                  <XAxis type="number" stroke="#94a3b8" fontSize={12} tickFormatter={(v) => `$${v.toFixed(2)}`} />
+                  <YAxis dataKey="provider" type="category" stroke="#94a3b8" fontSize={10} width={80} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
+                    formatter={(value) => [`$${Number(value ?? 0).toFixed(4)}`, 'Cost']}
+                  />
+                  <Bar dataKey="total_cost_usd" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-500 italic">
+                No provider cost data available
+              </div>
+            )}
           </div>
         </div>
 
@@ -268,6 +287,116 @@ export const LLMUsageDashboard: React.FC = () => {
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
+
+      {/* Daily Cost Trend */}
+      {costSummary && costSummary.total_cost_usd > 0 && (
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 shadow-xl">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-amber-400" />
+              Daily Cost Trend
+            </h3>
+            <span className="text-sm text-slate-400">
+              Avg: {formatCurrency(costSummary.avg_cost_per_call)}/call
+            </span>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={costSummary.daily_costs}>
+                <defs>
+                  <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  stroke="#94a3b8"
+                  fontSize={12}
+                  tickFormatter={(val) => val.split('-').slice(1).join('/')}
+                />
+                <YAxis stroke="#94a3b8" fontSize={12} tickFormatter={(v) => `$${v.toFixed(2)}`} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f1f5f9' }}
+                  formatter={(value) => [`$${Number(value ?? 0).toFixed(4)}`, 'Cost']}
+                  labelFormatter={(label) => `Date: ${label}`}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="cost_usd"
+                  stroke="#f59e0b"
+                  fillOpacity={1}
+                  fill="url(#colorCost)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Provider Performance Comparison */}
+      {providerComparison && Object.keys(providerComparison.by_agent_type).length > 0 && (
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden shadow-xl">
+          <div className="p-6 border-b border-slate-700/50">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <BarChart2 className="w-4 h-4 text-purple-400" />
+              Provider Performance Comparison
+            </h3>
+          </div>
+          <div className="p-6 space-y-6">
+            {Object.entries(providerComparison.by_agent_type).map(([agentType, providers]) => (
+              <div key={agentType}>
+                <h4 className="text-sm font-medium text-slate-300 mb-3 capitalize">
+                  {agentType.replace(/_/g, ' ')}
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="text-slate-400 text-xs uppercase tracking-wider">
+                        <th className="pb-2 pr-4 font-medium">Provider</th>
+                        <th className="pb-2 pr-4 font-medium text-right">Avg Latency</th>
+                        <th className="pb-2 pr-4 font-medium text-right">Avg Tokens</th>
+                        <th className="pb-2 pr-4 font-medium text-right">Cost/Call</th>
+                        <th className="pb-2 pr-4 font-medium text-right">Calls</th>
+                        <th className="pb-2 font-medium text-right">Success</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/30">
+                      {Object.entries(providers).map(([provider, pStats]) => (
+                        <tr key={provider} className="text-slate-300">
+                          <td className="py-2 pr-4 capitalize font-medium">{provider}</td>
+                          <td className="py-2 pr-4 text-right font-mono">
+                            {pStats.avg_latency_ms != null ? `${pStats.avg_latency_ms.toFixed(0)}ms` : '-'}
+                          </td>
+                          <td className="py-2 pr-4 text-right font-mono">
+                            {pStats.avg_tokens_per_call != null ? formatNumber(Math.round(pStats.avg_tokens_per_call)) : '-'}
+                          </td>
+                          <td className="py-2 pr-4 text-right font-mono text-amber-400/80">
+                            {pStats.calls > 0 ? `$${(pStats.total_cost_usd / pStats.calls).toFixed(4)}` : '-'}
+                          </td>
+                          <td className="py-2 pr-4 text-right font-mono">{formatNumber(pStats.calls)}</td>
+                          <td className="py-2 text-right">
+                            <span className={`font-mono ${pStats.success_rate >= 95 ? 'text-emerald-400' : pStats.success_rate >= 80 ? 'text-yellow-400' : 'text-red-400'}`}>
+                              {pStats.success_rate.toFixed(1)}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Model Pricing Configuration */}
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 shadow-xl">
+        <ModelPricingManager />
       </div>
 
       {/* Recent LLM Calls Table */}

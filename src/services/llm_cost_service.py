@@ -3,7 +3,7 @@ import logging
 from typing import Optional, Dict, Any, List
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.database.models import LLMModelConfig
+from src.database.models import LLMModelConfig, LLMUsage
 
 logger = logging.getLogger(__name__)
 
@@ -52,44 +52,85 @@ class LLMCostService:
         return input_cost + output_cost
 
     @staticmethod
-    async def ensure_default_configs(db: AsyncSession):
-        """Ensure default model configurations exist in the database."""
-        defaults = [
+    async def get_all_configs(db: AsyncSession) -> List[LLMModelConfig]:
+        """List all model pricing configurations."""
+        result = await db.execute(
+            select(LLMModelConfig).order_by(LLMModelConfig.provider, LLMModelConfig.model_name)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_unpriced_models(db: AsyncSession) -> List[Dict[str, Any]]:
+        """Find models seen in usage records that have no pricing config."""
+        configured = select(LLMModelConfig.model_name)
+        result = await db.execute(
+            select(
+                LLMUsage.model_name,
+                LLMUsage.provider,
+                func.count(LLMUsage.id).label("call_count"),
+                func.sum(LLMUsage.input_tokens + LLMUsage.output_tokens).label("total_tokens"),
+            )
+            .where(LLMUsage.model_name.notin_(configured))
+            .group_by(LLMUsage.model_name, LLMUsage.provider)
+            .order_by(func.count(LLMUsage.id).desc())
+        )
+        return [
             {
-                "model_name": "llama3",
-                "display_name": "Llama 3 (Local)",
-                "provider": "ollama",
-                "cost_per_1m_input_tokens": 0.0,
-                "cost_per_1m_output_tokens": 0.0,
-            },
-            {
-                "model_name": "gpt-4o",
-                "display_name": "GPT-4o",
-                "provider": "openai",
-                "cost_per_1m_input_tokens": 5.0,
-                "cost_per_1m_output_tokens": 15.0,
-            },
-            {
-                "model_name": "gpt-3.5-turbo",
-                "display_name": "GPT-3.5 Turbo",
-                "provider": "openai",
-                "cost_per_1m_input_tokens": 0.5,
-                "cost_per_1m_output_tokens": 1.5,
-            },
-            {
-                "model_name": "claude-3-5-sonnet",
-                "display_name": "Claude 3.5 Sonnet",
-                "provider": "anthropic",
-                "cost_per_1m_input_tokens": 3.0,
-                "cost_per_1m_output_tokens": 15.0,
+                "model_name": row.model_name,
+                "provider": row.provider,
+                "call_count": row.call_count,
+                "total_tokens": row.total_tokens or 0,
             }
+            for row in result.all()
         ]
 
-        for d in defaults:
-            stmt = select(LLMModelConfig).where(LLMModelConfig.model_name == d["model_name"])
-            result = await db.execute(stmt)
-            if not result.scalar_one_or_none():
-                config = LLMModelConfig(**d)
-                db.add(config)
+    @staticmethod
+    async def upsert_model_config(
+        db: AsyncSession,
+        model_name: str,
+        provider: str,
+        cost_per_1m_input_tokens: float,
+        cost_per_1m_output_tokens: float,
+        display_name: Optional[str] = None,
+    ) -> LLMModelConfig:
+        """Create or update a model pricing configuration."""
+        stmt = select(LLMModelConfig).where(LLMModelConfig.model_name == model_name)
+        result = await db.execute(stmt)
+        config = result.scalar_one_or_none()
+
+        if config:
+            config.provider = provider
+            config.cost_per_1m_input_tokens = cost_per_1m_input_tokens
+            config.cost_per_1m_output_tokens = cost_per_1m_output_tokens
+            if display_name is not None:
+                config.display_name = display_name
+        else:
+            config = LLMModelConfig(
+                model_name=model_name,
+                display_name=display_name or model_name,
+                provider=provider,
+                cost_per_1m_input_tokens=cost_per_1m_input_tokens,
+                cost_per_1m_output_tokens=cost_per_1m_output_tokens,
+            )
+            db.add(config)
 
         await db.commit()
+        await db.refresh(config)
+        return config
+
+    @staticmethod
+    async def delete_model_config(db: AsyncSession, model_name: str) -> bool:
+        """Delete a model pricing configuration. Returns True if deleted."""
+        stmt = select(LLMModelConfig).where(LLMModelConfig.model_name == model_name)
+        result = await db.execute(stmt)
+        config = result.scalar_one_or_none()
+        if config:
+            await db.delete(config)
+            await db.commit()
+            return True
+        return False
+
+    @staticmethod
+    async def ensure_default_configs(db: AsyncSession):
+        """No-op. Model pricing is user-managed via the admin API."""
+        pass

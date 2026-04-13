@@ -908,6 +908,75 @@ class InlineUsageStats(BaseModel):
 
 
 # ============================================================================
+# Multi-Provider Monitoring Schemas (Phase 17)
+# ============================================================================
+
+class ModelConfigResponse(BaseModel):
+    """Model pricing configuration."""
+    id: int
+    model_name: str
+    display_name: Optional[str] = None
+    provider: str
+    cost_per_1m_input_tokens: Optional[float] = None
+    cost_per_1m_output_tokens: Optional[float] = None
+    is_active: bool = True
+
+    class Config:
+        from_attributes = True
+
+
+class ModelConfigCreateRequest(BaseModel):
+    """Request to create/update a model pricing config."""
+    model_name: str
+    provider: str
+    cost_per_1m_input_tokens: float
+    cost_per_1m_output_tokens: float
+    display_name: Optional[str] = None
+
+
+class UnpricedModelResponse(BaseModel):
+    """A model seen in usage but missing pricing config."""
+    model_name: str
+    provider: str
+    call_count: int
+    total_tokens: int
+
+
+class DailyCostEntry(BaseModel):
+    """A single day's cost data."""
+    date: str
+    cost_usd: float
+    calls: int
+    tokens: int
+
+
+class CostSummaryResponse(BaseModel):
+    """Cost summary across all providers."""
+    period_days: int
+    total_cost_usd: float
+    total_tokens: int
+    total_calls: int
+    avg_cost_per_call: float
+    daily_costs: List[DailyCostEntry]
+    by_provider: Dict[str, float]
+
+
+class ProviderAgentStats(BaseModel):
+    """Stats for one provider within one agent type."""
+    calls: int
+    avg_latency_ms: Optional[float] = None
+    total_cost_usd: float
+    avg_tokens_per_call: Optional[float] = None
+    success_rate: float
+
+
+class ProviderComparisonResponse(BaseModel):
+    """Provider comparison grouped by agent type."""
+    period_days: int
+    by_agent_type: Dict[str, Dict[str, ProviderAgentStats]]
+
+
+# ============================================================================
 # Schema Health Analyzer Schemas (Phase 12.3)
 # ============================================================================
 
