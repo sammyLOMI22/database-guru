@@ -878,6 +878,27 @@ class LLMUsageByAgentResponse(BaseModel):
     avg_response_time_ms: Optional[float] = None
 
 
+class LLMUsageByModelResponse(BaseModel):
+    """Usage breakdown by model."""
+    model_name: str
+    total_calls: int
+    total_input_tokens: int
+    total_output_tokens: int
+    total_tokens: int
+    avg_response_time_ms: Optional[float] = None
+
+
+class LLMUsageByProviderResponse(BaseModel):
+    """Usage breakdown by provider."""
+    provider: str
+    total_calls: int
+    total_input_tokens: int
+    total_output_tokens: int
+    total_tokens: int
+    avg_response_time_ms: Optional[float] = None
+    total_cost_usd: float = 0.0
+
+
 class LLMUsageTimeSeriesResponse(BaseModel):
     """Time series data point."""
     period: str
@@ -927,11 +948,11 @@ class ModelConfigResponse(BaseModel):
 
 class ModelConfigCreateRequest(BaseModel):
     """Request to create/update a model pricing config."""
-    model_name: str
-    provider: str
-    cost_per_1m_input_tokens: float
-    cost_per_1m_output_tokens: float
-    display_name: Optional[str] = None
+    model_name: str = Field(..., min_length=1, max_length=100)
+    provider: str = Field(..., min_length=1, max_length=50)
+    cost_per_1m_input_tokens: float = Field(..., ge=0)
+    cost_per_1m_output_tokens: float = Field(..., ge=0)
+    display_name: Optional[str] = Field(default=None, max_length=100)
 
 
 class UnpricedModelResponse(BaseModel):

@@ -11,6 +11,13 @@ import { llmUsageApi, LLMUsageStats, LLMUsageByAgent, LLMUsageTimeSeries, LLMUsa
 import { formatNumber, formatCurrency } from '../../utils/formatUtils';
 import { ModelPricingManager } from './ModelPricingManager';
 
+const formatProvider = (provider: string): string =>
+  provider
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(' ');
+
 export const LLMUsageDashboard: React.FC = () => {
   const [timeRange, setTimeRange] = useState<number>(7);
   const [stats, setStats] = useState<LLMUsageStats | null>(null);
@@ -367,7 +374,7 @@ export const LLMUsageDashboard: React.FC = () => {
                     <tbody className="divide-y divide-slate-700/30">
                       {Object.entries(providers).map(([provider, pStats]) => (
                         <tr key={provider} className="text-slate-300">
-                          <td className="py-2 pr-4 capitalize font-medium">{provider}</td>
+                          <td className="py-2 pr-4 font-medium">{formatProvider(provider)}</td>
                           <td className="py-2 pr-4 text-right font-mono">
                             {pStats.avg_latency_ms != null ? `${pStats.avg_latency_ms.toFixed(0)}ms` : '-'}
                           </td>
@@ -438,8 +445,8 @@ export const LLMUsageDashboard: React.FC = () => {
                       {call.agent_type}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-slate-300 capitalize">
-                    {call.provider}
+                  <td className="px-6 py-4 text-slate-300">
+                    {formatProvider(call.provider)}
                   </td>
                   <td className="px-6 py-4 text-slate-300 whitespace-nowrap">
                     {call.model_name}

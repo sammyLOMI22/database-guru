@@ -192,7 +192,7 @@ class TestLLMCostService:
         mock_result.scalar_one_or_none.return_value = existing
         db.execute.return_value = mock_result
 
-        deleted = await LLMCostService.delete_model_config(db, "gpt-4o")
+        deleted = await LLMCostService.delete_model_config(db, "gpt-4o", "openai")
         assert deleted is True
         db.delete.assert_called_once_with(existing)
 
@@ -205,9 +205,43 @@ class TestLLMCostService:
         mock_result.scalar_one_or_none.return_value = None
         db.execute.return_value = mock_result
 
-        deleted = await LLMCostService.delete_model_config(db, "nonexistent")
+        deleted = await LLMCostService.delete_model_config(db, "nonexistent", "openai")
         assert deleted is False
         db.delete.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_upsert_model_config_race_falls_back_to_update(self):
+        """If INSERT races and hits IntegrityError, retry should find the row and UPDATE."""
+        from sqlalchemy.exc import IntegrityError
+        from src.services.llm_cost_service import LLMCostService
+
+        db = AsyncMock(spec=AsyncSession)
+
+        # First lookup: not found → insert path
+        first_lookup = MagicMock()
+        first_lookup.scalar_one_or_none.return_value = None
+        # Second lookup (after rollback): now found → update path
+        existing = MagicMock()
+        existing.provider = "openai"
+        second_lookup = MagicMock()
+        second_lookup.scalar_one_or_none.return_value = existing
+
+        db.execute.side_effect = [first_lookup, second_lookup]
+        db.commit.side_effect = [
+            IntegrityError("stmt", {}, Exception("duplicate")),
+            None,
+        ]
+
+        result = await LLMCostService.upsert_model_config(
+            db,
+            model_name="gpt-4o",
+            provider="openai",
+            cost_per_1m_input_tokens=2.50,
+            cost_per_1m_output_tokens=10.00,
+        )
+        assert result is existing
+        assert existing.cost_per_1m_input_tokens == 2.50
+        db.rollback.assert_called()
 
     @pytest.mark.asyncio
     async def test_calculate_cost_no_config_returns_zero(self):
@@ -278,10 +312,10 @@ class TestByProviderEndpoint:
         ]
         mock_db.execute.return_value = mock_result
 
-        with patch("src.api.endpoints.llm_usage.get_db", return_value=mock_db):
-            app.dependency_overrides[self._get_db_dep()] = lambda: mock_db
-            client = TestClient(app)
-            response = client.get("/llm/usage/by-provider?days=7")
+        from src.api.dependencies import get_db
+        app.dependency_overrides[get_db] = lambda: mock_db
+        client = TestClient(app)
+        response = client.get("/llm/usage/by-provider?days=7")
 
         assert response.status_code == 200
         data = response.json()
@@ -289,11 +323,6 @@ class TestByProviderEndpoint:
         assert "total_cost_usd" in data[0]
         assert data[0]["total_cost_usd"] == 0.05
         assert data[1]["total_cost_usd"] == 0.0
-
-    @staticmethod
-    def _get_db_dep():
-        from src.api.dependencies import get_db
-        return get_db
 
 
 class TestCostSummaryEndpoint:
@@ -452,6 +481,7 @@ class TestModelConfigEndpoints:
     def test_create_model_config(self):
         from src.api.endpoints.llm_usage import router
         from src.api.dependencies import get_db
+        from src.auth.dependencies import require_admin
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
@@ -471,6 +501,7 @@ class TestModelConfigEndpoints:
 
         with patch("src.services.llm_cost_service.LLMCostService.upsert_model_config", new_callable=AsyncMock, return_value=mock_config):
             app.dependency_overrides[get_db] = lambda: mock_db
+            app.dependency_overrides[require_admin] = lambda: MagicMock(is_admin=True)
             client = TestClient(app)
             response = client.post("/llm/usage/model-configs", json={
                 "model_name": "new-model",
@@ -484,9 +515,45 @@ class TestModelConfigEndpoints:
         data = response.json()
         assert data["model_name"] == "new-model"
 
+    def test_create_model_config_requires_admin(self):
+        """Unauthenticated requests to POST /model-configs must be rejected."""
+        from src.api.endpoints.llm_usage import router
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.include_router(router)
+        client = TestClient(app)
+        response = client.post("/llm/usage/model-configs", json={
+            "model_name": "new-model",
+            "provider": "openai",
+            "cost_per_1m_input_tokens": 1.00,
+            "cost_per_1m_output_tokens": 3.00,
+        })
+        assert response.status_code == 401
+
+    def test_create_model_config_rejects_negative_cost(self):
+        from src.api.endpoints.llm_usage import router
+        from src.auth.dependencies import require_admin
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[require_admin] = lambda: MagicMock(is_admin=True)
+        client = TestClient(app)
+        response = client.post("/llm/usage/model-configs", json={
+            "model_name": "new-model",
+            "provider": "openai",
+            "cost_per_1m_input_tokens": -1.00,
+            "cost_per_1m_output_tokens": 3.00,
+        })
+        assert response.status_code == 422
+
     def test_delete_model_config_success(self):
         from src.api.endpoints.llm_usage import router
         from src.api.dependencies import get_db
+        from src.auth.dependencies import require_admin
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
@@ -496,14 +563,16 @@ class TestModelConfigEndpoints:
 
         with patch("src.services.llm_cost_service.LLMCostService.delete_model_config", new_callable=AsyncMock, return_value=True):
             app.dependency_overrides[get_db] = lambda: mock_db
+            app.dependency_overrides[require_admin] = lambda: MagicMock(is_admin=True)
             client = TestClient(app)
-            response = client.delete("/llm/usage/model-configs/gpt-4o")
+            response = client.delete("/llm/usage/model-configs/openai/gpt-4o")
 
         assert response.status_code == 200
 
     def test_delete_model_config_not_found(self):
         from src.api.endpoints.llm_usage import router
         from src.api.dependencies import get_db
+        from src.auth.dependencies import require_admin
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
@@ -513,7 +582,53 @@ class TestModelConfigEndpoints:
 
         with patch("src.services.llm_cost_service.LLMCostService.delete_model_config", new_callable=AsyncMock, return_value=False):
             app.dependency_overrides[get_db] = lambda: mock_db
+            app.dependency_overrides[require_admin] = lambda: MagicMock(is_admin=True)
             client = TestClient(app)
-            response = client.delete("/llm/usage/model-configs/nonexistent")
+            response = client.delete("/llm/usage/model-configs/openai/nonexistent")
 
         assert response.status_code == 404
+
+    def test_delete_model_config_requires_admin(self):
+        from src.api.endpoints.llm_usage import router
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.include_router(router)
+        client = TestClient(app)
+        response = client.delete("/llm/usage/model-configs/openai/gpt-4o")
+        assert response.status_code == 401
+
+    def test_delete_model_config_with_slash_in_model_name(self):
+        """Model IDs from HF/local providers contain slashes (e.g. meta-llama/Llama-3-70b)."""
+        from src.api.endpoints.llm_usage import router
+        from src.api.dependencies import get_db
+        from src.auth.dependencies import require_admin
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.include_router(router)
+        mock_db = AsyncMock(spec=AsyncSession)
+
+        captured = {}
+
+        async def fake_delete(db, model_name, provider):
+            captured["model_name"] = model_name
+            captured["provider"] = provider
+            return True
+
+        with patch(
+            "src.services.llm_cost_service.LLMCostService.delete_model_config",
+            new=fake_delete,
+        ):
+            app.dependency_overrides[get_db] = lambda: mock_db
+            app.dependency_overrides[require_admin] = lambda: MagicMock(is_admin=True)
+            client = TestClient(app)
+            response = client.delete(
+                "/llm/usage/model-configs/vllm/meta-llama%2FLlama-3-70b"
+            )
+
+        assert response.status_code == 200
+        assert captured["provider"] == "vllm"
+        assert captured["model_name"] == "meta-llama/Llama-3-70b"

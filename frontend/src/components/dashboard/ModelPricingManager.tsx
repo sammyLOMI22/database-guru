@@ -11,6 +11,13 @@ interface EditingRow {
   isNew: boolean;
 }
 
+const formatProvider = (provider: string): string =>
+  provider
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(' ');
+
 export const ModelPricingManager: React.FC = () => {
   const [configs, setConfigs] = useState<ModelConfig[]>([]);
   const [unpriced, setUnpriced] = useState<UnpricedModel[]>([]);
@@ -42,6 +49,12 @@ export const ModelPricingManager: React.FC = () => {
 
   const handleSave = async () => {
     if (!editing) return;
+    const trimmedName = editing.model_name.trim();
+    const trimmedProvider = editing.provider.trim();
+    if (!trimmedName || !trimmedProvider) {
+      setError('Model name and provider are required');
+      return;
+    }
     const inputCost = parseFloat(editing.cost_per_1m_input_tokens);
     const outputCost = parseFloat(editing.cost_per_1m_output_tokens);
     if (isNaN(inputCost) || isNaN(outputCost) || inputCost < 0 || outputCost < 0) {
@@ -50,11 +63,11 @@ export const ModelPricingManager: React.FC = () => {
     }
     try {
       await llmUsageApi.upsertModelConfig({
-        model_name: editing.model_name,
-        provider: editing.provider,
+        model_name: trimmedName,
+        provider: trimmedProvider,
         cost_per_1m_input_tokens: inputCost,
         cost_per_1m_output_tokens: outputCost,
-        display_name: editing.display_name || undefined,
+        display_name: editing.display_name.trim() || undefined,
       });
       setEditing(null);
       setError(null);
@@ -65,9 +78,14 @@ export const ModelPricingManager: React.FC = () => {
     }
   };
 
-  const handleDelete = async (modelName: string) => {
+  const handleDelete = async (provider: string, modelName: string) => {
+    const confirmed = window.confirm(
+      `Delete pricing for "${modelName}" on ${formatProvider(provider)}?\n\n` +
+      `Future usage for this model will be recorded without a cost until pricing is reconfigured.`
+    );
+    if (!confirmed) return;
     try {
-      await llmUsageApi.deleteModelConfig(modelName);
+      await llmUsageApi.deleteModelConfig(provider, modelName);
       await fetchData();
     } catch (err) {
       setError('Failed to delete pricing config');
@@ -148,7 +166,7 @@ export const ModelPricingManager: React.FC = () => {
               >
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-slate-200 font-mono">{model.model_name}</span>
-                  <span className="text-xs text-slate-500 capitalize">{model.provider}</span>
+                  <span className="text-xs text-slate-500">{formatProvider(model.provider)}</span>
                   <span className="text-xs text-slate-500">{model.call_count} calls</span>
                 </div>
                 <button
@@ -254,9 +272,9 @@ export const ModelPricingManager: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-700/30">
               {configs.map((config) => (
-                <tr key={config.model_name} className="text-slate-300 hover:bg-slate-700/20 transition-colors">
+                <tr key={`${config.provider}-${config.model_name}`} className="text-slate-300 hover:bg-slate-700/20 transition-colors">
                   <td className="py-2.5 pr-4 font-mono text-sm">{config.model_name}</td>
-                  <td className="py-2.5 pr-4 capitalize text-slate-400">{config.provider}</td>
+                  <td className="py-2.5 pr-4 text-slate-400">{formatProvider(config.provider)}</td>
                   <td className="py-2.5 pr-4 text-right font-mono">
                     ${(config.cost_per_1m_input_tokens ?? 0).toFixed(2)}
                   </td>
@@ -272,7 +290,7 @@ export const ModelPricingManager: React.FC = () => {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(config.model_name)}
+                        onClick={() => handleDelete(config.provider, config.model_name)}
                         className="text-xs text-red-400 hover:text-red-300 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

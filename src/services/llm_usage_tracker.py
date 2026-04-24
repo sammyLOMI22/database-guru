@@ -67,6 +67,8 @@ class LLMUsageTracker:
             return usage.get("promptTokenCount"), usage.get("candidatesTokenCount")
 
         elif provider == "aws_bedrock":
+            # Bedrock provider uses the Converse API exclusively (see providers/aws_bedrock.py);
+            # InvokeModel responses would require per-model-family shapes.
             usage = response.get("usage", {})
             return usage.get("inputTokens"), usage.get("outputTokens")
 
@@ -185,7 +187,7 @@ class _TrackingContext:
         # Calculate estimated cost
         from src.services.llm_cost_service import LLMCostService
         estimated_cost = await LLMCostService.calculate_cost(
-            self.db, self.model_name, input_tokens, output_tokens
+            self.db, self.model_name, input_tokens, output_tokens, provider=self.provider
         )
 
         # Create record

@@ -5,11 +5,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict
 
 from src.api.dependencies import get_db
+from src.auth.dependencies import require_admin
 from src.database.models import LLMUsage
 from src.models.schemas import (
     LLMUsageResponse,
     LLMUsageStatsResponse,
     LLMUsageByAgentResponse,
+    LLMUsageByModelResponse,
+    LLMUsageByProviderResponse,
     LLMUsageTimeSeriesResponse,
     SessionUsageSummaryResponse,
     ModelConfigResponse,
@@ -90,7 +93,7 @@ async def get_usage_by_agent(
         for row in result.all()
     ]
 
-@router.get("/by-model", response_model=List[dict])
+@router.get("/by-model", response_model=List[LLMUsageByModelResponse])
 async def get_usage_by_model(
     days: int = Query(default=7, ge=1, le=90),
     db: AsyncSession = Depends(get_db),
@@ -123,7 +126,7 @@ async def get_usage_by_model(
         for row in result.all()
     ]
 
-@router.get("/by-provider", response_model=List[dict])
+@router.get("/by-provider", response_model=List[LLMUsageByProviderResponse])
 async def get_usage_by_provider(
     days: int = Query(default=7, ge=1, le=90),
     db: AsyncSession = Depends(get_db),
@@ -324,8 +327,9 @@ async def list_unpriced_models(
 async def upsert_model_config(
     request: ModelConfigCreateRequest,
     db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin),
 ):
-    """Create or update a model pricing configuration."""
+    """Create or update a model pricing configuration. Admin only."""
     from src.services.llm_cost_service import LLMCostService
     config = await LLMCostService.upsert_model_config(
         db,
@@ -338,17 +342,22 @@ async def upsert_model_config(
     return config
 
 
-@router.delete("/model-configs/{model_name}")
+@router.delete("/model-configs/{provider}/{model_name:path}")
 async def delete_model_config(
+    provider: str,
     model_name: str,
     db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin),
 ):
-    """Delete a model pricing configuration."""
+    """Delete a model pricing configuration. Admin only."""
     from src.services.llm_cost_service import LLMCostService
-    deleted = await LLMCostService.delete_model_config(db, model_name)
+    deleted = await LLMCostService.delete_model_config(db, model_name, provider)
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"Model config '{model_name}' not found")
-    return {"message": f"Model config '{model_name}' deleted"}
+        raise HTTPException(
+            status_code=404,
+            detail=f"Model config '{provider}/{model_name}' not found",
+        )
+    return {"message": f"Model config '{provider}/{model_name}' deleted"}
 
 
 # ============================================================================

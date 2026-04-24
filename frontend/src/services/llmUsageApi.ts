@@ -161,7 +161,9 @@ export const llmUsageApi = {
     return response.data;
   },
 
-  deleteModelConfig: async (modelName: string): Promise<void> => {
-    await api.delete(`/api/llm/usage/model-configs/${encodeURIComponent(modelName)}`);
+  deleteModelConfig: async (provider: string, modelName: string): Promise<void> => {
+    await api.delete(
+      `/api/llm/usage/model-configs/${encodeURIComponent(provider)}/${encodeURIComponent(modelName)}`
+    );
   },
 };

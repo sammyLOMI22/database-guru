@@ -1,7 +1,8 @@
 """Service for managing LLM model configurations and costs"""
 import logging
-from typing import Optional, Dict, Any, List
-from sqlalchemy import select, func
+from typing import Optional, Dict, Any, List, Tuple
+from sqlalchemy import select, func, tuple_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.models import LLMModelConfig, LLMUsage
 
@@ -11,10 +12,23 @@ class LLMCostService:
     """Service for managing LLM model configurations and costs."""
 
     @staticmethod
-    async def get_model_config(db: AsyncSession, model_name: str) -> Optional[LLMModelConfig]:
-        """Fetch configuration for a specific model."""
-        # Try exact match first
-        stmt = select(LLMModelConfig).where(LLMModelConfig.model_name == model_name)
+    async def get_model_config(
+        db: AsyncSession,
+        model_name: str,
+        provider: Optional[str] = None,
+    ) -> Optional[LLMModelConfig]:
+        """Fetch configuration for a specific model.
+
+        When provider is supplied, lookups are scoped to that provider so the same
+        model name on different providers (e.g. gpt-4o on openai vs azure_openai)
+        cannot return the wrong price. Falls back to a provider-agnostic lookup
+        only if provider is None (legacy callers).
+        """
+        # Try exact match first, scoped by provider when available
+        conditions = [LLMModelConfig.model_name == model_name]
+        if provider is not None:
+            conditions.append(LLMModelConfig.provider == provider)
+        stmt = select(LLMModelConfig).where(*conditions)
         result = await db.execute(stmt)
         config = result.scalar_one_or_none()
 
@@ -22,9 +36,12 @@ class LLMCostService:
             # Try fuzzy match (e.g. "llama3:latest" -> "llama3")
             # Order by name length to prefer exact prefix matches over longer ones
             base_name = model_name.split(":")[0]
+            fuzzy_conditions = [LLMModelConfig.model_name.like(f"{base_name}%")]
+            if provider is not None:
+                fuzzy_conditions.append(LLMModelConfig.provider == provider)
             stmt = (
                 select(LLMModelConfig)
-                .where(LLMModelConfig.model_name.like(f"{base_name}%"))
+                .where(*fuzzy_conditions)
                 .order_by(func.length(LLMModelConfig.model_name))
             )
             result = await db.execute(stmt)
@@ -37,10 +54,11 @@ class LLMCostService:
         db: AsyncSession,
         model_name: str,
         input_tokens: int,
-        output_tokens: int
+        output_tokens: int,
+        provider: Optional[str] = None,
     ) -> float:
         """Calculate the estimated cost in USD for a given model and token counts."""
-        config = await LLMCostService.get_model_config(db, model_name)
+        config = await LLMCostService.get_model_config(db, model_name, provider)
 
         if not config or (config.cost_per_1m_input_tokens is None and config.cost_per_1m_output_tokens is None):
             # Default for Ollama/local models is $0.0
@@ -61,8 +79,8 @@ class LLMCostService:
 
     @staticmethod
     async def get_unpriced_models(db: AsyncSession) -> List[Dict[str, Any]]:
-        """Find models seen in usage records that have no pricing config."""
-        configured = select(LLMModelConfig.model_name)
+        """Find (model_name, provider) pairs seen in usage with no pricing config."""
+        configured_pairs = select(LLMModelConfig.model_name, LLMModelConfig.provider)
         result = await db.execute(
             select(
                 LLMUsage.model_name,
@@ -70,7 +88,7 @@ class LLMCostService:
                 func.count(LLMUsage.id).label("call_count"),
                 func.sum(LLMUsage.input_tokens + LLMUsage.output_tokens).label("total_tokens"),
             )
-            .where(LLMUsage.model_name.notin_(configured))
+            .where(tuple_(LLMUsage.model_name, LLMUsage.provider).notin_(configured_pairs))
             .group_by(LLMUsage.model_name, LLMUsage.provider)
             .order_by(func.count(LLMUsage.id).desc())
         )
@@ -93,18 +111,33 @@ class LLMCostService:
         cost_per_1m_output_tokens: float,
         display_name: Optional[str] = None,
     ) -> LLMModelConfig:
-        """Create or update a model pricing configuration."""
-        stmt = select(LLMModelConfig).where(LLMModelConfig.model_name == model_name)
-        result = await db.execute(stmt)
-        config = result.scalar_one_or_none()
+        """Create or update a model pricing configuration keyed by (model_name, provider).
 
-        if config:
-            config.provider = provider
-            config.cost_per_1m_input_tokens = cost_per_1m_input_tokens
-            config.cost_per_1m_output_tokens = cost_per_1m_output_tokens
-            if display_name is not None:
-                config.display_name = display_name
-        else:
+        Race-safe: on concurrent create, catches IntegrityError and falls back to update.
+        """
+        for attempt in range(2):
+            stmt = select(LLMModelConfig).where(
+                LLMModelConfig.model_name == model_name,
+                LLMModelConfig.provider == provider,
+            )
+            result = await db.execute(stmt)
+            config = result.scalar_one_or_none()
+
+            if config:
+                config.cost_per_1m_input_tokens = cost_per_1m_input_tokens
+                config.cost_per_1m_output_tokens = cost_per_1m_output_tokens
+                if display_name is not None:
+                    config.display_name = display_name
+                try:
+                    await db.commit()
+                    await db.refresh(config)
+                    return config
+                except IntegrityError:
+                    await db.rollback()
+                    if attempt == 1:
+                        raise
+                    continue
+
             config = LLMModelConfig(
                 model_name=model_name,
                 display_name=display_name or model_name,
@@ -113,15 +146,31 @@ class LLMCostService:
                 cost_per_1m_output_tokens=cost_per_1m_output_tokens,
             )
             db.add(config)
+            try:
+                await db.commit()
+                await db.refresh(config)
+                return config
+            except IntegrityError:
+                await db.rollback()
+                if attempt == 1:
+                    raise
 
-        await db.commit()
-        await db.refresh(config)
-        return config
+        raise RuntimeError("upsert_model_config failed after retry")
 
     @staticmethod
-    async def delete_model_config(db: AsyncSession, model_name: str) -> bool:
-        """Delete a model pricing configuration. Returns True if deleted."""
+    async def delete_model_config(
+        db: AsyncSession,
+        model_name: str,
+        provider: Optional[str] = None,
+    ) -> bool:
+        """Delete a model pricing configuration. Returns True if deleted.
+
+        If provider is supplied, deletes the exact (model_name, provider) row.
+        Otherwise deletes any row matching model_name (legacy compatibility).
+        """
         stmt = select(LLMModelConfig).where(LLMModelConfig.model_name == model_name)
+        if provider is not None:
+            stmt = stmt.where(LLMModelConfig.provider == provider)
         result = await db.execute(stmt)
         config = result.scalar_one_or_none()
         if config:
