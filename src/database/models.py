@@ -99,9 +99,9 @@ class LLMModelConfig(Base):
     __tablename__ = "llm_model_config"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    model_name = Column(String(100), nullable=False, unique=True)
+    model_name = Column(String(100), nullable=False)
     display_name = Column(String(100))
-    provider = Column(String(50), default="ollama")
+    provider = Column(String(50), nullable=False, default="ollama")
 
     # Capabilities
     context_window_size = Column(Integer, default=4096)
@@ -119,6 +119,10 @@ class LLMModelConfig(Base):
     notes = Column(Text)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint('model_name', 'provider', name='uq_model_provider'),
+    )
 
 
 class LLMProviderConfig(Base):

@@ -1,17 +1,25 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, case
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from src.api.dependencies import get_db
+from src.auth.dependencies import require_admin
 from src.database.models import LLMUsage
 from src.models.schemas import (
     LLMUsageResponse,
     LLMUsageStatsResponse,
     LLMUsageByAgentResponse,
+    LLMUsageByModelResponse,
+    LLMUsageByProviderResponse,
     LLMUsageTimeSeriesResponse,
     SessionUsageSummaryResponse,
+    ModelConfigResponse,
+    ModelConfigCreateRequest,
+    UnpricedModelResponse,
+    CostSummaryResponse,
+    ProviderComparisonResponse,
 )
 
 router = APIRouter(prefix="/llm/usage", tags=["LLM Usage"])
@@ -85,7 +93,7 @@ async def get_usage_by_agent(
         for row in result.all()
     ]
 
-@router.get("/by-model", response_model=List[dict])
+@router.get("/by-model", response_model=List[LLMUsageByModelResponse])
 async def get_usage_by_model(
     days: int = Query(default=7, ge=1, le=90),
     db: AsyncSession = Depends(get_db),
@@ -118,7 +126,7 @@ async def get_usage_by_model(
         for row in result.all()
     ]
 
-@router.get("/by-provider", response_model=List[dict])
+@router.get("/by-provider", response_model=List[LLMUsageByProviderResponse])
 async def get_usage_by_provider(
     days: int = Query(default=7, ge=1, le=90),
     db: AsyncSession = Depends(get_db),
@@ -133,6 +141,7 @@ async def get_usage_by_provider(
             func.sum(LLMUsage.input_tokens).label("total_input_tokens"),
             func.sum(LLMUsage.output_tokens).label("total_output_tokens"),
             func.avg(LLMUsage.response_time_ms).label("avg_response_time_ms"),
+            func.sum(LLMUsage.estimated_cost_usd).label("total_cost"),
         )
         .where(LLMUsage.created_at >= since)
         .group_by(LLMUsage.provider)
@@ -147,6 +156,7 @@ async def get_usage_by_provider(
             "total_output_tokens": row.total_output_tokens or 0,
             "total_tokens": (row.total_input_tokens or 0) + (row.total_output_tokens or 0),
             "avg_response_time_ms": row.avg_response_time_ms,
+            "total_cost_usd": row.total_cost or 0.0,
         }
         for row in result.all()
     ]
@@ -286,7 +296,174 @@ async def trigger_aggregation(
 async def seed_model_configs(
     db: AsyncSession = Depends(get_db),
 ):
-    """Seed default model configurations."""
+    """Seed default model configurations (no-op, pricing is user-managed)."""
+    return {"message": "Model pricing is user-managed. Use POST /llm/usage/model-configs to configure."}
+
+
+# ============================================================================
+# Model Pricing Admin Endpoints (Phase 17)
+# ============================================================================
+
+@router.get("/model-configs", response_model=List[ModelConfigResponse])
+async def list_model_configs(
+    db: AsyncSession = Depends(get_db),
+):
+    """List all model pricing configurations."""
     from src.services.llm_cost_service import LLMCostService
-    await LLMCostService.ensure_default_configs(db)
-    return {"message": "Default model configurations seeded"}
+    configs = await LLMCostService.get_all_configs(db)
+    return configs
+
+
+@router.get("/unpriced-models", response_model=List[UnpricedModelResponse])
+async def list_unpriced_models(
+    db: AsyncSession = Depends(get_db),
+):
+    """List models seen in usage records that have no pricing configured."""
+    from src.services.llm_cost_service import LLMCostService
+    return await LLMCostService.get_unpriced_models(db)
+
+
+@router.post("/model-configs", response_model=ModelConfigResponse)
+async def upsert_model_config(
+    request: ModelConfigCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin),
+):
+    """Create or update a model pricing configuration. Admin only."""
+    from src.services.llm_cost_service import LLMCostService
+    config = await LLMCostService.upsert_model_config(
+        db,
+        model_name=request.model_name,
+        provider=request.provider,
+        cost_per_1m_input_tokens=request.cost_per_1m_input_tokens,
+        cost_per_1m_output_tokens=request.cost_per_1m_output_tokens,
+        display_name=request.display_name,
+    )
+    return config
+
+
+@router.delete("/model-configs/{provider}/{model_name:path}")
+async def delete_model_config(
+    provider: str,
+    model_name: str,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin),
+):
+    """Delete a model pricing configuration. Admin only."""
+    from src.services.llm_cost_service import LLMCostService
+    deleted = await LLMCostService.delete_model_config(db, model_name, provider)
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Model config '{provider}/{model_name}' not found",
+        )
+    return {"message": f"Model config '{provider}/{model_name}' deleted"}
+
+
+# ============================================================================
+# Cost Summary & Provider Comparison Endpoints (Phase 17)
+# ============================================================================
+
+@router.get("/cost-summary", response_model=CostSummaryResponse)
+async def get_cost_summary(
+    days: int = Query(default=30, ge=1, le=365),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get cost summary across all providers with daily breakdown."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    # Overall totals
+    result = await db.execute(
+        select(
+            func.sum(LLMUsage.estimated_cost_usd).label("total_cost"),
+            func.sum(LLMUsage.input_tokens).label("total_input_tokens"),
+            func.sum(LLMUsage.output_tokens).label("total_output_tokens"),
+            func.count(LLMUsage.id).label("total_calls"),
+        )
+        .where(LLMUsage.created_at >= since)
+    )
+    row = result.one()
+    total_cost = row.total_cost or 0.0
+    total_calls = row.total_calls or 0
+
+    # Daily breakdown
+    daily_result = await db.execute(
+        select(
+            func.date(LLMUsage.created_at).label("date"),
+            func.sum(LLMUsage.estimated_cost_usd).label("cost"),
+            func.count(LLMUsage.id).label("calls"),
+            func.sum(LLMUsage.input_tokens + LLMUsage.output_tokens).label("tokens"),
+        )
+        .where(LLMUsage.created_at >= since)
+        .group_by(func.date(LLMUsage.created_at))
+        .order_by(func.date(LLMUsage.created_at))
+    )
+
+    # By provider subtotals
+    provider_result = await db.execute(
+        select(
+            LLMUsage.provider,
+            func.sum(LLMUsage.estimated_cost_usd).label("cost"),
+        )
+        .where(LLMUsage.created_at >= since)
+        .group_by(LLMUsage.provider)
+    )
+
+    return {
+        "period_days": days,
+        "total_cost_usd": total_cost,
+        "total_tokens": (row.total_input_tokens or 0) + (row.total_output_tokens or 0),
+        "total_calls": total_calls,
+        "avg_cost_per_call": total_cost / total_calls if total_calls > 0 else 0.0,
+        "daily_costs": [
+            {
+                "date": str(r.date),
+                "cost_usd": r.cost or 0.0,
+                "calls": r.calls or 0,
+                "tokens": r.tokens or 0,
+            }
+            for r in daily_result.all()
+        ],
+        "by_provider": {
+            r.provider: r.cost or 0.0
+            for r in provider_result.all()
+        },
+    }
+
+
+@router.get("/provider-comparison", response_model=ProviderComparisonResponse)
+async def get_provider_comparison(
+    days: int = Query(default=7, ge=1, le=90),
+    db: AsyncSession = Depends(get_db),
+):
+    """Compare performance and cost across providers, grouped by agent type."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    result = await db.execute(
+        select(
+            LLMUsage.provider,
+            LLMUsage.agent_type,
+            func.count(LLMUsage.id).label("calls"),
+            func.avg(LLMUsage.response_time_ms).label("avg_latency"),
+            func.sum(LLMUsage.estimated_cost_usd).label("total_cost"),
+            func.avg(LLMUsage.input_tokens + LLMUsage.output_tokens).label("avg_tokens"),
+            func.sum(case((LLMUsage.success == True, 1), else_=0)).label("success_count"),
+        )
+        .where(LLMUsage.created_at >= since)
+        .group_by(LLMUsage.provider, LLMUsage.agent_type)
+    )
+
+    by_agent_type: Dict[str, Dict] = {}
+    for row in result.all():
+        agent = row.agent_type
+        if agent not in by_agent_type:
+            by_agent_type[agent] = {}
+        by_agent_type[agent][row.provider] = {
+            "calls": row.calls,
+            "avg_latency_ms": row.avg_latency,
+            "total_cost_usd": row.total_cost or 0.0,
+            "avg_tokens_per_call": row.avg_tokens,
+            "success_rate": (row.success_count / row.calls * 100) if row.calls > 0 else 0.0,
+        }
+
+    return {"period_days": days, "by_agent_type": by_agent_type}

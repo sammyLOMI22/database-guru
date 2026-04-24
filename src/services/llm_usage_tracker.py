@@ -44,7 +44,7 @@ class LLMUsageTracker:
     def extract_tokens(self, response: dict, provider: str) -> tuple[Optional[int], Optional[int]]:
         """
         Extract token counts from LLM response based on provider.
-        Supports: ollama, openai, anthropic, azure
+        Supports: ollama, openai, anthropic, azure, google_vertex, aws_bedrock
         """
         if not response:
             return None, None
@@ -54,13 +54,23 @@ class LLMUsageTracker:
             output_tokens = response.get("eval_count")
             return input_tokens, output_tokens
 
-        elif provider == "openai" or provider == "azure":
+        elif provider in ("openai", "azure", "azure_openai", "lm_studio", "vllm"):
             usage = response.get("usage", {})
             return usage.get("prompt_tokens"), usage.get("completion_tokens")
 
         elif provider == "anthropic":
             usage = response.get("usage", {})
             return usage.get("input_tokens"), usage.get("output_tokens")
+
+        elif provider == "google_vertex":
+            usage = response.get("usageMetadata", {})
+            return usage.get("promptTokenCount"), usage.get("candidatesTokenCount")
+
+        elif provider == "aws_bedrock":
+            # Bedrock provider uses the Converse API exclusively (see providers/aws_bedrock.py);
+            # InvokeModel responses would require per-model-family shapes.
+            usage = response.get("usage", {})
+            return usage.get("inputTokens"), usage.get("outputTokens")
 
         return None, None
 
@@ -177,7 +187,7 @@ class _TrackingContext:
         # Calculate estimated cost
         from src.services.llm_cost_service import LLMCostService
         estimated_cost = await LLMCostService.calculate_cost(
-            self.db, self.model_name, input_tokens, output_tokens
+            self.db, self.model_name, input_tokens, output_tokens, provider=self.provider
         )
 
         # Create record

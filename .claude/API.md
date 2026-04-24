@@ -207,10 +207,10 @@ GET /api/files/?session_id=xxx&include_global=true&status=ready
 - **Lazy Table Loading**: Tables loaded to DuckDB only when queried
 - **Session Isolation**: Files scoped to chat sessions or global
 
-## LLM Usage API (Phase 16 - February 2026)
+## LLM Usage API (Phase 16 + Phase 17 - February/April 2026)
 **File**: `llm_usage.py`
 
-Track and monitor LLM token usage, costs, and performance across all agents.
+Track and monitor LLM token usage, costs, and performance across all agents and providers.
 
 ### Usage Endpoints
 | Method | Endpoint | Purpose |
@@ -218,12 +218,26 @@ Track and monitor LLM token usage, costs, and performance across all agents.
 | GET | `/api/llm/usage/stats` | Overall usage statistics (calls, tokens, cost) |
 | GET | `/api/llm/usage/by-agent` | Usage breakdown by agent type |
 | GET | `/api/llm/usage/by-model` | Usage breakdown by model |
-| GET | `/api/llm/usage/by-provider` | Usage breakdown by provider |
+| GET | `/api/llm/usage/by-provider` | Usage breakdown by provider (includes total_cost_usd) |
 | GET | `/api/llm/usage/timeseries` | Usage over time for charting (hour/day granularity) |
 | GET | `/api/llm/usage/session/{session_id}` | Per-session usage with agent breakdown |
 | GET | `/api/llm/usage/recent` | Recent LLM call records with filtering |
 | POST | `/api/llm/usage/aggregate` | Manually trigger usage aggregation |
-| POST | `/api/llm/usage/configs/seed` | Seed default model cost configurations |
+| POST | `/api/llm/usage/configs/seed` | No-op (pricing is user-managed via model-configs) |
+
+### Model Pricing Admin Endpoints (Phase 17)
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/llm/usage/model-configs` | List all model pricing configurations |
+| GET | `/api/llm/usage/unpriced-models` | List models seen in usage but missing pricing |
+| POST | `/api/llm/usage/model-configs` | Create or update a model pricing configuration |
+| DELETE | `/api/llm/usage/model-configs/{model_name}` | Delete a model pricing configuration |
+
+### Cost Summary & Provider Comparison Endpoints (Phase 17)
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/llm/usage/cost-summary` | Cost summary with daily breakdown and per-provider totals |
+| GET | `/api/llm/usage/provider-comparison` | Compare performance and cost across providers by agent type |
 
 ### Query Parameters
 ```
@@ -231,6 +245,8 @@ GET /api/llm/usage/stats?days=7          # 1-90 day window
 GET /api/llm/usage/by-agent?days=30      # Agent breakdown
 GET /api/llm/usage/timeseries?days=7&granularity=hour  # hour or day
 GET /api/llm/usage/recent?limit=50&agent_type=sql_generator&model_name=qwen2.5-coder
+GET /api/llm/usage/cost-summary?days=30  # 1-365 day window
+GET /api/llm/usage/provider-comparison?days=7  # 1-90 day window
 ```
 
 ### Response Models
@@ -239,6 +255,10 @@ GET /api/llm/usage/recent?limit=50&agent_type=sql_generator&model_name=qwen2.5-c
 - **LLMUsageTimeSeriesResponse**: Period-based totals for charting
 - **SessionUsageSummaryResponse**: Per-session breakdown with by_agent map
 - **LLMUsageResponse**: Individual call records with full details
+- **ModelConfigResponse**: Model pricing configuration (id, model_name, provider, costs, is_active)
+- **UnpricedModelResponse**: Model seen in usage without pricing (model_name, provider, call_count, total_tokens)
+- **CostSummaryResponse**: period_days, total_cost_usd, total_tokens, total_calls, avg_cost_per_call, daily_costs, by_provider
+- **ProviderComparisonResponse**: period_days, by_agent_type → provider → stats (calls, latency, cost, tokens, success_rate)
 
 ## LLM Provider API (Phase 15 - April 2026)
 **File**: `llm_providers.py`

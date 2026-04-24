@@ -142,7 +142,7 @@ The demo showcases:
 - 🧠 **Lineage Intelligence (NEW!)** - LLM-powered explanations, schema health analysis, conversational Q&A
 - 🔀 **Table Sorting (NEW!)** - Click any column header to sort results (numbers, dates, strings auto-detected)
 - 📁 **CSV/Excel File Data Sources (NEW!)** - Upload CSV/Excel files as queryable data sources with DuckDB
-- 📊 **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance across all agents
+- 📊 **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance across all agents and providers with model pricing admin
 - 🔬 **Data Insights Enhancement (NEW!)** - Tiered narratives by model size, analytics caching, multi-source quality insights, adaptive chart presets
 - 🔄 **Database Migration Toolkit (NEW!)** - Schema diff, migration planner, script generator (up/down/verify SQL), data migration assistant
 - 🗃️ **NoSQL Database Support (NEW!)** - MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch with native query generation and mixed SQL+NoSQL sessions
@@ -257,7 +257,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Table Sorting (NEW!)** - Click column headers to sort results, with smart type detection for numbers, dates, and strings
 - ✅ **Small Model Optimization (NEW!)** - Per-task model routing, query templates, location preprocessing, and dialect-aware SQL generation for faster responses with smaller models
 - ✅ **CSV/Excel File Data Sources (NEW!)** - Upload and query CSV/Excel files as DuckDB tables
-- ✅ **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance per session and globally with full dashboard
+- ✅ **LLM Usage Monitoring (NEW!)** - Track token usage, costs, and performance per session and globally with full dashboard, multi-provider native token extraction (6 formats), user-managed model pricing admin, cost summary with daily breakdown, provider performance comparison, unpriced model detection
 - ✅ **Data Insights Enhancement (NEW!)** - Tiered narrative prompts (compact/standard/enhanced), analytics caching, multi-source data quality analysis, adaptive chart scoring presets, parallel analysis pipeline with early exit optimization
 - ✅ **Database Migration Toolkit (NEW!)** - Schema diff engine, dependency-aware migration planner, multi-dialect script generator (up.sql/down.sql/verify.sql), data migration assistant with staging table pattern and batched INSERT SELECT
 - ✅ **Performance Guru (NEW!)** - EXPLAIN plan analysis with LLM-powered insights, bottleneck detection, index suggestions with CREATE INDEX SQL, query rewrite recommendations, multi-dialect support (PostgreSQL, MySQL, SQLite, DuckDB), tiered prompts, deterministic fallback
@@ -714,8 +714,13 @@ Database Guru now includes **comprehensive LLM usage monitoring** that tracks ev
 
 **1. Centralized Token Tracking**
 Every LLM call is automatically instrumented using a context manager:
-- **Token counting**: tiktoken encoder with native Ollama/OpenAI/Anthropic extraction
-- **Cost estimation**: Configurable per-model pricing (per 1M tokens)
+- **Token counting**: tiktoken encoder with native extraction for 6 provider formats:
+  - Ollama (`prompt_eval_count`/`eval_count`)
+  - OpenAI / Azure OpenAI / LM Studio / vLLM (`usage.prompt_tokens`/`completion_tokens`)
+  - Anthropic (`usage.input_tokens`/`output_tokens`)
+  - Google Vertex AI (`usageMetadata.promptTokenCount`/`candidatesTokenCount`)
+  - AWS Bedrock (`usage.inputTokens`/`outputTokens`)
+- **Cost estimation**: User-managed per-model pricing (per 1M tokens) with admin API
 - **Response timing**: Millisecond-precision latency tracking
 - **Error logging**: Failed calls recorded with error details
 
@@ -727,16 +732,26 @@ Navigate to the **Usage** tab for a full monitoring dashboard:
 | **Stats Overview** | Total calls, tokens, avg latency, estimated cost |
 | **By Agent** | Token consumption per agent (SQL Generator, Query Planner, etc.) |
 | **By Model** | Usage breakdown by LLM model |
-| **By Provider** | Usage breakdown by provider (Ollama, OpenAI, etc.) |
+| **Cost by Provider** | Cost breakdown by provider with total cost display |
 | **Time Series** | Usage trends over time (hourly/daily) |
 | **Recent Calls** | Searchable log of recent LLM calls |
+| **Cost Summary** | Daily cost breakdown with per-provider totals |
+| **Provider Comparison** | Performance and cost comparison across providers by agent type |
+| **Model Pricing** | Admin panel for managing model pricing configurations |
 
-**3. Per-Session Tracking**
+**3. Model Pricing Admin**
+User-managed model pricing via the Model Pricing Manager panel:
+- **List configs**: View all model pricing configurations
+- **Add/Edit**: Set cost per 1M input/output tokens for any model
+- **Unpriced alerts**: Automatically detects models in usage without pricing and offers quick-add
+- **Delete**: Remove pricing configs no longer needed
+
+**4. Per-Session Tracking**
 Each chat session displays inline usage metrics:
 - **Session Usage Badge** - Compact token count and cost in the header
 - **Usage Summary** - Expandable panel with agent-level breakdown
 
-**4. Pre-Computed Aggregates**
+**5. Pre-Computed Aggregates**
 Background aggregation rolls up hourly/daily statistics by agent, provider, and model for fast dashboard queries.
 
 ### Tracked Agents:
@@ -769,8 +784,25 @@ curl "http://localhost:8000/api/llm/usage/recent?limit=50&agent_type=sql_generat
 # Trigger aggregation
 curl -X POST http://localhost:8000/api/llm/usage/aggregate?days=1
 
-# Seed default model configs
-curl -X POST http://localhost:8000/api/llm/usage/configs/seed
+# Cost summary with daily breakdown (Phase 17)
+curl http://localhost:8000/api/llm/usage/cost-summary?days=30
+
+# Provider performance comparison (Phase 17)
+curl http://localhost:8000/api/llm/usage/provider-comparison?days=7
+
+# List model pricing configs (Phase 17)
+curl http://localhost:8000/api/llm/usage/model-configs
+
+# List models without pricing (Phase 17)
+curl http://localhost:8000/api/llm/usage/unpriced-models
+
+# Create/update model pricing (Phase 17)
+curl -X POST http://localhost:8000/api/llm/usage/model-configs \
+  -H "Content-Type: application/json" \
+  -d '{"model_name":"gpt-4o","provider":"openai","cost_per_1m_input_tokens":5.0,"cost_per_1m_output_tokens":15.0}'
+
+# Delete model pricing (Phase 17)
+curl -X DELETE http://localhost:8000/api/llm/usage/model-configs/gpt-4o
 ```
 
 ### Database Tables:
@@ -779,7 +811,7 @@ curl -X POST http://localhost:8000/api/llm/usage/configs/seed
 |-------|---------|
 | `llm_usage` | Individual LLM call records (tokens, cost, timing, agent, model) |
 | `llm_usage_aggregate` | Pre-computed hourly/daily statistics |
-| `llm_model_config` | Model metadata and cost rates |
+| `llm_model_config` | User-managed model pricing rates |
 
 ---
 
@@ -2255,9 +2287,13 @@ open htmlcov/index.html
   - File preview and API endpoint tests
   - Content validation and deduplication tests
 - ✅ **LLM Usage Monitoring**: Unit + integration tests - NEW!
-  - Token estimation and native extraction
-  - Cost calculation and model config
+  - Token estimation and native extraction (6 provider formats)
+  - Cost calculation and user-managed model config
   - Usage aggregation and API endpoints
+- ✅ **Multi-Provider Monitoring** (Phase 17): 29 tests - NEW!
+  - Token extraction for Ollama, OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM
+  - Model pricing CRUD, unpriced model detection
+  - Cost summary and provider comparison endpoints
 - ✅ Confidence Scoring: 31/31 tests (100% coverage)
 - ✅ Result Verification Agent: 14/14 tests (89% coverage)
 - ✅ Correction Learner: 13/13 tests (87% coverage)

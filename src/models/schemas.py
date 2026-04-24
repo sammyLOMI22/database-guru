@@ -878,6 +878,27 @@ class LLMUsageByAgentResponse(BaseModel):
     avg_response_time_ms: Optional[float] = None
 
 
+class LLMUsageByModelResponse(BaseModel):
+    """Usage breakdown by model."""
+    model_name: str
+    total_calls: int
+    total_input_tokens: int
+    total_output_tokens: int
+    total_tokens: int
+    avg_response_time_ms: Optional[float] = None
+
+
+class LLMUsageByProviderResponse(BaseModel):
+    """Usage breakdown by provider."""
+    provider: str
+    total_calls: int
+    total_input_tokens: int
+    total_output_tokens: int
+    total_tokens: int
+    avg_response_time_ms: Optional[float] = None
+    total_cost_usd: float = 0.0
+
+
 class LLMUsageTimeSeriesResponse(BaseModel):
     """Time series data point."""
     period: str
@@ -905,6 +926,75 @@ class InlineUsageStats(BaseModel):
     llm_calls: int
     response_time_ms: float
     agents_involved: List[str]
+
+
+# ============================================================================
+# Multi-Provider Monitoring Schemas (Phase 17)
+# ============================================================================
+
+class ModelConfigResponse(BaseModel):
+    """Model pricing configuration."""
+    id: int
+    model_name: str
+    display_name: Optional[str] = None
+    provider: str
+    cost_per_1m_input_tokens: Optional[float] = None
+    cost_per_1m_output_tokens: Optional[float] = None
+    is_active: bool = True
+
+    class Config:
+        from_attributes = True
+
+
+class ModelConfigCreateRequest(BaseModel):
+    """Request to create/update a model pricing config."""
+    model_name: str = Field(..., min_length=1, max_length=100)
+    provider: str = Field(..., min_length=1, max_length=50)
+    cost_per_1m_input_tokens: float = Field(..., ge=0)
+    cost_per_1m_output_tokens: float = Field(..., ge=0)
+    display_name: Optional[str] = Field(default=None, max_length=100)
+
+
+class UnpricedModelResponse(BaseModel):
+    """A model seen in usage but missing pricing config."""
+    model_name: str
+    provider: str
+    call_count: int
+    total_tokens: int
+
+
+class DailyCostEntry(BaseModel):
+    """A single day's cost data."""
+    date: str
+    cost_usd: float
+    calls: int
+    tokens: int
+
+
+class CostSummaryResponse(BaseModel):
+    """Cost summary across all providers."""
+    period_days: int
+    total_cost_usd: float
+    total_tokens: int
+    total_calls: int
+    avg_cost_per_call: float
+    daily_costs: List[DailyCostEntry]
+    by_provider: Dict[str, float]
+
+
+class ProviderAgentStats(BaseModel):
+    """Stats for one provider within one agent type."""
+    calls: int
+    avg_latency_ms: Optional[float] = None
+    total_cost_usd: float
+    avg_tokens_per_call: Optional[float] = None
+    success_rate: float
+
+
+class ProviderComparisonResponse(BaseModel):
+    """Provider comparison grouped by agent type."""
+    period_days: int
+    by_agent_type: Dict[str, Dict[str, ProviderAgentStats]]
 
 
 # ============================================================================
