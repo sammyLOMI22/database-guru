@@ -183,6 +183,71 @@ services:
     networks:
       - dbguru
 
+  # ---- Profile: observability (Phase 24) ----
+  # Bring up with: docker compose --profile observability up -d
+  # Backend stays reachable even if any of these fail to start.
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.56
+    container_name: dbguru-jaeger
+    profiles:
+      - observability
+    ports:
+      - "127.0.0.1:16686:16686"   # Jaeger UI
+      - "127.0.0.1:4318:4318"     # OTLP HTTP receiver
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - dbguru
+
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: dbguru-prometheus
+    profiles:
+      - observability
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - dbguru
+
+  grafana:
+    image: grafana/grafana:10.4.5
+    container_name: dbguru-grafana
+    profiles:
+      - observability
+    ports:
+      - "127.0.0.1:3001:3000"     # 3001 to avoid the frontend on :3000
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - dbguru
+
 volumes:
   dbguru-data:
   dbguru-uploads:
@@ -190,6 +255,8 @@ volumes:
   ollama-models:
   postgres-data:
   redis-data:
+  prometheus-data:
+  grafana-data:
 
 networks:
   dbguru:
