@@ -115,11 +115,14 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
 
 def _route_template(request: Request) -> str:
-    """Return the matched route template (e.g. ``/api/chat/{session_id}``)
-    rather than the raw path — needed to keep metric label cardinality bounded.
+    """Return the matched route template (e.g. ``/api/chat/{session_id}``).
+
+    Falls back to a constant ``"unmatched"`` for paths that did not match any
+    route — using ``request.url.path`` here would let an attacker explode
+    metric cardinality by hitting random URLs.
     """
     route = request.scope.get("route")
     path = getattr(route, "path", None)
     if path:
         return path
-    return request.url.path
+    return "unmatched"
