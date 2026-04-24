@@ -1,0 +1,247 @@
+# Observability Guide (Phase 24)
+
+Database Guru ships with three production-grade observability primitives that
+are **off by default** and turned on through environment variables:
+
+1. Structured JSON logging with request-id propagation (24.1)
+2. Prometheus metrics with a `/metrics` scrape endpoint (24.2)
+3. OpenTelemetry tracing with OTLP HTTP export (24.3)
+4. A Docker `observability` profile that bundles Jaeger, Prometheus, and
+   Grafana (24.4)
+
+All three pillars share the same design rules:
+
+- **Opt-in.** When the relevant flag is `false`, the call sites pay essentially
+  nothing — metric helpers are no-ops, span helpers return null spans, log
+  format defaults to console.
+- **Never block startup.** A missing OTLP endpoint, a refused Prometheus
+  scrape, or a Grafana outage cannot prevent the backend from serving traffic.
+- **Bounded labels.** Metric labels never use raw URL paths, query text,
+  user_id, connection_id, or anything else that grows with usage.
+- **No secrets in logs/spans/metrics.** Authorization headers, API keys,
+  cookies, prompt text, SQL text, and result rows are redacted before they hit
+  any sink.
+
+---
+
+## 1. Structured Logging
+
+### Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| `LOG_FORMAT` | `console` | `json` for production, `console` for dev |
+| `LOG_LEVEL` | `INFO` | Standard Python log levels |
+| `LOG_INCLUDE_REQUEST_ID` | `true` | Attach a `request_id` to every record |
+| `LOG_INCLUDE_USER_ID` | `false` | Attach `user_id` once auth has resolved |
+
+### Behavior
+
+- Every HTTP request gets a `request_id` — taken from the `X-Request-ID`
+  header if the client supplies one (sanitised to alphanumeric/`-`/`_`,
+  ≤ 128 chars), otherwise a fresh `uuid4().hex`.
+- The same id is reflected back on the response as `X-Request-ID` so clients
+  can correlate.
+- Every log line emitted during the request — whether through `structlog` or
+  the legacy `logging` module — automatically carries `request_id` (and
+  `user_id` if enabled and authenticated).
+- A single terse `http_request` access log line is emitted per request with
+  `method`, `route` (template, never the raw path), `status_code`, and
+  `duration_ms`.
+
+### Redaction
+
+Sensitive keys are stripped to `[REDACTED]` before serialization. The list
+includes:
+
+```
+authorization, cookie, set-cookie, x-api-key, api_key, apikey, password,
+secret, token, access_token, refresh_token, prompt, sql, query, result, rows
+```
+
+Redaction runs both at the structlog processor layer and through the stdlib
+adapter, so it covers `logger.info(...)`, `log.info(prompt=...)`, and
+exceptions raised through warnings.
+
+### Example log line (JSON)
+
+```json
+{
+  "timestamp": "2026-04-23T12:00:00.123456Z",
+  "level": "info",
+  "logger": "src.api.endpoints.chat",
+  "event": "http_request",
+  "request_id": "8b1c5e09f1c34d8da9f9d3a7c6b1e6f0",
+  "method": "POST",
+  "route": "/api/chat/{session_id}",
+  "status_code": 200,
+  "duration_ms": 312.41
+}
+```
+
+---
+
+## 2. Metrics
+
+### Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| `METRICS_ENABLED` | `false` | Register collectors and start recording |
+| `METRICS_EXPOSE_ENDPOINT` | `false` | Mount `GET /metrics` |
+
+The two flags are independent. You can collect in-process metrics without
+exposing them, or skip both for zero overhead. When the endpoint is mounted
+it is **exempt from rate limiting** so Prometheus scrapes never trip the
+limiter.
+
+> Security note: `/metrics` is unauthenticated and intended for an internal
+> Docker network. Do not expose it directly to the public internet.
+
+### Collectors
+
+All collectors are prefixed with `dbguru_`:
+
+| Metric | Type | Labels |
+|---|---|---|
+| `dbguru_http_requests_total` | counter | method, route, status |
+| `dbguru_http_request_duration_seconds` | histogram | method, route |
+| `dbguru_llm_calls_total` | counter | provider, model, agent_type, success |
+| `dbguru_llm_latency_seconds` | histogram | provider, model, agent_type |
+| `dbguru_llm_tokens_total` | counter | provider, model, direction |
+| `dbguru_llm_cost_usd_total` | counter | provider, model |
+| `dbguru_sql_query_duration_seconds` | histogram | dialect, success |
+| `dbguru_connection_pool_checkouts_total` | counter | dialect |
+| `dbguru_connection_pool_size` | gauge | dialect |
+| `dbguru_cache_hits_total` | counter | cache |
+| `dbguru_cache_misses_total` | counter | cache |
+
+LLM token, cost, and success values are **read straight from
+`LLMUsageTracker`** so we never recompute or re-tokenise solely for metrics.
+Pool size gauges are populated at scrape time from
+`ConnectionPoolManager._pools`.
+
+### Bounded labels
+
+The middleware records HTTP metrics under the **matched FastAPI route
+template**, never `request.url.path`. Unmatched paths are bucketed into
+`route="unmatched"`. An attacker cannot blow up cardinality by hitting random
+URLs.
+
+---
+
+## 3. Tracing (OpenTelemetry)
+
+### Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| `OTEL_ENABLED` | `false` | Initialise the SDK + auto-instrumentation |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://jaeger:4318` | OTLP HTTP endpoint |
+| `OTEL_SERVICE_NAME` | `database-guru` | `service.name` resource attribute |
+| `OTEL_TRACES_SAMPLER_RATIO` | `0.1` | `ParentBased(TraceIdRatioBased)` |
+
+### Auto-instrumentation
+
+When enabled, the following are wired up at startup:
+
+- `FastAPIInstrumentor` — every HTTP request gets a server span
+- `SQLAlchemyInstrumentor` — every query becomes a span
+- `HTTPXClientInstrumentor` — outbound HTTP calls (LLM providers)
+- `RedisInstrumentor` — Redis cache calls
+
+Each instrumentation is wrapped in its own `try/except` — a missing optional
+dependency disables that one but does not affect the rest.
+
+### Manual spans
+
+- **`llm.call`** — opened by `TrackedLLMClient.generate()` and `chat()`.
+  Attributes: `llm.provider`, `llm.model`, `llm.agent_type`,
+  `llm.prompt_tokens`, `llm.completion_tokens`, `llm.cost_usd`,
+  `llm.success`, `llm.duration_ms`.
+- **`agent.self_correcting`** — opened around
+  `SelfCorrectingAgent.generate_and_execute_with_retry`. Attributes:
+  `agent.type`, `agent.attempts`, `agent.self_corrected`, `db.dialect`,
+  `execution.success`.
+
+Token/cost/success values reuse what `LLMUsageTracker` already computes.
+
+### Failure isolation
+
+If `init_tracing` cannot import `opentelemetry.sdk`, cannot construct an
+exporter, or the OTLP endpoint is unreachable, it logs a warning and disables
+itself. Span helpers always return a no-op span so call sites are safe.
+
+---
+
+## 4. Docker observability profile
+
+The compose file ships an `observability` profile with three services:
+
+```bash
+# Default stack (no observability):
+docker compose up -d
+
+# Add the monitoring stack:
+docker compose --profile observability up -d
+```
+
+| Service | Image | Port |
+|---|---|---|
+| Jaeger | `jaegertracing/all-in-one:1.56` | UI 16686, OTLP 4318 |
+| Prometheus | `prom/prometheus:v2.51.2` | UI 9090 |
+| Grafana | `grafana/grafana:10.4.5` | UI 3001 |
+
+Grafana is provisioned with:
+
+- A Prometheus datasource pointing to the in-network Prometheus
+- A "Database Guru — Overview" dashboard with 9 panels (request volume,
+  latency p50/p95/p99, error rate, LLM calls, LLM latency, LLM cost/h, SQL
+  latency, cache hit ratio, pool size)
+
+Prometheus scrapes `backend:8000/metrics` every 15 seconds and ships three
+starter alert rules:
+
+- `DbGuruHighErrorRate` — error rate > 5% for 5 min
+- `DbGuruLLMLatencyP99High` — LLM p99 > 30s for 10 min
+- `DbGuruConnectionPoolSaturation` — pool > 90% for 10 min
+
+To enable observability inside the backend container, set:
+
+```env
+LOG_FORMAT=json
+METRICS_ENABLED=true
+METRICS_EXPOSE_ENDPOINT=true
+OTEL_ENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+OTEL_TRACES_SAMPLER_RATIO=0.1
+```
+
+Sample values are in `.env.docker` (commented out by default).
+
+---
+
+## 5. Operational checklist
+
+Before turning observability on in production:
+
+- [ ] Set `LOG_FORMAT=json` and review one request's worth of logs.
+- [ ] Enable `METRICS_ENABLED` first; only flip `METRICS_EXPOSE_ENDPOINT`
+      after confirming the network boundary.
+- [ ] Pick an `OTEL_TRACES_SAMPLER_RATIO` that matches traffic (1.0 is fine
+      for low-traffic workloads; reduce it as request volume grows).
+- [ ] Confirm `/metrics` is reachable only from your scraper, not the
+      internet.
+- [ ] Verify alert thresholds match your SLOs and silence them during
+      planned LLM provider outages.
+
+---
+
+## 6. Out of scope for Phase 24
+
+These are intentionally deferred:
+
+- Loki / ELK / any log aggregator (we ship JSON to stdout only)
+- Long-term metrics retention tuning
+- PagerDuty / Slack / email notification routing
+- A user-facing observability UI in the main app

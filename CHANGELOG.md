@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 24: Observability & Monitoring** — production-grade observability, fully opt-in
+  - Structured JSON / console logging via `structlog` with sensitive-key redaction
+  - `RequestContextMiddleware` propagates a sanitised `X-Request-ID` through every log line and reflects it on responses
+  - Prometheus metrics (`dbguru_*`) for HTTP, LLM calls, SQL queries, connection pools, and cache hit/miss
+  - `GET /metrics` endpoint, gated by `METRICS_EXPOSE_ENDPOINT` and exempt from rate limiting
+  - Bounded label cardinality — route templates, never raw URL paths
+  - OpenTelemetry tracing with OTLP HTTP exporter, auto-instrumentation for FastAPI, SQLAlchemy, HTTPX, Redis
+  - Manual spans `llm.call` and `agent.self_correcting` with token / cost / outcome attributes (reused from `LLMUsageTracker`)
+  - Docker `observability` profile: Jaeger 1.56, Prometheus 2.51.2, Grafana 10.4.5
+  - Pre-provisioned Grafana dashboard with 9 panels (latency p50/95/99, LLM cost/h, pool saturation, etc.)
+  - Prometheus alert rules: high error rate, LLM p99 latency, pool saturation
+  - 17 new tests under `tests/observability/`
+  - New docs: `docs/guides/OBSERVABILITY_GUIDE.md`, `docs/guides/testing/PHASE_24_OBSERVABILITY_TESTING.md`
 - **Cache Trace Integration** - Cache operations now appear in Agent Execution Trace
   - Cache lookup, hit/miss, and store steps visible in trace timeline
   - Per-database cache status in multi-query results

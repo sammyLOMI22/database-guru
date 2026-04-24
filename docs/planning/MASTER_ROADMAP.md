@@ -310,27 +310,27 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    OBSERVABILITY & MONITORING (Phase 24) - MEDIUM PRIORITY              │
+    │                    OBSERVABILITY & MONITORING (Phase 24) ✅ COMPLETE                    │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │              OBSERVABILITY STACK (Phase 24) - MEDIUM PRIORITY                            │
+    │              OBSERVABILITY STACK (Phase 24) ✅ COMPLETE                                  │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
-    │  │ 24.1 Struct-│   │ 24.2 Open-  │   │ 24.3 Metrics│   │ 24.4 Docker │                   │
-    │  │ ured Logging│──▶│ Telemetry   │──▶│ & Dashboards│──▶│ Integration │                   │
-    │  │             │   │ Tracing     │   │             │   │             │                   │
-    │  │ • JSON logs │   │ • OTEL SDK  │   │ • Prometheus│   │ • Compose   │                   │
-    │  │ • Request   │   │ • Span per  │   │   exporter  │   │   profile   │                   │
-    │  │   context   │   │   agent call│   │ • Grafana   │   │ • Jaeger    │                   │
-    │  │ • Log       │   │ • Jaeger    │   │   dashboards│   │   container │                   │
-    │  │   aggregator│   │   exporter  │   │ • Alerting  │   │ • Grafana   │                   │
-    │  │             │   │ • LLM spans │   │   rules     │   │   container │                   │
-    │  │ ~300 lines  │   │ ~500 lines  │   │ ~400 lines  │   │ ~100 lines  │                   │
+    │  │ 24.1 Struct-│   │ 24.2 Metrics│   │ 24.3 Open-  │   │ 24.4 Docker │                   │
+    │  │ ured Logging│──▶│ + /metrics  │──▶│ Telemetry   │──▶│ Profile     │                   │
+    │  │             │   │             │   │ Tracing     │   │             │                   │
+    │  │ • structlog │   │ • Prometheus│   │ • OTEL SDK  │   │ • Compose   │                   │
+    │  │   JSON      │   │   collectors│   │ • OTLP HTTP │   │   profile   │                   │
+    │  │ • request_id│   │ • Bounded   │   │ • Auto-     │   │ • Jaeger    │                   │
+    │  │ • redaction │   │   labels    │   │   instrument│   │ • Prometheus│                   │
+    │  │ • stdout    │   │ • /metrics  │   │ • LLM +     │   │ • Grafana   │                   │
+    │  │   only      │   │   gated     │   │   agent     │   │   provisioned│                  │
+    │  │             │   │             │   │   spans     │   │   dashboard │                   │
     │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
     │                                                                                           │
-    │  Prereq: Phase 23 ✅ (Docker) | Priority: MEDIUM | Est: 2 weeks | ~1,300 lines          │
-    │  Adds observability profile to Docker Compose                                            │
+    │  Prereq: Phase 23 ✅ (Docker) | Status: ✅ Complete | Stdout JSON only (no aggregator)  │
+    │  Guide: OBSERVABILITY_GUIDE.md | Test guide: PHASE_24_OBSERVABILITY_TESTING.md          │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -716,12 +716,8 @@
 > **Strategic Direction** (per PM Review): Focus on "depth and safety" before "width expansion".
 > Security/Auth, Edit Mode, Enterprise LLMs, and Multi-Provider Monitoring are now complete.
 
-### Priority 1: Observability & Monitoring (Phase 24) - MEDIUM
-**Why**: Production readiness — structured logging, distributed tracing, metrics dashboards
-- **Prerequisite**: Phase 23 ✅ (Docker)
-- Structured JSON logging, OpenTelemetry tracing, Prometheus/Grafana, Docker integration
-
 ### Completed Priorities (this cycle)
+- ~~Observability & Monitoring (Phase 24)~~ - ✅ COMPLETE: structlog JSON logs with request_id propagation + sensitive-key redaction, Prometheus collectors (`dbguru_*`) for HTTP/LLM/SQL/pool/cache with bounded labels, gated `/metrics` endpoint, OpenTelemetry SDK + OTLP HTTP exporter with auto-instrumentation (FastAPI/SQLAlchemy/HTTPX/Redis), manual `llm.call` and `agent.self_correcting` spans reusing LLMUsageTracker values, Docker `observability` profile (Jaeger/Prometheus/Grafana with provisioned dashboard + alert rules). 17 tests, ~1,300 lines. Stdout JSON only — no log aggregator in scope.
 - ~~Multi-Provider Monitoring (Phase 17)~~ - ✅ COMPLETE: Native token extraction for 6 provider formats (Ollama, OpenAI/Azure/LM Studio/vLLM, Anthropic, Google Vertex, AWS Bedrock), user-managed model pricing (CRUD admin API), cost summary with daily breakdown, provider performance comparison by agent type, unpriced model detection, ModelPricingManager UI. 29 tests, 7 new endpoints, ~1,373 lines.
 - ~~LLM Provider Expansion (Phase 15)~~ - ✅ COMPLETE: 8 providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM), provider abstraction + registry, data security enforcement (local/cloud_private/cloud_public), Local/Frontier toggle UI, per-task routing, fallback chains, Fernet-encrypted API keys, frontend provider management. 220 tests, 8 endpoints, ~4,000 lines.
 - ~~Edit Mode & DML (Phase 18)~~ - ✅ COMPLETE: DML generator/validator/executor, inline editing UI, per-connection write permissions, preview mode. 40 tests, 5 endpoints, ~2,450 lines.
@@ -783,7 +779,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
 | **Docker Containerization** | Docker Compose, Nginx proxy, BYO LLM, profiles (ollama/full) | **Phase 23 ✅ COMPLETE** | ~200 lines config |
-| **Observability** | Structured logging, OpenTelemetry tracing, Prometheus/Grafana | **Phase 24 - MEDIUM** | ~1,300 lines |
+| **Observability** | Structured logging, OpenTelemetry tracing, Prometheus/Grafana, Docker observability profile | **Phase 24 ✅ Complete** | ~1,300 lines |
 | **Innovation Pipeline** | Synthetic Data, API-ify, Auto-Docs, Watchdog, Guru API, etc. | Ideas stage | TBD |
 
 ---
@@ -837,7 +833,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Phase 17** | Multi-Provider Monitoring | Phase 15✅ + 16✅ | ~1,373 lines | ✅ **COMPLETE** |
 | **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | ✅ **COMPLETE** |
 | **Phase 23** | Docker Containerization | None | ~200 lines config | ✅ **COMPLETE** |
-| **Phase 24** | Observability (OpenTelemetry) | Phase 23 ✅ | ~1,300 lines | MEDIUM |
+| **Phase 24** | Observability & Monitoring | Phase 23 ✅ | ~1,300 lines | ✅ **COMPLETE** |
 | **Phase 14** | NoSQL Database Expansion | None | ~6,000 lines | ✅ **COMPLETE** |
 
 ---
@@ -913,5 +909,5 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
   - Nginx reverse proxy with CSP headers, non-root containers, least-privilege Postgres
   - Ollama retry logic (tenacity), prompts.py refactored into package
   - CTE support added to SQL lineage parser
-- **Phase 24 NEW**: Observability & Monitoring (OpenTelemetry, Prometheus, Grafana)
+- **Phase 24 ✅ COMPLETE**: Observability & Monitoring (structlog, Prometheus, OpenTelemetry, Docker observability profile)
 - Previous: Added Phase 20-22, Innovation Pipeline, promoted Security to CRITICAL
