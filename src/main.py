@@ -15,6 +15,7 @@ from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.request_context import RequestContextMiddleware
 from src.observability.logging_config import configure_logging
 from src.observability import metrics as observability_metrics
+from src.observability import tracing as observability_tracing
 from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance, auth, audit, dml, llm_providers
 from src.core.file_source_session import FileSourceDuckDBSession
 from src.core.file_source_handler import cleanup_expired_files
@@ -56,6 +57,10 @@ async def lifespan(app: FastAPI):
 
     # Initialize Prometheus collectors (Phase 24.2). No-op if METRICS_ENABLED=False.
     observability_metrics.init_metrics(settings)
+
+    # Initialize OpenTelemetry tracing (Phase 24.3). No-op if OTEL_ENABLED=False;
+    # exporter/instrumentation failures degrade to warnings — never crash startup.
+    observability_tracing.init_tracing(settings, fastapi_app=app)
 
     # Initialize database
     logger.info("📊 Initializing database...")
@@ -188,6 +193,9 @@ async def lifespan(app: FastAPI):
         if pool_cls._instance is not None:
             await pool_cls._instance.close_all()
     logger.info("✅ NoSQL client pools closed")
+
+    # Flush any pending OTEL spans (Phase 24.3).
+    observability_tracing.shutdown()
 
     logger.info("👋 Goodbye!")
 

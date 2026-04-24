@@ -8,6 +8,7 @@ import tiktoken
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import LLMUsage
+from src.observability import tracing as _tracing
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +238,21 @@ class _TrackingContext:
             )
         except Exception as metrics_err:  # noqa: BLE001
             logger.debug(f"metrics record_llm_call failed: {metrics_err}")
+
+        # Phase 24: attach attrs to the active LLM span. Caller stack must have
+        # opened ``llm_call_span(...)`` already; if not, this is a no-op.
+        try:
+            from opentelemetry import trace as _otel_trace
+            span = _otel_trace.get_current_span()
+            if span and span.is_recording():
+                span.set_attribute("llm.prompt_tokens", int(input_tokens or 0))
+                span.set_attribute("llm.completion_tokens", int(output_tokens or 0))
+                if estimated_cost is not None:
+                    span.set_attribute("llm.cost_usd", float(estimated_cost))
+                span.set_attribute("llm.success", bool(self.success))
+                span.set_attribute("llm.duration_ms", float(response_time_ms))
+        except Exception:  # noqa: BLE001
+            pass
 
         return usage_record
 
