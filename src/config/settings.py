@@ -136,6 +136,20 @@ class Settings(BaseSettings):
     DUCKDB_FILE_MEMORY_LIMIT: str = "1GB"  # Memory limit for file query DuckDB session
     DUCKDB_FILE_THREADS: int = 4  # Number of threads for file query processing
 
+    # Observability (Phase 24) — all default to off-by-default / no-op values
+    LOG_FORMAT: str = "console"  # "json" in production, "console" in dev
+    LOG_LEVEL: str = "INFO"
+    LOG_INCLUDE_REQUEST_ID: bool = True
+    LOG_INCLUDE_USER_ID: bool = False
+
+    METRICS_ENABLED: bool = False        # gate Prometheus collectors
+    METRICS_EXPOSE_ENDPOINT: bool = False  # gate GET /metrics
+
+    OTEL_ENABLED: bool = False
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://jaeger:4318"
+    OTEL_SERVICE_NAME: str = "database-guru"
+    OTEL_TRACES_SAMPLER_RATIO: float = 0.1
+
     class Config:
         env_file = ".env"
         case_sensitive = True

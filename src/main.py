@@ -12,15 +12,14 @@ from src.database.connection import get_db_manager, run_alembic_migrations
 from src.cache.redis_client import get_redis_cache
 from src.core.connection_pool_manager import get_pool_manager_async
 from src.middleware.rate_limit import RateLimitMiddleware
+from src.middleware.request_context import RequestContextMiddleware
+from src.observability.logging_config import configure_logging
 from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance, auth, audit, dml, llm_providers
 from src.core.file_source_session import FileSourceDuckDBSession
 from src.core.file_source_handler import cleanup_expired_files
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure structured logging (Phase 24.1). Re-applied after migrations below.
+configure_logging(Settings())
 logger = logging.getLogger(__name__)
 
 
@@ -85,9 +84,7 @@ async def lifespan(app: FastAPI):
     # Re-apply logging config — alembic's fileConfig() disables all existing
     # loggers and resets the root logger to WARNING, suppressing all subsequent
     # INFO messages from the application.
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', force=True)
-    for name in logging.Logger.manager.loggerDict:
-        logging.getLogger(name).disabled = False
+    configure_logging(settings, force=True)
 
     # Seed default LLM model configs for cost tracking (Phase 16)
     try:
@@ -214,6 +211,10 @@ app.add_middleware(
     calls=500,  # Increased to 500 to support concurrent polling from multiple components
     period=60,  # per 60 seconds
 )
+
+# Request-scoped context (request_id, user_id) for structured logs (Phase 24.1).
+# Added last so it becomes the outermost wrapper and runs first on each request.
+app.add_middleware(RequestContextMiddleware, settings=Settings())
 
 # Include routers
 app.include_router(health.router)
