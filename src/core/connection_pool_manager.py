@@ -33,6 +33,7 @@ from sqlalchemy.engine import Engine
 
 from src.config.settings import Settings
 from src.database.models import DatabaseConnection
+from src.observability import metrics as _metrics
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +217,7 @@ class ConnectionPoolManager:
                 pool.metrics.last_used = datetime.now()
                 pool.metrics.total_checkouts += 1
                 logger.debug(f"Reusing pool for connection {connection.id} ({connection.database_type})")
+                _metrics.record_pool_checkout(connection.database_type)
                 return pool
 
         # Create new pool
@@ -230,6 +232,7 @@ class ConnectionPoolManager:
         async with self._lock:
             self._pools[key] = pool
 
+        _metrics.record_pool_checkout(connection.database_type)
         return pool
 
     async def _create_pool(self, connection: DatabaseConnection) -> PoolEntry:

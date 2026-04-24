@@ -8,8 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, DBAPIError, OperationalError
 from src.core.query_compiler import QueryCompiler
+from src.observability import metrics as _metrics
 
 logger = logging.getLogger(__name__)
+
+
+def _session_dialect(session: Union[AsyncSession, Session]) -> str:
+    """Best-effort dialect lookup for metric labels. Falls back to "unknown"."""
+    try:
+        bind = getattr(session, "bind", None) or session.get_bind()  # type: ignore[attr-defined]
+        return getattr(bind.dialect, "name", "unknown") or "unknown"
+    except Exception:
+        return "unknown"
 
 
 class QueryTimeout(Exception):
@@ -71,6 +81,7 @@ class SQLExecutor:
                 - compiled: Whether query was compiled/cached
         """
         start_time = datetime.utcnow()
+        dialect = _session_dialect(session)
 
         # Try to use compiled query if no params provided and it's a SELECT
         compiled_query = None
@@ -119,6 +130,7 @@ class SQLExecutor:
             if compiled_query:
                 self.compiler.update_stats(compiled_query, execution_time_ms)
 
+            _metrics.record_sql_query(dialect=dialect, success=True, duration_s=execution_time_ms / 1000.0)
             return {
                 "success": True,
                 "data": result["data"],
@@ -133,6 +145,7 @@ class SQLExecutor:
         except asyncio.TimeoutError:
             execution_time = (datetime.utcnow() - start_time).total_seconds()
             logger.error(f"Query timeout after {execution_time}s: {sql[:100]}")
+            _metrics.record_sql_query(dialect=dialect, success=False, duration_s=execution_time)
             return {
                 "success": False,
                 "data": [],
@@ -146,6 +159,7 @@ class SQLExecutor:
 
         except OperationalError as e:
             logger.error(f"Database operational error: {e}")
+            _metrics.record_sql_query(dialect=dialect, success=False, duration_s=(datetime.utcnow() - start_time).total_seconds())
             return {
                 "success": False,
                 "data": [],
@@ -159,6 +173,7 @@ class SQLExecutor:
 
         except DBAPIError as e:
             logger.error(f"Database API error: {e}")
+            _metrics.record_sql_query(dialect=dialect, success=False, duration_s=(datetime.utcnow() - start_time).total_seconds())
             return {
                 "success": False,
                 "data": [],
@@ -172,6 +187,7 @@ class SQLExecutor:
 
         except SQLAlchemyError as e:
             logger.error(f"SQLAlchemy error: {e}")
+            _metrics.record_sql_query(dialect=dialect, success=False, duration_s=(datetime.utcnow() - start_time).total_seconds())
             return {
                 "success": False,
                 "data": [],
@@ -185,6 +201,7 @@ class SQLExecutor:
 
         except Exception as e:
             logger.error(f"Unexpected error executing query: {e}", exc_info=True)
+            _metrics.record_sql_query(dialect=dialect, success=False, duration_s=(datetime.utcnow() - start_time).total_seconds())
             return {
                 "success": False,
                 "data": [],

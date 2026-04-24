@@ -221,6 +221,23 @@ class _TrackingContext:
         except Exception as e:
             logger.error(f"Failed to save LLM usage record: {e}")
 
+        # Phase 24: emit Prometheus metrics from the same numbers we just wrote
+        # to the LLMUsage row. No double-tokenization or double-pricing.
+        try:
+            from src.observability import metrics as _metrics
+            _metrics.record_llm_call(
+                provider=self.provider or "unknown",
+                model=self.model_name or "unknown",
+                agent_type=self.agent_type or "unknown",
+                success=self.success,
+                duration_s=response_time_ms / 1000.0,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost_usd=float(estimated_cost) if estimated_cost else None,
+            )
+        except Exception as metrics_err:  # noqa: BLE001
+            logger.debug(f"metrics record_llm_call failed: {metrics_err}")
+
         return usage_record
 
 

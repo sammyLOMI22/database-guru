@@ -18,6 +18,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.config.settings import Settings
+from src.observability import metrics
 from src.observability.logging_config import (
     get_logger,
     set_request_id,
@@ -86,15 +87,25 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                     set_user_id(str(uid))
             return response
         finally:
-            duration_ms = (time.perf_counter() - start) * 1000.0
+            duration_s = time.perf_counter() - start
+            route = _route_template(request)
             # Single terse access log line. No query strings, no bodies.
             try:
                 logger.info(
                     "http_request",
                     method=request.method,
-                    route=_route_template(request),
+                    route=route,
                     status_code=status_code,
-                    duration_ms=round(duration_ms, 2),
+                    duration_ms=round(duration_s * 1000.0, 2),
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                metrics.record_http_request(
+                    method=request.method,
+                    route=route,
+                    status_code=status_code,
+                    duration_s=duration_s,
                 )
             except Exception:  # noqa: BLE001
                 pass

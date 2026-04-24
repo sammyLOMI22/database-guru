@@ -187,6 +187,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Skip rate limiting for health/monitoring endpoints
         exempt_paths = [
             "/health", "/", "/docs", "/openapi.json",
+            # Phase 24: Prometheus scrape endpoint
+            "/metrics",
             # Pool monitoring endpoints (internal health checks, polled frequently)
             "/api/pools/stats", "/api/pools/health",
             # Model listing (needed on every page load)
