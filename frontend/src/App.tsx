@@ -13,6 +13,8 @@ import { LineagePanel } from './components/lineage/LineagePanel';
 import { LLMUsageDashboard } from './components/dashboard/LLMUsageDashboard';
 import { MigrationPanel } from './components/migration/MigrationPanel';
 import { PerformancePanel } from './components/performance/PerformancePanel';
+import AuditLogViewer from './components/admin/AuditLogViewer';
+import RequireAdmin from './components/common/RequireAdmin';
 import SchemaPanel from './components/SchemaPanel';
 import { healthAPI, settingsAPI } from './services/api';
 import { useDarkMode } from './hooks/useDarkMode';
@@ -34,7 +36,7 @@ function App() {
   const [showDemo, setShowDemo] = useState(false);
   const [requireAuth, setRequireAuth] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'migration' | 'performance' | 'settings'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'migration' | 'performance' | 'admin' | 'settings'>('chat');
 
   // Cross-component lineage navigation state
   const [lineageNav, setLineageNav] = useState<{ sql?: string; tab?: 'explore' | 'history' | 'impact'; impactTable?: string } | null>(null);
@@ -120,6 +122,7 @@ function App() {
           activeTab={activeTab}
           onTabChange={(id) => setActiveTab(id as any)}
           user={user}
+          isAdmin={!!user?.is_admin}
           onLogout={() => { logout(); if (requireAuth) setShowAuth(true); }}
           onSignIn={() => setShowAuth(true)}
         />
@@ -190,6 +193,13 @@ function App() {
                   initialConnectionId={performanceNav?.connectionId}
                 />
               </div>
+            </div>
+
+            {/* Admin */}
+            <div className={`flex-1 overflow-auto pb-32 ${activeTab === 'admin' ? '' : 'hidden'}`}>
+              <RequireAdmin user={user}>
+                <AuditLogViewer />
+              </RequireAdmin>
             </div>
 
             {/* Settings */}
