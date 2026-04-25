@@ -432,6 +432,26 @@ class ConnectionPoolManager:
         logger.info(f"Closed {len(pool_keys)} connection pool(s)")
         self._initialized = False
 
+    async def get_pool_metrics_snapshot(self) -> list[dict]:
+        """Return a per-pool snapshot suitable for metrics export.
+
+        Holds ``self._lock`` while copying so callers cannot observe a torn
+        state during pool churn. Each entry is a small dict with just the
+        fields the observability layer needs — keep it minimal so this stays
+        cheap to call on every Prometheus scrape.
+        """
+        snapshot: list[dict] = []
+        async with self._lock:
+            for (_, dialect), pool in self._pools.items():
+                m = pool.metrics
+                snapshot.append({
+                    "dialect": dialect,
+                    "active": int(m.active_connections),
+                    "idle": int(m.idle_connections),
+                    "total_capacity": int(m.total_capacity),
+                })
+        return snapshot
+
     def get_all_metrics(self) -> dict:
         """Get metrics for all pools"""
         pools_data = []

@@ -56,6 +56,15 @@ def _extract_rate_limit_key(request: Request) -> Optional[str]:
     sub = payload.get("sub")
     if not sub:
         return None
+    # Best-effort: bind the verified user ID into the structlog contextvar so
+    # endpoints that do not declare an auth dependency still get user_id on
+    # their log lines (Phase 24.1, gated by LOG_INCLUDE_USER_ID in the
+    # request-context middleware).
+    try:
+        from src.observability.logging_config import set_user_id
+        set_user_id(str(sub))
+    except Exception:  # noqa: BLE001
+        pass
     return f"user:{sub}"
 
 

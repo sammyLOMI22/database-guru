@@ -188,6 +188,19 @@ def _start_span(name: str) -> Any:
     return _TRACER.start_as_current_span(name)
 
 
+def _record_exception(span: Any, exc: BaseException) -> None:
+    """Best-effort: tag the span with the exception and ERROR status."""
+    try:
+        span.record_exception(exc)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from opentelemetry.trace import Status, StatusCode
+        span.set_status(Status(StatusCode.ERROR, str(exc)))
+    except Exception:  # noqa: BLE001
+        pass
+
+
 @contextmanager
 def llm_call_span(
     *,
@@ -197,6 +210,9 @@ def llm_call_span(
 ) -> Iterator[Any]:
     """Span for one LLM call. Attributes filled in by the caller via
     ``span.set_attribute(...)`` after the call completes.
+
+    Exceptions raised inside the block are recorded on the span (with ERROR
+    status) before being re-raised, so failed LLM calls show up in traces.
     """
     span_cm = _start_span("llm.call")
     span = span_cm.__enter__() if hasattr(span_cm, "__enter__") else span_cm
@@ -207,17 +223,32 @@ def llm_call_span(
             span.set_attribute("llm.agent_type", agent_type)
         except Exception:  # noqa: BLE001
             pass
-        yield span
-    finally:
         try:
-            span_cm.__exit__(None, None, None)
-        except Exception:  # noqa: BLE001
-            pass
+            yield span
+        except BaseException as exc:
+            _record_exception(span, exc)
+            try:
+                span_cm.__exit__(type(exc), exc, exc.__traceback__)
+            except Exception:  # noqa: BLE001
+                pass
+            raise
+        else:
+            try:
+                span_cm.__exit__(None, None, None)
+            except Exception:  # noqa: BLE001
+                pass
+    finally:
+        # span_cm is closed in the try/except branches above; nothing else to do.
+        pass
 
 
 @contextmanager
 def self_correcting_span(*, agent_type: str = "self_correcting") -> Iterator[Any]:
-    """Span for a SelfCorrectingAgent.generate_and_execute_with_retry run."""
+    """Span for a SelfCorrectingAgent.generate_and_execute_with_retry run.
+
+    Exceptions raised inside the block are recorded on the span (with ERROR
+    status) before being re-raised.
+    """
     span_cm = _start_span("agent.self_correcting")
     span = span_cm.__enter__() if hasattr(span_cm, "__enter__") else span_cm
     try:
@@ -225,12 +256,22 @@ def self_correcting_span(*, agent_type: str = "self_correcting") -> Iterator[Any
             span.set_attribute("agent.type", agent_type)
         except Exception:  # noqa: BLE001
             pass
-        yield span
-    finally:
         try:
-            span_cm.__exit__(None, None, None)
-        except Exception:  # noqa: BLE001
-            pass
+            yield span
+        except BaseException as exc:
+            _record_exception(span, exc)
+            try:
+                span_cm.__exit__(type(exc), exc, exc.__traceback__)
+            except Exception:  # noqa: BLE001
+                pass
+            raise
+        else:
+            try:
+                span_cm.__exit__(None, None, None)
+            except Exception:  # noqa: BLE001
+                pass
+    finally:
+        pass
 
 
 def shutdown() -> None:

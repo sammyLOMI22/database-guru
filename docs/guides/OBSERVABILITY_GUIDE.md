@@ -51,17 +51,35 @@ All three pillars share the same design rules:
 
 ### Redaction
 
-Sensitive keys are stripped to `[REDACTED]` before serialization. The list
-includes:
+Sensitive keys are stripped to `[REDACTED]` before serialization. The full
+list (matched case-insensitively, kept in sync with `_SENSITIVE_KEYS` in
+`src/observability/logging_config.py`):
 
 ```
-authorization, cookie, set-cookie, x-api-key, api_key, apikey, password,
-secret, token, access_token, refresh_token, prompt, sql, query, result, rows
+authorization, cookie, cookies, set-cookie, api_key, apikey, api-key,
+x-api-key, bearer, password, secret, token, access_token, refresh_token,
+prompt, sql, query, response_text, result, result_rows, rows
 ```
 
 Redaction runs both at the structlog processor layer and through the stdlib
-adapter, so it covers `logger.info(...)`, `log.info(prompt=...)`, and
-exceptions raised through warnings.
+adapter, so it covers `logger.info(...)`, `log.info(prompt=...)`, and bound
+contextvars. It also recurses into nested dicts/lists/tuples up to 6 levels
+deep.
+
+**Limits — do not rely on redaction for the following:**
+
+- **Free-form text.** Event messages, formatted strings, raw exception
+  messages from the DB driver / LLM provider are **not** scrubbed. If a
+  PostgreSQL error string contains the offending SQL, or an LLM provider
+  echoes the prompt into an error body, that text will appear in logs.
+  Scrub at the call site (or avoid logging raw `str(exc)` from external
+  systems) when secrets may be embedded in the message.
+- **Unknown keys.** Redaction is key-based only. Custom field names like
+  `oauth_jwt` or `ssn` are not scrubbed unless added to `_SENSITIVE_KEYS`.
+
+When you find a developer-facing surprise — `logger.info("...", sql=...)`
+showing `[REDACTED]` — that is intentional. Use a different key name (e.g.
+`sql_template`) only if the value is provably safe to log.
 
 ### Example log line (JSON)
 
@@ -95,8 +113,25 @@ exposing them, or skip both for zero overhead. When the endpoint is mounted
 it is **exempt from rate limiting** so Prometheus scrapes never trip the
 limiter.
 
-> Security note: `/metrics` is unauthenticated and intended for an internal
-> Docker network. Do not expose it directly to the public internet.
+> Security note: `/metrics` is unauthenticated, exempt from rate limiting,
+> and intended for an internal Docker network only. **In production, protect
+> it at the reverse proxy / firewall layer** (e.g. allowlist your Prometheus
+> scraper IP, or terminate behind an internal-only listener). It exposes
+> route templates, model names, provider/cost rates, latency, and error
+> rates — most teams do not want this public. The endpoint is gated by
+> `METRICS_EXPOSE_ENDPOINT`; keep it `false` until the network boundary is
+> in place.
+>
+> Example nginx allowlist (production):
+>
+> ```nginx
+> location /metrics {
+>     allow 10.0.0.0/8;        # internal network
+>     allow 192.168.0.0/16;
+>     deny all;
+>     proxy_pass http://backend:8000;
+> }
+> ```
 
 ### Collectors
 
@@ -113,13 +148,15 @@ All collectors are prefixed with `dbguru_`:
 | `dbguru_sql_query_duration_seconds` | histogram | dialect, success |
 | `dbguru_connection_pool_checkouts_total` | counter | dialect |
 | `dbguru_connection_pool_size` | gauge | dialect |
+| `dbguru_connection_pool_max_size` | gauge | dialect |
 | `dbguru_cache_hits_total` | counter | cache |
 | `dbguru_cache_misses_total` | counter | cache |
 
 LLM token, cost, and success values are **read straight from
 `LLMUsageTracker`** so we never recompute or re-tokenise solely for metrics.
-Pool size gauges are populated at scrape time from
-`ConnectionPoolManager._pools`.
+Pool size and max-size gauges are populated at scrape time via
+`ConnectionPoolManager.get_pool_metrics_snapshot()` (under the manager's
+lock, so the gauge values cannot be torn during pool churn).
 
 ### Bounded labels
 
@@ -182,15 +219,29 @@ The compose file ships an `observability` profile with three services:
 # Default stack (no observability):
 docker compose up -d
 
-# Add the monitoring stack:
+# Add the monitoring stack (Jaeger + Prometheus + Grafana):
 docker compose --profile observability up -d
 ```
+
+> ⚠ The `--profile observability` flag starts the **monitoring tooling
+> only** — it does not flip the backend's observability flags. The Prometheus
+> container will scrape `backend:8000/metrics` immediately, but until you
+> also set `METRICS_ENABLED=true`, `METRICS_EXPOSE_ENDPOINT=true`, and
+> `OTEL_ENABLED=true` in the backend env (see `.env.docker`), `/metrics`
+> will return 404 and no spans will be exported. Restart the backend
+> container after editing the env.
 
 | Service | Image | Port |
 |---|---|---|
 | Jaeger | `jaegertracing/all-in-one:1.56` | UI 16686, OTLP 4318 |
 | Prometheus | `prom/prometheus:v2.51.2` | UI 9090 |
 | Grafana | `grafana/grafana:10.4.5` | UI 3001 |
+
+> ⚠ **Grafana credentials.** The compose file falls back to `admin/admin`
+> when `GRAFANA_USER`/`GRAFANA_PASSWORD` are not set. This is acceptable for
+> a laptop bound to `127.0.0.1` only. **For any non-local deployment** —
+> shared dev hosts, remote tunnels, or copied prod compose files — set
+> `GRAFANA_PASSWORD` to a generated secret before bringing the stack up.
 
 Grafana is provisioned with:
 

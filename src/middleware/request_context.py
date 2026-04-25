@@ -70,6 +70,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         else:
             set_request_id(None)
 
+        # The auth dependency / rate-limit middleware will populate user_id
+        # via set_user_id(...) once the JWT has been validated. We unset it
+        # here so a new request never inherits the previous task's value.
         set_user_id(None)
 
         start = time.perf_counter()
@@ -79,12 +82,10 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             status_code = response.status_code
             if rid is not None:
                 response.headers["X-Request-ID"] = rid
-            # After the endpoint has run, auth dependencies may have populated
-            # request.state.user_id. Bind it if the feature is enabled.
-            if self._include_user_id:
-                uid = getattr(request.state, "user_id", None)
-                if uid is not None:
-                    set_user_id(str(uid))
+            # If the feature is disabled, scrub user_id back out so the access
+            # log line below does not include it even if a dep set it.
+            if not self._include_user_id:
+                set_user_id(None)
             return response
         finally:
             duration_s = time.perf_counter() - start

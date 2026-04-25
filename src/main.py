@@ -20,8 +20,14 @@ from src.api.endpoints import query, health, schema, models, connections, chat, 
 from src.core.file_source_session import FileSourceDuckDBSession
 from src.core.file_source_handler import cleanup_expired_files
 
+# Single module-level Settings instance — read once and shared across the
+# logging, CORS, lifespan, and middleware setup blocks so we don't re-parse the
+# environment 4-5 times during import. Lifespan still uses its own local copy
+# in case env was reloaded between import and startup (e.g. in tests).
+_settings = Settings()
+
 # Configure structured logging (Phase 24.1). Re-applied after migrations below.
-configure_logging(Settings())
+configure_logging(_settings)
 logger = logging.getLogger(__name__)
 
 
@@ -211,10 +217,13 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in Settings().CORS_ORIGINS.split(",") if o.strip()],
+    allow_origins=[o.strip() for o in _settings.CORS_ORIGINS.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    # X-Request-ID lets browser clients pass a correlation id through to the
+    # backend; expose_headers makes it readable from response.headers in JS.
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    expose_headers=["X-Request-ID"],
 )
 
 # Add rate limiting middleware
@@ -226,7 +235,7 @@ app.add_middleware(
 
 # Request-scoped context (request_id, user_id) for structured logs (Phase 24.1).
 # Added last so it becomes the outermost wrapper and runs first on each request.
-app.add_middleware(RequestContextMiddleware, settings=Settings())
+app.add_middleware(RequestContextMiddleware, settings=_settings)
 
 # Include routers
 app.include_router(health.router)
@@ -259,7 +268,7 @@ app.include_router(llm_providers.router, prefix="/api")  # Phase 15: LLM Provide
 # import time (not in lifespan) so reverse-proxies can scrape it as soon as
 # the worker comes up. The handler itself returns 404 when METRICS_ENABLED is
 # false, so toggling either flag suffices to hide the endpoint.
-if Settings().METRICS_EXPOSE_ENDPOINT:
+if _settings.METRICS_EXPOSE_ENDPOINT:
     app.add_api_route(
         "/metrics",
         observability_metrics.metrics_endpoint,

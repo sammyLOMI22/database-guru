@@ -30,10 +30,17 @@ groups:
           description: "Some provider/model is consistently slow — investigate prompt size, model availability, or upstream rate limits."
 
       - alert: DbGuruConnectionPoolSaturation
+        # Fires when (current pool size / configured capacity) >= 90% per dialect.
+        # Skips dialects where max_size is missing or zero so a partial
+        # registration does not produce divide-by-zero alerts.
         expr: |
-          max by (dialect) (dbguru_connection_pool_size) /
-          on(dialect) group_left()
-          max by (dialect) (dbguru_connection_pool_size) >= 0.9
+          (
+            sum by (dialect) (dbguru_connection_pool_size)
+            /
+            clamp_min(sum by (dialect) (dbguru_connection_pool_max_size), 1)
+          ) >= 0.9
+          and
+          sum by (dialect) (dbguru_connection_pool_max_size) > 0
         for: 10m
         labels:
           severity: warning

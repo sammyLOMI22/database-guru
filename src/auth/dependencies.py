@@ -10,6 +10,7 @@ from src.api.dependencies.common import get_db, get_settings
 from src.auth.models import User
 from src.auth.service import AuthService
 from src.config.settings import Settings
+from src.observability.logging_config import set_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,13 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Bind into the structlog contextvar so every log line emitted later in
+    # the request carries user_id (Phase 24.1, gated by LOG_INCLUDE_USER_ID
+    # in the middleware — set_user_id is a no-op when nothing reads it).
+    try:
+        set_user_id(str(user.id))
+    except Exception:  # noqa: BLE001
+        pass
     return user
 
 
@@ -134,6 +142,10 @@ async def get_optional_user(
         _raise_or_none(settings.REQUIRE_AUTH, "User account is deactivated")
         return None
 
+    try:
+        set_user_id(str(user.id))
+    except Exception:  # noqa: BLE001
+        pass
     return user
 
 

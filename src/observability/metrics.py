@@ -70,6 +70,7 @@ sql_query_duration_seconds: Any = _Noop()
 
 connection_pool_checkouts_total: Any = _Noop()
 connection_pool_size: Any = _Noop()
+connection_pool_max_size: Any = _Noop()
 
 cache_hits_total: Any = _Noop()
 cache_misses_total: Any = _Noop()
@@ -93,7 +94,7 @@ def init_metrics(settings: Optional[Settings] = None, *, force: bool = False) ->
     global http_requests_total, http_request_duration_seconds
     global llm_calls_total, llm_latency_seconds, llm_tokens_total, llm_cost_usd_total
     global sql_query_duration_seconds
-    global connection_pool_checkouts_total, connection_pool_size
+    global connection_pool_checkouts_total, connection_pool_size, connection_pool_max_size
     global cache_hits_total, cache_misses_total
 
     if _INITIALIZED and not force:
@@ -197,6 +198,12 @@ def init_metrics(settings: Optional[Settings] = None, *, force: bool = False) ->
         ("dialect",),
         registry=registry,
     )
+    connection_pool_max_size = Gauge(
+        "dbguru_connection_pool_max_size",
+        "Configured pool capacity (sum of total_capacity per dialect).",
+        ("dialect",),
+        registry=registry,
+    )
 
     cache_hits_total = Counter(
         "dbguru_cache_hits_total",
@@ -249,12 +256,12 @@ def record_llm_call(
     llm_latency_seconds.labels(
         provider=provider, model=model, agent_type=agent_type
     ).observe(max(0.0, duration_s))
-    if input_tokens:
-        llm_tokens_total.labels(provider=provider, model=model, direction="input").inc(input_tokens)
-    if output_tokens:
-        llm_tokens_total.labels(provider=provider, model=model, direction="output").inc(output_tokens)
-    if cost_usd:
-        llm_cost_usd_total.labels(provider=provider, model=model).inc(float(cost_usd))
+    if input_tokens is not None:
+        llm_tokens_total.labels(provider=provider, model=model, direction="input").inc(max(0, int(input_tokens)))
+    if output_tokens is not None:
+        llm_tokens_total.labels(provider=provider, model=model, direction="output").inc(max(0, int(output_tokens)))
+    if cost_usd is not None:
+        llm_cost_usd_total.labels(provider=provider, model=model).inc(max(0.0, float(cost_usd)))
 
 
 def record_sql_query(*, dialect: str, success: bool, duration_s: float) -> None:
@@ -275,6 +282,12 @@ def set_pool_size(dialect: str, size: int) -> None:
     if not _ENABLED:
         return
     connection_pool_size.labels(dialect=dialect).set(size)
+
+
+def set_pool_max_size(dialect: str, max_size: int) -> None:
+    if not _ENABLED:
+        return
+    connection_pool_max_size.labels(dialect=dialect).set(max_size)
 
 
 def record_cache_hit(cache: str) -> None:
@@ -305,13 +318,17 @@ async def _refresh_pool_gauges() -> None:
         manager = _pool_manager_instance
         if manager is None:
             return
-        # Aggregate (active+idle) per dialect.
+        snapshot = await manager.get_pool_metrics_snapshot()
         sizes: dict[str, int] = {}
-        for (_, dialect), pool in list(manager._pools.items()):
-            m = pool.metrics
-            sizes[dialect] = sizes.get(dialect, 0) + int(m.active_connections + m.idle_connections)
+        capacities: dict[str, int] = {}
+        for entry in snapshot:
+            d = entry["dialect"]
+            sizes[d] = sizes.get(d, 0) + entry["active"] + entry["idle"]
+            capacities[d] = capacities.get(d, 0) + entry["total_capacity"]
         for dialect, size in sizes.items():
             set_pool_size(dialect, size)
+        for dialect, cap in capacities.items():
+            set_pool_max_size(dialect, cap)
     except Exception as e:  # noqa: BLE001
         logger.debug("pool gauge refresh failed: %s", e)
 
@@ -363,6 +380,7 @@ def reset_for_test() -> None:
         "sql_query_duration_seconds",
         "connection_pool_checkouts_total",
         "connection_pool_size",
+        "connection_pool_max_size",
         "cache_hits_total",
         "cache_misses_total",
     ):
