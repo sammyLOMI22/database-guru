@@ -1,7 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, RotateCcw, Info } from 'lucide-react';
+import {
+  Settings as SettingsIcon,
+  Save,
+  RotateCcw,
+  Info,
+  Activity,
+  ExternalLink,
+  Gauge,
+  Search,
+  BarChart3,
+} from 'lucide-react';
 import { ModelConfigPanel } from './ModelConfigPanel';
 import { LLMProviderSettings } from './LLMProviderSettings';
+import { useLastRequestStore, shortId } from '../stores/lastRequestStore';
 
 interface SystemSettings {
   id: number;
@@ -43,6 +54,15 @@ interface SystemSettings {
   timeout_impact_analysis: number;
   timeout_schema_health: number;
   timeout_lineage_conversation: number;
+  // Observability surfacing (Phase 24)
+  metrics_enabled?: boolean;
+  metrics_endpoint_exposed?: boolean;
+  metrics_public_url?: string | null;
+  otel_enabled?: boolean;
+  otel_service_name?: string | null;
+  otel_traces_sampler_ratio?: number | null;
+  jaeger_ui_url?: string | null;
+  grafana_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -577,10 +597,158 @@ export function SettingsPanel() {
             </div>
           </div>
 
+          {/* Observability (Phase 24) */}
+          <ObservabilitySection settings={settings} />
+
           {/* Metadata */}
           <div className="pt-2 flex justify-between items-center text-xs font-black uppercase tracking-[0.2em] text-gray-400">
             <p>LAST_SYNC: {new Date(settings.updated_at).toLocaleTimeString()}</p>
             <p className="text-gray-300 dark:text-gray-600">ID: {settings.id.toString(16).toUpperCase()}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ObservabilityLinkProps {
+  href: string | null | undefined;
+  enabled: boolean;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  disabledReason: string;
+}
+
+function ObservabilityLink({ href, enabled, label, description, icon, disabledReason }: ObservabilityLinkProps) {
+  const usable = enabled && !!href;
+  const baseClasses =
+    'flex items-start gap-3 p-4 rounded-xl border transition-all glass-panel';
+  const stateClasses = usable
+    ? 'border-blue-500/30 hover:border-blue-500/60 hover:shadow-lg hover:shadow-blue-500/10'
+    : 'border-gray-200 dark:border-gray-700 opacity-60 cursor-not-allowed';
+
+  const content = (
+    <>
+      <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 flex-shrink-0">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{label}</span>
+          {usable ? (
+            <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+          ) : (
+            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-800 text-gray-500">
+              {!enabled ? 'Disabled' : 'No URL'}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          {usable ? description : disabledReason}
+        </p>
+        {usable && href && (
+          <p className="text-[10px] font-mono text-gray-400 mt-1 truncate">{href}</p>
+        )}
+      </div>
+    </>
+  );
+
+  if (usable && href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`${baseClasses} ${stateClasses}`}
+      >
+        {content}
+      </a>
+    );
+  }
+  return <div className={`${baseClasses} ${stateClasses}`}>{content}</div>;
+}
+
+function ObservabilitySection({ settings }: { settings: SystemSettings }) {
+  const last = useLastRequestStore((s) => s.last);
+  const metricsHref =
+    settings.metrics_public_url ||
+    (settings.metrics_endpoint_exposed ? '/metrics' : null);
+
+  return (
+    <div className="space-y-6">
+      <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white flex items-center gap-3">
+        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+        Observability
+      </h3>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <ObservabilityLink
+          href={metricsHref}
+          enabled={!!settings.metrics_enabled && !!settings.metrics_endpoint_exposed}
+          label="Prometheus metrics"
+          description="Scrape /metrics for request counts, latencies, and LLM usage."
+          icon={<Gauge className="w-4 h-4" />}
+          disabledReason={
+            !settings.metrics_enabled
+              ? 'METRICS_ENABLED is off. Set it in your .env to collect metrics.'
+              : !settings.metrics_endpoint_exposed
+                ? 'Endpoint disabled. Set METRICS_EXPOSE_ENDPOINT=true to expose /metrics.'
+                : 'No browser-accessible URL configured. Set METRICS_PUBLIC_URL.'
+          }
+        />
+        <ObservabilityLink
+          href={settings.jaeger_ui_url}
+          enabled={!!settings.otel_enabled}
+          label="Jaeger traces"
+          description={`Search traces${settings.otel_service_name ? ` for service "${settings.otel_service_name}"` : ''}.`}
+          icon={<Search className="w-4 h-4" />}
+          disabledReason={
+            !settings.otel_enabled
+              ? 'OTEL_ENABLED is off. Tracing is disabled.'
+              : 'No Jaeger UI configured. Set JAEGER_UI_URL in your .env.'
+          }
+        />
+        <ObservabilityLink
+          href={settings.grafana_url}
+          enabled={true}
+          label="Grafana dashboards"
+          description="Open the operator dashboards for this deployment."
+          icon={<BarChart3 className="w-4 h-4" />}
+          disabledReason="Set GRAFANA_URL to add a deep-link to your dashboards."
+        />
+      </div>
+
+      <div className="p-4 rounded-xl glass-panel bg-gradient-to-br from-emerald-500/5 via-transparent to-blue-500/5 border-white/10">
+        <div className="flex items-start gap-3">
+          <Activity className="w-4 h-4 mt-0.5 text-emerald-500 flex-shrink-0" />
+          <div className="flex-1 min-w-0 text-xs text-gray-600 dark:text-gray-300">
+            <p className="font-bold text-gray-800 dark:text-gray-100 mb-1">
+              Last request correlation
+            </p>
+            {last ? (
+              <p>
+                Use{' '}
+                <span className="font-mono px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-blue-600 dark:text-blue-400">
+                  {shortId(last.requestId)}
+                </span>{' '}
+                to grep your structured logs (full id available from the badge in the header).
+                {last.traceparent && (
+                  <>
+                    {' '}Traceparent: <span className="font-mono">{last.traceparent}</span>.
+                  </>
+                )}
+              </p>
+            ) : (
+              <p>
+                Run a query — the most recent <span className="font-mono">X-Request-ID</span>{' '}
+                will appear here and in the header badge for log correlation.
+              </p>
+            )}
+            {settings.otel_traces_sampler_ratio != null && (
+              <p className="mt-2 text-[11px] text-gray-500">
+                Trace sampler ratio:{' '}
+                <span className="font-mono">{settings.otel_traces_sampler_ratio}</span>
+              </p>
+            )}
           </div>
         </div>
       </div>

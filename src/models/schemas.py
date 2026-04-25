@@ -513,6 +513,17 @@ class SystemSettingsResponse(BaseModel):
     # Server-level auth configuration (read-only, from environment)
     require_auth: bool = False
 
+    # Server-level observability configuration (read-only, from environment).
+    # Phase 24 admin UI uses these to render deep-links and feature gates.
+    metrics_enabled: bool = False
+    metrics_endpoint_exposed: bool = False
+    metrics_public_url: Optional[str] = None
+    otel_enabled: bool = False
+    otel_service_name: Optional[str] = None
+    otel_traces_sampler_ratio: Optional[float] = None
+    jaeger_ui_url: Optional[str] = None
+    grafana_url: Optional[str] = None
+
     class Config:
         from_attributes = True
 

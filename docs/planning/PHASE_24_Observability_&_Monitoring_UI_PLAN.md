@@ -67,7 +67,7 @@ Implementation Plan — UI Integration Gaps
                                                                                                                                                        
   Backend (src/api/endpoints/audit.py)                                                                                                                 
   - Verify GET /api/audit/logs exists with filters: user_id, action, resource_type, start_date, end_date, limit, offset. Add if missing, gated by      
-  require_admin.                                                                                                                                       
+  require_admin.                                                                                                           
   - Add GET /api/audit/actions returning distinct action types for filter dropdown.
                                                                                                                                                        
   Frontend                                                                                                                                             

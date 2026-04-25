@@ -13,7 +13,7 @@ import { LineagePanel } from './components/lineage/LineagePanel';
 import { LLMUsageDashboard } from './components/dashboard/LLMUsageDashboard';
 import { MigrationPanel } from './components/migration/MigrationPanel';
 import { PerformancePanel } from './components/performance/PerformancePanel';
-import AuditLogViewer from './components/admin/AuditLogViewer';
+import AdminPanel from './components/admin/AdminPanel';
 import RequireAdmin from './components/common/RequireAdmin';
 import SchemaPanel from './components/SchemaPanel';
 import { healthAPI, settingsAPI } from './services/api';
@@ -196,10 +196,12 @@ function App() {
             </div>
 
             {/* Admin */}
-            <div className={`flex-1 overflow-auto pb-32 ${activeTab === 'admin' ? '' : 'hidden'}`}>
-              <RequireAdmin user={user}>
-                <AuditLogViewer />
-              </RequireAdmin>
+            <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'admin' ? '' : 'hidden'}`}>
+              <div className="flex-1 flex flex-col h-full min-h-0">
+                <RequireAdmin user={user}>
+                  <AdminPanel />
+                </RequireAdmin>
+              </div>
             </div>
 
             {/* Settings */}

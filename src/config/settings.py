@@ -150,6 +150,13 @@ class Settings(BaseSettings):
     OTEL_SERVICE_NAME: str = "database-guru"
     OTEL_TRACES_SAMPLER_RATIO: float = 0.1
 
+    # External observability UI deep-links (Phase 24 admin UI). All optional —
+    # when unset the UI hides the link rather than dead-linking to a host that
+    # may not be reachable from the operator's browser.
+    JAEGER_UI_URL: str = ""           # e.g. http://localhost:16686
+    GRAFANA_URL: str = ""             # e.g. http://localhost:3001
+    METRICS_PUBLIC_URL: str = ""      # browser-accessible URL for /metrics
+
     class Config:
         env_file = ".env"
         case_sensitive = True

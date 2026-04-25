@@ -86,6 +86,16 @@ async def get_app_settings(
         settings = await get_or_create_settings(db)
         response = SystemSettingsResponse.model_validate(settings)
         response.require_auth = app_settings.REQUIRE_AUTH
+        # Surface observability config so the admin UI can render deep-links
+        # and conditionally enable the Health/metrics views (Phase 24).
+        response.metrics_enabled = app_settings.METRICS_ENABLED
+        response.metrics_endpoint_exposed = app_settings.METRICS_EXPOSE_ENDPOINT
+        response.metrics_public_url = app_settings.METRICS_PUBLIC_URL or None
+        response.otel_enabled = app_settings.OTEL_ENABLED
+        response.otel_service_name = app_settings.OTEL_SERVICE_NAME or None
+        response.otel_traces_sampler_ratio = app_settings.OTEL_TRACES_SAMPLER_RATIO
+        response.jaeger_ui_url = app_settings.JAEGER_UI_URL or None
+        response.grafana_url = app_settings.GRAFANA_URL or None
         return response
     except Exception as e:
         logger.error(f"Failed to get settings: {e}", exc_info=True)
