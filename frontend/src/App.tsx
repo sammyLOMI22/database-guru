@@ -199,7 +199,7 @@ function App() {
             <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'admin' ? '' : 'hidden'}`}>
               <div className="flex-1 flex flex-col h-full min-h-0">
                 <RequireAdmin user={user}>
-                  <AdminPanel />
+                  <AdminPanel currentUserId={user?.id} />
                 </RequireAdmin>
               </div>
             </div>

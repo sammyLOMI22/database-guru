@@ -1,27 +1,23 @@
 import { useState } from 'react';
-import { ScrollText, HeartPulse } from 'lucide-react';
+import { ScrollText, HeartPulse, Users } from 'lucide-react';
 import AuditLogViewer from './AuditLogViewer';
+import UserManagement from './UserManagement';
 import { ObservabilityDemo } from '../ObservabilityDemo';
 
-type AdminSubTab = 'audit' | 'health';
+type AdminSubTab = 'users' | 'audit' | 'health';
 
-const SUB_TABS: { id: AdminSubTab; label: string; icon: React.ReactNode; description: string }[] = [
-  {
-    id: 'audit',
-    label: 'Audit Log',
-    icon: <ScrollText className="w-3.5 h-3.5" />,
-    description: 'Security-relevant actions taken in this deployment.',
-  },
-  {
-    id: 'health',
-    label: 'Health',
-    icon: <HeartPulse className="w-3.5 h-3.5" />,
-    description: 'End-to-end observability surface (planning, verification, traces).',
-  },
+const SUB_TABS: { id: AdminSubTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'users', label: 'Users', icon: <Users className="w-3.5 h-3.5" /> },
+  { id: 'audit', label: 'Audit Log', icon: <ScrollText className="w-3.5 h-3.5" /> },
+  { id: 'health', label: 'Health', icon: <HeartPulse className="w-3.5 h-3.5" /> },
 ];
 
-export default function AdminPanel() {
-  const [tab, setTab] = useState<AdminSubTab>('audit');
+interface AdminPanelProps {
+  currentUserId?: number;
+}
+
+export default function AdminPanel({ currentUserId }: AdminPanelProps) {
+  const [tab, setTab] = useState<AdminSubTab>('users');
 
   return (
     <div className="flex flex-col h-full">
@@ -43,6 +39,7 @@ export default function AdminPanel() {
       </nav>
 
       <div className="flex-1 overflow-auto">
+        {tab === 'users' && <UserManagement currentUserId={currentUserId} />}
         {tab === 'audit' && <AuditLogViewer />}
         {tab === 'health' && <ObservabilityDemo />}
       </div>
