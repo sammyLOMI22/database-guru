@@ -260,8 +260,9 @@ app.include_router(llm_usage.router, prefix="/api")  # Phase 16: LLM usage monit
 app.include_router(migration.router, prefix="/api")  # Phase 20: Migration Toolkit
 app.include_router(performance.router, prefix="/api")  # Phase 22: Performance Guru
 app.include_router(auth.router, prefix="/api")  # Phase 21: Security & Auth
-app.include_router(audit.router, prefix="/api")  # Phase 21: Audit logging
-app.include_router(admin_users.router, prefix="/api")  # Phase 24: Admin user management
+if _settings.ADMIN_UI_ENABLED:
+    app.include_router(audit.router, prefix="/api")  # Phase 21: Audit logging
+    app.include_router(admin_users.router, prefix="/api")  # Phase 24: Admin user management
 app.include_router(dml.router, prefix="/api")  # Phase 18: Edit Mode & DML
 app.include_router(llm_providers.router, prefix="/api")  # Phase 15: LLM Provider Management
 

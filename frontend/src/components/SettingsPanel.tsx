@@ -63,6 +63,7 @@ interface SystemSettings {
   otel_traces_sampler_ratio?: number | null;
   jaeger_ui_url?: string | null;
   grafana_url?: string | null;
+  admin_ui_enabled?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -597,8 +598,8 @@ export function SettingsPanel() {
             </div>
           </div>
 
-          {/* Observability (Phase 24) */}
-          <ObservabilitySection settings={settings} />
+          {/* Observability (Phase 24) — hidden entirely when admin UI is disabled */}
+          {settings.admin_ui_enabled !== false && <ObservabilitySection settings={settings} />}
 
           {/* Metadata */}
           <div className="pt-2 flex justify-between items-center text-xs font-black uppercase tracking-[0.2em] text-gray-400">

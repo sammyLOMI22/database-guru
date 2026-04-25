@@ -96,6 +96,7 @@ async def get_app_settings(
         response.otel_traces_sampler_ratio = app_settings.OTEL_TRACES_SAMPLER_RATIO
         response.jaeger_ui_url = app_settings.JAEGER_UI_URL or None
         response.grafana_url = app_settings.GRAFANA_URL or None
+        response.admin_ui_enabled = app_settings.ADMIN_UI_ENABLED
         return response
     except Exception as e:
         logger.error(f"Failed to get settings: {e}", exc_info=True)

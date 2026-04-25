@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from 'react';
 import EnhancedChatInterface from './components/EnhancedChatInterface';
 import Header from './components/Header';
 import AuthPage from './components/AuthPage';
-import { ObservabilityDemo } from './components/ObservabilityDemo';
 import { FeedbackStats } from './components/FeedbackStats';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ToolsPanel } from './components/ToolsPanel';
@@ -33,8 +32,8 @@ function App() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const { user, isLoading: authLoading, isAuthenticated, login, register, logout } = useAuth();
   const [isHealthy, setIsHealthy] = useState(false);
-  const [showDemo, setShowDemo] = useState(false);
   const [requireAuth, setRequireAuth] = useState(false);
+  const [adminUiEnabled, setAdminUiEnabled] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'migration' | 'performance' | 'admin' | 'settings'>('chat');
 
@@ -66,30 +65,20 @@ function App() {
       .then(() => setIsHealthy(true))
       .catch(() => setIsHealthy(false));
 
-    // Check if backend requires auth via the public settings endpoint.
+    // Check if backend requires auth + whether the admin UI kill-switch is on.
     settingsAPI.getSettings()
       .then((data: any) => {
         if (data?.require_auth) {
           setRequireAuth(true);
         }
+        // admin_ui_enabled defaults to true when older backends don't return it.
+        if (data?.admin_ui_enabled === false) {
+          setAdminUiEnabled(false);
+        }
       })
       .catch(() => {/* settings fetch failed — default to no auth required */});
 
-    // Check URL for demo parameter
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('demo') === 'true') {
-      setShowDemo(true);
-    }
   }, []);
-
-  // Show demo if ?demo=true in URL
-  if (showDemo) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <ObservabilityDemo />
-      </QueryClientProvider>
-    );
-  }
 
   // Show loading while verifying stored token
   if (authLoading) {
@@ -122,7 +111,7 @@ function App() {
           activeTab={activeTab}
           onTabChange={(id) => setActiveTab(id as any)}
           user={user}
-          isAdmin={!!user?.is_admin}
+          isAdmin={adminUiEnabled && !!user?.is_admin}
           onLogout={() => { logout(); if (requireAuth) setShowAuth(true); }}
           onSignIn={() => setShowAuth(true)}
         />
@@ -196,13 +185,15 @@ function App() {
             </div>
 
             {/* Admin */}
-            <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'admin' ? '' : 'hidden'}`}>
-              <div className="flex-1 flex flex-col h-full min-h-0">
-                <RequireAdmin user={user}>
-                  <AdminPanel currentUserId={user?.id} />
-                </RequireAdmin>
+            {adminUiEnabled && (
+              <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'admin' ? '' : 'hidden'}`}>
+                <div className="flex-1 flex flex-col h-full min-h-0">
+                  <RequireAdmin user={user}>
+                    <AdminPanel currentUserId={user?.id} />
+                  </RequireAdmin>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Settings */}
             <div className={`flex-1 overflow-auto pb-32 ${activeTab === 'settings' ? '' : 'hidden'}`}>

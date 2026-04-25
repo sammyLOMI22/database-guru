@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ScrollText, HeartPulse, Users } from 'lucide-react';
 import AuditLogViewer from './AuditLogViewer';
 import UserManagement from './UserManagement';
-import { ObservabilityDemo } from '../ObservabilityDemo';
+import SystemHealthPanel from './SystemHealthPanel';
 
 type AdminSubTab = 'users' | 'audit' | 'health';
 
@@ -41,7 +41,7 @@ export default function AdminPanel({ currentUserId }: AdminPanelProps) {
       <div className="flex-1 overflow-auto">
         {tab === 'users' && <UserManagement currentUserId={currentUserId} />}
         {tab === 'audit' && <AuditLogViewer />}
-        {tab === 'health' && <ObservabilityDemo />}
+        {tab === 'health' && <SystemHealthPanel />}
       </div>
     </div>
   );

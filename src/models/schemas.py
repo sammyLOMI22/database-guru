@@ -524,6 +524,9 @@ class SystemSettingsResponse(BaseModel):
     jaeger_ui_url: Optional[str] = None
     grafana_url: Optional[str] = None
 
+    # Hard kill-switch for the Phase 24 admin UI as a whole.
+    admin_ui_enabled: bool = True
+
     class Config:
         from_attributes = True
 

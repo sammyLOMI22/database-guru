@@ -157,6 +157,11 @@ class Settings(BaseSettings):
     GRAFANA_URL: str = ""             # e.g. http://localhost:3001
     METRICS_PUBLIC_URL: str = ""      # browser-accessible URL for /metrics
 
+    # Hard kill-switch for the Phase 24 admin UI (audit log, user management,
+    # observability surface). When False the routers are not mounted and the
+    # frontend hides the Admin tab and Observability section entirely.
+    ADMIN_UI_ENABLED: bool = True
+
     class Config:
         env_file = ".env"
         case_sensitive = True

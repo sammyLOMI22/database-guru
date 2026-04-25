@@ -87,6 +87,7 @@ class TestObservabilitySettingsExposure:
             OTEL_TRACES_SAMPLER_RATIO=0.1,
             JAEGER_UI_URL="",
             GRAFANA_URL="",
+            ADMIN_UI_ENABLED=True,
         )
         app = _build_app(app_settings)
         with patch(
@@ -118,6 +119,7 @@ class TestObservabilitySettingsExposure:
             OTEL_TRACES_SAMPLER_RATIO=0.25,
             JAEGER_UI_URL="http://jaeger.example.com",
             GRAFANA_URL="http://grafana.example.com/d/abc",
+            ADMIN_UI_ENABLED=True,
         )
         app = _build_app(app_settings)
         with patch(
@@ -135,3 +137,27 @@ class TestObservabilitySettingsExposure:
         assert body["otel_traces_sampler_ratio"] == 0.25
         assert body["jaeger_ui_url"] == "http://jaeger.example.com"
         assert body["grafana_url"] == "http://grafana.example.com/d/abc"
+        assert body["admin_ui_enabled"] is True
+
+    def test_admin_ui_toggle_surfaces_in_response(self):
+        app_settings = SimpleNamespace(
+            REQUIRE_AUTH=False,
+            METRICS_ENABLED=False,
+            METRICS_EXPOSE_ENDPOINT=False,
+            METRICS_PUBLIC_URL="",
+            OTEL_ENABLED=False,
+            OTEL_SERVICE_NAME="database-guru",
+            OTEL_TRACES_SAMPLER_RATIO=0.1,
+            JAEGER_UI_URL="",
+            GRAFANA_URL="",
+            ADMIN_UI_ENABLED=False,
+        )
+        app = _build_app(app_settings)
+        with patch(
+            "src.api.endpoints.settings.get_or_create_settings",
+            new=AsyncMock(return_value=_settings_obj()),
+        ):
+            client = TestClient(app)
+            resp = client.get("/api/settings/")
+        assert resp.status_code == 200
+        assert resp.json()["admin_ui_enabled"] is False
