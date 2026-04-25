@@ -1,6 +1,7 @@
 import { Database, Sun, Moon, LogIn, LogOut, User } from 'lucide-react';
 import mascot from '../assets/boxer_mascot.png';
 import type { AuthUser } from '../hooks/useAuth';
+import LastRequestBadge from './common/LastRequestBadge';
 
 interface HeaderProps {
   isHealthy: boolean;
@@ -74,6 +75,9 @@ export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTa
 
         {/* Right Side: Status & Controls */}
         <div className="flex items-center space-x-6 min-w-[240px] justify-end">
+          {/* Last request id (Phase 24 observability) */}
+          <LastRequestBadge />
+
           {/* Theme Toggle */}
           <button
             onClick={toggleDarkMode}
