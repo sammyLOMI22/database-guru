@@ -74,7 +74,11 @@ class AdminUserUpdate(BaseModel):
 class AdminPasswordResetResponse(BaseModel):
     user_id: int
     temporary_password: str
-    detail: str = "Share this password securely. The user should change it on next login."
+    detail: str = (
+        "Share this password securely. The user will be forced to change it "
+        "on next login before they can use the application."
+    )
+    must_change_password: bool = True
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -266,6 +270,9 @@ async def reset_user_password(
 
     temp_password = _generate_temp_password()
     user.hashed_password = auth_service.hash_password(temp_password)
+    # Force the user through the change-password flow on next login so the
+    # operator-generated credential cannot become a long-lived secret.
+    user.must_change_password = True
 
     await log_action(
         db,

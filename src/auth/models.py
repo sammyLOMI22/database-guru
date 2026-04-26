@@ -15,6 +15,10 @@ class User(Base):
 
     is_active = Column(Boolean, default=True, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
+    # Set to True after an operator resets the password via the admin UI.
+    # The login response surfaces this flag so the frontend forces a change
+    # before any other action; the change-password endpoint clears it.
+    must_change_password = Column(Boolean, default=False, nullable=False, server_default="0")
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc),

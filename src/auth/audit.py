@@ -1,5 +1,4 @@
 """Audit logging for security-sensitive operations (Phase 21)"""
-import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
@@ -174,15 +173,16 @@ async def list_and_count_audit_logs(
 async def get_audit_facets(db: AsyncSession) -> Dict[str, list]:
     """Return distinct action/resource_type values for filter dropdowns.
 
-    Runs the two distinct queries concurrently so the round-trip cost is
-    `max(rtt_actions, rtt_resources)` instead of the sum.
+    Runs the two distinct queries sequentially. SQLAlchemy ``AsyncSession``
+    serializes a single underlying connection, so ``asyncio.gather`` against
+    the same session can raise "session is already provisioning" with real
+    drivers (asyncpg/aiomysql) even though it works fine with mocked sessions
+    in tests. Two short admin-screen lookups don't justify a separate session.
     """
     actions_q = select(AuditLog.action).distinct().order_by(AuditLog.action)
     resources_q = select(AuditLog.resource_type).distinct().order_by(AuditLog.resource_type)
-    actions_res, resources_res = await asyncio.gather(
-        db.execute(actions_q),
-        db.execute(resources_q),
-    )
+    actions_res = await db.execute(actions_q)
+    resources_res = await db.execute(resources_q)
     return {
         "actions": [a for a in actions_res.scalars().all() if a],
         "resource_types": [r for r in resources_res.scalars().all() if r],

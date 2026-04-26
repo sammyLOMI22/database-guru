@@ -226,12 +226,16 @@ class TestResetPassword:
         assert body["user_id"] == seed_users["alice"].id
         temp = body["temporary_password"]
         assert len(temp) == 16
+        # Operator-driven reset must flag the account so the next login is
+        # forced through the change-password flow.
+        assert body["must_change_password"] is True
 
         # Hash actually rotated and verifies against the temp password.
         async with session_factory() as db:
             row = await db.execute(select(User).where(User.id == seed_users["alice"].id))
             alice = row.scalar_one()
         assert AuthService.verify_password(temp, alice.hashed_password)
+        assert alice.must_change_password is True
 
         actions = await _all_audit_actions(session_factory)
         assert "admin_reset_password" in actions

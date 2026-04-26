@@ -6,14 +6,18 @@ import pytest
 from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 
-from src.api.endpoints.audit import router
+from src.api.endpoints.audit import admin_router, router
 from src.auth.audit import AuditLog
 from src.auth.dependencies import get_current_active_user, require_admin
 
 
 def _make_app() -> FastAPI:
     app = FastAPI()
+    # /logs/me lives on `router` (always mounted); /logs and /facets are on
+    # `admin_router` (gated behind ADMIN_UI_ENABLED in main.py). Both belong
+    # to the same audit surface, so mount them together for these tests.
     app.include_router(router, prefix="/api")
+    app.include_router(admin_router, prefix="/api")
     return app
 
 
@@ -205,9 +209,7 @@ class TestAuditFilterHelpers:
         from src.auth.audit import get_audit_facets
 
         db = AsyncMock()
-        # Two execute() calls dispatched concurrently via asyncio.gather —
-        # AsyncMock consumes side_effect in call-registration order so this
-        # remains deterministic.
+        # Two sequential execute() calls — actions, then resource_types.
         actions_result = MagicMock()
         actions_scalars = MagicMock()
         actions_scalars.all.return_value = ["login", "logout"]

@@ -223,17 +223,26 @@ The compose file ships an `observability` profile with three services:
 # Default stack (no observability):
 docker compose up -d
 
-# Add the monitoring stack (Jaeger + Prometheus + Grafana):
+# Recommended: add the monitoring stack AND auto-enable backend flags so
+# Prometheus has something to scrape and Jaeger receives spans:
+docker compose -f docker-compose.yml -f docker-compose.observability.yml \
+    --profile observability up -d
+
+# Bare profile (monitoring containers only — backend flags stay off):
 docker compose --profile observability up -d
 ```
 
-> ⚠ The `--profile observability` flag starts the **monitoring tooling
-> only** — it does not flip the backend's observability flags. The Prometheus
-> container will scrape `backend:8000/metrics` immediately, but until you
-> also set `METRICS_ENABLED=true`, `METRICS_EXPOSE_ENDPOINT=true`, and
-> `OTEL_ENABLED=true` in the backend env (see `.env.docker`), `/metrics`
-> will return 404 and no spans will be exported. Restart the backend
-> container after editing the env.
+> ⚠ Using `--profile observability` on its own brings up Jaeger, Prometheus,
+> and Grafana but does **not** flip the backend's observability flags.
+> Prometheus will scrape `backend:8000/metrics` immediately, but until
+> `METRICS_ENABLED=true`, `METRICS_EXPOSE_ENDPOINT=true`, and `OTEL_ENABLED=true`
+> are set on the backend, `/metrics` returns 404 and no spans are exported.
+>
+> The `docker-compose.observability.yml` override sets those flags (plus the
+> Jaeger/Grafana deep-link URLs and `ADMIN_UI_ENABLED`) automatically. If you
+> prefer to keep observability config in `.env.docker`, uncomment the Phase 24
+> block in that file and use the bare profile command — values you set there
+> override the compose override.
 
 | Service | Image | Port |
 |---|---|---|

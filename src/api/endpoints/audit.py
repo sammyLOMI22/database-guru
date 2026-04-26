@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
+# Routes that are admin-only and only useful when the admin UI is mounted.
+# Mounted by main.py only when ADMIN_UI_ENABLED=True.
+admin_router = APIRouter(prefix="/audit", tags=["audit"])
+
 
 class AuditLogResponse(BaseModel):
     id: int
@@ -47,7 +51,7 @@ class AuditFacetsResponse(BaseModel):
     resource_types: List[str]
 
 
-@router.get("/logs", response_model=AuditLogListResponse)
+@admin_router.get("/logs", response_model=AuditLogListResponse)
 async def list_audit_logs(
     user_id: Optional[int] = None,
     action: Optional[str] = None,
@@ -108,7 +112,7 @@ async def list_my_audit_logs(
     )
 
 
-@router.get("/facets", response_model=AuditFacetsResponse)
+@admin_router.get("/facets", response_model=AuditFacetsResponse)
 async def list_audit_facets(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),

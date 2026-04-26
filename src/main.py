@@ -263,8 +263,13 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(migration.router, prefix="/api")
     app.include_router(performance.router, prefix="/api")
     app.include_router(auth.router, prefix="/api")
+    # /api/audit/logs/me is per-user and predates the admin UI; keep it mounted
+    # regardless of ADMIN_UI_ENABLED so end users can always see their own
+    # activity. The admin-only routes (logs list, facets) and user CRUD are
+    # gated behind the kill-switch.
+    app.include_router(audit.router, prefix="/api")
     if settings.ADMIN_UI_ENABLED:
-        app.include_router(audit.router, prefix="/api")
+        app.include_router(audit.admin_router, prefix="/api")
         app.include_router(admin_users.router, prefix="/api")
     app.include_router(dml.router, prefix="/api")
     app.include_router(llm_providers.router, prefix="/api")

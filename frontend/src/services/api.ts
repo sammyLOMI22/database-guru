@@ -639,6 +639,14 @@ export interface AuthUserResponse {
   is_active: boolean;
   is_admin: boolean;
   created_at: string;
+  // True after an operator-driven reset; the UI must force a password change
+  // before the user can do anything else.
+  must_change_password?: boolean;
+}
+
+export interface PasswordChangeRequest {
+  current_password: string;
+  new_password: string;
 }
 
 export interface AuthTokenResponse {
@@ -661,6 +669,11 @@ export const authAPI = {
 
   async getMe(): Promise<AuthUserResponse> {
     const { data: resp } = await api.get<AuthUserResponse>('/api/auth/me');
+    return resp;
+  },
+
+  async changePassword(data: PasswordChangeRequest): Promise<AuthUserResponse> {
+    const { data: resp } = await api.post<AuthUserResponse>('/api/auth/change-password', data);
     return resp;
   },
 };

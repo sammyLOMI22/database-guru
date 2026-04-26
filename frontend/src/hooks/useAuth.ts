@@ -8,6 +8,7 @@ export interface AuthUser {
   is_active: boolean;
   is_admin: boolean;
   created_at: string;
+  must_change_password?: boolean;
 }
 
 interface AuthState {
@@ -86,6 +87,14 @@ export function useAuth() {
     setState({ token: null, user: null, isLoading: false });
   }, []);
 
+  // Patch the cached user (e.g. after a successful password change clears
+  // must_change_password) so the rest of the app reads the fresh state
+  // without forcing a re-login round trip.
+  const updateUser = useCallback((user: AuthUser) => {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    setState((prev) => ({ ...prev, user }));
+  }, []);
+
   return {
     user: state.user,
     token: state.token,
@@ -94,6 +103,7 @@ export function useAuth() {
     login,
     register,
     logout,
+    updateUser,
   };
 }
 

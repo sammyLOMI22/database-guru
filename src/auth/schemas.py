@@ -54,6 +54,10 @@ class UserResponse(BaseModel):
     is_active: bool
     is_admin: bool
     created_at: datetime
+    # True after an operator-driven password reset; the frontend uses this to
+    # route the user into a forced-change screen before letting them do
+    # anything else with the session.
+    must_change_password: bool = False
 
     class Config:
         from_attributes = True
@@ -65,5 +69,16 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
+
+
+class PasswordChangeRequest(BaseModel):
+    """Request model for self-service password change."""
+    current_password: str
+    new_password: str = Field(..., min_length=12, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return validate_password_complexity(v)
 
 

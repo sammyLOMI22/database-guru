@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import EnhancedChatInterface from './components/EnhancedChatInterface';
 import Header from './components/Header';
 import AuthPage from './components/AuthPage';
+import ForcedPasswordChange from './components/ForcedPasswordChange';
 import { FeedbackStats } from './components/FeedbackStats';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ToolsPanel } from './components/ToolsPanel';
@@ -31,10 +32,12 @@ const queryClient = new QueryClient({
 
 function App() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
-  const { user, isLoading: authLoading, isAuthenticated, login, register, logout } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated, login, register, logout, updateUser } = useAuth();
   const [isHealthy, setIsHealthy] = useState(false);
   const [requireAuth, setRequireAuth] = useState(false);
-  const [adminUiEnabled, setAdminUiEnabled] = useState(true);
+  // Default false until /api/settings confirms it. If the settings fetch fails
+  // we'd rather hide the Admin tab than render a tab that 404s on every click.
+  const [adminUiEnabled, setAdminUiEnabled] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'migration' | 'performance' | 'admin' | 'settings'>('chat');
 
@@ -72,12 +75,14 @@ function App() {
         if (data?.require_auth) {
           setRequireAuth(true);
         }
-        // admin_ui_enabled defaults to true when older backends don't return it.
-        if (data?.admin_ui_enabled === false) {
-          setAdminUiEnabled(false);
+        // Older backends (pre-Phase 24.7) don't return admin_ui_enabled; treat
+        // a missing field as "enabled" so existing deployments don't lose the
+        // Admin tab on upgrade. New backends explicitly set the flag.
+        if (data?.admin_ui_enabled !== false) {
+          setAdminUiEnabled(true);
         }
       })
-      .catch(() => {/* settings fetch failed — default to no auth required */});
+      .catch(() => {/* settings fetch failed — default to no auth required, hide Admin tab */});
 
   }, []);
 
@@ -98,6 +103,22 @@ function App() {
         onRegister={async (e, u, p) => { await register(e, u, p); setShowAuth(false); }}
         onSkip={requireAuth ? undefined : () => setShowAuth(false)}
         requireAuth={requireAuth}
+      />
+    );
+  }
+
+  // After an operator-driven password reset the backend flags the account
+  // until the user picks a new password; intercept the whole UI here so the
+  // temporary credential cannot be used to perform any other action.
+  if (isAuthenticated && user?.must_change_password) {
+    return (
+      <ForcedPasswordChange
+        username={user.username}
+        onChanged={(updated) => updateUser({ ...user, ...updated })}
+        onLogout={() => {
+          logout();
+          if (requireAuth) setShowAuth(true);
+        }}
       />
     );
   }
