@@ -540,6 +540,23 @@ class SystemSettingsResponse(BaseModel):
     # Hard kill-switch for the Phase 24 admin UI as a whole.
     admin_ui_enabled: bool = True
 
+    # Auth hardening flags (read-only mirror of Settings; Admin UI surfaces
+    # these so an operator can tell at a glance which protections are live).
+    # See docs/planning/PASSWORD_AUTH_HARDENING_PLAN.md for the rollout plan.
+    auth_token_versioning_enabled: bool = False
+    auth_invalidate_tokens_on_deactivate: bool = False
+    auth_invalidate_tokens_on_logout: bool = False
+    auth_rate_limit_change_password: bool = False
+    auth_change_password_per_user_per_minute: int = 5
+    auth_rate_limit_login_lockout_enabled: bool = False
+    auth_login_lockout_threshold: int = 5
+    auth_login_lockout_window_seconds: int = 900
+    auth_password_reset_mode: str = "temp_password"
+    auth_password_reset_token_ttl_minutes: int = 15
+    auth_password_reset_base_url: Optional[str] = None
+    auth_password_history_depth: int = 0
+    auth_require_admin_quorum: bool = False
+
     class Config:
         from_attributes = True
 

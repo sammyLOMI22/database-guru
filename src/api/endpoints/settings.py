@@ -97,6 +97,21 @@ async def get_app_settings(
         response.jaeger_ui_url = app_settings.JAEGER_UI_URL or None
         response.grafana_url = app_settings.GRAFANA_URL or None
         response.admin_ui_enabled = app_settings.ADMIN_UI_ENABLED
+
+        # Auth hardening flags (read-only) — see PASSWORD_AUTH_HARDENING_PLAN.md.
+        response.auth_token_versioning_enabled = app_settings.AUTH_TOKEN_VERSIONING_ENABLED
+        response.auth_invalidate_tokens_on_deactivate = app_settings.AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE
+        response.auth_invalidate_tokens_on_logout = app_settings.AUTH_INVALIDATE_TOKENS_ON_LOGOUT
+        response.auth_rate_limit_change_password = app_settings.AUTH_RATE_LIMIT_CHANGE_PASSWORD
+        response.auth_change_password_per_user_per_minute = app_settings.AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE
+        response.auth_rate_limit_login_lockout_enabled = app_settings.AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED
+        response.auth_login_lockout_threshold = app_settings.AUTH_LOGIN_LOCKOUT_THRESHOLD
+        response.auth_login_lockout_window_seconds = app_settings.AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS
+        response.auth_password_reset_mode = app_settings.AUTH_PASSWORD_RESET_MODE
+        response.auth_password_reset_token_ttl_minutes = app_settings.AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES
+        response.auth_password_reset_base_url = app_settings.AUTH_PASSWORD_RESET_BASE_URL or None
+        response.auth_password_history_depth = app_settings.AUTH_PASSWORD_HISTORY_DEPTH
+        response.auth_require_admin_quorum = app_settings.AUTH_REQUIRE_ADMIN_QUORUM
         return response
     except Exception as e:
         logger.error(f"Failed to get settings: {e}", exc_info=True)

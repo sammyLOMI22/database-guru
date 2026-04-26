@@ -12,11 +12,13 @@ import {
   Search,
   ScrollText,
   HeartPulse,
+  ShieldCheck,
 } from 'lucide-react';
 import { healthAPI, queryAPI, settingsAPI } from '../../services/api';
 import { cacheAPI } from '../../services/cacheApi';
 import { auditApi, type AuditLog } from '../../services/auditApi';
 import type {
+  AuthHardeningConfig,
   HealthCheckResponse,
   ObservabilityConfig,
   QueryHistoryItem,
@@ -50,6 +52,7 @@ export default function SystemHealthPanel() {
   const [recentAuditError, setRecentAuditError] = useState<string | null>(null);
   const [cache, setCache] = useState<CacheStats | null>(null);
   const [obsConfig, setObsConfig] = useState<ObservabilityConfig | null>(null);
+  const [authConfig, setAuthConfig] = useState<AuthHardeningConfig | null>(null);
   const [loading, setLoading] = useState(false);
 
   const lastRequest = useLastRequestStore((s) => s.last);
@@ -98,7 +101,7 @@ export default function SystemHealthPanel() {
       // optional
     }
 
-    // Observability config from settings — same axios path as above.
+    // Observability + auth-hardening config from settings — single round trip.
     try {
       const data: any = await settingsAPI.getSettings();
       setObsConfig({
@@ -110,6 +113,21 @@ export default function SystemHealthPanel() {
         otel_traces_sampler_ratio: data.otel_traces_sampler_ratio,
         jaeger_ui_url: data.jaeger_ui_url,
         grafana_url: data.grafana_url,
+      });
+      setAuthConfig({
+        auth_token_versioning_enabled: data.auth_token_versioning_enabled,
+        auth_invalidate_tokens_on_deactivate: data.auth_invalidate_tokens_on_deactivate,
+        auth_invalidate_tokens_on_logout: data.auth_invalidate_tokens_on_logout,
+        auth_rate_limit_change_password: data.auth_rate_limit_change_password,
+        auth_change_password_per_user_per_minute: data.auth_change_password_per_user_per_minute,
+        auth_rate_limit_login_lockout_enabled: data.auth_rate_limit_login_lockout_enabled,
+        auth_login_lockout_threshold: data.auth_login_lockout_threshold,
+        auth_login_lockout_window_seconds: data.auth_login_lockout_window_seconds,
+        auth_password_reset_mode: data.auth_password_reset_mode,
+        auth_password_reset_token_ttl_minutes: data.auth_password_reset_token_ttl_minutes,
+        auth_password_reset_base_url: data.auth_password_reset_base_url,
+        auth_password_history_depth: data.auth_password_history_depth,
+        auth_require_admin_quorum: data.auth_require_admin_quorum,
       });
     } catch {
       // optional
@@ -199,6 +217,84 @@ export default function SystemHealthPanel() {
             Trace sampler ratio: <span className="font-mono">{obsConfig.otel_traces_sampler_ratio}</span>
           </p>
         )}
+      </section>
+
+      {/* Auth hardening gates — read-only mirror of Settings. See
+          docs/planning/PASSWORD_AUTH_HARDENING_PLAN.md for what each toggle does. */}
+      <section className="p-4 rounded-xl glass-panel border border-gray-200 dark:border-gray-800">
+        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-700 dark:text-gray-200 mb-1 flex items-center gap-2">
+          <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
+          Auth hardening
+        </h3>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3">
+          Read-only view. Flip these in <code className="font-mono">.env</code> /{' '}
+          <code className="font-mono">.env.docker</code> and restart the backend; defaults preserve current behavior.
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <Gate
+            label="Token versioning"
+            on={!!authConfig?.auth_token_versioning_enabled}
+            extra="invalidate stale JWTs"
+          />
+          <Gate
+            label="Logout invalidation"
+            on={!!authConfig?.auth_invalidate_tokens_on_logout}
+            extra="kicks all devices"
+          />
+          <Gate
+            label="Deactivate invalidation"
+            on={!!authConfig?.auth_invalidate_tokens_on_deactivate}
+            extra="immediate kick on disable"
+          />
+          <Gate
+            label="Change-password limit"
+            on={!!authConfig?.auth_rate_limit_change_password}
+            extra={
+              authConfig?.auth_rate_limit_change_password
+                ? `${authConfig.auth_change_password_per_user_per_minute}/min per user`
+                : ''
+            }
+          />
+          <Gate
+            label="Login lockout"
+            on={!!authConfig?.auth_rate_limit_login_lockout_enabled}
+            extra={
+              authConfig?.auth_rate_limit_login_lockout_enabled
+                ? `${authConfig.auth_login_lockout_threshold} fails / ${
+                    Math.round((authConfig.auth_login_lockout_window_seconds ?? 0) / 60)
+                  }m`
+                : ''
+            }
+          />
+          <Gate
+            label="Reset mode"
+            on={authConfig?.auth_password_reset_mode === 'reset_token' || authConfig?.auth_password_reset_mode === 'both'}
+            extra={authConfig?.auth_password_reset_mode ?? '—'}
+          />
+          <Gate
+            label="Password history"
+            on={(authConfig?.auth_password_history_depth ?? 0) > 0}
+            extra={
+              (authConfig?.auth_password_history_depth ?? 0) > 0
+                ? `last ${authConfig?.auth_password_history_depth}`
+                : 'disabled'
+            }
+          />
+          <Gate
+            label="Admin quorum"
+            on={!!authConfig?.auth_require_admin_quorum}
+            extra="block last-admin demote"
+          />
+        </div>
+        {(authConfig?.auth_password_reset_mode === 'reset_token' ||
+          authConfig?.auth_password_reset_mode === 'both') &&
+          !authConfig?.auth_password_reset_base_url && (
+            <p className="mt-3 text-[11px] text-amber-600 dark:text-amber-400">
+              Reset mode is <span className="font-mono">{authConfig.auth_password_reset_mode}</span> but{' '}
+              <span className="font-mono">AUTH_PASSWORD_RESET_BASE_URL</span> is unset — redemption links will be bare
+              paths.
+            </p>
+          )}
       </section>
 
       {/* Cache + correlation */}

@@ -63,7 +63,38 @@ def _settings_obj(**overrides):
     return SimpleNamespace(**base)
 
 
+def _with_auth_defaults(ns: SimpleNamespace, **overrides) -> SimpleNamespace:
+    """Stamp the auth-hardening fields onto an app_settings stub.
+
+    Endpoint reads these unconditionally now; tests can override individual
+    flags but most assert the default-off shape.
+    """
+    defaults = dict(
+        AUTH_TOKEN_VERSIONING_ENABLED=False,
+        AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE=False,
+        AUTH_INVALIDATE_TOKENS_ON_LOGOUT=False,
+        AUTH_RATE_LIMIT_CHANGE_PASSWORD=False,
+        AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE=5,
+        AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED=False,
+        AUTH_LOGIN_LOCKOUT_THRESHOLD=5,
+        AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS=900,
+        AUTH_PASSWORD_RESET_MODE="temp_password",
+        AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES=15,
+        AUTH_PASSWORD_RESET_BASE_URL="",
+        AUTH_PASSWORD_HISTORY_DEPTH=0,
+        AUTH_REQUIRE_ADMIN_QUORUM=False,
+    )
+    defaults.update(overrides)
+    for k, v in defaults.items():
+        setattr(ns, k, v)
+    return ns
+
+
 def _build_app(app_settings) -> FastAPI:
+    # Auto-stamp auth-hardening defaults if the test didn't set them — these
+    # plumb through /api/settings now and would NPE on a bare SimpleNamespace.
+    if not hasattr(app_settings, "AUTH_TOKEN_VERSIONING_ENABLED"):
+        _with_auth_defaults(app_settings)
     app = FastAPI()
     app.include_router(router, prefix="/api")
 
@@ -138,6 +169,77 @@ class TestObservabilitySettingsExposure:
         assert body["jaeger_ui_url"] == "http://jaeger.example.com"
         assert body["grafana_url"] == "http://grafana.example.com/d/abc"
         assert body["admin_ui_enabled"] is True
+
+    def test_auth_hardening_defaults_off(self):
+        app_settings = SimpleNamespace(
+            REQUIRE_AUTH=False,
+            METRICS_ENABLED=False,
+            METRICS_EXPOSE_ENDPOINT=False,
+            METRICS_PUBLIC_URL="",
+            OTEL_ENABLED=False,
+            OTEL_SERVICE_NAME="database-guru",
+            OTEL_TRACES_SAMPLER_RATIO=0.1,
+            JAEGER_UI_URL="",
+            GRAFANA_URL="",
+            ADMIN_UI_ENABLED=True,
+        )
+        app = _build_app(app_settings)
+        with patch(
+            "src.api.endpoints.settings.get_or_create_settings",
+            new=AsyncMock(return_value=_settings_obj()),
+        ):
+            client = TestClient(app)
+            resp = client.get("/api/settings/")
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["auth_token_versioning_enabled"] is False
+        assert body["auth_invalidate_tokens_on_deactivate"] is False
+        assert body["auth_invalidate_tokens_on_logout"] is False
+        assert body["auth_rate_limit_change_password"] is False
+        assert body["auth_rate_limit_login_lockout_enabled"] is False
+        assert body["auth_password_reset_mode"] == "temp_password"
+        assert body["auth_password_history_depth"] == 0
+        assert body["auth_require_admin_quorum"] is False
+
+    def test_auth_hardening_surfaces_when_enabled(self):
+        app_settings = SimpleNamespace(
+            REQUIRE_AUTH=False,
+            METRICS_ENABLED=False,
+            METRICS_EXPOSE_ENDPOINT=False,
+            METRICS_PUBLIC_URL="",
+            OTEL_ENABLED=False,
+            OTEL_SERVICE_NAME="database-guru",
+            OTEL_TRACES_SAMPLER_RATIO=0.1,
+            JAEGER_UI_URL="",
+            GRAFANA_URL="",
+            ADMIN_UI_ENABLED=True,
+        )
+        _with_auth_defaults(
+            app_settings,
+            AUTH_TOKEN_VERSIONING_ENABLED=True,
+            AUTH_RATE_LIMIT_CHANGE_PASSWORD=True,
+            AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE=10,
+            AUTH_PASSWORD_RESET_MODE="reset_token",
+            AUTH_PASSWORD_RESET_BASE_URL="http://localhost:3000",
+            AUTH_PASSWORD_HISTORY_DEPTH=5,
+            AUTH_REQUIRE_ADMIN_QUORUM=True,
+        )
+        app = _build_app(app_settings)
+        with patch(
+            "src.api.endpoints.settings.get_or_create_settings",
+            new=AsyncMock(return_value=_settings_obj()),
+        ):
+            client = TestClient(app)
+            resp = client.get("/api/settings/")
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["auth_token_versioning_enabled"] is True
+        assert body["auth_rate_limit_change_password"] is True
+        assert body["auth_change_password_per_user_per_minute"] == 10
+        assert body["auth_password_reset_mode"] == "reset_token"
+        assert body["auth_password_reset_base_url"] == "http://localhost:3000"
+        assert body["auth_password_history_depth"] == 5
+        assert body["auth_require_admin_quorum"] is True
 
     def test_admin_ui_toggle_surfaces_in_response(self):
         app_settings = SimpleNamespace(

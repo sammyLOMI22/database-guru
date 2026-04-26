@@ -61,6 +61,7 @@ async def lifespan(app: FastAPI):
 
     settings = Settings()
     settings.check_jwt_secret()
+    settings.check_auth_hardening()
 
     # Initialize Prometheus collectors (Phase 24.2). No-op if METRICS_ENABLED=False.
     observability_metrics.init_metrics(settings)

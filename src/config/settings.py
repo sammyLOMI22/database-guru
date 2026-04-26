@@ -168,9 +168,71 @@ class Settings(BaseSettings):
     # avoids accidentally enabling the surface in fresh deployments.
     ADMIN_UI_ENABLED: bool = False
 
+    # ── Auth Hardening (see docs/planning/PASSWORD_AUTH_HARDENING_PLAN.md) ──
+    # Every flag defaults to off so an upgrade is behavior-preserving. Each
+    # phase wires the actual enforcement; today these are read-only surface
+    # the Admin UI renders so operators can pre-plan their rollout.
+
+    # Phase A — token versioning. When enabled, JWTs carry a `pv` claim and
+    # tokens with a stale pv are rejected. Bumps happen on password change /
+    # admin reset; per-trigger bumps below extend that to deactivate/logout.
+    AUTH_TOKEN_VERSIONING_ENABLED: bool = False
+    AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE: bool = False
+    AUTH_INVALIDATE_TOKENS_ON_LOGOUT: bool = False
+
+    # Phase B — rate limit + lockout. The change-password limiter is keyed by
+    # user id (caller is authenticated); the login lockout is keyed by username.
+    AUTH_RATE_LIMIT_CHANGE_PASSWORD: bool = False
+    AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE: int = 5
+    AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED: bool = False
+    AUTH_LOGIN_LOCKOUT_THRESHOLD: int = 5            # failures before temp lock
+    AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS: int = 900     # 15 minutes
+
+    # Phase C — one-shot reset tokens. `temp_password` keeps current behavior;
+    # `reset_token` returns a redemption URL instead; `both` returns both during
+    # a UX transition.
+    AUTH_PASSWORD_RESET_MODE: str = "temp_password"  # temp_password | reset_token | both
+    AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES: int = 15
+    AUTH_PASSWORD_RESET_BASE_URL: str = ""           # e.g. http://localhost:3000
+
+    # Phase D — optional hardening. 0 disables history; quorum guard blocks
+    # demoting/deactivating the last active admin.
+    AUTH_PASSWORD_HISTORY_DEPTH: int = 0
+    AUTH_REQUIRE_ADMIN_QUORUM: bool = False
+
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    def check_auth_hardening(self) -> None:
+        """Validate the auth-hardening flag combinations at startup.
+
+        Catches typos (`AUTH_PASSWORD_RESET_MODE=token` instead of
+        `reset_token`) before they surface as silent fallbacks at request time.
+        """
+        valid_modes = {"temp_password", "reset_token", "both"}
+        if self.AUTH_PASSWORD_RESET_MODE not in valid_modes:
+            raise ValueError(
+                f"AUTH_PASSWORD_RESET_MODE must be one of {sorted(valid_modes)}, "
+                f"got {self.AUTH_PASSWORD_RESET_MODE!r}"
+            )
+        if self.AUTH_PASSWORD_RESET_MODE in ("reset_token", "both") and not self.AUTH_PASSWORD_RESET_BASE_URL:
+            import logging
+            logging.getLogger(__name__).warning(
+                "AUTH_PASSWORD_RESET_MODE=%s but AUTH_PASSWORD_RESET_BASE_URL is empty — "
+                "the redemption link will be a bare /reset?token=… path.",
+                self.AUTH_PASSWORD_RESET_MODE,
+            )
+        if self.AUTH_PASSWORD_HISTORY_DEPTH < 0:
+            raise ValueError("AUTH_PASSWORD_HISTORY_DEPTH must be >= 0")
+        if self.AUTH_LOGIN_LOCKOUT_THRESHOLD < 1:
+            raise ValueError("AUTH_LOGIN_LOCKOUT_THRESHOLD must be >= 1")
+        if self.AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS < 1:
+            raise ValueError("AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS must be >= 1")
+        if self.AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE < 1:
+            raise ValueError("AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE must be >= 1")
+        if self.AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES < 1:
+            raise ValueError("AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES must be >= 1")
 
     def check_jwt_secret(self) -> None:
         """Reject the default JWT secret at startup.

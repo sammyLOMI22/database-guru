@@ -723,3 +723,23 @@ export interface ObservabilityConfig {
   grafana_url?: string | null;
   admin_ui_enabled?: boolean;
 }
+
+// Read-only mirror of the auth-hardening flags from SystemSettingsResponse.
+// Surfaced in Admin → Health → Security so an operator can tell at a glance
+// which protections are currently live. See
+// docs/planning/PASSWORD_AUTH_HARDENING_PLAN.md for what each flag does.
+export interface AuthHardeningConfig {
+  auth_token_versioning_enabled?: boolean;
+  auth_invalidate_tokens_on_deactivate?: boolean;
+  auth_invalidate_tokens_on_logout?: boolean;
+  auth_rate_limit_change_password?: boolean;
+  auth_change_password_per_user_per_minute?: number;
+  auth_rate_limit_login_lockout_enabled?: boolean;
+  auth_login_lockout_threshold?: number;
+  auth_login_lockout_window_seconds?: number;
+  auth_password_reset_mode?: 'temp_password' | 'reset_token' | 'both' | string;
+  auth_password_reset_token_ttl_minutes?: number;
+  auth_password_reset_base_url?: string | null;
+  auth_password_history_depth?: number;
+  auth_require_admin_quorum?: boolean;
+}
