@@ -1,13 +1,17 @@
 """Authentication endpoints — register, login, me"""
 import logging
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db
 from src.auth.dependencies import get_current_active_user, get_auth_service
-from src.auth.models import User
+from src.auth.models import PasswordResetToken, User
 from src.auth.schemas import (
     PasswordChangeRequest,
+    PasswordResetRedeemRequest,
     TokenResponse,
     UserCreate,
     UserLogin,
@@ -231,6 +235,97 @@ async def change_password(
     )
     await db.commit()
     await db.refresh(user)
+    token, expires_in = auth_service.create_access_token(
+        user.id, user.username, password_version=user.password_version,
+    )
+    return TokenResponse(
+        access_token=token,
+        expires_in=expires_in,
+        user=UserResponse.model_validate(user),
+    )
+
+
+@router.post("/redeem-reset", response_model=TokenResponse)
+async def redeem_password_reset(
+    request: Request,
+    data: PasswordResetRedeemRequest,
+    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
+    settings: Settings = Depends(get_settings),
+    _rate_limit: None = Depends(auth_rate_limiter),
+):
+    """Redeem an admin-issued one-shot password reset token (Phase C).
+
+    The endpoint is unauthenticated by design — the token IS the credential.
+    Lookup walks the user's outstanding tokens and verifies each via bcrypt
+    so the plaintext token is never compared as a string. After a successful
+    redemption the token is marked used, the password is rotated, the
+    must-change flag clears, password_version bumps to evict any other
+    sessions, and a fresh JWT is returned so the user lands signed in.
+
+    Rejection paths return generic 401s so the caller can't tell whether
+    the token was unknown, expired, or already used.
+    """
+    if settings.AUTH_PASSWORD_RESET_MODE not in ("reset_token", "both"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Password reset tokens are not enabled on this server",
+        )
+
+    now = datetime.now(timezone.utc)
+    rows = await db.execute(
+        select(PasswordResetToken).where(
+            PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.expires_at > now,
+        )
+    )
+    candidates = list(rows.scalars().all())
+    matched = None
+    for record in candidates:
+        if auth_service.verify_password(data.token, record.token_hash):
+            matched = record
+            break
+
+    if matched is None:
+        await log_action(
+            db, action="password_reset_redeem_failed", resource_type="password_reset_token",
+            details={"reason": "unknown_or_expired"},
+            ip_address=get_client_ip(request),
+        )
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Reset token is invalid, expired, or already used",
+        )
+
+    user = await auth_service.get_user_by_id(db, matched.user_id)
+    if user is None or not user.is_active:
+        await log_action(
+            db, action="password_reset_redeem_failed", resource_type="user",
+            resource_id=str(matched.user_id),
+            details={"reason": "user_missing_or_inactive"},
+            ip_address=get_client_ip(request),
+        )
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Reset token is invalid, expired, or already used",
+        )
+
+    user.hashed_password = auth_service.hash_password(data.new_password)
+    user.must_change_password = False
+    bump_password_version(user)
+    matched.used_at = now
+
+    await log_action(
+        db, action="password_reset_redeemed", resource_type="user",
+        resource_id=str(user.id), user_id=user.id, username=user.username,
+        details={"token_id": matched.id},
+        ip_address=get_client_ip(request),
+    )
+    await db.commit()
+    await db.refresh(user)
+
     token, expires_in = auth_service.create_access_token(
         user.id, user.username, password_version=user.password_version,
     )

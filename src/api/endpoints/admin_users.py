@@ -7,7 +7,7 @@ this router exists for operator-driven CRUD against existing accounts.
 import logging
 import secrets
 import string
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.dependencies import get_db
 from src.auth.audit import log_action
 from src.auth.dependencies import get_auth_service, require_admin
-from src.auth.models import User
+from src.auth.models import PasswordResetToken, User
 from src.auth.schemas import validate_password_complexity
 from src.auth.service import AuthService, bump_password_version
 from src.api.dependencies.common import get_settings
@@ -74,12 +74,20 @@ class AdminUserUpdate(BaseModel):
 
 
 class AdminPasswordResetResponse(BaseModel):
+    """Operator response after a password reset.
+
+    Shape depends on ``AUTH_PASSWORD_RESET_MODE``:
+    - ``temp_password`` (default): only ``temporary_password`` is set.
+    - ``reset_token``: only ``reset_token`` + ``redemption_url`` + ``expires_at``.
+    - ``both``: every field populated for transition periods.
+    """
     user_id: int
-    temporary_password: str
-    detail: str = (
-        "Share this password securely. The user will be forced to change it "
-        "on next login before they can use the application."
-    )
+    mode: str = "temp_password"
+    temporary_password: Optional[str] = None
+    reset_token: Optional[str] = None
+    redemption_url: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    detail: str = ""
     must_change_password: bool = True
 
 
@@ -109,6 +117,22 @@ def _generate_temp_password(length: int = 16) -> str:
     chars.extend(_SYSRAND.choice(_PASSWORD_ALPHABET) for _ in range(length - 3))
     _SYSRAND.shuffle(chars)
     return "".join(chars)
+
+
+def _generate_reset_token() -> str:
+    """URL-safe ~43-char token (32 bytes). Plaintext returned once, never stored."""
+    return secrets.token_urlsafe(32)
+
+
+def _build_redemption_url(base_url: str, token: str) -> str:
+    """Glue the configured base URL and the token into a redemption link.
+
+    Falls back to a bare ``/reset?token=...`` path if no base URL is set —
+    the operator can still hand-paste it into the host they're on. The
+    settings validator already warns at startup when this happens.
+    """
+    base = (base_url or "").rstrip("/")
+    return f"{base}/reset?token={token}"
 
 
 async def _get_user_or_404(db: AsyncSession, user_id: int) -> User:
@@ -264,13 +288,23 @@ async def reset_user_password(
     db: AsyncSession = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service),
     admin: User = Depends(require_admin),
+    settings: Settings = Depends(get_settings),
 ):
-    """Reset a user's password to a generated temporary value.
+    """Reset a user's password.
+
+    Behavior depends on ``AUTH_PASSWORD_RESET_MODE``:
+
+    - ``temp_password`` (default): mints a random password, returns it once,
+      forces a change on next login. Same as the original Phase 24.7 flow.
+    - ``reset_token``: stores a hashed one-shot token, returns the plaintext
+      token + redemption URL. The user's password stays at its previous value
+      until they redeem the token via ``POST /api/auth/redeem-reset``.
+    - ``both``: emits both for a transition period so operators can pick the
+      channel that's available to them.
 
     Self-resets are blocked: an admin who lost their password should use the
     standard self-service /api/auth flow rather than this operator endpoint,
-    which would otherwise risk a single-admin lockout if the temporary
-    password is lost between this call and the next login.
+    which would otherwise risk a single-admin lockout.
     """
     user = await _get_user_or_404(db, user_id)
 
@@ -280,15 +314,51 @@ async def reset_user_password(
             detail="Admins cannot reset their own password via this endpoint",
         )
 
-    temp_password = _generate_temp_password()
-    user.hashed_password = auth_service.hash_password(temp_password)
-    # Force the user through the change-password flow on next login so the
-    # operator-generated credential cannot become a long-lived secret.
-    user.must_change_password = True
-    # Phase A: invalidate every existing session for the target user. Their
-    # next request 401s and they must redeem the temp password. No-op when
-    # token versioning is off.
-    bump_password_version(user)
+    mode = settings.AUTH_PASSWORD_RESET_MODE
+    response = AdminPasswordResetResponse(user_id=user.id, mode=mode)
+    audit_details: dict = {"target_username": user.username, "mode": mode}
+
+    if mode in ("temp_password", "both"):
+        temp_password = _generate_temp_password()
+        user.hashed_password = auth_service.hash_password(temp_password)
+        user.must_change_password = True
+        bump_password_version(user)
+        response.temporary_password = temp_password
+        response.detail = (
+            "Share this password securely. The user will be forced to change "
+            "it on next login before they can use the application."
+        )
+
+    if mode in ("reset_token", "both"):
+        token = _generate_reset_token()
+        ttl = max(1, int(settings.AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES))
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=ttl)
+        record = PasswordResetToken(
+            user_id=user.id,
+            token_hash=auth_service.hash_password(token),
+            expires_at=expires_at,
+            created_by_admin_id=admin.id,
+        )
+        db.add(record)
+        # When mode is reset_token only, the user's existing password is left
+        # alone — they keep it until redemption swaps it. Still bump the
+        # version so any session they were holding before the reset request
+        # is invalidated; otherwise an operator-driven reset wouldn't actually
+        # kick a logged-in account.
+        if mode == "reset_token":
+            bump_password_version(user)
+            user.must_change_password = True
+        response.reset_token = token
+        response.expires_at = expires_at
+        response.redemption_url = _build_redemption_url(
+            settings.AUTH_PASSWORD_RESET_BASE_URL, token,
+        )
+        audit_details["expires_at"] = expires_at.isoformat()
+        if not response.detail:
+            response.detail = (
+                f"Send the redemption link to the user. It expires in "
+                f"{ttl} minute(s) and can only be used once."
+            )
 
     await log_action(
         db,
@@ -297,15 +367,12 @@ async def reset_user_password(
         resource_id=str(user.id),
         user_id=admin.id,
         username=admin.username,
-        details={"target_username": user.username},
+        details=audit_details,
         ip_address=get_client_ip(request),
     )
     await db.commit()
 
-    return AdminPasswordResetResponse(
-        user_id=user.id,
-        temporary_password=temp_password,
-    )
+    return response
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

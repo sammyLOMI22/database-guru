@@ -39,8 +39,14 @@ export interface UpdateUserRequest {
 
 export interface PasswordResetResponse {
   user_id: number;
-  temporary_password: string;
+  // Phase C: shape varies by AUTH_PASSWORD_RESET_MODE on the backend.
+  mode?: 'temp_password' | 'reset_token' | 'both' | string;
+  temporary_password?: string | null;
+  reset_token?: string | null;
+  redemption_url?: string | null;
+  expires_at?: string | null;
   detail: string;
+  must_change_password?: boolean;
 }
 
 const buildParams = (q: AdminUserListQuery): Record<string, any> => {

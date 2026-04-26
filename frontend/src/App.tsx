@@ -4,6 +4,7 @@ import EnhancedChatInterface from './components/EnhancedChatInterface';
 import Header from './components/Header';
 import AuthPage from './components/AuthPage';
 import ForcedPasswordChange from './components/ForcedPasswordChange';
+import PasswordReset from './components/PasswordReset';
 import { FeedbackStats } from './components/FeedbackStats';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ToolsPanel } from './components/ToolsPanel';
@@ -30,9 +31,21 @@ const queryClient = new QueryClient({
   },
 });
 
+// Detect a Phase C redemption URL on initial load. We don't have a router, so
+// we read window.location once at module load time and let App decide whether
+// to render the redemption flow before anything else.
+function _readResetTokenFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  if (!window.location.pathname.startsWith('/reset')) return null;
+  const params = new URLSearchParams(window.location.search);
+  const t = params.get('token');
+  return t && t.length >= 10 ? t : null;
+}
+
 function App() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const { user, isLoading: authLoading, isAuthenticated, login, register, logout, applyTokenResponse } = useAuth();
+  const [resetToken, setResetToken] = useState<string | null>(() => _readResetTokenFromUrl());
   const [isHealthy, setIsHealthy] = useState(false);
   const [requireAuth, setRequireAuth] = useState(false);
   // Default false until /api/settings confirms it. If the settings fetch fails
@@ -85,6 +98,26 @@ function App() {
       .catch(() => {/* settings fetch failed — default to no auth required, hide Admin tab */});
 
   }, []);
+
+  // Phase C: a /reset?token=... link short-circuits the rest of the gating
+  // so the user can redeem an admin-issued reset before anything else
+  // (auth, forced-change, etc.). On success we drop them straight in.
+  if (resetToken) {
+    return (
+      <PasswordReset
+        token={resetToken}
+        onSuccess={(resp) => {
+          applyTokenResponse(resp);
+          setResetToken(null);
+          window.history.replaceState({}, '', '/');
+        }}
+        onCancel={() => {
+          setResetToken(null);
+          window.history.replaceState({}, '', '/');
+        }}
+      />
+    );
+  }
 
   // Show loading while verifying stored token
   if (authLoading) {

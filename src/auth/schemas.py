@@ -82,3 +82,14 @@ class PasswordChangeRequest(BaseModel):
         return validate_password_complexity(v)
 
 
+class PasswordResetRedeemRequest(BaseModel):
+    """Request model for redeeming an admin-issued password reset token."""
+    token: str = Field(..., min_length=10, max_length=512)
+    new_password: str = Field(..., min_length=12, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return validate_password_complexity(v)
+
+

@@ -1,6 +1,6 @@
 """User model for authentication"""
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Index
+from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, DateTime, Index
 from src.database.connection import Base
 
 
@@ -36,3 +36,27 @@ class User(Base):
 
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
+
+
+class PasswordResetToken(Base):
+    """One-shot password reset token (Phase C of auth hardening).
+
+    The plaintext token never lives in the DB — only the bcrypt hash.
+    Tokens are single-use (used_at is set on redemption) and TTL-bounded
+    (expires_at). Redemption verifies the bcrypt hash, expiry, and unused
+    state in that order, then sets the new password and bumps
+    password_version to invalidate any other live sessions.
+    """
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(255), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_by_admin_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        Index("idx_reset_token_user_used", "user_id", "used_at"),
+    )

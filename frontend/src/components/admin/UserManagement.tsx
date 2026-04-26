@@ -16,6 +16,7 @@ import {
   adminUsersApi,
   type AdminUser,
   type AdminUserListQuery,
+  type PasswordResetResponse,
 } from '../../services/adminUsersApi';
 import CreateUserModal from './CreateUserModal';
 
@@ -31,7 +32,7 @@ const EMPTY_FILTERS: FilterState = { search: '', is_active: '', is_admin: '' };
 
 interface ResetResult {
   user: AdminUser;
-  password: string;
+  response: PasswordResetResponse;
 }
 
 interface ConfirmDeactivate {
@@ -115,7 +116,7 @@ export default function UserManagement({ currentUserId }: UserManagementProps) {
     setError(null);
     try {
       const resp = await adminUsersApi.resetPassword(user.id);
-      setResetResult({ user, password: resp.temporary_password });
+      setResetResult({ user, response: resp });
     } catch (err: any) {
       setError(err?.response?.data?.detail || err?.message || 'Reset failed.');
     } finally {
@@ -409,26 +410,61 @@ export default function UserManagement({ currentUserId }: UserManagementProps) {
               <header className="px-5 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-amber-500" />
                 <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                  Temporary password for {resetResult.user.username}
+                  Reset issued for {resetResult.user.username}
                 </h3>
               </header>
-              <div className="p-5 space-y-3 text-xs">
-                <p className="text-gray-600 dark:text-gray-300">
-                  Share this securely. The user should change it on next login. This is the only
-                  time it will be shown.
-                </p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 px-3 py-2 rounded-md bg-gray-100 dark:bg-gray-800 font-mono text-sm break-all text-gray-800 dark:text-gray-100">
-                    {resetResult.password}
-                  </code>
-                  <button
-                    onClick={() => copyPassword(resetResult.password)}
-                    className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider"
-                  >
-                    <Copy className="w-3 h-3" />
-                    {copied ? 'Copied' : 'Copy'}
-                  </button>
-                </div>
+              <div className="p-5 space-y-4 text-xs">
+                {resetResult.response.detail && (
+                  <p className="text-gray-600 dark:text-gray-300">{resetResult.response.detail}</p>
+                )}
+
+                {resetResult.response.temporary_password && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      Temporary password
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 px-3 py-2 rounded-md bg-gray-100 dark:bg-gray-800 font-mono text-sm break-all text-gray-800 dark:text-gray-100">
+                        {resetResult.response.temporary_password}
+                      </code>
+                      <button
+                        onClick={() => copyPassword(resetResult.response.temporary_password!)}
+                        className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider"
+                      >
+                        <Copy className="w-3 h-3" />
+                        {copied ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {resetResult.response.redemption_url && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      Redemption link {resetResult.response.expires_at && (
+                        <span className="font-normal normal-case text-gray-400">
+                          — expires {new Date(resetResult.response.expires_at).toLocaleString()}
+                        </span>
+                      )}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 px-3 py-2 rounded-md bg-gray-100 dark:bg-gray-800 font-mono text-[11px] break-all text-gray-800 dark:text-gray-100">
+                        {resetResult.response.redemption_url}
+                      </code>
+                      <button
+                        onClick={() => copyPassword(resetResult.response.redemption_url!)}
+                        className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider"
+                      >
+                        <Copy className="w-3 h-3" />
+                        {copied ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                    <p className="text-[10px] mt-1 text-gray-500">
+                      Single-use. Hand this link to {resetResult.user.username} via your usual secure
+                      channel — anyone holding it can set a new password until it expires.
+                    </p>
+                  </div>
+                )}
               </div>
               <footer className="px-5 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 flex justify-end">
                 <button
