@@ -13,21 +13,16 @@ import {
   ScrollText,
   HeartPulse,
 } from 'lucide-react';
-import { healthAPI, queryAPI } from '../../services/api';
+import { healthAPI, queryAPI, settingsAPI } from '../../services/api';
+import { cacheAPI } from '../../services/cacheApi';
 import { auditApi, type AuditLog } from '../../services/auditApi';
-import type { HealthCheckResponse, QueryHistoryItem } from '../../types/api';
+import type {
+  HealthCheckResponse,
+  ObservabilityConfig,
+  QueryHistoryItem,
+} from '../../types/api';
 import { useLastRequestStore, shortId } from '../../stores/lastRequestStore';
-
-interface ObservabilityConfig {
-  metrics_enabled?: boolean;
-  metrics_endpoint_exposed?: boolean;
-  otel_enabled?: boolean;
-  otel_service_name?: string | null;
-  otel_traces_sampler_ratio?: number | null;
-  jaeger_ui_url?: string | null;
-  grafana_url?: string | null;
-  metrics_public_url?: string | null;
-}
+import { formatTimestamp } from '../../utils/formatUtils';
 
 interface CacheStats {
   semantic_cache?: {
@@ -39,14 +34,6 @@ interface CacheStats {
     hit_rate_percent?: number;
   };
 }
-
-const formatTimestamp = (iso: string) => {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-};
 
 const formatDuration = (ms: number | null | undefined) => {
   if (ms == null) return '—';
@@ -101,30 +88,29 @@ export default function SystemHealthPanel() {
       else setRecentAuditError(err?.response?.data?.detail || err?.message || 'Could not load audit activity.');
     }
 
-    // Cache (best-effort)
+    // Cache (best-effort) — routed through axios so the auth interceptor
+    // attaches the bearer token under REQUIRE_AUTH=true and the 401 handler
+    // can clear stale credentials consistently with the rest of the app.
     try {
-      const r = await fetch('/api/cache/stats');
-      if (r.ok) setCache(await r.json());
+      const stats = await cacheAPI.getStats();
+      setCache(stats as unknown as CacheStats);
     } catch {
       // optional
     }
 
-    // Observability config from settings
+    // Observability config from settings — same axios path as above.
     try {
-      const r = await fetch('/api/settings/');
-      if (r.ok) {
-        const data = await r.json();
-        setObsConfig({
-          metrics_enabled: data.metrics_enabled,
-          metrics_endpoint_exposed: data.metrics_endpoint_exposed,
-          metrics_public_url: data.metrics_public_url,
-          otel_enabled: data.otel_enabled,
-          otel_service_name: data.otel_service_name,
-          otel_traces_sampler_ratio: data.otel_traces_sampler_ratio,
-          jaeger_ui_url: data.jaeger_ui_url,
-          grafana_url: data.grafana_url,
-        });
-      }
+      const data: any = await settingsAPI.getSettings();
+      setObsConfig({
+        metrics_enabled: data.metrics_enabled,
+        metrics_endpoint_exposed: data.metrics_endpoint_exposed,
+        metrics_public_url: data.metrics_public_url,
+        otel_enabled: data.otel_enabled,
+        otel_service_name: data.otel_service_name,
+        otel_traces_sampler_ratio: data.otel_traces_sampler_ratio,
+        jaeger_ui_url: data.jaeger_ui_url,
+        grafana_url: data.grafana_url,
+      });
     } catch {
       // optional
     }

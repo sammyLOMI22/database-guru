@@ -406,5 +406,5 @@ frontend/src/
 | `services/adminUsersApi.ts` | `list(query)`, `create()`, `update()`, `resetPassword()`, `deactivate()` — wraps `/api/admin/users/*` |
 
 ### Feature Toggle
-- Backend `ADMIN_UI_ENABLED` (default `true`) gates router mounting; `/api/settings/` returns `admin_ui_enabled` so the frontend hides the Admin tab and the Settings → Observability section entirely when the kill-switch is off
+- Backend `ADMIN_UI_ENABLED` (default `false` — opt-in) gates router mounting; `/api/settings/` returns `admin_ui_enabled` so the frontend hides the Admin tab and the Settings → Observability section entirely when the kill-switch is off
 - The Admin tab is also conditioned on `user.is_admin`; non-admins see a `RequireAdmin` placeholder if they navigate to it directly

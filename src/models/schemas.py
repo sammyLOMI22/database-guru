@@ -1,4 +1,17 @@
-"""Pydantic schemas for API requests and responses"""
+"""Pydantic schemas for API requests and responses
+
+Note on schema location: most request/response models live here, but a few
+endpoint-local schemas are intentionally co-located with their routers when
+they're a private contract for that one endpoint:
+
+- Auth (`UserCreate`, `UserLogin`, `UserResponse`, `TokenResponse`) →
+  `src/auth/schemas.py` — kept next to the auth service so the password
+  complexity validator and the User model travel together.
+- Admin user CRUD (`AdminUserCreate`, `AdminUserUpdate`, `AdminUserResponse`,
+  `AdminUserListResponse`, `AdminPasswordResetResponse`) →
+  `src/api/endpoints/admin_users.py` — only used by the Phase 24.7 admin
+  router and gated by `ADMIN_UI_ENABLED`.
+"""
 from datetime import datetime
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field, validator, field_validator, model_validator

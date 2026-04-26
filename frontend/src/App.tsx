@@ -18,6 +18,7 @@ import SchemaPanel from './components/SchemaPanel';
 import { healthAPI, settingsAPI } from './services/api';
 import { useDarkMode } from './hooks/useDarkMode';
 import { useAuth } from './hooks/useAuth';
+import { useLastRequestStore } from './stores/lastRequestStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -112,7 +113,13 @@ function App() {
           onTabChange={(id) => setActiveTab(id as any)}
           user={user}
           isAdmin={adminUiEnabled && !!user?.is_admin}
-          onLogout={() => { logout(); if (requireAuth) setShowAuth(true); }}
+          onLogout={() => {
+            logout();
+            // Clear the last-request badge so it doesn't keep surfacing the
+            // previous user's request_id / traceparent across the auth boundary.
+            useLastRequestStore.getState().clear();
+            if (requireAuth) setShowAuth(true);
+          }}
           onSignIn={() => setShowAuth(true)}
         />
 

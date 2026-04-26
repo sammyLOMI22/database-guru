@@ -9,9 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db
 from src.auth.audit import (
-    count_audit_logs,
     get_audit_facets,
-    get_audit_logs,
+    list_and_count_audit_logs,
 )
 from src.auth.dependencies import get_current_active_user, require_admin
 from src.auth.models import User
@@ -61,15 +60,16 @@ async def list_audit_logs(
     admin: User = Depends(require_admin),
 ):
     """List audit logs (admin only) with filters and pagination."""
-    filters = dict(
+    logs, total = await list_and_count_audit_logs(
+        db,
         user_id=user_id,
         action=action,
         resource_type=resource_type,
         start_date=start_date,
         end_date=end_date,
+        limit=limit,
+        offset=offset,
     )
-    logs = await get_audit_logs(db, limit=limit, offset=offset, **filters)
-    total = await count_audit_logs(db, **filters)
     return AuditLogListResponse(
         items=[AuditLogResponse.model_validate(log) for log in logs],
         total=total,
@@ -90,15 +90,16 @@ async def list_my_audit_logs(
     user: User = Depends(get_current_active_user),
 ):
     """List audit logs for the current user."""
-    filters = dict(
+    logs, total = await list_and_count_audit_logs(
+        db,
         user_id=user.id,
         action=action,
         resource_type=resource_type,
         start_date=start_date,
         end_date=end_date,
+        limit=limit,
+        offset=offset,
     )
-    logs = await get_audit_logs(db, limit=limit, offset=offset, **filters)
-    total = await count_audit_logs(db, **filters)
     return AuditLogListResponse(
         items=[AuditLogResponse.model_validate(log) for log in logs],
         total=total,

@@ -13,8 +13,9 @@ import {
 import { ModelConfigPanel } from './ModelConfigPanel';
 import { LLMProviderSettings } from './LLMProviderSettings';
 import { useLastRequestStore, shortId } from '../stores/lastRequestStore';
+import type { ObservabilityConfig } from '../types/api';
 
-interface SystemSettings {
+interface SystemSettings extends ObservabilityConfig {
   id: number;
   auto_learning_enabled: boolean;
   confidence_threshold: number;
@@ -54,16 +55,8 @@ interface SystemSettings {
   timeout_impact_analysis: number;
   timeout_schema_health: number;
   timeout_lineage_conversation: number;
-  // Observability surfacing (Phase 24)
-  metrics_enabled?: boolean;
-  metrics_endpoint_exposed?: boolean;
-  metrics_public_url?: string | null;
-  otel_enabled?: boolean;
-  otel_service_name?: string | null;
-  otel_traces_sampler_ratio?: number | null;
-  jaeger_ui_url?: string | null;
-  grafana_url?: string | null;
-  admin_ui_enabled?: boolean;
+  // Observability flags (metrics/otel/jaeger/grafana/admin_ui_enabled) come
+  // from the shared `ObservabilityConfig` interface above.
   created_at: string;
   updated_at: string;
 }

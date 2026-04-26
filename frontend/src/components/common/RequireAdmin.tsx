@@ -6,6 +6,17 @@ interface RequireAdminProps {
   children: React.ReactNode;
 }
 
+/**
+ * UX-only guard that hides admin-restricted UI from non-admin users.
+ *
+ * NOT a security boundary. The check reads `user.is_admin` from the auth
+ * store, which is derived from the JWT claim — it is never re-verified
+ * server-side per render, so a stale token claiming `is_admin=true` will
+ * pass this gate until it expires. The authoritative check is the
+ * `require_admin` FastAPI dependency on every admin endpoint
+ * (`src/auth/dependencies.py`); never assume the backend is "safe because
+ * the UI hid the button."
+ */
 export default function RequireAdmin({ user, children }: RequireAdminProps) {
   if (!user) {
     return (

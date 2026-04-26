@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Backend admin endpoints under `/api/admin/users` (`admin_users.py`): `GET` list with search/filters/pagination, `POST` create, `PATCH` update (`is_active` / `is_admin`), `POST /{id}/reset-password`, `DELETE /{id}` (idempotent soft-deactivate). Every mutation calls `log_action()`.
   - Backend audit endpoints under `/api/audit` (`audit.py`): `GET /logs` (admin), `GET /logs/me` (current user), `GET /facets` for dropdown values
   - `src/auth/audit.py` adds `count_audit_logs()` and `get_audit_facets()` helpers; `get_audit_logs()` extended with filters
-  - New settings: `ADMIN_UI_ENABLED` (default `true`, hard kill-switch for the entire admin surface), `JAEGER_UI_URL`, `GRAFANA_URL`, `METRICS_PUBLIC_URL`
+  - New settings: `ADMIN_UI_ENABLED` (default `false` — opt-in, matching `METRICS_ENABLED` / `OTEL_ENABLED`; hard kill-switch for the entire admin surface), `JAEGER_UI_URL`, `GRAFANA_URL`, `METRICS_PUBLIC_URL`
   - `/api/settings/` response surfaces `metrics_enabled`, `metrics_endpoint_exposed`, `metrics_public_url`, `otel_enabled`, `otel_service_name`, `otel_traces_sampler_ratio`, `jaeger_ui_url`, `grafana_url`, `admin_ui_enabled` so the UI can render conditionally
   - 4 new test files: `tests/test_admin_users_endpoints.py` (320 LOC), `tests/test_audit_endpoints.py` (237 LOC), `tests/test_admin_ui_toggle.py` (35 LOC), `tests/test_settings_observability.py` (163 LOC)
   - Plan: `docs/planning/PHASE_24_Observability_&_Monitoring_UI_PLAN.md`

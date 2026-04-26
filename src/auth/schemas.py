@@ -11,6 +11,23 @@ _COMMON_PASSWORDS = frozenset({
 })
 
 
+def validate_password_complexity(v: str) -> str:
+    """Shared password complexity check.
+
+    Reused by `UserCreate` (self-service) and `AdminUserCreate` (admin
+    endpoints) so the rules can't drift between the two paths.
+    """
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("Password must contain at least one uppercase letter.")
+    if not re.search(r"[a-z]", v):
+        raise ValueError("Password must contain at least one lowercase letter.")
+    if not re.search(r"\d", v):
+        raise ValueError("Password must contain at least one digit.")
+    if v.lower() in _COMMON_PASSWORDS:
+        raise ValueError("This password is too common. Please choose a stronger one.")
+    return v
+
+
 class UserCreate(BaseModel):
     """Request model for user registration"""
     email: EmailStr
@@ -20,15 +37,7 @@ class UserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def password_complexity(cls, v: str) -> str:
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("Password must contain at least one uppercase letter.")
-        if not re.search(r"[a-z]", v):
-            raise ValueError("Password must contain at least one lowercase letter.")
-        if not re.search(r"\d", v):
-            raise ValueError("Password must contain at least one digit.")
-        if v.lower() in _COMMON_PASSWORDS:
-            raise ValueError("This password is too common. Please choose a stronger one.")
-        return v
+        return validate_password_complexity(v)
 
 
 class UserLogin(BaseModel):

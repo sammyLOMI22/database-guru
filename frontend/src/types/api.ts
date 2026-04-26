@@ -705,3 +705,21 @@ export interface FileSourceListResponse {
   files: FileSource[];
   total: number;
 }
+
+// ── Observability (Phase 24 / 24.7) ────────────────────────────────────
+//
+// Subset of `GET /api/settings/` used by SettingsPanel and SystemHealthPanel
+// to render the observability gate matrix and the Prometheus/Jaeger/Grafana
+// deep-links. Pulled into a shared type so the two surfaces can't drift when
+// the backend exposes new flags via SystemSettingsResponse.
+export interface ObservabilityConfig {
+  metrics_enabled?: boolean;
+  metrics_endpoint_exposed?: boolean;
+  metrics_public_url?: string | null;
+  otel_enabled?: boolean;
+  otel_service_name?: string | null;
+  otel_traces_sampler_ratio?: number | null;
+  jaeger_ui_url?: string | null;
+  grafana_url?: string | null;
+  admin_ui_enabled?: boolean;
+}

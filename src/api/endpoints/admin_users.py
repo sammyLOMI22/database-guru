@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ from src.api.dependencies import get_db
 from src.auth.audit import log_action
 from src.auth.dependencies import get_auth_service, require_admin
 from src.auth.models import User
+from src.auth.schemas import validate_password_complexity
 from src.auth.service import AuthService
 from src.middleware.rate_limit import get_client_ip
 
@@ -38,6 +39,9 @@ class AdminUserResponse(BaseModel):
     is_admin: bool
     created_at: datetime
     updated_at: datetime
+    # `modified` is only set by `PATCH /{id}`; defaults to None on every other
+    # response so list/create responses don't carry a misleading flag.
+    modified: Optional[bool] = None
 
     class Config:
         from_attributes = True
@@ -56,6 +60,11 @@ class AdminUserCreate(BaseModel):
     password: str = Field(..., min_length=12, max_length=128)
     is_admin: bool = False
 
+    @field_validator("password")
+    @classmethod
+    def _password_complexity(cls, v: str) -> str:
+        return validate_password_complexity(v)
+
 
 class AdminUserUpdate(BaseModel):
     is_active: Optional[bool] = None
@@ -72,18 +81,28 @@ class AdminPasswordResetResponse(BaseModel):
 
 
 _PASSWORD_ALPHABET = string.ascii_letters + string.digits
+_SYSRAND = secrets.SystemRandom()
 
 
 def _generate_temp_password(length: int = 16) -> str:
-    """Generate a temporary password that satisfies the UserCreate complexity rules."""
-    while True:
-        candidate = "".join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(length))
-        if (
-            any(c.isupper() for c in candidate)
-            and any(c.islower() for c in candidate)
-            and any(c.isdigit() for c in candidate)
-        ):
-            return candidate
+    """Generate a temporary password that satisfies the UserCreate complexity rules.
+
+    Constructs deterministically — one upper, one lower, one digit, then fills
+    the remainder from the alphanumeric alphabet — and shuffles the result.
+    Avoids the rejection-sampling loop, so worst-case time is O(length) and
+    the function has no probabilistic upper bound on iterations.
+    """
+    if length < 3:
+        raise ValueError("length must be >= 3 to satisfy complexity rules")
+
+    chars = [
+        _SYSRAND.choice(string.ascii_uppercase),
+        _SYSRAND.choice(string.ascii_lowercase),
+        _SYSRAND.choice(string.digits),
+    ]
+    chars.extend(_SYSRAND.choice(_PASSWORD_ALPHABET) for _ in range(length - 3))
+    _SYSRAND.shuffle(chars)
+    return "".join(chars)
 
 
 async def _get_user_or_404(db: AsyncSession, user_id: int) -> User:
@@ -215,7 +234,11 @@ async def update_user(
 
     await db.commit()
     await db.refresh(user)
-    return AdminUserResponse.model_validate(user)
+    response = AdminUserResponse.model_validate(user)
+    # Tell the frontend whether anything actually changed so the UI can show
+    # an "already up to date" hint instead of a misleading success toast.
+    response.modified = bool(changes)
+    return response
 
 
 @router.post("/{user_id}/reset-password", response_model=AdminPasswordResetResponse)
@@ -226,8 +249,21 @@ async def reset_user_password(
     auth_service: AuthService = Depends(get_auth_service),
     admin: User = Depends(require_admin),
 ):
-    """Reset a user's password to a generated temporary value."""
+    """Reset a user's password to a generated temporary value.
+
+    Self-resets are blocked: an admin who lost their password should use the
+    standard self-service /api/auth flow rather than this operator endpoint,
+    which would otherwise risk a single-admin lockout if the temporary
+    password is lost between this call and the next login.
+    """
     user = await _get_user_or_404(db, user_id)
+
+    if user.id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admins cannot reset their own password via this endpoint",
+        )
+
     temp_password = _generate_temp_password()
     user.hashed_password = auth_service.hash_password(temp_password)
 

@@ -57,14 +57,10 @@ class TestAuditListEndpoint:
         admin = _admin_user()
         app.dependency_overrides[require_admin] = lambda: admin
 
-        async def fake_logs(db, **kwargs):
-            return [_sample_log(), _sample_log(id=2, action="logout")]
+        async def fake_list_and_count(db, **kwargs):
+            return [_sample_log(), _sample_log(id=2, action="logout")], 2
 
-        async def fake_count(db, **kwargs):
-            return 2
-
-        with patch("src.api.endpoints.audit.get_audit_logs", new=fake_logs), \
-             patch("src.api.endpoints.audit.count_audit_logs", new=fake_count):
+        with patch("src.api.endpoints.audit.list_and_count_audit_logs", new=fake_list_and_count):
             client = TestClient(app)
             resp = client.get("/api/audit/logs")
         app.dependency_overrides.clear()
@@ -84,15 +80,11 @@ class TestAuditListEndpoint:
 
         captured: dict = {}
 
-        async def fake_logs(db, **kwargs):
+        async def fake_list_and_count(db, **kwargs):
             captured.update(kwargs)
-            return []
+            return [], 0
 
-        async def fake_count(db, **kwargs):
-            return 0
-
-        with patch("src.api.endpoints.audit.get_audit_logs", new=fake_logs), \
-             patch("src.api.endpoints.audit.count_audit_logs", new=fake_count):
+        with patch("src.api.endpoints.audit.list_and_count_audit_logs", new=fake_list_and_count):
             client = TestClient(app)
             resp = client.get(
                 "/api/audit/logs",
@@ -174,15 +166,11 @@ class TestMyAuditLogs:
 
         captured: dict = {}
 
-        async def fake_logs(db, **kwargs):
+        async def fake_list_and_count(db, **kwargs):
             captured.update(kwargs)
-            return [_sample_log(user_id=user.id, username=user.username)]
+            return [_sample_log(user_id=user.id, username=user.username)], 1
 
-        async def fake_count(db, **kwargs):
-            return 1
-
-        with patch("src.api.endpoints.audit.get_audit_logs", new=fake_logs), \
-             patch("src.api.endpoints.audit.count_audit_logs", new=fake_count):
+        with patch("src.api.endpoints.audit.list_and_count_audit_logs", new=fake_list_and_count):
             client = TestClient(app)
             # Even if a malicious user tries to pass user_id, the endpoint
             # ignores it and pins to current user.
@@ -217,7 +205,9 @@ class TestAuditFilterHelpers:
         from src.auth.audit import get_audit_facets
 
         db = AsyncMock()
-        # Two execute() calls — actions then resource_types
+        # Two execute() calls dispatched concurrently via asyncio.gather —
+        # AsyncMock consumes side_effect in call-registration order so this
+        # remains deterministic.
         actions_result = MagicMock()
         actions_scalars = MagicMock()
         actions_scalars.all.return_value = ["login", "logout"]
@@ -235,3 +225,44 @@ class TestAuditFilterHelpers:
             "actions": ["login", "logout"],
             "resource_types": ["user", "connection"],
         }
+        # Both queries should have been issued.
+        assert db.execute.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_list_and_count_audit_logs_single_round_trip_window(self):
+        """Non-empty page should return total without a separate count query."""
+        from src.auth.audit import list_and_count_audit_logs
+
+        db = AsyncMock()
+        sample = _sample_log()
+        rows_result = MagicMock()
+        # Each row is (AuditLog, total) — total is identical across rows.
+        rows_result.all.return_value = [(sample, 42), (_sample_log(id=2), 42)]
+        db.execute.return_value = rows_result
+
+        items, total = await list_and_count_audit_logs(db, limit=10, offset=0)
+
+        assert total == 42
+        assert len(items) == 2
+        assert items[0] is sample
+        # Only one execute() call — no extra COUNT round trip.
+        assert db.execute.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_list_and_count_audit_logs_empty_page_falls_back_to_count(self):
+        """Empty result still needs an accurate total for 'page X of Y' UI."""
+        from src.auth.audit import list_and_count_audit_logs
+
+        db = AsyncMock()
+        empty_rows = MagicMock()
+        empty_rows.all.return_value = []
+        count_result = MagicMock()
+        count_result.scalar.return_value = 7  # total despite empty page
+        db.execute.side_effect = [empty_rows, count_result]
+
+        items, total = await list_and_count_audit_logs(db, limit=10, offset=100)
+
+        assert items == []
+        assert total == 7
+        # Window query returned nothing, so we fall back to a dedicated count.
+        assert db.execute.await_count == 2

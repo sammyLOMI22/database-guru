@@ -175,7 +175,7 @@ Settings in `src/config/settings.py`:
 - Auth settings: `JWT_EXPIRATION_MINUTES` (default 1440), `REQUIRE_AUTH` (default False), `RATE_LIMIT_PER_USER` (200), `RATE_LIMIT_LLM_PER_USER` (30)
 - LLM Provider settings: `DATA_SECURITY_LEVEL` (default `local_only`), per-provider `*_ENABLED`/`*_API_KEY`/`*_DEFAULT_MODEL` flags for OpenAI, Azure, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM
 - Observability (Phase 24, all opt-in): `LOG_FORMAT` (default `console`, set to `json` in prod), `LOG_LEVEL`, `LOG_INCLUDE_REQUEST_ID` (default true), `LOG_INCLUDE_USER_ID` (default false), `METRICS_ENABLED` (false), `METRICS_EXPOSE_ENDPOINT` (false — gates `GET /metrics`), `OTEL_ENABLED` (false), `OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://jaeger:4318`), `OTEL_SERVICE_NAME`, `OTEL_TRACES_SAMPLER_RATIO` (default 0.1)
-- Admin & Observability UI (Phase 24.7): `ADMIN_UI_ENABLED` (default true — when false, the audit/admin-users routers aren't mounted and the frontend hides the Admin tab and Observability section), plus optional deep-link URLs surfaced to the UI: `JAEGER_UI_URL`, `GRAFANA_URL`, `METRICS_PUBLIC_URL` (browser-reachable URL for `/metrics`)
+- Admin & Observability UI (Phase 24.7): `ADMIN_UI_ENABLED` (default false — opt-in, matching `METRICS_ENABLED` / `OTEL_ENABLED`; when false the audit/admin-users routers aren't mounted and the frontend hides the Admin tab and Observability section), plus optional deep-link URLs surfaced to the UI: `JAEGER_UI_URL`, `GRAFANA_URL`, `METRICS_PUBLIC_URL` (browser-reachable URL for `/metrics`)
 
 ## Documentation
 

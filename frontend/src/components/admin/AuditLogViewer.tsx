@@ -13,6 +13,7 @@ import {
   type AuditLog,
   type AuditLogQuery,
 } from '../../services/auditApi';
+import { formatTimestamp } from '../../utils/formatUtils';
 
 const PAGE_SIZE = 50;
 
@@ -39,14 +40,6 @@ const toIsoOrUndefined = (v: string): string | undefined => {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return undefined;
   return d.toISOString();
-};
-
-const formatTimestamp = (iso: string): string => {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
 };
 
 export default function AuditLogViewer() {

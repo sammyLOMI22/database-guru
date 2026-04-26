@@ -432,7 +432,9 @@ Phase 24.7 surfaces the Phase 24 observability stack and Phase 21 audit log dire
 ### Configuration
 
 ```bash
-# Feature toggle for the entire admin surface (default: true)
+# Feature toggle for the entire admin surface (default: false — opt-in,
+# matching METRICS_ENABLED / OTEL_ENABLED). Set to true to mount the audit /
+# admin-users routers and render the Admin tab + Settings → Observability.
 ADMIN_UI_ENABLED=true
 
 # External UI deep-links (all optional; UI hides links if unset)

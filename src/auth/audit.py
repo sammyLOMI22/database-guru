@@ -1,7 +1,8 @@
 """Audit logging for security-sensitive operations (Phase 21)"""
+import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy import Column, Integer, String, DateTime, JSON, Index, select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -125,13 +126,64 @@ async def count_audit_logs(
     return int(result.scalar() or 0)
 
 
+async def list_and_count_audit_logs(
+    db: AsyncSession,
+    user_id: Optional[int] = None,
+    action: Optional[str] = None,
+    resource_type: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> Tuple[list, int]:
+    """Fetch a page of audit logs and the matching total in a single round trip.
+
+    Uses `COUNT(*) OVER ()` so the unbounded audit table is scanned once per
+    request instead of twice (one SELECT + one COUNT). The total comes back
+    on every row; we read it from the first row and fall back to 0 when the
+    page is empty.
+    """
+    base = _apply_audit_filters(
+        select(AuditLog, func.count().over().label("__total")).order_by(desc(AuditLog.timestamp)),
+        user_id=user_id,
+        action=action,
+        resource_type=resource_type,
+        start_date=start_date,
+        end_date=end_date,
+    ).limit(limit).offset(offset)
+
+    rows = (await db.execute(base)).all()
+    if not rows:
+        # Empty page — could be no matches at all OR offset past the end. We
+        # still need an accurate total so the UI can show "page 5 of 4".
+        total = await count_audit_logs(
+            db,
+            user_id=user_id,
+            action=action,
+            resource_type=resource_type,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return [], total
+
+    items = [row[0] for row in rows]
+    total = int(rows[0][1] or 0)
+    return items, total
+
+
 async def get_audit_facets(db: AsyncSession) -> Dict[str, list]:
-    """Return distinct action/resource_type values for filter dropdowns."""
+    """Return distinct action/resource_type values for filter dropdowns.
+
+    Runs the two distinct queries concurrently so the round-trip cost is
+    `max(rtt_actions, rtt_resources)` instead of the sum.
+    """
     actions_q = select(AuditLog.action).distinct().order_by(AuditLog.action)
     resources_q = select(AuditLog.resource_type).distinct().order_by(AuditLog.resource_type)
-    actions = (await db.execute(actions_q)).scalars().all()
-    resources = (await db.execute(resources_q)).scalars().all()
+    actions_res, resources_res = await asyncio.gather(
+        db.execute(actions_q),
+        db.execute(resources_q),
+    )
     return {
-        "actions": [a for a in actions if a],
-        "resource_types": [r for r in resources if r],
+        "actions": [a for a in actions_res.scalars().all() if a],
+        "resource_types": [r for r in resources_res.scalars().all() if r],
     }

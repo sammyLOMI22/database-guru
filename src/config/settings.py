@@ -160,7 +160,13 @@ class Settings(BaseSettings):
     # Hard kill-switch for the Phase 24 admin UI (audit log, user management,
     # observability surface). When False the routers are not mounted and the
     # frontend hides the Admin tab and Observability section entirely.
-    ADMIN_UI_ENABLED: bool = True
+    #
+    # Defaults to False (opt-in) to match the rest of the security/observability
+    # surface (METRICS_ENABLED, OTEL_ENABLED, METRICS_EXPOSE_ENDPOINT). Operators
+    # who want the Admin tab must set ADMIN_UI_ENABLED=true explicitly — this is
+    # the safer posture for a feature that exposes user CRUD + audit logs and
+    # avoids accidentally enabling the surface in fresh deployments.
+    ADMIN_UI_ENABLED: bool = False
 
     class Config:
         env_file = ".env"

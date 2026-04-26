@@ -311,10 +311,15 @@ kill-switch.
 ### Kill-switch
 
 ```
-ADMIN_UI_ENABLED=true   # default; set false to remove the entire admin surface
+ADMIN_UI_ENABLED=true   # opt-in (default: false); set true to mount the admin surface
 ```
 
-When `ADMIN_UI_ENABLED=false`:
+The flag defaults to `false` so a fresh deployment never accidentally exposes
+user CRUD or audit logs — matching the opt-in posture of `METRICS_ENABLED`,
+`OTEL_ENABLED`, and `METRICS_EXPOSE_ENDPOINT`. Operators must set it
+explicitly in their `.env` to use the Admin tab.
+
+When `ADMIN_UI_ENABLED=false` (the default):
 
 - The `audit` and `admin_users` routers are **not mounted** (they don't appear
   in `/api/docs` either)

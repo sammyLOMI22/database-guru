@@ -279,6 +279,24 @@ class TestCreateUser:
         )
         assert resp.status_code == 409
 
+    @pytest.mark.asyncio
+    async def test_weak_password_422(self, app_factory, seed_users):
+        """Passwords missing uppercase/lowercase/digit are 422, not 409."""
+        app = app_factory(current_user=seed_users["admin"])
+        client = TestClient(app)
+        # Length OK (12), but all-lowercase + no digit fails complexity.
+        resp = client.post(
+            "/api/admin/users",
+            json={
+                "email": "weak@example.com",
+                "username": "weak",
+                "password": "alllowercase",
+            },
+        )
+        assert resp.status_code == 422, resp.text
+        # Confirm the error came from the password validator, not duplicate-email.
+        assert any("password" in str(e.get("loc", [])).lower() for e in resp.json()["detail"])
+
 
 # ── Deactivate ───────────────────────────────────────────────────────
 
@@ -318,3 +336,70 @@ class TestDeactivate:
         client = TestClient(app)
         resp = client.delete(f"/api/admin/users/{seed_users['admin'].id}")
         assert resp.status_code == 400
+
+
+# ── Self-reset-password guard (H1) ───────────────────────────────────
+
+
+class TestResetPasswordSelfGuard:
+    @pytest.mark.asyncio
+    async def test_admin_cannot_reset_own_password(self, app_factory, seed_users, session_factory):
+        """An admin must use the self-service /api/auth flow, not this endpoint."""
+        app = app_factory(current_user=seed_users["admin"])
+        client = TestClient(app)
+        resp = client.post(f"/api/admin/users/{seed_users['admin'].id}/reset-password")
+        assert resp.status_code == 400
+        assert "own password" in resp.json()["detail"].lower()
+
+        # Also confirms no audit entry was written for the rejected attempt.
+        actions = await _all_audit_actions(session_factory)
+        assert "admin_reset_password" not in actions
+
+
+# ── Non-admin 403 probes for every mutating endpoint (H3) ────────────
+
+
+class TestNonAdminForbidden:
+    """Each endpoint must return 403 for callers without `require_admin`.
+
+    Catches accidental drops of the dependency on a single route — the kind
+    of regression that wouldn't surface from positive-path tests.
+    """
+
+    @pytest.mark.asyncio
+    async def test_create_403(self, app_factory):
+        app = app_factory(current_user=None)
+        client = TestClient(app)
+        resp = client.post(
+            "/api/admin/users",
+            json={
+                "email": "x@example.com",
+                "username": "x",
+                "password": "StrongPass1234",
+            },
+        )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_update_403(self, app_factory, seed_users):
+        app = app_factory(current_user=None)
+        client = TestClient(app)
+        resp = client.patch(
+            f"/api/admin/users/{seed_users['alice'].id}",
+            json={"is_admin": True},
+        )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_reset_password_403(self, app_factory, seed_users):
+        app = app_factory(current_user=None)
+        client = TestClient(app)
+        resp = client.post(f"/api/admin/users/{seed_users['alice'].id}/reset-password")
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_deactivate_403(self, app_factory, seed_users):
+        app = app_factory(current_user=None)
+        client = TestClient(app)
+        resp = client.delete(f"/api/admin/users/{seed_users['alice'].id}")
+        assert resp.status_code == 403

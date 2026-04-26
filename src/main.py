@@ -16,7 +16,8 @@ from src.middleware.request_context import RequestContextMiddleware
 from src.observability.logging_config import configure_logging
 from src.observability import metrics as observability_metrics
 from src.observability import tracing as observability_tracing
-from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, settings, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance, auth, audit, admin_users, dml, llm_providers
+from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance, auth, audit, admin_users, dml, llm_providers
+from src.api.endpoints import settings as settings_endpoints
 from src.core.file_source_session import FileSourceDuckDBSession
 from src.core.file_source_handler import cleanup_expired_files
 
@@ -206,77 +207,85 @@ async def lifespan(app: FastAPI):
     logger.info("👋 Goodbye!")
 
 
-# Create FastAPI app
-app = FastAPI(
-    title="Database Guru",
-    description="AI-powered database expert that converts natural language to SQL",
-    version="1.0.0",
-    lifespan=lifespan,
-)
+def create_app(settings: Settings) -> FastAPI:
+    """Build a FastAPI app from an explicit Settings instance.
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[o.strip() for o in _settings.CORS_ORIGINS.split(",") if o.strip()],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    # X-Request-ID lets browser clients pass a correlation id through to the
-    # backend; expose_headers makes it readable from response.headers in JS.
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
-    expose_headers=["X-Request-ID"],
-)
-
-# Add rate limiting middleware
-app.add_middleware(
-    RateLimitMiddleware,
-    calls=500,  # Increased to 500 to support concurrent polling from multiple components
-    period=60,  # per 60 seconds
-)
-
-# Request-scoped context (request_id, user_id) for structured logs (Phase 24.1).
-# Added last so it becomes the outermost wrapper and runs first on each request.
-app.add_middleware(RequestContextMiddleware, settings=_settings)
-
-# Include routers
-app.include_router(health.router)
-app.include_router(query.router, prefix="/api")
-app.include_router(schema.router, prefix="/api")
-app.include_router(models.router, prefix="/api")
-app.include_router(connections.router, prefix="/api")
-app.include_router(chat.router, prefix="/api")
-app.include_router(multi_db_query.router, prefix="/api")
-app.include_router(learned_corrections.router)
-app.include_router(result_verification.router, prefix="/api")
-app.include_router(query_planning.router, prefix="/api")
-app.include_router(feedback.router, prefix="/api")
-app.include_router(mappings.router, prefix="/api")
-app.include_router(settings.router, prefix="/api")
-app.include_router(tools.router, prefix="/api")
-app.include_router(cache.router, prefix="/api")
-app.include_router(pools.router, prefix="/api")
-app.include_router(lineage.router, prefix="/api")
-app.include_router(files.router, prefix="/api")  # Phase 13: CSV & Excel file support
-app.include_router(llm_usage.router, prefix="/api")  # Phase 16: LLM usage monitoring
-app.include_router(migration.router, prefix="/api")  # Phase 20: Migration Toolkit
-app.include_router(performance.router, prefix="/api")  # Phase 22: Performance Guru
-app.include_router(auth.router, prefix="/api")  # Phase 21: Security & Auth
-if _settings.ADMIN_UI_ENABLED:
-    app.include_router(audit.router, prefix="/api")  # Phase 21: Audit logging
-    app.include_router(admin_users.router, prefix="/api")  # Phase 24: Admin user management
-app.include_router(dml.router, prefix="/api")  # Phase 18: Edit Mode & DML
-app.include_router(llm_providers.router, prefix="/api")  # Phase 15: LLM Provider Management
-
-# Phase 24.2: /metrics endpoint, gated by METRICS_EXPOSE_ENDPOINT. Mounted at
-# import time (not in lifespan) so reverse-proxies can scrape it as soon as
-# the worker comes up. The handler itself returns 404 when METRICS_ENABLED is
-# false, so toggling either flag suffices to hide the endpoint.
-if _settings.METRICS_EXPOSE_ENDPOINT:
-    app.add_api_route(
-        "/metrics",
-        observability_metrics.metrics_endpoint,
-        methods=["GET"],
-        include_in_schema=False,
+    Factored out so tests can construct a self-contained app with a chosen
+    `ADMIN_UI_ENABLED` (or other) flag without relying on `importlib.reload`
+    + env-var patching, which races with Pydantic BaseSettings' env-read.
+    """
+    app = FastAPI(
+        title="Database Guru",
+        description="AI-powered database expert that converts natural language to SQL",
+        version="1.0.0",
+        lifespan=lifespan,
     )
+
+    # CORS — X-Request-ID and traceparent are exposed so browser clients can
+    # surface them in the LastRequestBadge / SystemHealthPanel for log + trace
+    # correlation.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        expose_headers=["X-Request-ID", "traceparent"],
+    )
+
+    # Rate limiting (500/min, supports concurrent polling from the dashboard).
+    app.add_middleware(RateLimitMiddleware, calls=500, period=60)
+
+    # Request-scoped context (request_id, user_id) for structured logs.
+    # Added last so it becomes the outermost wrapper and runs first.
+    app.add_middleware(RequestContextMiddleware, settings=settings)
+
+    # Routers
+    app.include_router(health.router)
+    app.include_router(query.router, prefix="/api")
+    app.include_router(schema.router, prefix="/api")
+    app.include_router(models.router, prefix="/api")
+    app.include_router(connections.router, prefix="/api")
+    app.include_router(chat.router, prefix="/api")
+    app.include_router(multi_db_query.router, prefix="/api")
+    app.include_router(learned_corrections.router)
+    app.include_router(result_verification.router, prefix="/api")
+    app.include_router(query_planning.router, prefix="/api")
+    app.include_router(feedback.router, prefix="/api")
+    app.include_router(mappings.router, prefix="/api")
+    app.include_router(settings_endpoints.router, prefix="/api")
+    app.include_router(tools.router, prefix="/api")
+    app.include_router(cache.router, prefix="/api")
+    app.include_router(pools.router, prefix="/api")
+    app.include_router(lineage.router, prefix="/api")
+    app.include_router(files.router, prefix="/api")
+    app.include_router(llm_usage.router, prefix="/api")
+    app.include_router(migration.router, prefix="/api")
+    app.include_router(performance.router, prefix="/api")
+    app.include_router(auth.router, prefix="/api")
+    if settings.ADMIN_UI_ENABLED:
+        app.include_router(audit.router, prefix="/api")
+        app.include_router(admin_users.router, prefix="/api")
+    app.include_router(dml.router, prefix="/api")
+    app.include_router(llm_providers.router, prefix="/api")
+
+    # /metrics endpoint, gated by METRICS_EXPOSE_ENDPOINT. Mounted at import
+    # time (not in lifespan) so reverse-proxies can scrape it as soon as the
+    # worker comes up. The handler returns 404 when METRICS_ENABLED is false,
+    # so toggling either flag suffices to hide the endpoint.
+    if settings.METRICS_EXPOSE_ENDPOINT:
+        app.add_api_route(
+            "/metrics",
+            observability_metrics.metrics_endpoint,
+            methods=["GET"],
+            include_in_schema=False,
+        )
+
+    return app
+
+
+# Module-level instance used by uvicorn / `python -m src.main`.
+app = create_app(_settings)
 
 if __name__ == "__main__":
     import uvicorn
