@@ -23,6 +23,83 @@ def bump_password_version(user: User) -> None:
     current = int(getattr(user, "password_version", 1) or 1)
     user.password_version = current + 1
 
+
+async def check_password_history(
+    db: AsyncSession,
+    user: User,
+    new_password: str,
+    *,
+    depth: int,
+) -> bool:
+    """Return True when ``new_password`` matches one of the user's last
+    ``depth`` passwords (current + history). Caller decides what to do.
+
+    Bcrypt compares are expensive, so we cap the lookup at ``depth`` rows
+    and short-circuit on the first match. ``depth <= 0`` disables the check.
+    """
+    if depth <= 0:
+        return False
+    # Always reject if it matches the *current* hash, regardless of depth.
+    if user.hashed_password and bcrypt.checkpw(
+        new_password.encode("utf-8"), user.hashed_password.encode("utf-8")
+    ):
+        return True
+    from src.auth.models import PasswordHistory  # local import to avoid cycle
+    rows = await db.execute(
+        select(PasswordHistory.hashed_password)
+        .where(PasswordHistory.user_id == user.id)
+        .order_by(PasswordHistory.replaced_at.desc())
+        .limit(depth)
+    )
+    for previous in rows.scalars().all():
+        if bcrypt.checkpw(new_password.encode("utf-8"), previous.encode("utf-8")):
+            return True
+    return False
+
+
+async def record_password_history(
+    db: AsyncSession,
+    user: User,
+    *,
+    depth: int,
+) -> None:
+    """Append the user's *current* hash to history before it's overwritten,
+    and trim the table back to ``depth`` rows so it stays bounded.
+
+    No-op when depth <= 0 — keeps the table empty when the feature is off.
+    Caller writes the new hash to ``user.hashed_password`` after this call.
+    """
+    if depth <= 0:
+        return
+    from src.auth.models import PasswordHistory  # local import to avoid cycle
+    if user.hashed_password:
+        db.add(PasswordHistory(user_id=user.id, hashed_password=user.hashed_password))
+        await db.flush()
+    # Trim: keep the most recent ``depth`` rows, delete the rest.
+    rows = await db.execute(
+        select(PasswordHistory.id)
+        .where(PasswordHistory.user_id == user.id)
+        .order_by(PasswordHistory.replaced_at.desc())
+    )
+    ids = list(rows.scalars().all())
+    if len(ids) > depth:
+        from sqlalchemy import delete
+        await db.execute(
+            delete(PasswordHistory).where(PasswordHistory.id.in_(ids[depth:]))
+        )
+
+
+async def count_active_admins(db: AsyncSession) -> int:
+    """Count users who are both is_admin=True and is_active=True. Used by the
+    admin-quorum guard (Phase D3) to block locking out the last admin."""
+    from sqlalchemy import func as _func
+    rows = await db.execute(
+        select(_func.count())
+        .select_from(User)
+        .where(User.is_admin.is_(True), User.is_active.is_(True))
+    )
+    return int(rows.scalar() or 0)
+
 logger = logging.getLogger(__name__)
 
 # Pre-computed dummy hash for constant-time authentication (prevents timing attacks)

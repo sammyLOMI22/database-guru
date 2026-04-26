@@ -60,3 +60,22 @@ class PasswordResetToken(Base):
     __table_args__ = (
         Index("idx_reset_token_user_used", "user_id", "used_at"),
     )
+
+
+class PasswordHistory(Base):
+    """Bcrypt hashes of a user's previous passwords (Phase D1).
+
+    Only populated when AUTH_PASSWORD_HISTORY_DEPTH > 0. The column store
+    contains hashes only — never plaintext — and the row count per user is
+    trimmed on insert so the table stays bounded.
+    """
+    __tablename__ = "password_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
+    replaced_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        Index("idx_pwd_history_user_time", "user_id", "replaced_at"),
+    )

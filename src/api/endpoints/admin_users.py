@@ -20,7 +20,7 @@ from src.auth.audit import log_action
 from src.auth.dependencies import get_auth_service, require_admin
 from src.auth.models import PasswordResetToken, User
 from src.auth.schemas import validate_password_complexity
-from src.auth.service import AuthService, bump_password_version
+from src.auth.service import AuthService, bump_password_version, count_active_admins
 from src.api.dependencies.common import get_settings
 from src.config.settings import Settings
 from src.middleware.rate_limit import get_client_ip
@@ -143,6 +143,44 @@ async def _get_user_or_404(db: AsyncSession, user_id: int) -> User:
     return user
 
 
+async def _enforce_admin_quorum(
+    db: AsyncSession,
+    target: User,
+    *,
+    settings: Settings,
+    will_be_admin: Optional[bool] = None,
+    will_be_active: Optional[bool] = None,
+) -> None:
+    """Phase D3 guard: refuse to demote/deactivate the last active admin.
+
+    No-op when AUTH_REQUIRE_ADMIN_QUORUM is off. Otherwise, if the target is
+    currently a counted admin (is_admin=True, is_active=True) and the change
+    would remove them from that set, ensure at least one other counted admin
+    survives. We compute the post-change population by adjusting the live
+    count by -1.
+    """
+    if not settings.AUTH_REQUIRE_ADMIN_QUORUM:
+        return
+    target_is_counted = bool(target.is_admin and target.is_active)
+    if not target_is_counted:
+        return
+    becomes_counted = (
+        (will_be_admin if will_be_admin is not None else target.is_admin)
+        and (will_be_active if will_be_active is not None else target.is_active)
+    )
+    if becomes_counted:
+        return  # the change keeps them in the admin pool
+    active_admins = await count_active_admins(db)
+    if active_admins <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "At least one active admin must remain. Promote or activate "
+                "another user before changing this account."
+            ),
+        )
+
+
 # ── Endpoints ────────────────────────────────────────────────────────
 
 
@@ -242,6 +280,13 @@ async def update_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Admins cannot deactivate themselves",
             )
+
+    # Phase D3: refuse the change if it would drop the active-admin count to 0.
+    await _enforce_admin_quorum(
+        db, user, settings=settings,
+        will_be_admin=data.is_admin,
+        will_be_active=data.is_active,
+    )
 
     changes: dict = {}
     if data.is_active is not None and data.is_active != user.is_active:
@@ -391,6 +436,11 @@ async def deactivate_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Admins cannot deactivate themselves",
         )
+
+    # Phase D3: refuse if this drop would leave zero active admins.
+    await _enforce_admin_quorum(
+        db, user, settings=settings, will_be_active=False,
+    )
 
     invalidated = False
     if user.is_active:

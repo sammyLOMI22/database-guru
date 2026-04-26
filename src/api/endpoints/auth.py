@@ -18,7 +18,12 @@ from src.auth.schemas import (
     UserResponse,
 )
 from src.auth.audit import log_action
-from src.auth.service import AuthService, bump_password_version
+from src.auth.service import (
+    AuthService,
+    bump_password_version,
+    check_password_history,
+    record_password_history,
+)
 from src.api.dependencies.common import get_settings
 from src.config.settings import Settings
 from src.middleware.rate_limit import (
@@ -215,6 +220,21 @@ async def change_password(
             detail="New password must differ from the current password",
         )
 
+    # Phase D1: reject reuse against the last N hashes (no-op when depth=0).
+    if await check_password_history(
+        db, user, data.new_password, depth=settings.AUTH_PASSWORD_HISTORY_DEPTH,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"This password was used recently. "
+                f"Pick one you haven't used in the last "
+                f"{settings.AUTH_PASSWORD_HISTORY_DEPTH} change(s)."
+            ),
+        )
+
+    # Capture the previous hash before we overwrite it.
+    await record_password_history(db, user, depth=settings.AUTH_PASSWORD_HISTORY_DEPTH)
     user.hashed_password = auth_service.hash_password(data.new_password)
     forced = user.must_change_password
     user.must_change_password = False
@@ -312,6 +332,22 @@ async def redeem_password_reset(
             detail="Reset token is invalid, expired, or already used",
         )
 
+    if await check_password_history(
+        db, user, data.new_password, depth=settings.AUTH_PASSWORD_HISTORY_DEPTH,
+    ):
+        # Don't burn the token on a recoverable input error — the operator
+        # can issue a fresh one if reuse blocks the user out repeatedly.
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"This password was used recently. "
+                f"Pick one you haven't used in the last "
+                f"{settings.AUTH_PASSWORD_HISTORY_DEPTH} change(s)."
+            ),
+        )
+
+    await record_password_history(db, user, depth=settings.AUTH_PASSWORD_HISTORY_DEPTH)
     user.hashed_password = auth_service.hash_password(data.new_password)
     user.must_change_password = False
     bump_password_version(user)
