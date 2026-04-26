@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: April 12, 2026
+**Last Updated**: April 25, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -331,6 +331,42 @@
     │                                                                                           │
     │  Prereq: Phase 23 ✅ (Docker) | Status: ✅ Complete | Stdout JSON only (no aggregator)  │
     │  Guide: OBSERVABILITY_GUIDE.md | Test guide: PHASE_24_OBSERVABILITY_TESTING.md          │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │              ADMIN & OBSERVABILITY UI (Phase 24.7) ✅ COMPLETE                          │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │              UI INTEGRATION GAPS (Phase 24.7) ✅ COMPLETE — Apr 25, 2026                 │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
+    │  │ PR1: Trace- │   │ PR2: Audit  │   │ PR3: Health │   │ PR4: User   │                   │
+    │  │ ID Header   │──▶│ Log Viewer  │──▶│ Sub-Tab +   │──▶│ Management  │                   │
+    │  │ + Axios     │   │ + Admin Tab │   │ Deep-links  │   │ CRUD        │                   │
+    │  │ Interceptor │   │             │   │             │   │             │                   │
+    │  │             │   │ • paginated │   │ • Prometheus│   │ • list/create│                  │
+    │  │ • zustand   │   │ • filters   │   │   /Jaeger/  │   │ • role toggl│                   │
+    │  │   store     │   │ • JSON      │   │   Grafana   │   │ • disable   │                   │
+    │  │ • header    │   │   drawer    │   │   deep-links│   │ • reset pwd │                   │
+    │  │   badge     │   │ • facets    │   │ • /health   │   │ • audit-log │                   │
+    │  │ • copy id   │   │   endpoint  │   │   cards     │   │   side-eff  │                   │
+    │  │             │   │             │   │ • obs gates │   │ • self-lock │                   │
+    │  │             │   │             │   │ • last-req  │   │   protection│                   │
+    │  │             │   │             │   │   widget    │   │             │                   │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │                                                                                           │
+    │  Plus: removed mock data (1,133 LOC ObservabilityDemo.tsx), introduced ADMIN_UI_ENABLED   │
+    │  kill-switch (gates router mounting + frontend tab/section rendering), exposed            │
+    │  observability config via /api/settings (jaeger_ui_url, grafana_url, metrics_public_url,  │
+    │  metrics_enabled, metrics_endpoint_exposed, otel_enabled, otel_service_name,              │
+    │  otel_traces_sampler_ratio, admin_ui_enabled).                                            │
+    │                                                                                           │
+    │  Prereq: Phase 21 ✅ (Auth+Audit), Phase 24 ✅ (Observability backend)                   │
+    │  Plan: PHASE_24_Observability_&_Monitoring_UI_PLAN.md                                    │
+    │  Tests: tests/test_admin_users_endpoints.py (320), tests/test_audit_endpoints.py (237),   │
+    │         tests/test_admin_ui_toggle.py (35), tests/test_settings_observability.py (163)    │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -711,12 +747,13 @@
 
 ---
 
-## Recommended Next Steps (Updated April 12, 2026)
+## Recommended Next Steps (Updated April 25, 2026)
 
 > **Strategic Direction** (per PM Review): Focus on "depth and safety" before "width expansion".
-> Security/Auth, Edit Mode, Enterprise LLMs, and Multi-Provider Monitoring are now complete.
+> Security/Auth, Edit Mode, Enterprise LLMs, Multi-Provider Monitoring, Observability backend, and the operator-facing Admin/Observability UI are now complete.
 
 ### Completed Priorities (this cycle)
+- ~~Admin & Observability UI (Phase 24.7)~~ - ✅ COMPLETE: Trace-id badge in header (axios interceptor + zustand `lastRequestStore`), AuditLogViewer with server-side filters/pagination/JSON drawer + `/api/audit/facets`, UserManagement CRUD (list/create/role-toggle/disable/reset-password) with audit-log side-effects and self-lockout protection, SystemHealthPanel sub-tab replacing the 1,133-LOC `ObservabilityDemo.tsx` mock (live `/health`, recent queries, recent audit, observability gates, last-request widget), Settings → Observability section with Prometheus/Jaeger/Grafana deep-links, hard `ADMIN_UI_ENABLED` kill-switch (router mount + frontend tab/section gating). New endpoints: 5 under `/api/admin/users`, 3 under `/api/audit`. New tests: `test_admin_users_endpoints.py` (320 LOC), `test_audit_endpoints.py` (237 LOC), `test_admin_ui_toggle.py` (35 LOC), `test_settings_observability.py` (163 LOC). Plan: `PHASE_24_Observability_&_Monitoring_UI_PLAN.md`.
 - ~~Observability & Monitoring (Phase 24)~~ - ✅ COMPLETE: structlog JSON logs with request_id propagation + sensitive-key redaction, Prometheus collectors (`dbguru_*`) for HTTP/LLM/SQL/pool/cache with bounded labels, gated `/metrics` endpoint, OpenTelemetry SDK + OTLP HTTP exporter with auto-instrumentation (FastAPI/SQLAlchemy/HTTPX/Redis), manual `llm.call` and `agent.self_correcting` spans reusing LLMUsageTracker values, Docker `observability` profile (Jaeger/Prometheus/Grafana with provisioned dashboard + alert rules). 17 tests, ~1,300 lines. Stdout JSON only — no log aggregator in scope.
 - ~~Multi-Provider Monitoring (Phase 17)~~ - ✅ COMPLETE: Native token extraction for 6 provider formats (Ollama, OpenAI/Azure/LM Studio/vLLM, Anthropic, Google Vertex, AWS Bedrock), user-managed model pricing (CRUD admin API), cost summary with daily breakdown, provider performance comparison by agent type, unpriced model detection, ModelPricingManager UI. 29 tests, 7 new endpoints, ~1,373 lines.
 - ~~LLM Provider Expansion (Phase 15)~~ - ✅ COMPLETE: 8 providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM), provider abstraction + registry, data security enforcement (local/cloud_private/cloud_public), Local/Frontier toggle UI, per-task routing, fallback chains, Fernet-encrypted API keys, frontend provider management. 220 tests, 8 endpoints, ~4,000 lines.
@@ -834,6 +871,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | ✅ **COMPLETE** |
 | **Phase 23** | Docker Containerization | None | ~200 lines config | ✅ **COMPLETE** |
 | **Phase 24** | Observability & Monitoring | Phase 23 ✅ | ~1,300 lines | ✅ **COMPLETE** |
+| **Phase 24.7** | Admin & Observability UI | Phase 21 ✅ + Phase 24 ✅ | ~3,465 lines (4 PRs) | ✅ **COMPLETE** |
 | **Phase 14** | NoSQL Database Expansion | None | ~6,000 lines | ✅ **COMPLETE** |
 
 ---
@@ -854,12 +892,14 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - [DATA_INSIGHTS_ENHANCEMENT_PLAN.md](DATA_INSIGHTS_ENHANCEMENT_PLAN.md) - Data Insights Enhancement (Phase 19)
 - [MIGRATION_TOOLKIT_PROPOSAL.md](MIGRATION_TOOLKIT_PROPOSAL.md) - Database Migration Toolkit (Phase 20)
 - [DOCKER_CONTAINERIZATION_PLAN.md](DOCKER_CONTAINERIZATION_PLAN.md) - Docker Containerization (Phase 23)
+- [Phase 24_Observability_&_Monitoring.md](Phase%2024_Observability_%26_Monitoring.md) - Observability backend (Phase 24) ✅
+- [PHASE_24_Observability_&_Monitoring_UI_PLAN.md](PHASE_24_Observability_%26_Monitoring_UI_PLAN.md) - Admin & Observability UI (Phase 24.7) ✅
 - [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md) - Innovation pipeline ideas
 - [ROADMAP_FEEDBACK.md](ROADMAP_FEEDBACK.md) - PM review & strategic recommendations
 
 ---
 
-**Updated**: April 12, 2026
+**Updated**: April 26, 2026
 - **Phase 17 ✅ COMPLETE**: Multi-Provider Monitoring
 - **Phase 15 ✅ COMPLETE**: LLM Provider Expansion
   - 15.1: Provider Abstraction — BaseLLMProvider ABC, DataLocality enum, ProviderRegistry, TrackedLLMClient wrapper
@@ -910,4 +950,10 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
   - Ollama retry logic (tenacity), prompts.py refactored into package
   - CTE support added to SQL lineage parser
 - **Phase 24 ✅ COMPLETE**: Observability & Monitoring (structlog, Prometheus, OpenTelemetry, Docker observability profile)
+- **Phase 24.7 ✅ COMPLETE**: Admin & Observability UI (4 PRs)
+  - PR1: X-Request-ID exposed via CORS, axios response interceptor populates `useLastRequestStore`, header `LastRequestBadge` shows short id and copies the full id + traceparent
+  - PR2: Admin tab scaffolding (`AdminPanel`), `AuditLogViewer` with paginated server-side filters and JSON drawer, `auditApi.ts`, `audit.py` adds list/me/facets endpoints
+  - PR3: Observability section in `SettingsPanel` with deep-links (Prometheus / Jaeger / Grafana), `SystemHealthPanel` Health sub-tab replacing the demo (live `/health`, observability gates, last-request widget, recent queries + audit), `JAEGER_UI_URL`/`GRAFANA_URL`/`METRICS_PUBLIC_URL` settings exposed via `/api/settings`
+  - PR4: `admin_users.py` with list/create/update/reset-password/deactivate, `UserManagement.tsx` with role toggle / disable / reset, `CreateUserModal`, `adminUsersApi.ts`, self-lockout protection on the backend, every action audit-logged
+  - Plus: removed 1,133-LOC `ObservabilityDemo.tsx` mock, introduced `ADMIN_UI_ENABLED` kill-switch (router mount + frontend tab/section gating)
 - Previous: Added Phase 20-22, Innovation Pipeline, promoted Security to CRITICAL

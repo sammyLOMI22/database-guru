@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 24.7: Admin & Observability UI** — operator-facing surface for the Phase 24 stack and Phase 21 audit log, fully gated by `ADMIN_UI_ENABLED`
+  - Header `LastRequestBadge` (`frontend/src/components/common/LastRequestBadge.tsx`) — surfaces the most recent `X-Request-ID`, click-to-copy id + `traceparent` for log/trace correlation
+  - Axios response interceptor (`frontend/src/services/api.ts`) populates a Zustand `useLastRequestStore` from `X-Request-ID` / `traceparent` response headers
+  - Backend `CORSMiddleware` exposes `X-Request-ID` so browser clients can read it (`expose_headers`)
+  - **Admin tab** (`frontend/src/components/admin/AdminPanel.tsx`) — three sub-tabs (Users / Audit Log / Health), wrapped in a `RequireAdmin` guard, only rendered when `ADMIN_UI_ENABLED=true` and `user.is_admin`
+  - **Audit Log Viewer** (`AuditLogViewer.tsx`) — paginated table with server-side filters (action, resource_type, user_id, date range), JSON detail drawer per row, facet-driven dropdowns
+  - **User Management** (`UserManagement.tsx` + `CreateUserModal.tsx`) — list/search/filter, inline admin-role toggle, enable/disable, one-time temporary password reset (returned once, copy-to-clipboard), self-lockout protection on the backend
+  - **System Health Panel** (`SystemHealthPanel.tsx`) — replaces the 1,133-LOC `ObservabilityDemo.tsx` mock with a live readout: API/DB/Cache/LLM cards from `/health`, observability gate matrix (Prometheus / OpenTelemetry / Jaeger / Grafana), last-request widget, semantic + LLM cache hit rates, recent queries, recent audit activity
+  - **Settings → Observability section** — deep-links to Prometheus `/metrics`, Jaeger UI, and Grafana, falling back to disabled with a tooltip when the backing flag is off
+  - Backend admin endpoints under `/api/admin/users` (`admin_users.py`): `GET` list with search/filters/pagination, `POST` create, `PATCH` update (`is_active` / `is_admin`), `POST /{id}/reset-password`, `DELETE /{id}` (idempotent soft-deactivate). Every mutation calls `log_action()`.
+  - Backend audit endpoints under `/api/audit` (`audit.py`): `GET /logs` (admin), `GET /logs/me` (current user), `GET /facets` for dropdown values
+  - `src/auth/audit.py` adds `count_audit_logs()` and `get_audit_facets()` helpers; `get_audit_logs()` extended with filters
+  - New settings: `ADMIN_UI_ENABLED` (default `true`, hard kill-switch for the entire admin surface), `JAEGER_UI_URL`, `GRAFANA_URL`, `METRICS_PUBLIC_URL`
+  - `/api/settings/` response surfaces `metrics_enabled`, `metrics_endpoint_exposed`, `metrics_public_url`, `otel_enabled`, `otel_service_name`, `otel_traces_sampler_ratio`, `jaeger_ui_url`, `grafana_url`, `admin_ui_enabled` so the UI can render conditionally
+  - 4 new test files: `tests/test_admin_users_endpoints.py` (320 LOC), `tests/test_audit_endpoints.py` (237 LOC), `tests/test_admin_ui_toggle.py` (35 LOC), `tests/test_settings_observability.py` (163 LOC)
+  - Plan: `docs/planning/PHASE_24_Observability_&_Monitoring_UI_PLAN.md`
+
+### Removed
+- `frontend/src/components/ObservabilityDemo.tsx` (1,133 LOC of mock data) — superseded by `SystemHealthPanel` reading real `/health`, audit, and cache endpoints
+
 - **Phase 24: Observability & Monitoring** — production-grade observability, fully opt-in
   - Structured JSON / console logging via `structlog` with sensitive-key redaction
   - `RequestContextMiddleware` propagates a sanitised `X-Request-ID` through every log line and reflects it on responses

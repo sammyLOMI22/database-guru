@@ -380,19 +380,54 @@ Inline data editing with preview, execution, and per-connection write permission
 - **Dependencies**: `get_current_user` (401 if no token), `get_optional_user` (returns None if unauthenticated), `require_admin` (403 if not admin)
 - **Audit Logging**: Register, login, and failed login events are logged
 
-## Audit Log API (Phase 21)
+## Audit Log API (Phase 21 + Phase 24.7)
 **File**: `audit.py`
+**Mounted only when**: `ADMIN_UI_ENABLED=true`
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/audit/logs` | List audit logs (admin only) |
+| GET | `/api/audit/logs` | List audit logs (admin only, filters + pagination) |
 | GET | `/api/audit/logs/me` | List current user's audit logs |
+| GET | `/api/audit/facets` | Distinct `actions` / `resource_types` for filter dropdowns (admin only) |
 
 ### Query Parameters
 ```
-GET /api/audit/logs?action=login&resource_type=user&limit=50&offset=0
+GET /api/audit/logs?action=login&resource_type=user&user_id=42&start_date=2026-04-01T00:00:00&end_date=2026-04-30T23:59:59&limit=50&offset=0
 GET /api/audit/logs/me?action=create&limit=20
 ```
+
+### Response Shape
+```json
+{
+  "items": [{
+    "id": 1, "user_id": 42, "username": "alice",
+    "action": "login", "resource_type": "user", "resource_id": "42",
+    "details": {"...": "..."}, "ip_address": "10.0.0.1",
+    "timestamp": "2026-04-25T18:00:00Z"
+  }],
+  "total": 12345, "limit": 50, "offset": 0
+}
+```
+
+## Admin Users API (Phase 24.7)
+**File**: `admin_users.py`
+**Mounted only when**: `ADMIN_UI_ENABLED=true`
+**All endpoints require**: `require_admin` dependency; every mutation calls `log_action()`
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/admin/users` | List users with `search` (username/email), `is_active`, `is_admin`, `limit`, `offset` |
+| POST | `/api/admin/users` | Create user (email, username, password ≥12 chars, optional `is_admin`) |
+| PATCH | `/api/admin/users/{user_id}` | Toggle `is_active` / `is_admin`; self-lockout protected (cannot demote/deactivate self) |
+| POST | `/api/admin/users/{user_id}/reset-password` | Reset to 16-char alnum temp password (returned once in response) |
+| DELETE | `/api/admin/users/{user_id}` | Idempotent soft-deactivate (`is_active=False`); returns 204 |
+
+### Settings → Observability Surfacing (Phase 24.7)
+`GET /api/settings/` adds these fields so the UI can render the Health sub-tab and observability deep-links conditionally:
+- `metrics_enabled`, `metrics_endpoint_exposed`, `metrics_public_url`
+- `otel_enabled`, `otel_service_name`, `otel_traces_sampler_ratio`
+- `jaeger_ui_url`, `grafana_url`
+- `admin_ui_enabled` (frontend uses this to hide the Admin tab + Observability section entirely)
 
 ---
 

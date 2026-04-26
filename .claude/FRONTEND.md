@@ -378,4 +378,33 @@ frontend/src/
 | Tools | Orange | Tool-Using Agent management |
 | Cache | Amber | Semantic cache monitoring |
 | Usage | Default | LLM usage monitoring dashboard |
+| Admin | Purple | Users / Audit Log / Health (admin-only, gated by `ADMIN_UI_ENABLED`) |
 | Settings | Default | System configuration |
+
+## Admin & Observability UI (Phase 24.7 - April 2026)
+**Location**: `frontend/src/components/admin/` and `frontend/src/components/common/`
+
+### Components
+| Component | File | Purpose |
+|-----------|------|---------|
+| `AdminPanel` | `admin/AdminPanel.tsx` | Container with three sub-tabs (Users / Audit / Health) |
+| `UserManagement` | `admin/UserManagement.tsx` | List, create, role-toggle, disable, reset password |
+| `CreateUserModal` | `admin/CreateUserModal.tsx` | Modal for creating new users |
+| `AuditLogViewer` | `admin/AuditLogViewer.tsx` | Paginated audit log with filters + JSON drawer |
+| `SystemHealthPanel` | `admin/SystemHealthPanel.tsx` | Live `/health`, observability gates, last-request, recent queries/audit, cache stats |
+| `LastRequestBadge` | `common/LastRequestBadge.tsx` | Header badge showing short request_id, click-to-copy full id + traceparent |
+| `RequireAdmin` | `common/RequireAdmin.tsx` | Guard component that renders children only for admin users |
+| `ObservabilitySection` | (inside `SettingsPanel.tsx`) | Settings → deep-links to Prometheus / Jaeger / Grafana |
+
+### State
+- `stores/lastRequestStore.ts` — Zustand store holding the last `request_id`, `traceparent`, method, url, status; populated by the axios response interceptor in `services/api.ts`
+
+### Services
+| Service | Purpose |
+|---------|---------|
+| `services/auditApi.ts` | `listLogs(query)`, `getFacets()` — wraps `/api/audit/logs` + `/api/audit/facets` |
+| `services/adminUsersApi.ts` | `list(query)`, `create()`, `update()`, `resetPassword()`, `deactivate()` — wraps `/api/admin/users/*` |
+
+### Feature Toggle
+- Backend `ADMIN_UI_ENABLED` (default `true`) gates router mounting; `/api/settings/` returns `admin_ui_enabled` so the frontend hides the Admin tab and the Settings → Observability section entirely when the kill-switch is off
+- The Admin tab is also conditioned on `user.is_admin`; non-admins see a `RequireAdmin` placeholder if they navigate to it directly

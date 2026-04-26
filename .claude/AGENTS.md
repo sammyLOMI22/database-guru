@@ -627,8 +627,20 @@ Audit trail for security-sensitive operations:
 - **Never-Raising**: `log_action()` wraps all DB operations in try/except — audit failures never break business logic
 - **Structured**: action, resource_type, resource_id, details JSON, IP address, timestamp
 - **Queryable**: `get_audit_logs()` with filtering by user, action, resource type, date range
+- **UI-driven helpers (Phase 24.7)**: `count_audit_logs()` for pagination totals, `get_audit_facets()` returning distinct `actions` / `resource_types` to populate filter dropdowns
 
-**Key methods**: `log_action()`, `get_audit_logs()`
+**Key methods**: `log_action()`, `get_audit_logs()`, `count_audit_logs()`, `get_audit_facets()`
+
+### 37b. Admin Users API (Phase 24.7)
+**File**: `src/api/endpoints/admin_users.py`
+
+Operator-driven user CRUD that complements the self-service auth flow:
+- **Gated by `require_admin`** + `ADMIN_UI_ENABLED` (router only mounted when the kill-switch is on)
+- **Endpoints**: list (search/filter/paginate), create, update (`is_active`/`is_admin`), reset-password (returns one-time temp password matching the `UserCreate` complexity rules), idempotent soft-deactivate
+- **Self-lockout protection**: an admin cannot demote or deactivate themselves through the same UI
+- **Audit-logged**: every mutation calls `log_action()` with the target user, the changes diff, and the operator's IP
+
+**Key endpoints**: `GET/POST /api/admin/users`, `PATCH /api/admin/users/{id}`, `POST /api/admin/users/{id}/reset-password`, `DELETE /api/admin/users/{id}`
 
 ---
 

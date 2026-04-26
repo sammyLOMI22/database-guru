@@ -18,9 +18,10 @@ Quick reference for finding important code in the Database Guru codebase.
 | **Audit Logging** | |
 | AuditLog model | `src/auth/audit.py:AuditLog` |
 | log_action helper | `src/auth/audit.py:log_action()` |
+| Audit query helpers | `src/auth/audit.py:get_audit_logs()`, `count_audit_logs()`, `get_audit_facets()` |
 | **API Endpoints** | |
 | Auth endpoints | `src/api/endpoints/auth.py` (register, login, me) |
-| Audit endpoints | `src/api/endpoints/audit.py` (admin logs, user logs) |
+| Audit endpoints | `src/api/endpoints/audit.py` (admin logs, user logs, facets) |
 | **Rate Limiting** | |
 | User ID extraction | `src/middleware/rate_limit.py:_extract_user_id_from_token()` |
 | **Migrations** | |
@@ -33,6 +34,39 @@ Quick reference for finding important code in the Database Guru codebase.
 | Rate limit tests | `tests/test_rate_limit_user.py` (8 tests) |
 | Audit tests | `tests/test_audit.py` (8 tests) |
 | Soft-delete tests | `tests/test_connection_soft_delete.py` (3 tests) |
+
+## Admin & Observability UI (Phase 24.7 - April 2026)
+| Component | Location |
+|-----------|----------|
+| **Backend** | |
+| Admin users router | `src/api/endpoints/admin_users.py` (list/create/update/reset-password/deactivate) |
+| Audit endpoints (extended) | `src/api/endpoints/audit.py` (`/logs`, `/logs/me`, `/facets`) |
+| Settings observability surface | `src/api/endpoints/settings.py` (returns `metrics_*`, `otel_*`, `jaeger_ui_url`, `grafana_url`, `admin_ui_enabled`) |
+| Kill-switch | `src/config/settings.py:Settings.ADMIN_UI_ENABLED` (gates router mounting in `src/main.py`) |
+| Deep-link config | `src/config/settings.py:JAEGER_UI_URL` / `GRAFANA_URL` / `METRICS_PUBLIC_URL` |
+| CORS exposes request id | `src/main.py` CORS `expose_headers=["X-Request-ID"]` |
+| **Frontend (admin/)** | |
+| AdminPanel | `frontend/src/components/admin/AdminPanel.tsx` |
+| UserManagement | `frontend/src/components/admin/UserManagement.tsx` |
+| CreateUserModal | `frontend/src/components/admin/CreateUserModal.tsx` |
+| AuditLogViewer | `frontend/src/components/admin/AuditLogViewer.tsx` |
+| SystemHealthPanel | `frontend/src/components/admin/SystemHealthPanel.tsx` |
+| **Frontend (common/)** | |
+| LastRequestBadge | `frontend/src/components/common/LastRequestBadge.tsx` |
+| RequireAdmin guard | `frontend/src/components/common/RequireAdmin.tsx` |
+| **Frontend state** | |
+| Last request store | `frontend/src/stores/lastRequestStore.ts` (Zustand) |
+| Axios interceptor | `frontend/src/services/api.ts:recordLastRequest()` |
+| **Frontend services** | |
+| Audit API client | `frontend/src/services/auditApi.ts` |
+| Admin users API client | `frontend/src/services/adminUsersApi.ts` |
+| Observability section in Settings | `frontend/src/components/SettingsPanel.tsx:ObservabilitySection` |
+| **Tests** | |
+| Admin users endpoints | `tests/test_admin_users_endpoints.py` (320 LOC) |
+| Audit endpoints | `tests/test_audit_endpoints.py` (237 LOC) |
+| ADMIN_UI_ENABLED toggle | `tests/test_admin_ui_toggle.py` (35 LOC) |
+| Settings observability surface | `tests/test_settings_observability.py` (163 LOC) |
+| **Plan** | `docs/planning/PHASE_24_Observability_&_Monitoring_UI_PLAN.md` |
 
 ## Edit Mode & DML (Phase 18 - March 2026)
 | Component | Location |

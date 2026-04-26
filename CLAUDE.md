@@ -98,7 +98,8 @@ The system uses a multi-agent architecture with 40+ specialized agents (includin
 | Elasticsearch Handler | `src/nosql/elasticsearch/handler.py` | Query DSL generation, aggregations (Phase 14) |
 | Auth Service | `src/auth/service.py` | JWT auth, bcrypt hashing, user CRUD (Phase 21) |
 | Auth Dependencies | `src/auth/dependencies.py` | get_current_user, get_optional_user, require_admin (Phase 21) |
-| Audit Logger | `src/auth/audit.py` | AuditLog model, never-raising log_action() (Phase 21) |
+| Audit Logger | `src/auth/audit.py` | AuditLog model, never-raising log_action(), facets/count helpers (Phase 21 + 24.7) |
+| Admin Users API | `src/api/endpoints/admin_users.py` | Operator-driven user CRUD, reset-password, audit-logged (Phase 24.7) |
 | DML Generator | `src/dml/dml_generator.py` | Parameterized INSERT/UPDATE/DELETE generation (Phase 18) |
 | DML Validator | `src/dml/dml_validator.py` | Safety checks, write permissions, row limits (Phase 18) |
 | DML Executor | `src/dml/dml_executor.py` | Transaction-wrapped DML execution (Phase 18) |
@@ -119,6 +120,12 @@ Natural Language Query → Auth Check (optional, REQUIRE_AUTH flag)
   → Tiered Narrative Generation → Return Results
   → [Edit Mode] Inline Editing → Change Tracker → DML Generator → Validator
       → Preview → DML Executor (transaction-wrapped)
+  → [Every Response] X-Request-ID echoed to client → Frontend axios interceptor
+      captures request_id + traceparent → LastRequestBadge in header
+  → [Admin Tab, gated by ADMIN_UI_ENABLED + is_admin]
+      Users (list/create/role-toggle/disable/reset-password)
+      Audit Log (filters: action/resource/user/date, JSON drawer)
+      Health (live /health, recent queries, audit feed, observability gates)
 ```
 
 ### Detailed References
@@ -168,6 +175,7 @@ Settings in `src/config/settings.py`:
 - Auth settings: `JWT_EXPIRATION_MINUTES` (default 1440), `REQUIRE_AUTH` (default False), `RATE_LIMIT_PER_USER` (200), `RATE_LIMIT_LLM_PER_USER` (30)
 - LLM Provider settings: `DATA_SECURITY_LEVEL` (default `local_only`), per-provider `*_ENABLED`/`*_API_KEY`/`*_DEFAULT_MODEL` flags for OpenAI, Azure, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM
 - Observability (Phase 24, all opt-in): `LOG_FORMAT` (default `console`, set to `json` in prod), `LOG_LEVEL`, `LOG_INCLUDE_REQUEST_ID` (default true), `LOG_INCLUDE_USER_ID` (default false), `METRICS_ENABLED` (false), `METRICS_EXPOSE_ENDPOINT` (false — gates `GET /metrics`), `OTEL_ENABLED` (false), `OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://jaeger:4318`), `OTEL_SERVICE_NAME`, `OTEL_TRACES_SAMPLER_RATIO` (default 0.1)
+- Admin & Observability UI (Phase 24.7): `ADMIN_UI_ENABLED` (default true — when false, the audit/admin-users routers aren't mounted and the frontend hides the Admin tab and Observability section), plus optional deep-link URLs surfaced to the UI: `JAEGER_UI_URL`, `GRAFANA_URL`, `METRICS_PUBLIC_URL` (browser-reachable URL for `/metrics`)
 
 ## Documentation
 
@@ -189,4 +197,5 @@ Key docs in `docs/`:
 | **Edit Mode & DML** | `planning/PHASE_18_EDIT_MODE_FEATURE_IMP_PLAN.md` |
 | **LLM Providers** | `planning/LLM_PROVIDER_EXPANSION_PLAN.md` |
 | **Deployment** | `guides/DOCKER_DEPLOYMENT_GUIDE.md`, `planning/DOCKER_CONTAINERIZATION_PLAN.md` |
-| **Observability** | `guides/OBSERVABILITY_GUIDE.md` (Phase 24 — structlog, Prometheus `/metrics`, OpenTelemetry tracing, Docker `observability` profile) |
+| **Observability** | `guides/OBSERVABILITY_GUIDE.md` (Phase 24 — structlog, Prometheus `/metrics`, OpenTelemetry tracing, Docker `observability` profile; Phase 24.7 — Admin UI deep-links, Health sub-tab, request-id badge) |
+| **Admin & Observability UI** | `planning/PHASE_24_Observability_&_Monitoring_UI_PLAN.md` (Phase 24.7 — trace-id surfacing, audit viewer, user CRUD, Health sub-tab, `ADMIN_UI_ENABLED` kill-switch) |

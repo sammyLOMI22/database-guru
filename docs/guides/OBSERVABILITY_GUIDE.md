@@ -1,13 +1,17 @@
-# Observability Guide (Phase 24)
+# Observability Guide (Phase 24 + Phase 24.7)
 
 Database Guru ships with three production-grade observability primitives that
-are **off by default** and turned on through environment variables:
+are **off by default** and turned on through environment variables, plus an
+in-app admin surface that exposes them to operators:
 
 1. Structured JSON logging with request-id propagation (24.1)
 2. Prometheus metrics with a `/metrics` scrape endpoint (24.2)
 3. OpenTelemetry tracing with OTLP HTTP export (24.3)
 4. A Docker `observability` profile that bundles Jaeger, Prometheus, and
    Grafana (24.4)
+5. **Admin & Observability UI (24.7)** — Last-request badge, audit log viewer,
+   user management, Health sub-tab, and deep-links to Prometheus/Jaeger/Grafana
+   from the Settings panel
 
 All three pillars share the same design rules:
 
@@ -295,4 +299,95 @@ These are intentionally deferred:
 - Loki / ELK / any log aggregator (we ship JSON to stdout only)
 - Long-term metrics retention tuning
 - PagerDuty / Slack / email notification routing
+
+---
+
+## 7. Admin & Observability UI (Phase 24.7)
+
+The backend stack is hardened, but operators still need a way to *use* it
+without leaving the app. Phase 24.7 ships that surface, fully gated by a single
+kill-switch.
+
+### Kill-switch
+
+```
+ADMIN_UI_ENABLED=true   # default; set false to remove the entire admin surface
+```
+
+When `ADMIN_UI_ENABLED=false`:
+
+- The `audit` and `admin_users` routers are **not mounted** (they don't appear
+  in `/api/docs` either)
+- `/api/settings/` returns `admin_ui_enabled: false`
+- The frontend hides the **Admin** tab and the Settings → **Observability**
+  section entirely
+
+### Last-request badge (header)
+
+Every API response carries `X-Request-ID` (set by `RequestContextMiddleware`,
+exposed via CORS `expose_headers`). The frontend axios response interceptor
+captures `x-request-id` + `traceparent` into a Zustand `useLastRequestStore`,
+and the header `LastRequestBadge` shows a short id and copies the full id +
+traceparent to the clipboard on click. Drop the id into your log aggregator or
+Jaeger to jump straight to the trace for the last action you took.
+
+### Admin tab (admin-only)
+
+Sub-tabs, all wrapped in a `RequireAdmin` guard:
+
+- **Users** — list with search/filter, inline admin role toggle, enable/disable,
+  one-time temporary password reset. Self-lockout protection is enforced
+  server-side: an admin cannot demote or deactivate themselves through the API.
+- **Audit Log** — paginated viewer over `GET /api/audit/logs` with server-side
+  filters (action, resource_type, user_id, date range), JSON detail drawer per
+  row, dropdowns populated from `GET /api/audit/facets`.
+- **Health** — replaces the old `?demo=true` mock. Live `/health` cards
+  (API/Database/Cache/LLM), observability gate matrix
+  (Prometheus/OpenTelemetry/Jaeger/Grafana), last-request widget with
+  traceparent, semantic + LLM cache hit rates, recent queries, recent audit
+  feed.
+
+### Observability deep-links (Settings → Observability)
+
+Optional environment variables, surfaced via `/api/settings/`:
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `JAEGER_UI_URL` | unset | Browser URL for Jaeger UI (e.g. `http://localhost:16686`) |
+| `GRAFANA_URL` | unset | Browser URL for Grafana (e.g. `http://localhost:3001`) |
+| `METRICS_PUBLIC_URL` | unset | Browser-reachable URL for `/metrics` (falls back to relative `/metrics` when `METRICS_EXPOSE_ENDPOINT=true`) |
+
+The Settings panel renders one card per link. Each card is **disabled with a
+tooltip** when the corresponding feature flag is off — e.g. clicking the
+Prometheus link with `METRICS_ENABLED=false` shows "Set `METRICS_ENABLED=true`
+in your `.env` to collect metrics." This keeps the surface honest even in
+partially-configured deployments.
+
+### Endpoints exposed to the UI
+
+```
+# Audit (admin)
+GET  /api/audit/logs         # filters + pagination
+GET  /api/audit/logs/me      # current user's own actions
+GET  /api/audit/facets       # distinct actions / resource_types
+
+# Admin users
+GET    /api/admin/users
+POST   /api/admin/users
+PATCH  /api/admin/users/{id}
+POST   /api/admin/users/{id}/reset-password
+DELETE /api/admin/users/{id}
+```
+
+All admin mutations call `log_action()` so they show up in the Audit Log
+viewer immediately.
+
+### Tests
+
+| File | LOC | Coverage |
+|---|---|---|
+| `tests/test_admin_users_endpoints.py` | 320 | full CRUD, self-lockout, password complexity, audit side-effects |
+| `tests/test_audit_endpoints.py` | 237 | filters, pagination, facets, admin-vs-user 403 |
+| `tests/test_admin_ui_toggle.py` | 35 | `ADMIN_UI_ENABLED=false` removes routers from the OpenAPI schema |
+| `tests/test_settings_observability.py` | 163 | `/api/settings/` surfaces `metrics_*`, `otel_*`, deep-link URLs |
 - A user-facing observability UI in the main app

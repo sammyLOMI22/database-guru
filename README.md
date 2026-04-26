@@ -265,6 +265,8 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Security & Auth Foundation (NEW!)** - JWT authentication (bcrypt + python-jose), resource ownership with `owner_id` FK, per-user rate limiting with JWT-based user ID extraction, audit logging, `REQUIRE_AUTH` feature flag for gradual rollout
 - ✅ **Edit Mode & DML Operations (NEW!)** - Inline cell editing in query results, add new rows with schema-aware forms, delete rows with confirmation, preview INSERT/UPDATE/DELETE scripts before execution, per-connection write permissions (INSERT/UPDATE/DELETE toggles, allowed tables, row limits), transaction-wrapped execution with rollback
 - ✅ **Multi-Provider LLM Support (NEW!)** - 8 LLM providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Google Vertex AI, AWS Bedrock, LM Studio, vLLM) with Local/Frontier toggle, data security enforcement (local_only/cloud_private/unrestricted), per-task provider routing with fallback chains, Fernet-encrypted API key storage, provider health checks, and frontend provider management UI with color-coded locality badges
+- ✅ **Production Observability (Phase 24)** - Structured `structlog` JSON logging with request-id propagation, Prometheus `/metrics` endpoint with bounded label cardinality, OpenTelemetry tracing with OTLP HTTP export, Docker `observability` profile bundling Jaeger + Prometheus + Grafana with a pre-provisioned dashboard
+- ✅ **Admin & Observability UI (NEW!)** - Header badge surfacing the last `X-Request-ID` for log correlation, admin-only Audit Log viewer with filters and JSON drawer, User Management CRUD (role toggle, disable, reset password), System Health sub-tab with live `/health`, recent queries, audit feed, and observability gates, deep-links to Prometheus/Jaeger/Grafana, hard kill-switch via `ADMIN_UI_ENABLED`
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
@@ -396,6 +398,68 @@ Both features include comprehensive metrics for monitoring and optimization:
 - Real-time performance visualization
 
 **See:** [Parallel Execution Technical Guide](docs/technical/PARALLEL_EXECUTION.md) for implementation details and [Code Review](docs/reports/CODE_REVIEW_PARALLEL_EXECUTION.md) for quality assurance
+
+## 🛡️ Admin & Observability UI (NEW!)
+
+Phase 24.7 surfaces the Phase 24 observability stack and Phase 21 audit log directly in the app, plus a full operator-grade user-management console. The whole surface is gated by `ADMIN_UI_ENABLED` and the user's `is_admin` flag.
+
+### Header — Last Request Badge
+- Every API response carries an `X-Request-ID` (set by `RequestContextMiddleware`).
+- The axios response interceptor records `request_id` + `traceparent` into a Zustand store; the `LastRequestBadge` in the header shows a short id and copies the full id + traceparent to the clipboard on click.
+- Drop the id into your log aggregator or Jaeger to jump straight to the trace for the last action you took.
+
+### Admin Tab (admin-only, three sub-tabs)
+**Users** — `frontend/src/components/admin/UserManagement.tsx`
+- Search by username/email, filter by status / role
+- Inline role toggle (Admin ↔ User), Enable/Disable, Reset Password (returns a one-time temporary password)
+- Create new users via modal, all actions audit-logged
+
+**Audit Log** — `frontend/src/components/admin/AuditLogViewer.tsx`
+- Server-side filters: action, resource type, user id, date range
+- Pagination (50/page), facets pulled from `GET /api/audit/facets`
+- Per-row JSON drawer with full `details` payload
+
+**Health** — `frontend/src/components/admin/SystemHealthPanel.tsx` (replaces the old `?demo=true` `ObservabilityDemo`)
+- Live `/health` cards (API, Database, Cache, LLM)
+- Observability gate matrix (Prometheus / OpenTelemetry / Jaeger / Grafana) with deep-links when configured
+- Last-request widget with traceparent
+- Cache hit-rate snapshot, recent queries, recent audit activity
+
+### Settings — Observability Section
+- Deep-links to Prometheus `/metrics`, Jaeger UI, and Grafana — surfaced from `JAEGER_UI_URL`, `GRAFANA_URL`, `METRICS_PUBLIC_URL` (or falls back to relative `/metrics`)
+- Each link is disabled with an explanatory tooltip if the corresponding feature flag is off
+
+### Configuration
+
+```bash
+# Feature toggle for the entire admin surface (default: true)
+ADMIN_UI_ENABLED=true
+
+# External UI deep-links (all optional; UI hides links if unset)
+JAEGER_UI_URL=http://localhost:16686
+GRAFANA_URL=http://localhost:3001
+METRICS_PUBLIC_URL=http://localhost:8000/metrics
+```
+
+When `ADMIN_UI_ENABLED=false`, the `audit` and `admin_users` routers are not mounted and the frontend hides the Admin tab and Observability section entirely.
+
+### API Endpoints
+
+```bash
+# Audit log (admin)
+GET  /api/audit/logs            # filters: user_id, action, resource_type, start_date, end_date, limit, offset
+GET  /api/audit/logs/me         # current user's own actions
+GET  /api/audit/facets          # distinct actions/resource_types for filter dropdowns
+
+# User management (admin)
+GET    /api/admin/users         # search/filter/paginate
+POST   /api/admin/users         # create
+PATCH  /api/admin/users/{id}    # toggle is_active / is_admin (self-lockout protected)
+POST   /api/admin/users/{id}/reset-password
+DELETE /api/admin/users/{id}    # soft-deactivate, idempotent
+```
+
+**See:** [Phase 24 Observability Guide](docs/guides/OBSERVABILITY_GUIDE.md) and the [UI integration plan](docs/planning/PHASE_24_Observability_&_Monitoring_UI_PLAN.md).
 
 ## Tool-Using Agent Dashboard (NEW!)
 
