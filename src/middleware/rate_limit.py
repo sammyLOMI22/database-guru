@@ -169,6 +169,136 @@ llm_rate_limiter = EndpointRateLimiter(calls=20, period=60)  # 20 LLM calls/min
 auth_rate_limiter = EndpointRateLimiter(calls=5, period=60)  # 5 login/register attempts/min
 
 
+# ============================================================================
+# Phase B — change-password rate limit + login lockout
+# Both are in-process: simple, no Redis dependency, but they don't share state
+# across multiple uvicorn workers. Documented in PASSWORD_AUTH_HARDENING_PLAN.md
+# (open question §8). For multi-worker deployments swap in a Redis backend.
+# ============================================================================
+
+
+class _UserKeyedRateLimiter:
+    """Per-user rate limiter for endpoints that already require auth.
+
+    Keyed by ``user.id``, not IP, because the caller is authenticated and
+    we want to limit *that account's* rate regardless of how many devices
+    they hop across. Sliding-window with a fixed cap; oldest call exits the
+    window first.
+    """
+
+    def __init__(self):
+        self._buckets: Dict[int, list[float]] = {}
+        self._lock = asyncio.Lock()
+
+    async def check(self, user_id: int, *, limit: int, period_s: int) -> None:
+        """Raise 429 if ``user_id`` is over the limit, otherwise record the call."""
+        if limit <= 0:
+            return  # operator misconfig; treat as disabled
+        now = time.time()
+        async with self._lock:
+            calls = [t for t in self._buckets.get(user_id, []) if t > now - period_s]
+            if len(calls) >= limit:
+                oldest = min(calls)
+                retry_after = max(1, int(oldest + period_s - now))
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=(
+                        f"Too many password-change attempts. "
+                        f"Try again in {retry_after} seconds."
+                    ),
+                    headers={"Retry-After": str(retry_after)},
+                )
+            calls.append(now)
+            self._buckets[user_id] = calls
+
+    def reset(self) -> None:
+        """Clear all buckets — for tests and post-success teardown."""
+        self._buckets.clear()
+
+
+change_password_rate_limiter = _UserKeyedRateLimiter()
+
+
+async def enforce_change_password_limit(user_id: int, settings: Settings) -> None:
+    """Apply change-password rate limit when AUTH_RATE_LIMIT_CHANGE_PASSWORD=True.
+
+    Called from inside the endpoint (after auth) so we have the user.id.
+    """
+    if not settings.AUTH_RATE_LIMIT_CHANGE_PASSWORD:
+        return
+    await change_password_rate_limiter.check(
+        user_id,
+        limit=settings.AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE,
+        period_s=60,
+    )
+
+
+class LoginAttemptTracker:
+    """Per-username failed-login counter with sliding-window lockout.
+
+    Behavior when ``AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED=True``:
+    - record_failure(name) appends a timestamp.
+    - is_locked(name) returns True once >= threshold failures sit inside
+      the rolling window.
+    - record_success(name) clears the bucket (and emits an unlock signal).
+
+    Keys are ``username.lower()`` so casing doesn't let an attacker dodge
+    the counter. We do not look up Users — the tracker is dumb on purpose
+    so it works for both real and unknown usernames (timing-attack parity).
+    """
+
+    def __init__(self):
+        self._failures: Dict[str, list[float]] = {}
+        self._lock = asyncio.Lock()
+
+    @staticmethod
+    def _key(username: str) -> str:
+        return (username or "").strip().lower()
+
+    async def is_locked(
+        self,
+        username: str,
+        *,
+        threshold: int,
+        window_s: int,
+    ) -> tuple[bool, int]:
+        """Return ``(locked, retry_after_s)``."""
+        if threshold <= 0 or window_s <= 0:
+            return False, 0
+        now = time.time()
+        key = self._key(username)
+        async with self._lock:
+            recent = [t for t in self._failures.get(key, []) if t > now - window_s]
+            self._failures[key] = recent
+            if len(recent) >= threshold:
+                oldest = min(recent)
+                return True, max(1, int(oldest + window_s - now))
+        return False, 0
+
+    async def record_failure(self, username: str, *, window_s: int) -> None:
+        now = time.time()
+        key = self._key(username)
+        async with self._lock:
+            recent = [t for t in self._failures.get(key, []) if t > now - window_s]
+            recent.append(now)
+            self._failures[key] = recent
+
+    async def record_success(self, username: str) -> bool:
+        """Clear the failure counter on success. Returns True if anything cleared
+        (so the caller can audit-log an unlock)."""
+        key = self._key(username)
+        async with self._lock:
+            had = bool(self._failures.get(key))
+            self._failures.pop(key, None)
+            return had
+
+    def reset(self) -> None:
+        self._failures.clear()
+
+
+login_attempt_tracker = LoginAttemptTracker()
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
     Simple rate limiting middleware using in-memory storage

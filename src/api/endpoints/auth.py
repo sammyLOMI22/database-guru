@@ -17,7 +17,12 @@ from src.auth.audit import log_action
 from src.auth.service import AuthService, bump_password_version
 from src.api.dependencies.common import get_settings
 from src.config.settings import Settings
-from src.middleware.rate_limit import auth_rate_limiter, get_client_ip
+from src.middleware.rate_limit import (
+    auth_rate_limiter,
+    enforce_change_password_limit,
+    get_client_ip,
+    login_attempt_tracker,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +66,42 @@ async def login(
     data: UserLogin,
     db: AsyncSession = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service),
+    settings: Settings = Depends(get_settings),
     _rate_limit: None = Depends(auth_rate_limiter),
 ):
     """Authenticate and return a JWT token."""
+    # Phase B: per-username lockout. Check before bcrypt so a locked account
+    # short-circuits without burning a hash. Threshold/window are configurable
+    # and the tracker keys by lowercase username so casing can't dodge it.
+    if settings.AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED:
+        locked, retry_after = await login_attempt_tracker.is_locked(
+            data.username,
+            threshold=settings.AUTH_LOGIN_LOCKOUT_THRESHOLD,
+            window_s=settings.AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS,
+        )
+        if locked:
+            await log_action(
+                db, action="account_locked", resource_type="user",
+                details={"username": data.username, "retry_after_seconds": retry_after},
+                ip_address=get_client_ip(request),
+            )
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    f"Account temporarily locked after too many failed attempts. "
+                    f"Try again in {retry_after} seconds."
+                ),
+                headers={"Retry-After": str(retry_after)},
+            )
+
     user = await auth_service.authenticate(db, data.username, data.password)
     if user is None:
+        if settings.AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED:
+            await login_attempt_tracker.record_failure(
+                data.username,
+                window_s=settings.AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS,
+            )
         await log_action(
             db, action="login_failed", resource_type="user",
             details={"username": data.username},
@@ -76,6 +112,16 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
+
+    # Successful auth — clear any failure counter for this username.
+    if settings.AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED:
+        had_failures = await login_attempt_tracker.record_success(data.username)
+        if had_failures:
+            await log_action(
+                db, action="account_unlocked", resource_type="user",
+                resource_id=str(user.id), user_id=user.id, username=user.username,
+                ip_address=get_client_ip(request),
+            )
 
     await log_action(
         db, action="login", resource_type="user", resource_id=str(user.id),
@@ -133,6 +179,7 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service),
     user: User = Depends(get_current_active_user),
+    settings: Settings = Depends(get_settings),
 ):
     """Change the current user's password.
 
@@ -142,6 +189,10 @@ async def change_password(
     ``password_version`` to evict other sessions, and returns a fresh token
     so the caller stays signed in on this device.
     """
+    # Phase B: rate-limit per-user. Runs before the bcrypt compare so a
+    # caller that's already over-limit can't keep burning hashes.
+    await enforce_change_password_limit(user.id, settings)
+
     if not auth_service.verify_password(data.current_password, user.hashed_password):
         await log_action(
             db, action="password_change_failed", resource_type="user",
