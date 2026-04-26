@@ -68,6 +68,19 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Phase A token versioning. A token whose `pv` claim is older than the
+    # user's current password_version is rejected — this is how a password
+    # change / admin reset evicts every active session. Tokens minted while
+    # the feature was off carry no `pv` and are accepted as legacy so flipping
+    # the flag does not boot every signed-in user instantly.
+    token_pv = payload.get("pv")
+    if token_pv is not None and int(token_pv) != int(user.password_version):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session invalidated, please sign in again",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -136,6 +149,11 @@ async def get_optional_user(
     user = await auth_service.get_user_by_id(db, uid)
     if user is None:
         _raise_or_none(settings.REQUIRE_AUTH, "User not found")
+        return None
+
+    token_pv = payload.get("pv")
+    if token_pv is not None and int(token_pv) != int(user.password_version):
+        _raise_or_none(settings.REQUIRE_AUTH, "Session invalidated, please sign in again")
         return None
 
     if not user.is_active:

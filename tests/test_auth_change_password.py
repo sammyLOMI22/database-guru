@@ -101,13 +101,19 @@ class TestChangePassword:
         )
         assert resp.status_code == 200, resp.text
         body = resp.json()
-        assert body["must_change_password"] is False
+        # Response is now a TokenResponse so the caller stays signed in after
+        # the password_version bump.
+        assert "access_token" in body
+        assert body["user"]["must_change_password"] is False
 
         async with session_factory() as db:
             row = await db.execute(select(User).where(User.id == reset_user.id))
             updated = row.scalar_one()
         assert updated.must_change_password is False
         assert AuthService.verify_password("NewStrongPass99", updated.hashed_password)
+        # password_version bumps regardless of the feature flag — the column
+        # is always present and the bump is a cheap counter increment.
+        assert updated.password_version == reset_user.password_version + 1
 
         assert await _last_audit_action(session_factory) == "password_change"
 

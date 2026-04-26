@@ -672,8 +672,10 @@ export const authAPI = {
     return resp;
   },
 
-  async changePassword(data: PasswordChangeRequest): Promise<AuthUserResponse> {
-    const { data: resp } = await api.post<AuthUserResponse>('/api/auth/change-password', data);
+  async changePassword(data: PasswordChangeRequest): Promise<AuthTokenResponse> {
+    // Returns a fresh token so the caller stays signed in after the
+    // password_version bump invalidates the previous JWT (Phase A).
+    const { data: resp } = await api.post<AuthTokenResponse>('/api/auth/change-password', data);
     return resp;
   },
 };

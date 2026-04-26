@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from src.api.dependencies import get_db
+from src.api.dependencies.common import get_settings
 from src.api.endpoints.admin_users import router, _generate_temp_password
 from src.auth.audit import AuditLog
 from src.auth.dependencies import get_auth_service, require_admin
@@ -72,7 +73,12 @@ def app_factory(session_factory):
         Settings(JWT_SECRET="test", JWT_ALGORITHM="HS256", JWT_EXPIRATION_MINUTES=60)
     )
 
-    def make_app(*, current_user: User | None, override_admin: bool = True) -> FastAPI:
+    def make_app(
+        *,
+        current_user: User | None,
+        override_admin: bool = True,
+        settings: Settings | None = None,
+    ) -> FastAPI:
         app = FastAPI()
         app.include_router(router, prefix="/api")
 
@@ -82,6 +88,10 @@ def app_factory(session_factory):
 
         app.dependency_overrides[get_db] = override_db
         app.dependency_overrides[get_auth_service] = lambda: auth_service
+        # Tests can pass custom settings to flip Phase A flags.
+        app.dependency_overrides[get_settings] = lambda: settings or Settings(
+            JWT_SECRET="test", JWT_ALGORITHM="HS256", JWT_EXPIRATION_MINUTES=60,
+        )
 
         if override_admin:
             if current_user is None:
@@ -210,6 +220,47 @@ class TestUpdateUser:
         assert resp.status_code == 404
 
 
+# ── Phase A: token-versioning bumps ─────────────────────────────────
+
+
+class TestDeactivateInvalidationFlag:
+    @pytest.mark.asyncio
+    async def test_deactivate_does_not_bump_when_flag_off(self, app_factory, seed_users, session_factory):
+        from sqlalchemy import select
+
+        before = seed_users["alice"].password_version
+        app = app_factory(current_user=seed_users["admin"])  # default settings -> flag off
+        client = TestClient(app)
+        r = client.delete(f"/api/admin/users/{seed_users['alice'].id}")
+        assert r.status_code == 204
+
+        async with session_factory() as db:
+            row = await db.execute(select(User).where(User.id == seed_users["alice"].id))
+            alice = row.scalar_one()
+        assert alice.is_active is False
+        assert alice.password_version == before  # untouched
+
+    @pytest.mark.asyncio
+    async def test_deactivate_bumps_when_flag_on(self, app_factory, seed_users, session_factory):
+        from sqlalchemy import select
+
+        before = seed_users["alice"].password_version
+        s = Settings(
+            JWT_SECRET="test", JWT_ALGORITHM="HS256", JWT_EXPIRATION_MINUTES=60,
+            AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE=True,
+        )
+        app = app_factory(current_user=seed_users["admin"], settings=s)
+        client = TestClient(app)
+        r = client.delete(f"/api/admin/users/{seed_users['alice'].id}")
+        assert r.status_code == 204
+
+        async with session_factory() as db:
+            row = await db.execute(select(User).where(User.id == seed_users["alice"].id))
+            alice = row.scalar_one()
+        assert alice.is_active is False
+        assert alice.password_version == before + 1
+
+
 # ── Reset password ───────────────────────────────────────────────────
 
 
@@ -236,6 +287,9 @@ class TestResetPassword:
             alice = row.scalar_one()
         assert AuthService.verify_password(temp, alice.hashed_password)
         assert alice.must_change_password is True
+        # Phase A: admin reset bumps password_version so any token the user
+        # may already hold is invalidated on next request.
+        assert alice.password_version > 1
 
         actions = await _all_audit_actions(session_factory)
         assert "admin_reset_password" in actions

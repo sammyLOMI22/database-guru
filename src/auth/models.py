@@ -19,6 +19,11 @@ class User(Base):
     # The login response surfaces this flag so the frontend forces a change
     # before any other action; the change-password endpoint clears it.
     must_change_password = Column(Boolean, default=False, nullable=False, server_default="0")
+    # Phase A token versioning. JWTs issued while AUTH_TOKEN_VERSIONING_ENABLED
+    # carry this value as the `pv` claim; bumping the column instantly
+    # invalidates every outstanding token for the user. Bumped on password
+    # change, admin reset, and (when their flags are on) deactivate / logout.
+    password_version = Column(Integer, default=1, nullable=False, server_default="1")
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc),

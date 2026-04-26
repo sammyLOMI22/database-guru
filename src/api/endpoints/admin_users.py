@@ -20,7 +20,9 @@ from src.auth.audit import log_action
 from src.auth.dependencies import get_auth_service, require_admin
 from src.auth.models import User
 from src.auth.schemas import validate_password_complexity
-from src.auth.service import AuthService
+from src.auth.service import AuthService, bump_password_version
+from src.api.dependencies.common import get_settings
+from src.config.settings import Settings
 from src.middleware.rate_limit import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -199,6 +201,7 @@ async def update_user(
     data: AdminUserUpdate,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
+    settings: Settings = Depends(get_settings),
 ):
     """Update is_active / is_admin for a user."""
     user = await _get_user_or_404(db, user_id)
@@ -223,6 +226,15 @@ async def update_user(
     if data.is_admin is not None and data.is_admin != user.is_admin:
         changes["is_admin"] = {"from": user.is_admin, "to": data.is_admin}
         user.is_admin = data.is_admin
+
+    # Phase A: optionally evict every active session when an admin deactivates
+    # an account so the kick is immediate, not "next time the JWT expires."
+    if (
+        changes.get("is_active", {}).get("to") is False
+        and settings.AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE
+    ):
+        bump_password_version(user)
+        changes["sessions_invalidated"] = True
 
     if changes:
         await log_action(
@@ -273,6 +285,10 @@ async def reset_user_password(
     # Force the user through the change-password flow on next login so the
     # operator-generated credential cannot become a long-lived secret.
     user.must_change_password = True
+    # Phase A: invalidate every existing session for the target user. Their
+    # next request 401s and they must redeem the temp password. No-op when
+    # token versioning is off.
+    bump_password_version(user)
 
     await log_action(
         db,
@@ -298,6 +314,7 @@ async def deactivate_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
+    settings: Settings = Depends(get_settings),
 ):
     """Soft-delete a user (sets is_active=False). Idempotent."""
     user = await _get_user_or_404(db, user_id)
@@ -308,8 +325,12 @@ async def deactivate_user(
             detail="Admins cannot deactivate themselves",
         )
 
+    invalidated = False
     if user.is_active:
         user.is_active = False
+        if settings.AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE:
+            bump_password_version(user)
+            invalidated = True
         await log_action(
             db,
             action="admin_deactivate_user",
@@ -317,7 +338,7 @@ async def deactivate_user(
             resource_id=str(user.id),
             user_id=admin.id,
             username=admin.username,
-            details={"target_username": user.username},
+            details={"target_username": user.username, "sessions_invalidated": invalidated},
             ip_address=get_client_ip(request),
         )
 

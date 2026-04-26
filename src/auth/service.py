@@ -11,6 +11,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.models import User
 from src.config.settings import Settings
 
+
+def bump_password_version(user: User) -> None:
+    """Increment ``password_version`` so every outstanding JWT for this user
+    is rejected on its next request. Safe to call regardless of whether
+    AUTH_TOKEN_VERSIONING_ENABLED is on — the bump is a cheap counter
+    increment that has no effect when verification ignores the claim.
+
+    Callers are responsible for committing the surrounding transaction.
+    """
+    current = int(getattr(user, "password_version", 1) or 1)
+    user.password_version = current + 1
+
 logger = logging.getLogger(__name__)
 
 # Pre-computed dummy hash for constant-time authentication (prevents timing attacks)
@@ -24,6 +36,10 @@ class AuthService:
         self.secret_key = settings.JWT_SECRET
         self.algorithm = settings.JWT_ALGORITHM
         self.expiration_minutes = settings.JWT_EXPIRATION_MINUTES
+        # Phase A — token versioning. Read once at construction time so a
+        # mid-session config change doesn't half-stamp the claim. Cheap to
+        # rebuild the service on a settings reload.
+        self.token_versioning_enabled = bool(getattr(settings, "AUTH_TOKEN_VERSIONING_ENABLED", False))
 
     # ── Password helpers ──────────────────────────────────────────────
 
@@ -37,16 +53,31 @@ class AuthService:
 
     # ── JWT helpers ───────────────────────────────────────────────────
 
-    def create_access_token(self, user_id: int, username: str) -> tuple[str, int]:
-        """Create JWT token. Returns (token, expires_in_seconds)."""
+    def create_access_token(
+        self,
+        user_id: int,
+        username: str,
+        *,
+        password_version: Optional[int] = None,
+    ) -> tuple[str, int]:
+        """Create JWT token. Returns (token, expires_in_seconds).
+
+        When AUTH_TOKEN_VERSIONING_ENABLED is on and a ``password_version`` is
+        provided, the JWT carries a ``pv`` claim that get_current_user will
+        compare against the user's current value. Tokens minted while the
+        flag was off carry no ``pv`` and are accepted as legacy until they
+        expire — the flip is non-destructive.
+        """
         expires_delta = timedelta(minutes=self.expiration_minutes)
         expire = datetime.now(timezone.utc) + expires_delta
-        payload = {
+        payload: dict = {
             "sub": str(user_id),
             "username": username,
             "exp": expire,
             "iat": datetime.now(timezone.utc),
         }
+        if self.token_versioning_enabled and password_version is not None:
+            payload["pv"] = int(password_version)
         token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
         return token, int(expires_delta.total_seconds())
 

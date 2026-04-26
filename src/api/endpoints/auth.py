@@ -14,7 +14,9 @@ from src.auth.schemas import (
     UserResponse,
 )
 from src.auth.audit import log_action
-from src.auth.service import AuthService
+from src.auth.service import AuthService, bump_password_version
+from src.api.dependencies.common import get_settings
+from src.config.settings import Settings
 from src.middleware.rate_limit import auth_rate_limiter, get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -43,7 +45,9 @@ async def register(
     )
     await db.commit()
 
-    token, expires_in = auth_service.create_access_token(user.id, user.username)
+    token, expires_in = auth_service.create_access_token(
+        user.id, user.username, password_version=user.password_version,
+    )
     return TokenResponse(
         access_token=token,
         expires_in=expires_in,
@@ -80,7 +84,9 @@ async def login(
     )
     await db.commit()
 
-    token, expires_in = auth_service.create_access_token(user.id, user.username)
+    token, expires_in = auth_service.create_access_token(
+        user.id, user.username, password_version=user.password_version,
+    )
     return TokenResponse(
         access_token=token,
         expires_in=expires_in,
@@ -93,16 +99,21 @@ async def logout(
     request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_active_user),
+    settings: Settings = Depends(get_settings),
 ):
     """Log out the current user.
 
-    Records the event in the audit log. The client should discard its
-    token. Server-side token revocation (e.g. via Redis denylist) is a
-    known gap tracked for a future release.
+    Records the event in the audit log. The client should discard its token.
+    When ``AUTH_INVALIDATE_TOKENS_ON_LOGOUT`` is on, also bumps the user's
+    ``password_version`` so every device they're signed in on is evicted —
+    this is the explicit kill-switch for "log me out everywhere."
     """
+    if settings.AUTH_INVALIDATE_TOKENS_ON_LOGOUT:
+        bump_password_version(user)
     await log_action(
         db, action="logout", resource_type="user", resource_id=str(user.id),
         user_id=user.id, username=user.username,
+        details={"invalidated_all_sessions": settings.AUTH_INVALIDATE_TOKENS_ON_LOGOUT},
         ip_address=get_client_ip(request),
     )
     await db.commit()
@@ -115,7 +126,7 @@ async def get_me(user: User = Depends(get_current_active_user)):
     return UserResponse.model_validate(user)
 
 
-@router.post("/change-password", response_model=UserResponse)
+@router.post("/change-password", response_model=TokenResponse)
 async def change_password(
     request: Request,
     data: PasswordChangeRequest,
@@ -127,7 +138,9 @@ async def change_password(
 
     Required after an admin password reset (User.must_change_password=True),
     but available to any authenticated user. Verifies the current password,
-    enforces complexity on the new one, and clears the must-change flag.
+    enforces complexity on the new one, clears the must-change flag, bumps
+    ``password_version`` to evict other sessions, and returns a fresh token
+    so the caller stays signed in on this device.
     """
     if not auth_service.verify_password(data.current_password, user.hashed_password):
         await log_action(
@@ -150,6 +163,10 @@ async def change_password(
     user.hashed_password = auth_service.hash_password(data.new_password)
     forced = user.must_change_password
     user.must_change_password = False
+    # Phase A: invalidate every other outstanding session for this user. The
+    # bump is a no-op when token versioning is off; when it's on, the caller
+    # gets a fresh token below so their current session keeps working.
+    bump_password_version(user)
 
     await log_action(
         db,
@@ -163,4 +180,11 @@ async def change_password(
     )
     await db.commit()
     await db.refresh(user)
-    return UserResponse.model_validate(user)
+    token, expires_in = auth_service.create_access_token(
+        user.id, user.username, password_version=user.password_version,
+    )
+    return TokenResponse(
+        access_token=token,
+        expires_in=expires_in,
+        user=UserResponse.model_validate(user),
+    )

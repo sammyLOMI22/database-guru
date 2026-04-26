@@ -32,7 +32,7 @@ const queryClient = new QueryClient({
 
 function App() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
-  const { user, isLoading: authLoading, isAuthenticated, login, register, logout, updateUser } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated, login, register, logout, applyTokenResponse } = useAuth();
   const [isHealthy, setIsHealthy] = useState(false);
   const [requireAuth, setRequireAuth] = useState(false);
   // Default false until /api/settings confirms it. If the settings fetch fails
@@ -114,7 +114,7 @@ function App() {
     return (
       <ForcedPasswordChange
         username={user.username}
-        onChanged={(updated) => updateUser({ ...user, ...updated })}
+        onChanged={(resp) => applyTokenResponse(resp)}
         onLogout={() => {
           logout();
           if (requireAuth) setShowAuth(true);

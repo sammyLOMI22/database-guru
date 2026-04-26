@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { AlertCircle, Eye, EyeOff, KeyRound, LogOut } from 'lucide-react';
-import { authAPI, type AuthUserResponse } from '../services/api';
+import { authAPI, type AuthTokenResponse } from '../services/api';
 import mascot from '../assets/boxer_mascot.png';
 
 interface ForcedPasswordChangeProps {
   username: string;
-  onChanged: (user: AuthUserResponse) => void;
+  onChanged: (resp: AuthTokenResponse) => void;
   onLogout: () => void;
 }
 
@@ -32,11 +32,11 @@ export default function ForcedPasswordChange({ username, onChanged, onLogout }: 
 
     setIsSubmitting(true);
     try {
-      const user = await authAPI.changePassword({
+      const resp = await authAPI.changePassword({
         current_password: currentPassword,
         new_password: newPassword,
       });
-      onChanged(user);
+      onChanged(resp);
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       if (typeof detail === 'string') {

@@ -95,6 +95,14 @@ export function useAuth() {
     setState((prev) => ({ ...prev, user }));
   }, []);
 
+  // Swap in a fresh token + user (e.g. /api/auth/change-password issues a new
+  // JWT after Phase A bumps password_version, invalidating the previous one).
+  const applyTokenResponse = useCallback((resp: { access_token: string; user: AuthUser }) => {
+    localStorage.setItem(TOKEN_KEY, resp.access_token);
+    localStorage.setItem(USER_KEY, JSON.stringify(resp.user));
+    setState({ token: resp.access_token, user: resp.user, isLoading: false });
+  }, []);
+
   return {
     user: state.user,
     token: state.token,
@@ -104,6 +112,7 @@ export function useAuth() {
     register,
     logout,
     updateUser,
+    applyTokenResponse,
   };
 }
 
