@@ -388,23 +388,28 @@ frontend/src/
 | Component | File | Purpose |
 |-----------|------|---------|
 | `AdminPanel` | `admin/AdminPanel.tsx` | Container with three sub-tabs (Users / Audit / Health) |
-| `UserManagement` | `admin/UserManagement.tsx` | List, create, role-toggle, disable, reset password |
+| `UserManagement` | `admin/UserManagement.tsx` | List, create, role-toggle, disable, reset password. Phase 24.8: reset modal renders password OR redemption URL OR both based on `AUTH_PASSWORD_RESET_MODE` |
 | `CreateUserModal` | `admin/CreateUserModal.tsx` | Modal for creating new users |
 | `AuditLogViewer` | `admin/AuditLogViewer.tsx` | Paginated audit log with filters + JSON drawer |
-| `SystemHealthPanel` | `admin/SystemHealthPanel.tsx` | Live `/health`, observability gates, last-request, recent queries/audit, cache stats |
+| `SystemHealthPanel` | `admin/SystemHealthPanel.tsx` | Live `/health`, observability gates, last-request, recent queries/audit, cache stats. Phase 24.8 adds an **Auth hardening** section showing live state of token versioning, change-pwd rate limit, login lockout, reset mode, password history, admin quorum |
 | `LastRequestBadge` | `common/LastRequestBadge.tsx` | Header badge showing short request_id, click-to-copy full id + traceparent |
 | `RequireAdmin` | `common/RequireAdmin.tsx` | Guard component that renders children only for admin users |
 | `ObservabilitySection` | (inside `SettingsPanel.tsx`) | Settings → deep-links to Prometheus / Jaeger / Grafana |
+| `ForcedPasswordChange` | `ForcedPasswordChange.tsx` | Phase 24.8: full-screen forced-change view rendered before any other UI when `user.must_change_password=True`. Calls `/api/auth/change-password`, then `applyTokenResponse()` swaps in the fresh JWT |
+| `PasswordReset` | `PasswordReset.tsx` | Phase 24.8 — Phase C: redeems an admin-issued token (`/reset?token=…`). Calls `/api/auth/redeem-reset` and lands the user signed in via `applyTokenResponse()` |
 
 ### State
 - `stores/lastRequestStore.ts` — Zustand store holding the last `request_id`, `traceparent`, method, url, status; populated by the axios response interceptor in `services/api.ts`
+- `hooks/useAuth.ts` — `applyTokenResponse(resp)` helper added in Phase 24.8 atomically swaps token + user in localStorage when `change-password` / `redeem-reset` returns a fresh `TokenResponse`
 
 ### Services
 | Service | Purpose |
 |---------|---------|
 | `services/auditApi.ts` | `listLogs(query)`, `getFacets()` — wraps `/api/audit/logs` + `/api/audit/facets` |
-| `services/adminUsersApi.ts` | `list(query)`, `create()`, `update()`, `resetPassword()`, `deactivate()` — wraps `/api/admin/users/*` |
+| `services/adminUsersApi.ts` | `list(query)`, `create()`, `update()`, `resetPassword()`, `deactivate()` — wraps `/api/admin/users/*`. `PasswordResetResponse` widened in Phase 24.8 to carry `mode` + optional `temporary_password` / `reset_token` / `redemption_url` / `expires_at` |
+| `services/api.ts` | `authAPI.changePassword(data)` returns `AuthTokenResponse` (Phase 24.8). `AuthHardeningConfig` type covers all 13 read-only `auth_*` fields exposed on `/api/settings/` |
 
 ### Feature Toggle
 - Backend `ADMIN_UI_ENABLED` (default `false` — opt-in) gates router mounting; `/api/settings/` returns `admin_ui_enabled` so the frontend hides the Admin tab and the Settings → Observability section entirely when the kill-switch is off
 - The Admin tab is also conditioned on `user.is_admin`; non-admins see a `RequireAdmin` placeholder if they navigate to it directly
+- Phase 24.8: `App.tsx` checks `window.location.pathname === '/reset'` on initial load and short-circuits all other gating to render `<PasswordReset>`. Forced-change is checked next, before the main UI mounts.

@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -57,7 +57,7 @@ docker compose down -v                         # Stop + remove volumes
 
 ## Architecture Overview
 
-The system uses a multi-agent architecture with 40+ specialized agents (including 6 NoSQL handlers, auth system, and DML pipeline). See [.claude/AGENTS.md](.claude/AGENTS.md) for detailed agent documentation.
+The system uses a multi-agent architecture with 40+ specialized agents (including 6 NoSQL handlers, auth system, and DML pipeline). See [.Codex/AGENTS.md](.Codex/AGENTS.md) for detailed agent documentation.
 
 ### Key Agents (Quick Reference)
 | Agent | File | Purpose |
@@ -144,11 +144,11 @@ Natural Language Query → Auth Check (optional, REQUIRE_AUTH flag)
 ```
 
 ### Detailed References
-- **[.claude/AGENTS.md](.claude/AGENTS.md)** - All agents with methods and features
-- **[.claude/ARCHITECTURE.md](.claude/ARCHITECTURE.md)** - Architectural patterns (pooling, caching, security)
-- **[.claude/API.md](.claude/API.md)** - All API endpoints by category
-- **[.claude/CODE_LOCATIONS.md](.claude/CODE_LOCATIONS.md)** - Quick lookup for key code locations
-- **[.claude/FRONTEND.md](.claude/FRONTEND.md)** - Frontend components and structure
+- **[.Codex/AGENTS.md](.Codex/AGENTS.md)** - All agents with methods and features
+- **[.Codex/ARCHITECTURE.md](.Codex/ARCHITECTURE.md)** - Architectural patterns (pooling, caching, security)
+- **[.Codex/API.md](.Codex/API.md)** - All API endpoints by category
+- **[.Codex/CODE_LOCATIONS.md](.Codex/CODE_LOCATIONS.md)** - Quick lookup for key code locations
+- **[.Codex/FRONTEND.md](.Codex/FRONTEND.md)** - Frontend components and structure
 
 ## Development Workflow
 
@@ -215,9 +215,9 @@ Key docs in `docs/`:
 | **Performance** | `guides/PERFORMANCE_GURU_GUIDE.md` |
 | **NoSQL** | `planning/NOSQL_EXPANSION_PLAN.md` |
 | **Security & Auth** | `planning/MASTER_ROADMAP.md` (Phase 21 section) |
-| **Auth Hardening** | `planning/PASSWORD_AUTH_HARDENING_PLAN.md` (Phase 24.8 — token versioning, change-pwd rate limit, login lockout, one-shot reset tokens, password history, admin quorum; D2 deferred) |
 | **Edit Mode & DML** | `planning/PHASE_18_EDIT_MODE_FEATURE_IMP_PLAN.md` |
 | **LLM Providers** | `planning/LLM_PROVIDER_EXPANSION_PLAN.md` |
 | **Deployment** | `guides/DOCKER_DEPLOYMENT_GUIDE.md`, `planning/DOCKER_CONTAINERIZATION_PLAN.md` |
 | **Observability** | `guides/OBSERVABILITY_GUIDE.md` (Phase 24 — structlog, Prometheus `/metrics`, OpenTelemetry tracing, Docker `observability` profile; Phase 24.7 — Admin UI deep-links, Health sub-tab, request-id badge) |
 | **Admin & Observability UI** | `planning/PHASE_24_Observability_&_Monitoring_UI_PLAN.md` (Phase 24.7 — trace-id surfacing, audit viewer, user CRUD, Health sub-tab, `ADMIN_UI_ENABLED` kill-switch) |
+| **Auth Hardening** | `planning/PASSWORD_AUTH_HARDENING_PLAN.md` (Phase 24.8 — token versioning, change-pwd rate limit, login lockout, one-shot reset tokens, password history, admin quorum; D2 deferred) |

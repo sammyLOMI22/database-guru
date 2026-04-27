@@ -350,16 +350,23 @@ Jaeger to jump straight to the trace for the last action you took.
 Sub-tabs, all wrapped in a `RequireAdmin` guard:
 
 - **Users** — list with search/filter, inline admin role toggle, enable/disable,
-  one-time temporary password reset. Self-lockout protection is enforced
-  server-side: an admin cannot demote or deactivate themselves through the API.
+  password reset. Self-lockout protection is enforced server-side: an admin
+  cannot demote or deactivate themselves through the API. Reset modal renders
+  password OR redemption URL OR both depending on `AUTH_PASSWORD_RESET_MODE`
+  (Phase 24.8 — see [Auth Hardening Plan](../planning/PASSWORD_AUTH_HARDENING_PLAN.md)).
 - **Audit Log** — paginated viewer over `GET /api/audit/logs` with server-side
   filters (action, resource_type, user_id, date range), JSON detail drawer per
-  row, dropdowns populated from `GET /api/audit/facets`.
+  row, dropdowns populated from `GET /api/audit/facets`. Phase 24.8 adds
+  `password_change`, `password_change_failed`, `password_reset_redeemed`,
+  `password_reset_redeem_failed`, `account_locked`, `account_unlocked` actions.
 - **Health** — replaces the old `?demo=true` mock. Live `/health` cards
   (API/Database/Cache/LLM), observability gate matrix
   (Prometheus/OpenTelemetry/Jaeger/Grafana), last-request widget with
   traceparent, semantic + LLM cache hit rates, recent queries, recent audit
-  feed.
+  feed. Phase 24.8 adds an **Auth hardening** section showing the live state
+  of every `AUTH_*` flag (token versioning, change-pwd rate limit, login
+  lockout, reset mode, password history depth, admin quorum) so an operator
+  can confirm at a glance which protections are live.
 
 ### Observability deep-links (Settings → Observability)
 

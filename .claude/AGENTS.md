@@ -606,18 +606,19 @@ Tiered prompt templates for EXPLAIN analysis:
 
 JWT-based authentication with bcrypt password hashing:
 - **Password Hashing**: bcrypt with automatic salting (not passlib — direct bcrypt for Python 3.13 compat)
-- **JWT Tokens**: HS256 via python-jose, configurable expiration
+- **JWT Tokens**: HS256 via python-jose, configurable expiration. Phase 24.8 stamps `pv` (password_version) claim when `AUTH_TOKEN_VERSIONING_ENABLED=True`
 - **User CRUD**: Register (with duplicate check), authenticate (with active check), get by ID
+- **Phase 24.8 helpers** (module-level): `bump_password_version(user)` invalidates every outstanding JWT for the user; `check_password_history(db, user, new_password, depth=)` rejects reuse against current + last N hashes; `record_password_history(db, user, depth=)` snapshots the current hash and trims; `count_active_admins(db)` for the quorum guard
 
-**Key methods**: `hash_password()`, `verify_password()`, `create_access_token()`, `decode_token()`, `register()`, `authenticate()`
+**Key methods**: `hash_password()`, `verify_password()`, `create_access_token(..., password_version=)`, `decode_token()`, `register()`, `authenticate()`, plus the four module-level helpers above.
 
 ### 36. Auth Dependencies
 **File**: `src/auth/dependencies.py`
 
 FastAPI dependency injection for authentication:
-- `get_current_user` — requires valid JWT, raises 401
+- `get_current_user` — requires valid JWT, raises 401. Phase 24.8: rejects tokens whose `pv` claim is older than the user's current `password_version` ("Session invalidated, please sign in again"); legacy tokens with no `pv` are accepted so flipping the feature flag mid-flight does not boot every signed-in user.
 - `get_current_active_user` — requires active user
-- `get_optional_user` — returns User or None based on `REQUIRE_AUTH` setting (backwards compatible)
+- `get_optional_user` — returns User or None based on `REQUIRE_AUTH` setting (backwards compatible). Same `pv` check as above when the claim is present.
 - `require_admin` — requires `is_admin=True`, raises 403
 
 ### 37. Audit Logger
@@ -631,16 +632,35 @@ Audit trail for security-sensitive operations:
 
 **Key methods**: `log_action()`, `get_audit_logs()`, `count_audit_logs()`, `get_audit_facets()`
 
-### 37b. Admin Users API (Phase 24.7)
+### 37b. Admin Users API (Phase 24.7 + Phase 24.8 hardening)
 **File**: `src/api/endpoints/admin_users.py`
 
 Operator-driven user CRUD that complements the self-service auth flow:
 - **Gated by `require_admin`** + `ADMIN_UI_ENABLED` (router only mounted when the kill-switch is on)
-- **Endpoints**: list (search/filter/paginate), create, update (`is_active`/`is_admin`), reset-password (returns one-time temp password matching the `UserCreate` complexity rules), idempotent soft-deactivate
+- **Endpoints**: list (search/filter/paginate), create, update (`is_active`/`is_admin`), reset-password, idempotent soft-deactivate
+- **Reset-password (Phase C)**: behavior depends on `AUTH_PASSWORD_RESET_MODE` — `temp_password` (default; returns 16-char alnum), `reset_token` (returns single-use redemption URL with TTL via `_build_redemption_url()`), or `both`. Always sets `must_change_password=True` and bumps `password_version` so prior sessions are evicted.
 - **Self-lockout protection**: an admin cannot demote or deactivate themselves through the same UI
+- **Admin quorum guard (Phase D3)**: `_enforce_admin_quorum()` refuses any change that would drop active admins to 0 when `AUTH_REQUIRE_ADMIN_QUORUM=True`
+- **Optional session eviction**: bumps `password_version` on deactivate when `AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE=True`
 - **Audit-logged**: every mutation calls `log_action()` with the target user, the changes diff, and the operator's IP
 
 **Key endpoints**: `GET/POST /api/admin/users`, `PATCH /api/admin/users/{id}`, `POST /api/admin/users/{id}/reset-password`, `DELETE /api/admin/users/{id}`
+
+### 37c. Auth Endpoints (Phase 24.8 surface)
+**File**: `src/api/endpoints/auth.py`
+
+Self-service auth surface, hardened in Phase 24.8:
+- **`POST /api/auth/login`** — optional per-username lockout via `LoginAttemptTracker` (`AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED`). Stamps `pv` on the issued JWT.
+- **`POST /api/auth/logout`** — bumps `password_version` (kicks every device) when `AUTH_INVALIDATE_TOKENS_ON_LOGOUT=True`.
+- **`POST /api/auth/change-password`** — per-user rate limit via `_UserKeyedRateLimiter` (`AUTH_RATE_LIMIT_CHANGE_PASSWORD`), reuse-history check (Phase D1), bumps `password_version`, returns a fresh `TokenResponse` so the caller stays signed in while every other session is evicted.
+- **`POST /api/auth/redeem-reset`** — Phase C unauthenticated endpoint. Walks outstanding `password_reset_tokens` via bcrypt, marks `used_at`, rotates the password (with reuse-history check), bumps `password_version`, returns a fresh `TokenResponse`. Generic 401 on unknown / expired / used / inactive-user; 404 when `AUTH_PASSWORD_RESET_MODE` is `temp_password`.
+
+### 37d. Rate-Limit Helpers (Phase 24.8)
+**File**: `src/middleware/rate_limit.py`
+
+In-process auth-side rate limiters (per uvicorn worker — swap in Redis for multi-worker deploys):
+- `_UserKeyedRateLimiter` — sliding-window limiter keyed by `user.id`. Singleton `change_password_rate_limiter`; gate `enforce_change_password_limit(user_id, settings)` honours `AUTH_RATE_LIMIT_CHANGE_PASSWORD` + `AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE`.
+- `LoginAttemptTracker` — per-username failure counter with sliding-window lockout. Singleton `login_attempt_tracker`. Keys are lowercased so casing can't dodge it; unknown usernames count too to defeat enumeration via lockout-vs-401.
 
 ---
 

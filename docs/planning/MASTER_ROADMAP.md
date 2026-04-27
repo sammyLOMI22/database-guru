@@ -370,6 +370,48 @@
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │              AUTH HARDENING (Phase 24.8) ✅ A/B/C/D1/D3 — Apr 26, 2026                   │
+    │                                                                                           │
+    │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                   │
+    │  │ Phase A      │  │ Phase B      │  │ Phase C      │  │ Phase D1+D3  │                   │
+    │  │ Token        │  │ Rate limit + │  │ One-shot     │  │ Pwd history  │                   │
+    │  │ versioning   │  │ login lockout│  │ reset tokens │  │ + Admin       │                   │
+    │  │              │  │              │  │              │  │ quorum       │                   │
+    │  │ • password_  │  │ • per-user   │  │ • password_  │  │ • last-N hash│                   │
+    │  │   version    │  │   change-pwd │  │   reset_     │  │   reuse block│                   │
+    │  │   column     │  │   limiter    │  │   tokens     │  │ • depth-     │                   │
+    │  │ • pv claim   │  │ • per-user   │  │   table      │  │   bounded    │                   │
+    │  │   in JWT     │  │   login      │  │ • redeem     │  │ • no-quorum  │                   │
+    │  │ • bumps on   │  │   lockout    │  │   endpoint   │  │   guard:     │                   │
+    │  │   change/    │  │   tracker    │  │ • mode flag  │  │   block last │                   │
+    │  │   reset      │  │ • case-      │  │   3-way      │  │   admin      │                   │
+    │  │ • opt-in     │  │   insensitive│  │   (temp/     │  │   demote/    │                   │
+    │  │   logout/    │  │ • account_   │  │   token/     │  │   deactivate │                   │
+    │  │   deactivate │  │   locked     │  │   both)      │  │              │                   │
+    │  │   triggers   │  │   audit log  │  │ • frontend   │  │              │                   │
+    │  │              │  │              │  │   /reset?token│ │              │                   │
+    │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘                   │
+    │                                                                                           │
+    │  All toggles default OFF (behavior-preserving on upgrade). Surfaced read-only in           │
+    │  Admin → Health → Auth hardening so operators can see live state.                          │
+    │                                                                                           │
+    │  Migrations: 3d8f4c2a1e9b (must_change_password), 4f9a1c8b2e3d (password_version),         │
+    │              5e2b7a9d4c8f (password_reset_tokens), 6a3c5f8e7b1d (password_history)         │
+    │  New endpoints: POST /api/auth/change-password, POST /api/auth/redeem-reset                │
+    │  Tests: test_auth_change_password.py (4), test_auth_token_versioning.py (7),               │
+    │         test_auth_rate_limit.py (8), test_auth_reset_tokens.py (9),                        │
+    │         test_auth_history_and_quorum.py (9), test_settings_auth_hardening.py (7)           │
+    │  Plan: PASSWORD_AUTH_HARDENING_PLAN.md                                                    │
+    │                                                                                           │
+    │  ⏳ Phase D2 (JWT JTI denylist on logout) — DEFERRED, requires Redis                      │
+    │     Phase A's AUTH_INVALIDATE_TOKENS_ON_LOGOUT covers the coarse use case (kicks all       │
+    │     devices). D2 only matters when per-session revocation is needed AND multi-device       │
+    │     hygiene matters more than the simplicity of the version-bump approach. Slot it in     │
+    │     once REDIS_URL is part of the standard deploy story (Phase 23 full profile).          │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                              INNOVATION PIPELINE (Future)                                │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
@@ -753,6 +795,7 @@
 > Security/Auth, Edit Mode, Enterprise LLMs, Multi-Provider Monitoring, Observability backend, and the operator-facing Admin/Observability UI are now complete.
 
 ### Completed Priorities (this cycle)
+- ~~Auth Hardening (Phase 24.8)~~ - ✅ COMPLETE for Phases A/B/C/D1/D3 (Apr 26, 2026): **Phase A** token versioning (`users.password_version` column, `pv` JWT claim, evicts every outstanding session on password change/admin reset, optional triggers for logout/deactivate). **Phase B** per-user change-password rate limit + per-username login lockout (case-insensitive, account_locked/account_unlocked audit events). **Phase C** one-shot password reset tokens (new `password_reset_tokens` table, `AUTH_PASSWORD_RESET_MODE` 3-way switch, `POST /api/auth/redeem-reset` endpoint, frontend `/reset?token=…` redemption screen, conditional admin reset modal). **Phase D1** password history (`password_history` table, depth-bounded reuse rejection). **Phase D3** admin quorum guard (refuses to demote/deactivate the last active admin). All 13 toggles default OFF, surfaced read-only in Admin → Health → Auth hardening. 4 migrations (`3d8f4c2a1e9b`, `4f9a1c8b2e3d`, `5e2b7a9d4c8f`, `6a3c5f8e7b1d`), 2 new endpoints (`/api/auth/change-password`, `/api/auth/redeem-reset`), 44 new tests across 6 files. **Phase D2 (JTI denylist) deferred** — covered coarsely by `AUTH_INVALIDATE_TOKENS_ON_LOGOUT`; revisit when Redis is part of the standard deploy story. Plan: `PASSWORD_AUTH_HARDENING_PLAN.md`.
 - ~~Admin & Observability UI (Phase 24.7)~~ - ✅ COMPLETE: Trace-id badge in header (axios interceptor + zustand `lastRequestStore`), AuditLogViewer with server-side filters/pagination/JSON drawer + `/api/audit/facets`, UserManagement CRUD (list/create/role-toggle/disable/reset-password) with audit-log side-effects and self-lockout protection, SystemHealthPanel sub-tab replacing the 1,133-LOC `ObservabilityDemo.tsx` mock (live `/health`, recent queries, recent audit, observability gates, last-request widget), Settings → Observability section with Prometheus/Jaeger/Grafana deep-links, hard `ADMIN_UI_ENABLED` kill-switch (router mount + frontend tab/section gating). New endpoints: 5 under `/api/admin/users`, 3 under `/api/audit`. New tests: `test_admin_users_endpoints.py` (320 LOC), `test_audit_endpoints.py` (237 LOC), `test_admin_ui_toggle.py` (35 LOC), `test_settings_observability.py` (163 LOC). Plan: `PHASE_24_Observability_&_Monitoring_UI_PLAN.md`.
 - ~~Observability & Monitoring (Phase 24)~~ - ✅ COMPLETE: structlog JSON logs with request_id propagation + sensitive-key redaction, Prometheus collectors (`dbguru_*`) for HTTP/LLM/SQL/pool/cache with bounded labels, gated `/metrics` endpoint, OpenTelemetry SDK + OTLP HTTP exporter with auto-instrumentation (FastAPI/SQLAlchemy/HTTPX/Redis), manual `llm.call` and `agent.self_correcting` spans reusing LLMUsageTracker values, Docker `observability` profile (Jaeger/Prometheus/Grafana with provisioned dashboard + alert rules). 17 tests, ~1,300 lines. Stdout JSON only — no log aggregator in scope.
 - ~~Multi-Provider Monitoring (Phase 17)~~ - ✅ COMPLETE: Native token extraction for 6 provider formats (Ollama, OpenAI/Azure/LM Studio/vLLM, Anthropic, Google Vertex, AWS Bedrock), user-managed model pricing (CRUD admin API), cost summary with daily breakdown, provider performance comparison by agent type, unpriced model detection, ModelPricingManager UI. 29 tests, 7 new endpoints, ~1,373 lines.
@@ -805,6 +848,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Data Sources** | CSV & Excel File Support | **Phase 13 ✅ COMPLETE** | ~2,500 lines |
 | **LLM Monitoring** | Token usage tracking, dashboard, inline stats | **Phase 16 ✅ COMPLETE** | ~1,500 lines |
 | **Security & Auth** | JWT auth, resource ownership, per-user rate limiting, audit logging | **Phase 21 ✅ COMPLETE** | ~2,200 lines |
+| **Auth Hardening** | Token versioning (`pv` JWT claim), per-user change-pwd rate limit, login lockout, one-shot reset tokens, password history, admin quorum | **Phase 24.8 ✅ A/B/C/D1/D3** (D2 deferred) | ~1,400 lines |
 | **LLM Integration** | 8 providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM), data security, provider routing | **Phase 15 ✅ COMPLETE** | ~4,000 lines |
 | **Migration Toolkit** | Schema diff, migration planner, script gen, data migration | **Phase 20 ✅ COMPLETE** | ~5,676 lines |
 | **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, preview mode, write permissions | **Phase 18 ✅ COMPLETE** | ~2,450 lines |
@@ -872,6 +916,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Phase 23** | Docker Containerization | None | ~200 lines config | ✅ **COMPLETE** |
 | **Phase 24** | Observability & Monitoring | Phase 23 ✅ | ~1,300 lines | ✅ **COMPLETE** |
 | **Phase 24.7** | Admin & Observability UI | Phase 21 ✅ + Phase 24 ✅ | ~3,465 lines (4 PRs) | ✅ **COMPLETE** |
+| **Phase 24.8** | Auth Hardening (A/B/C/D1/D3) | Phase 21 ✅ + Phase 24.7 ✅ | ~1,400 lines + 4 migrations | ✅ **COMPLETE** (D2 deferred, needs Redis) |
 | **Phase 14** | NoSQL Database Expansion | None | ~6,000 lines | ✅ **COMPLETE** |
 
 ---
@@ -894,6 +939,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - [DOCKER_CONTAINERIZATION_PLAN.md](DOCKER_CONTAINERIZATION_PLAN.md) - Docker Containerization (Phase 23)
 - [Phase 24_Observability_&_Monitoring.md](Phase%2024_Observability_%26_Monitoring.md) - Observability backend (Phase 24) ✅
 - [PHASE_24_Observability_&_Monitoring_UI_PLAN.md](PHASE_24_Observability_%26_Monitoring_UI_PLAN.md) - Admin & Observability UI (Phase 24.7) ✅
+- [PASSWORD_AUTH_HARDENING_PLAN.md](PASSWORD_AUTH_HARDENING_PLAN.md) - Auth Hardening (Phase 24.8) ✅ A/B/C/D1/D3, ⏳ D2 deferred
 - [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md) - Innovation pipeline ideas
 - [ROADMAP_FEEDBACK.md](ROADMAP_FEEDBACK.md) - PM review & strategic recommendations
 
@@ -956,4 +1002,13 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
   - PR3: Observability section in `SettingsPanel` with deep-links (Prometheus / Jaeger / Grafana), `SystemHealthPanel` Health sub-tab replacing the demo (live `/health`, observability gates, last-request widget, recent queries + audit), `JAEGER_UI_URL`/`GRAFANA_URL`/`METRICS_PUBLIC_URL` settings exposed via `/api/settings`
   - PR4: `admin_users.py` with list/create/update/reset-password/deactivate, `UserManagement.tsx` with role toggle / disable / reset, `CreateUserModal`, `adminUsersApi.ts`, self-lockout protection on the backend, every action audit-logged
   - Plus: removed 1,133-LOC `ObservabilityDemo.tsx` mock, introduced `ADMIN_UI_ENABLED` kill-switch (router mount + frontend tab/section gating)
+- **Phase 24.8 ✅ A/B/C/D1/D3 COMPLETE**: Auth Hardening (toggleable per-deployment)
+  - **Phase A — Token versioning**: `users.password_version` column (alembic `4f9a1c8b2e3d`), JWT `pv` claim stamped only when `AUTH_TOKEN_VERSIONING_ENABLED=True`, `get_current_user` rejects stale `pv` (legacy tokens with no claim accepted so flipping the flag is non-destructive). `bump_password_version()` helper called on password change, admin reset, and conditionally on logout / deactivate (`AUTH_INVALIDATE_TOKENS_ON_LOGOUT`, `AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE`). Change-password endpoint returns a fresh `TokenResponse` so the caller stays signed in while every other device is evicted.
+  - **Phase B — Rate limit + lockout**: `_UserKeyedRateLimiter` for change-password (`AUTH_RATE_LIMIT_CHANGE_PASSWORD`, `AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE`), `LoginAttemptTracker` for username-keyed login lockout (`AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED`, `AUTH_LOGIN_LOCKOUT_THRESHOLD`, `AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS`). Tracker is case-insensitive so casing can't dodge it; unknown usernames count too (defeats enumeration via lockout-vs-401). `account_locked` / `account_unlocked` audit events. In-process — multi-worker deployments swap in a Redis backend.
+  - **Phase C — One-shot reset tokens**: `password_reset_tokens` table (alembic `5e2b7a9d4c8f`), `AUTH_PASSWORD_RESET_MODE` 3-way switch (`temp_password` | `reset_token` | `both`), `POST /api/auth/redeem-reset` walks outstanding tokens via bcrypt comparison, frontend `/reset?token=…` redemption screen short-circuits the rest of the gating. Admin reset modal conditionally renders password OR redemption URL OR both. `AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES` and `AUTH_PASSWORD_RESET_BASE_URL` configurable.
+  - **Phase D1 — Password history**: `password_history` table (alembic `6a3c5f8e7b1d`), `AUTH_PASSWORD_HISTORY_DEPTH` (0 = disabled). Reuse against current or last N hashes returns 400 from both `change-password` and `redeem-reset`. Trimmed on insert so the table stays bounded.
+  - **Phase D3 — Admin quorum**: `count_active_admins()` + `_enforce_admin_quorum()` helper. When `AUTH_REQUIRE_ADMIN_QUORUM=True`, refuses any demote/deactivate that would drop the active-admin count to 0. Layered with the existing self-edit protection.
+  - **Plumbed everywhere**: 13 new `AUTH_*` settings, `Settings.check_auth_hardening()` startup validator, `SystemSettingsResponse` mirror, frontend `AuthHardeningConfig` type, Admin → Health "Auth hardening" panel with live gates and inline warnings (e.g. `reset_token` mode + missing base URL).
+  - 4 migrations, 2 new endpoints (`/api/auth/change-password`, `/api/auth/redeem-reset`), ~1,400 lines, 44 new tests across 6 files (`test_auth_change_password.py`, `test_auth_token_versioning.py`, `test_auth_rate_limit.py`, `test_auth_reset_tokens.py`, `test_auth_history_and_quorum.py`, `test_settings_auth_hardening.py`).
+  - **⏳ Phase D2 (JWT JTI denylist on logout) — DEFERRED.** Phase A's `AUTH_INVALIDATE_TOKENS_ON_LOGOUT` covers the coarse case (logout kicks every device). D2 only matters when per-session revocation is needed and the version-bump approach is too coarse. Slot it in once Redis is part of the standard deploy story (Phase 23 `full` profile).
 - Previous: Added Phase 20-22, Innovation Pipeline, promoted Security to CRITICAL

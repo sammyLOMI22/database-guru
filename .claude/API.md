@@ -364,21 +364,24 @@ Inline data editing with preview, execution, and per-connection write permission
 
 ---
 
-## Authentication API (Phase 21)
+## Authentication API (Phase 21 + Phase 24.8 hardening)
 **File**: `auth.py`
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | POST | `/api/auth/register` | Register new user (email, username, password) |
-| POST | `/api/auth/login` | Login and receive JWT token |
+| POST | `/api/auth/login` | Login and receive JWT token (optional per-username lockout when `AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED=True`) |
+| POST | `/api/auth/logout` | Audit-log the logout; optionally bumps `password_version` to evict every device when `AUTH_INVALIDATE_TOKENS_ON_LOGOUT=True` |
 | GET | `/api/auth/me` | Get current authenticated user info |
+| POST | `/api/auth/change-password` | Self-service password change. Verifies current password, enforces complexity + history (Phase D1), bumps `password_version` (Phase A), returns a fresh `TokenResponse` so the caller stays signed in while other sessions are evicted. Per-user rate-limited when `AUTH_RATE_LIMIT_CHANGE_PASSWORD=True`. |
+| POST | `/api/auth/redeem-reset` | Phase C: redeem an admin-issued one-shot reset token (`{ token, new_password }`). Walks outstanding tokens via bcrypt, marks `used_at`, rotates the password, returns a fresh `TokenResponse`. **404 when `AUTH_PASSWORD_RESET_MODE` is `temp_password`.** |
 
 ### Features
-- **JWT Tokens**: HS256 algorithm with configurable expiration (default 24hr)
-- **Password Hashing**: bcrypt via `python-jose[cryptography]`
-- **Feature Flag**: `REQUIRE_AUTH=False` for backwards-compatible gradual rollout
-- **Dependencies**: `get_current_user` (401 if no token), `get_optional_user` (returns None if unauthenticated), `require_admin` (403 if not admin)
-- **Audit Logging**: Register, login, and failed login events are logged
+- **JWT Tokens**: HS256 algorithm with configurable expiration (default 24hr). When `AUTH_TOKEN_VERSIONING_ENABLED=True`, tokens carry a `pv` (password_version) claim and `get_current_user` rejects stale ones with 401 "Session invalidated, please sign in again." Legacy tokens with no `pv` are accepted so flipping the flag is non-destructive.
+- **Password Hashing**: bcrypt via `python-jose[cryptography]`. `must_change_password` flag set on every operator reset; the frontend force-routes the user through `/change-password` before any other action.
+- **Feature Flag**: `REQUIRE_AUTH=False` for backwards-compatible gradual rollout.
+- **Dependencies**: `get_current_user` (401 if no token), `get_optional_user` (returns None if unauthenticated), `require_admin` (403 if not admin).
+- **Audit Logging**: `register`, `login`, `login_failed`, `logout`, `password_change`, `password_change_failed`, `password_reset_redeemed`, `password_reset_redeem_failed`, `account_locked`, `account_unlocked`.
 
 ## Audit Log API (Phase 21 + Phase 24.7)
 **File**: `audit.py`
@@ -419,15 +422,13 @@ GET /api/audit/logs/me?action=create&limit=20
 | GET | `/api/admin/users` | List users with `search` (username/email), `is_active`, `is_admin`, `limit`, `offset` |
 | POST | `/api/admin/users` | Create user (email, username, password ≥12 chars, optional `is_admin`) |
 | PATCH | `/api/admin/users/{user_id}` | Toggle `is_active` / `is_admin`; self-lockout protected (cannot demote/deactivate self) |
-| POST | `/api/admin/users/{user_id}/reset-password` | Reset to 16-char alnum temp password (returned once in response) |
-| DELETE | `/api/admin/users/{user_id}` | Idempotent soft-deactivate (`is_active=False`); returns 204 |
+| POST | `/api/admin/users/{user_id}/reset-password` | Behavior depends on `AUTH_PASSWORD_RESET_MODE` (Phase C). `temp_password` (default): returns a 16-char alnum password once. `reset_token`: returns a single-use redemption URL with TTL. `both`: returns both for transition periods. Sets `must_change_password=True` and bumps `password_version` to evict prior sessions. |
+| DELETE | `/api/admin/users/{user_id}` | Idempotent soft-deactivate (`is_active=False`); returns 204. Refused with 400 when `AUTH_REQUIRE_ADMIN_QUORUM=True` and the target is the last active admin (Phase D3). Bumps `password_version` when `AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE=True`. |
 
-### Settings → Observability Surfacing (Phase 24.7)
-`GET /api/settings/` adds these fields so the UI can render the Health sub-tab and observability deep-links conditionally:
-- `metrics_enabled`, `metrics_endpoint_exposed`, `metrics_public_url`
-- `otel_enabled`, `otel_service_name`, `otel_traces_sampler_ratio`
-- `jaeger_ui_url`, `grafana_url`
-- `admin_ui_enabled` (frontend uses this to hide the Admin tab + Observability section entirely)
+### Settings → Observability + Auth Hardening Surfacing (Phase 24.7 + 24.8)
+`GET /api/settings/` returns the read-only flags below so the Admin → Health panel can render gates and deep-links conditionally:
+- **Observability**: `metrics_enabled`, `metrics_endpoint_exposed`, `metrics_public_url`, `otel_enabled`, `otel_service_name`, `otel_traces_sampler_ratio`, `jaeger_ui_url`, `grafana_url`, `admin_ui_enabled` (frontend hides Admin tab + Observability section when false)
+- **Auth hardening (Phase 24.8)**: `auth_token_versioning_enabled`, `auth_invalidate_tokens_on_deactivate`, `auth_invalidate_tokens_on_logout`, `auth_rate_limit_change_password`, `auth_change_password_per_user_per_minute`, `auth_rate_limit_login_lockout_enabled`, `auth_login_lockout_threshold`, `auth_login_lockout_window_seconds`, `auth_password_reset_mode`, `auth_password_reset_token_ttl_minutes`, `auth_password_reset_base_url`, `auth_password_history_depth`, `auth_require_admin_quorum`
 
 ---
 

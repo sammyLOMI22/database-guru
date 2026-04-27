@@ -68,6 +68,47 @@ Quick reference for finding important code in the Database Guru codebase.
 | Settings observability surface | `tests/test_settings_observability.py` (163 LOC) |
 | **Plan** | `docs/planning/PHASE_24_Observability_&_Monitoring_UI_PLAN.md` |
 
+## Auth Hardening (Phase 24.8 - April 2026)
+| Component | Location |
+|-----------|----------|
+| **Backend helpers** | |
+| Token-version bump helper | `src/auth/service.py:bump_password_version()` |
+| Password history check | `src/auth/service.py:check_password_history()` |
+| Password history record/trim | `src/auth/service.py:record_password_history()` |
+| Active-admin counter | `src/auth/service.py:count_active_admins()` |
+| Settings validator | `src/config/settings.py:Settings.check_auth_hardening()` (called from `src/main.py` lifespan) |
+| `pv` claim stamping | `src/auth/service.py:AuthService.create_access_token()` (gated by `AUTH_TOKEN_VERSIONING_ENABLED`) |
+| `pv` claim verification | `src/auth/dependencies.py:get_current_user()` / `get_optional_user()` |
+| **Models + Migrations** | |
+| `must_change_password` column | `src/auth/models.py:User`, migration `alembic/versions/3d8f4c2a1e9b_add_must_change_password.py` |
+| `password_version` column | `src/auth/models.py:User`, migration `alembic/versions/4f9a1c8b2e3d_add_password_version.py` |
+| `password_reset_tokens` table | `src/auth/models.py:PasswordResetToken`, migration `alembic/versions/5e2b7a9d4c8f_add_password_reset_tokens.py` |
+| `password_history` table | `src/auth/models.py:PasswordHistory`, migration `alembic/versions/6a3c5f8e7b1d_add_password_history.py` |
+| **Endpoints** | |
+| Change password | `src/api/endpoints/auth.py:change_password()` (history block + bump + fresh token) |
+| Redeem reset token | `src/api/endpoints/auth.py:redeem_password_reset()` (404 when feature off) |
+| Admin reset (mode-conditional) | `src/api/endpoints/admin_users.py:reset_user_password()` |
+| Admin quorum guard | `src/api/endpoints/admin_users.py:_enforce_admin_quorum()` |
+| **Rate limiting** | |
+| Per-user change-password limiter | `src/middleware/rate_limit.py:_UserKeyedRateLimiter` (singleton `change_password_rate_limiter`, gate `enforce_change_password_limit()`) |
+| Per-username login lockout | `src/middleware/rate_limit.py:LoginAttemptTracker` (singleton `login_attempt_tracker`) |
+| **Frontend** | |
+| ForcedPasswordChange screen | `frontend/src/components/ForcedPasswordChange.tsx` (renders when `user.must_change_password`) |
+| PasswordReset (Phase C redemption) | `frontend/src/components/PasswordReset.tsx` (intercepts `/reset?token=…`) |
+| Admin reset modal (mode-aware) | `frontend/src/components/admin/UserManagement.tsx` |
+| Auth hardening type | `frontend/src/types/api.ts:AuthHardeningConfig` |
+| Auth hardening gates UI | `frontend/src/components/admin/SystemHealthPanel.tsx` ("Auth hardening" section) |
+| `applyTokenResponse` swap | `frontend/src/hooks/useAuth.ts` |
+| **Tests** | |
+| Forced-change flow | `tests/test_auth_change_password.py` (4) |
+| Token versioning | `tests/test_auth_token_versioning.py` (7) |
+| Rate limit + lockout | `tests/test_auth_rate_limit.py` (8) |
+| Reset tokens | `tests/test_auth_reset_tokens.py` (9) |
+| Password history + admin quorum | `tests/test_auth_history_and_quorum.py` (9) |
+| Settings validator | `tests/test_settings_auth_hardening.py` (7) |
+| **Plan** | `docs/planning/PASSWORD_AUTH_HARDENING_PLAN.md` |
+| **Status** | Phases A / B / C / D1 / D3 ✅ shipped behind toggles. Phase D2 (JTI denylist) deferred — needs Redis. |
+
 ## Edit Mode & DML (Phase 18 - March 2026)
 | Component | Location |
 |-----------|----------|

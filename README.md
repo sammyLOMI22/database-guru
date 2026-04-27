@@ -148,6 +148,7 @@ The demo showcases:
 - 🗃️ **NoSQL Database Support (NEW!)** - MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch with native query generation and mixed SQL+NoSQL sessions
 - ✏️ **Edit Mode & DML (NEW!)** - Inline cell editing, add/delete rows, preview INSERT/UPDATE/DELETE scripts, per-connection write permissions
 - 🔐 **Security & Auth (NEW!)** - JWT authentication, resource ownership, per-user rate limiting, audit logging
+- 🛡 **Auth Hardening (NEW!)** - Token versioning (`pv` JWT claim) for instant session eviction on password change, per-user change-password rate limit, per-username login lockout, one-shot password reset tokens, password history, admin-quorum guard — all opt-in via `AUTH_*` flags
 
 All with mock data - no database connection needed!
 
@@ -267,6 +268,7 @@ PARALLEL_CORRECTIONS_TIMEOUT=10
 - ✅ **Multi-Provider LLM Support (NEW!)** - 8 LLM providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Google Vertex AI, AWS Bedrock, LM Studio, vLLM) with Local/Frontier toggle, data security enforcement (local_only/cloud_private/unrestricted), per-task provider routing with fallback chains, Fernet-encrypted API key storage, provider health checks, and frontend provider management UI with color-coded locality badges
 - ✅ **Production Observability (Phase 24)** - Structured `structlog` JSON logging with request-id propagation, Prometheus `/metrics` endpoint with bounded label cardinality, OpenTelemetry tracing with OTLP HTTP export, Docker `observability` profile bundling Jaeger + Prometheus + Grafana with a pre-provisioned dashboard
 - ✅ **Admin & Observability UI (NEW!)** - Header badge surfacing the last `X-Request-ID` for log correlation, admin-only Audit Log viewer with filters and JSON drawer, User Management CRUD (role toggle, disable, reset password), System Health sub-tab with live `/health`, recent queries, audit feed, and observability gates, deep-links to Prometheus/Jaeger/Grafana, hard kill-switch via `ADMIN_UI_ENABLED`
+- ✅ **Auth Hardening (Phase 24.8 — NEW!)** - **Phase A** token versioning (`pv` JWT claim, instant session eviction on password change/admin reset, optional logout/deactivate triggers), **Phase B** per-user change-password rate limit + per-username login lockout (case-insensitive, account_locked/account_unlocked audit events), **Phase C** one-shot password reset tokens (3-mode switch: temp_password / reset_token / both, in-app `/reset?token=…` redemption page), **Phase D1** password history (depth-bounded reuse rejection on change + redeem), **Phase D3** admin-quorum guard (blocks demoting/deactivating the last active admin). All 13 toggles default OFF, surfaced read-only in Admin → Health. Phase D2 (JTI denylist) deferred until Redis is in the deploy story.
 - ✅ **Chat sessions** - Maintain context across queries
 - ✅ Database connection management
 - ✅ Schema introspection
@@ -947,6 +949,20 @@ database-guru/
 ✅ **Audit Logging** - Never-raising `log_action()` helper tracks security-sensitive operations
 ✅ **Feature Flag** - `REQUIRE_AUTH=False` for backwards-compatible gradual rollout
 ✅ **Admin Controls** - Admin-only audit log access, `require_admin` dependency
+
+### Auth Hardening (Phase 24.8 — Optional, all flags default OFF)
+
+Every behavior below is gated by an `AUTH_*` flag in `Settings`. Defaults preserve existing behavior; flip the flags per deployment posture (see [PASSWORD_AUTH_HARDENING_PLAN.md](docs/planning/PASSWORD_AUTH_HARDENING_PLAN.md) for the full rollout matrix).
+
+✅ **Token Versioning (Phase A)** - `AUTH_TOKEN_VERSIONING_ENABLED=true` stamps a `pv` claim on every JWT and rejects stale ones. Password change, admin reset, and (optionally) logout / deactivate evict every outstanding session immediately. Legacy tokens with no `pv` are accepted so flipping the flag is non-destructive.
+✅ **Change-Password Rate Limit (Phase B)** - `AUTH_RATE_LIMIT_CHANGE_PASSWORD=true` adds a per-user sliding-window limiter to `/api/auth/change-password`. Default 5/min — tunable via `AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE`.
+✅ **Login Lockout (Phase B)** - `AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED=true` locks an account after N failed logins inside a window (`AUTH_LOGIN_LOCKOUT_THRESHOLD`, `AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS`). Case-insensitive keying; unknown usernames count too to defeat enumeration via lockout-vs-401.
+✅ **One-Shot Reset Tokens (Phase C)** - `AUTH_PASSWORD_RESET_MODE=reset_token` (or `both`) returns a single-use redemption URL instead of a temp password the operator has to handle. The user redeems via `/reset?token=…` in the app and lands signed in. TTL configurable via `AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES`.
+✅ **Password History (Phase D1)** - `AUTH_PASSWORD_HISTORY_DEPTH=5` blocks reuse of the last 5 hashes on both `change-password` and `redeem-reset`. `0` (default) disables it.
+✅ **Admin Quorum Guard (Phase D3)** - `AUTH_REQUIRE_ADMIN_QUORUM=true` refuses any demote/deactivate that would drop the active-admin count to 0.
+⏳ **JTI Denylist (Phase D2)** - Deferred until Redis is in the standard deploy story. The coarse case ("log me out everywhere") is covered by `AUTH_INVALIDATE_TOKENS_ON_LOGOUT` via the version-bump approach.
+
+The Admin → Health → "Auth hardening" panel renders the live state of every flag so operators can confirm at a glance which protections are in effect.
 
 ### Prompt Injection Protection
 
