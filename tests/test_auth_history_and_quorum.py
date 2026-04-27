@@ -23,7 +23,18 @@ from src.auth.models import PasswordHistory, User
 from src.auth.service import AuthService, count_active_admins
 from src.config.settings import Settings
 from src.database.connection import Base
-from src.middleware.rate_limit import auth_rate_limiter
+from src.middleware.rate_limit import auth_rate_limiter, change_password_rate_limiter
+
+
+@pytest.fixture(autouse=True)
+def _reset_change_password_limiter():
+    """Default for AUTH_RATE_LIMIT_CHANGE_PASSWORD is now True; reset between
+    tests so a multi-rotation test (e.g. test_history_trims_to_depth) doesn't
+    blow through the per-user limit on a clean account.
+    """
+    change_password_rate_limiter.reset()
+    yield
+    change_password_rate_limiter.reset()
 
 
 @pytest_asyncio.fixture
@@ -77,7 +88,7 @@ async def alice(session_factory):
 class TestPasswordHistory:
     @pytest.mark.asyncio
     async def test_history_disabled_keeps_table_empty(self, session_factory, alice):
-        s = Settings(JWT_SECRET="x" * 32, AUTH_PASSWORD_HISTORY_DEPTH=0)
+        s = Settings(JWT_SECRET="x" * 32, AUTH_RATE_LIMIT_CHANGE_PASSWORD=False, AUTH_PASSWORD_HISTORY_DEPTH=0)
         client = TestClient(_build_change_password_app(s, session_factory, alice.id))
         r = client.post(
             "/api/auth/change-password",
@@ -90,7 +101,7 @@ class TestPasswordHistory:
 
     @pytest.mark.asyncio
     async def test_history_blocks_immediate_reuse(self, session_factory, alice):
-        s = Settings(JWT_SECRET="x" * 32, AUTH_PASSWORD_HISTORY_DEPTH=3)
+        s = Settings(JWT_SECRET="x" * 32, AUTH_RATE_LIMIT_CHANGE_PASSWORD=False, AUTH_PASSWORD_HISTORY_DEPTH=3)
         client = TestClient(_build_change_password_app(s, session_factory, alice.id))
         # Rotate to a new password.
         r = client.post(
@@ -109,7 +120,7 @@ class TestPasswordHistory:
 
     @pytest.mark.asyncio
     async def test_history_trims_to_depth(self, session_factory, alice):
-        s = Settings(JWT_SECRET="x" * 32, AUTH_PASSWORD_HISTORY_DEPTH=2)
+        s = Settings(JWT_SECRET="x" * 32, AUTH_RATE_LIMIT_CHANGE_PASSWORD=False, AUTH_PASSWORD_HISTORY_DEPTH=2)
         client = TestClient(_build_change_password_app(s, session_factory, alice.id))
         passwords = ["AlphaPass1234", "BetaPass1234", "GammaPass1234", "DeltaPass1234"]
         current = "OriginalPass99"
@@ -132,7 +143,7 @@ class TestPasswordHistory:
     @pytest.mark.asyncio
     async def test_oldest_password_outside_depth_can_be_reused(self, session_factory, alice):
         """With depth=2, an old enough password rolls off the window."""
-        s = Settings(JWT_SECRET="x" * 32, AUTH_PASSWORD_HISTORY_DEPTH=2)
+        s = Settings(JWT_SECRET="x" * 32, AUTH_RATE_LIMIT_CHANGE_PASSWORD=False, AUTH_PASSWORD_HISTORY_DEPTH=2)
         client = TestClient(_build_change_password_app(s, session_factory, alice.id))
         chain = [
             ("OriginalPass99", "FirstReuseMe11"),  # original goes into history slot 1

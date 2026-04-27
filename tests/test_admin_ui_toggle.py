@@ -46,12 +46,22 @@ def test_admin_routes_absent_when_disabled():
 
 
 def test_admin_routes_absent_in_openapi_schema_when_disabled():
-    """OpenAPI schema should not advertise admin paths when the flag is off."""
+    """OpenAPI schema should not advertise admin paths when the flag is off.
+
+    `/api/audit/logs/me` is always mounted (the user-self route predates the
+    admin UI — see comment in src/main.py beside the audit.router include),
+    so the assertion targets only the admin-only paths.
+    """
     client = _client(admin_ui_enabled=False)
     schema = client.get("/openapi.json").json()
     paths = schema.get("paths", {})
-    assert not any(p.startswith("/api/audit") for p in paths), (
-        "Audit routes leaked into OpenAPI schema with ADMIN_UI_ENABLED=false"
+    leaked_audit = [
+        p for p in paths
+        if p.startswith("/api/audit") and p != "/api/audit/logs/me"
+    ]
+    assert not leaked_audit, (
+        f"Admin-only audit routes leaked into OpenAPI schema "
+        f"with ADMIN_UI_ENABLED=false: {leaked_audit}"
     )
     assert not any(p.startswith("/api/admin/users") for p in paths), (
         "Admin user routes leaked into OpenAPI schema with ADMIN_UI_ENABLED=false"

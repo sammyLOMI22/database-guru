@@ -337,7 +337,22 @@ async def redeem_password_reset(
     ):
         # Don't burn the token on a recoverable input error — the operator
         # can issue a fresh one if reuse blocks the user out repeatedly.
+        # Roll back first so the matched token's pending mutations don't
+        # leak, then re-open a transaction just to record the audit entry —
+        # security forensics want to see "user attempted reuse on token X."
         await db.rollback()
+        try:
+            await log_action(
+                db, action="password_reset_redeem_failed", resource_type="user",
+                resource_id=str(user.id), user_id=user.id, username=user.username,
+                details={"reason": "password_reused", "token_id": matched.id},
+                ip_address=get_client_ip(request),
+            )
+            await db.commit()
+        except Exception:  # noqa: BLE001
+            # log_action already swallows its own errors; this guards the
+            # commit() for paranoia. The user-facing 400 must always go out.
+            await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(

@@ -182,7 +182,10 @@ class Settings(BaseSettings):
 
     # Phase B — rate limit + lockout. The change-password limiter is keyed by
     # user id (caller is authenticated); the login lockout is keyed by username.
-    AUTH_RATE_LIMIT_CHANGE_PASSWORD: bool = False
+    # Change-password defaults to ON because the endpoint is auth-required and
+    # the limit (5/min/user) is well above any legitimate workflow — the only
+    # callers it slows down are token-holding attackers probing reuse history.
+    AUTH_RATE_LIMIT_CHANGE_PASSWORD: bool = True
     AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE: int = 5
     AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED: bool = False
     AUTH_LOGIN_LOCKOUT_THRESHOLD: int = 5            # failures before temp lock

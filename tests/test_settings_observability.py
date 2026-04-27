@@ -10,6 +10,16 @@ from fastapi.testclient import TestClient
 from src.api.endpoints.settings import router
 from src.api.dependencies import get_db
 from src.api.dependencies.common import get_settings
+from src.auth.dependencies import get_optional_user
+
+
+def _admin_user():
+    """Return a tiny admin-shaped object the endpoint accepts.
+
+    SystemSettingsResponse only checks ``user.is_admin``; using a SimpleNamespace
+    avoids importing the SQLAlchemy User and constructing a session.
+    """
+    return SimpleNamespace(id=1, username="admin", is_admin=True, is_active=True)
 
 
 def _settings_obj(**overrides):
@@ -90,7 +100,7 @@ def _with_auth_defaults(ns: SimpleNamespace, **overrides) -> SimpleNamespace:
     return ns
 
 
-def _build_app(app_settings) -> FastAPI:
+def _build_app(app_settings, *, as_admin: bool = True) -> FastAPI:
     # Auto-stamp auth-hardening defaults if the test didn't set them — these
     # plumb through /api/settings now and would NPE on a bare SimpleNamespace.
     if not hasattr(app_settings, "AUTH_TOKEN_VERSIONING_ENABLED"):
@@ -103,6 +113,12 @@ def _build_app(app_settings) -> FastAPI:
 
     app.dependency_overrides[get_db] = fake_db
     app.dependency_overrides[get_settings] = lambda: app_settings
+    # Auth-hardening fields on the response are admin-gated. Tests that
+    # care about those fields run as admin; tests that exercise the public
+    # observability subset can pass ``as_admin=False`` to verify the gate.
+    app.dependency_overrides[get_optional_user] = (
+        (lambda: _admin_user()) if as_admin else (lambda: None)
+    )
     return app
 
 

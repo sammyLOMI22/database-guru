@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from src.api.dependencies import get_db
+from src.api.dependencies.common import get_settings
 from src.api.endpoints.auth import router as auth_router
 from src.auth.audit import AuditLog
 from src.auth.dependencies import get_auth_service, get_current_active_user
@@ -23,7 +24,19 @@ from src.auth.models import User
 from src.auth.service import AuthService
 from src.config.settings import Settings
 from src.database.connection import Base
-from src.middleware.rate_limit import auth_rate_limiter
+from src.middleware.rate_limit import auth_rate_limiter, change_password_rate_limiter
+
+
+@pytest.fixture(autouse=True)
+def _reset_change_password_limiter():
+    """Wipe the per-user limiter so tests don't bleed into each other.
+
+    The default for AUTH_RATE_LIMIT_CHANGE_PASSWORD flipped to True; without
+    this reset the second test in any class would 429 on a clean call.
+    """
+    change_password_rate_limiter.reset()
+    yield
+    change_password_rate_limiter.reset()
 
 
 @pytest_asyncio.fixture
@@ -56,7 +69,13 @@ async def reset_user(session_factory):
 
 @pytest.fixture
 def app_factory(session_factory):
-    auth_service = AuthService(Settings(JWT_SECRET="test", JWT_ALGORITHM="HS256", JWT_EXPIRATION_MINUTES=60))
+    test_settings = Settings(
+        JWT_SECRET="test",
+        JWT_ALGORITHM="HS256",
+        JWT_EXPIRATION_MINUTES=60,
+        AUTH_RATE_LIMIT_CHANGE_PASSWORD=False,
+    )
+    auth_service = AuthService(test_settings)
 
     def build(current_user: User) -> FastAPI:
         app = FastAPI()
@@ -76,6 +95,7 @@ def app_factory(session_factory):
             return row.scalar_one()
 
         app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_settings] = lambda: test_settings
         app.dependency_overrides[get_auth_service] = lambda: auth_service
         app.dependency_overrides[get_current_active_user] = reload_user
         # Skip rate limiting in unit tests.

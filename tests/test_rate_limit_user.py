@@ -31,11 +31,20 @@ def _make_request(auth_header: str = None, client_host: str = "127.0.0.1"):
 
 @pytest.fixture(autouse=True)
 def _patch_settings():
-    """Patch module-level _settings so JWT validation uses our test secret."""
-    with patch("src.middleware.rate_limit._settings") as mock_settings:
-        mock_settings.JWT_SECRET = TEST_SECRET
-        mock_settings.JWT_ALGORITHM = TEST_ALGORITHM
-        yield mock_settings
+    """Patch the JWT-settings accessor so validation uses our test secret.
+
+    The rate_limit module reads JWT_SECRET / JWT_ALGORITHM lazily via
+    _get_jwt_settings() (cached) instead of holding a module-level Settings
+    instance, so the patch target moved with that refactor.
+    """
+    from src.middleware import rate_limit
+    rate_limit._get_jwt_settings.cache_clear()
+    with patch(
+        "src.middleware.rate_limit._get_jwt_settings",
+        return_value=(TEST_SECRET, TEST_ALGORITHM),
+    ) as mock_getter:
+        yield mock_getter
+    rate_limit._get_jwt_settings.cache_clear()
 
 
 class TestExtractRateLimitKey:
