@@ -332,6 +332,31 @@ async def redeem_password_reset(
             detail="Reset token is invalid, expired, or already used",
         )
 
+    # Independent of password-history depth, redeeming a reset token must
+    # actually rotate the password — otherwise the user can "redeem" with
+    # their existing password, clear must_change_password, consume the
+    # token, and avoid rotation entirely. ``check_password_history`` only
+    # covers this when AUTH_PASSWORD_HISTORY_DEPTH > 0; this guard runs
+    # unconditionally and is cheap (one bcrypt compare).
+    if user.hashed_password and auth_service.verify_password(
+        data.new_password, user.hashed_password
+    ):
+        await db.rollback()
+        try:
+            await log_action(
+                db, action="password_reset_redeem_failed", resource_type="user",
+                resource_id=str(user.id), user_id=user.id, username=user.username,
+                details={"reason": "same_as_current", "token_id": matched.id},
+                ip_address=get_client_ip(request),
+            )
+            await db.commit()
+        except Exception:  # noqa: BLE001
+            await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must differ from your current password.",
+        )
+
     if await check_password_history(
         db, user, data.new_password, depth=settings.AUTH_PASSWORD_HISTORY_DEPTH,
     ):

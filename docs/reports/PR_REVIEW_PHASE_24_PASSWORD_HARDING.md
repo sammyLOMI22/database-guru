@@ -109,4 +109,18 @@ PR Review — phase-24-Observability-&-Monitoring
   quality/cleanup. The crypto and migration design is solid; the bundling and the new attack surface around /api/settings/ are the
   headline concerns.
 
-  FIXED issues 1-7
+Findings
+
+  1. High: must_change_password is enforced only in the React shell, not by backend auth dependencies.
+     src/api/endpoints/admin_users.py:366 sets must_change_password=True and tells the operator the user is forced to change before
+     using the app, but src/api/endpoints/auth.py:142 still returns a normal JWT and src/auth/dependencies.py:71 only checks token
+     validity/version and is_active. A direct API client can use the temporary password token against any protected endpoint without
+     changing it. Add backend enforcement in the auth dependency, allowing only /api/auth/change-password, /api/auth/logout, and
+     maybe /api/auth/me while the flag is set.
+  2. Medium: reset-token redemption can “rotate” to the existing password when history is disabled.
+     src/api/endpoints/auth.py:335 relies solely on check_password_history, but src/auth/service.py:40 returns False immediately when
+     AUTH_PASSWORD_HISTORY_DEPTH=0. In reset_token mode the current password is intentionally left unchanged until redemption, so a
+     user can redeem the link with their current password, clear must_change_password, consume the token, and avoid rotation. Add an
+     explicit current-password comparison in /redeem-reset, independent of password-history depth.
+
+  FIXED issues 1-7 first review +1+2 second review
