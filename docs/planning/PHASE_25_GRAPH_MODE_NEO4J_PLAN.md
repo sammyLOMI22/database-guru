@@ -315,21 +315,22 @@ Extend `src/core/multi_db_handler.py`:
 
 ## 4. API Surface
 
-All under `src/api/endpoints/graph.py`, gated by existing auth dependencies. Mounted in `src/main.py` next to NoSQL routes.
+All graph-specific routes live under `src/api/endpoints/graph.py` and mount in `src/main.py` next to the NoSQL routes. The `/api/graph/*` namespace is introduced **in Phase 25.2** alongside the first graph-only endpoints — Phase 25.1 deliberately reuses the existing `/api/connections/*` flow so the existing modal Test button works with zero new frontend wiring.
 
-| Method | Path | Purpose | Auth |
-|---|---|---|---|
-| POST | `/api/graph/connections/test` | Test Bolt connect (no save) | user |
-| GET  | `/api/graph/connections/{id}/schema` | Cached schema JSON | user |
-| POST | `/api/graph/connections/{id}/introspect` | Force fresh introspection | user (write-perm check) |
-| POST | `/api/graph/connections/{id}/query` | Run Cypher; returns `{records, graph_viz, table, safety_level, truncated, warnings}` | user |
-| POST | `/api/graph/connections/{id}/explore` | Expand from node(s) — wraps server-controlled Cypher for visual explorer | user |
-| POST | `/api/graph/connections/{id}/ai/generate-cypher` | NL → Cypher + explanation | user |
-| POST | `/api/graph/connections/{id}/ai/explain-cypher` | Cypher → plain-English | user |
-| POST | `/api/graph/connections/{id}/ai/modeling-advice` | Rule-based + AI recommendations | user |
-| GET  | `/api/graph/connections/{id}/history` | Paginated query history | user |
+| Method | Path | Purpose | Ships in | Auth |
+|---|---|---|---|---|
+| POST | `/api/connections/test` | Existing endpoint — accepts `database_type='neo4j'`. Dispatches to `ConnectionTester._test_neo4j` → `Neo4jGraphAdapter.test_connection`. | **25.1** | user |
+| POST | `/api/connections/` | Existing endpoint — accepts `database_type='neo4j'` with `encrypted` + `read_only` columns. | **25.1** | user |
+| GET  | `/api/graph/connections/{id}/schema` | Cached schema JSON | 25.2 | user |
+| POST | `/api/graph/connections/{id}/introspect` | Force fresh introspection | 25.2 | user (write-perm check) |
+| POST | `/api/graph/connections/{id}/query` | Run Cypher; returns `{records, graph_viz, table, safety_level, truncated, warnings}` | 25.3 | user |
+| POST | `/api/graph/connections/{id}/explore` | Expand from node(s) — wraps server-controlled Cypher for visual explorer | 25.5 | user |
+| POST | `/api/graph/connections/{id}/ai/generate-cypher` | NL → Cypher + explanation | 25.4 | user |
+| POST | `/api/graph/connections/{id}/ai/explain-cypher` | Cypher → plain-English | 25.4 | user |
+| POST | `/api/graph/connections/{id}/ai/modeling-advice` | Rule-based + AI recommendations | 25.6 | user |
+| GET  | `/api/graph/connections/{id}/history` | Paginated query history | 25.3 | user |
 
-**Existing endpoints already cover connection CRUD** via `src/api/endpoints/connections.py` — Neo4j just goes through `database_type='neo4j'`. The new POST `/api/graph/connections/test` is a thin wrapper that calls `Neo4jAdapter.test_connection()` without writing to DB.
+**Connection CRUD is covered by `src/api/endpoints/connections.py`** — Neo4j just goes through `database_type='neo4j'`. `GRAPH_MODE_ENABLED=False` returns HTTP 400 from both the create and test endpoints so the kill-switch is real, not cosmetic.
 
 Pydantic schemas added to `src/models/schemas.py`: `GraphConnectionTest`, `GraphQueryRequest`, `GraphQueryResult`, `GraphVizNode`, `GraphVizEdge`, `GraphSchemaResponse`, `GeneratedCypherResponse`, `CypherExplanationResponse`, `GraphModelingAdvice`.
 
@@ -349,7 +350,7 @@ Pydantic schemas added to `src/models/schemas.py`: `GraphConnectionTest`, `Graph
   - `database_name` (text, default `neo4j`)
   - `encrypted` (toggle, off by default for local)
   - `read_only` (toggle, **on** by default — matches spec §5.1)
-- "Test connection" button hits POST `/api/graph/connections/test`.
+- "Test connection" button hits the existing POST `/api/connections/test` (Phase 25.1); when the dedicated `/api/graph/*` namespace lands in 25.2 the modal continues to use the standard endpoint — graph-only routes are for introspection and query, not connection-test.
 - Error messages map to spec §13 cases (auth failed, unreachable, unknown DB, TLS mismatch).
 
 ### 5.2 Graph tab (sidebar entry)
@@ -448,22 +449,32 @@ New gauge: `graph_active_drivers` (pool size) — flushed on shutdown.
 
 Each sub-phase = one PR, mergeable independently. Test counts are minimums.
 
-### Phase 25.1 — Foundation (Connection + Driver) — ~500 LOC, ~8 tests
+### Phase 25.1 — Foundation (Connection + Driver) — ~600 LOC, 26 tests ✅ SHIPPED
 
 Files:
-- `src/graph/__init__.py`, `src/graph/base.py`
-- `src/graph/neo4j/driver_pool.py`
-- `src/graph/neo4j/handler.py` (test_connection only)
-- `src/api/endpoints/graph.py` (POST `/test`)
-- Alembic migration: add `encrypted`, `read_only` columns
-- Frontend: add Neo4j to `DatabaseConnectionModal.tsx`
-- Add `neo4j` to `requirements.txt`
-- Docker Compose: add `neo4j:5-community` service (matches spec §16)
+- `src/graph/__init__.py`, `src/graph/base.py` (`GraphAdapter` Protocol, `ConnectionTestResult`, `GraphProvider` enum)
+- `src/graph/router.py` (`is_graph`, `get_adapter`, `test_connection`)
+- `src/graph/neo4j/driver_pool.py` (`Neo4jDriverPool` singleton with per-instance lock; `build_driver` factory; URI helpers)
+- `src/graph/neo4j/handler.py` (`Neo4jGraphAdapter.test_connection` with auth / unavailable / unreachable / timeout / config-error mapping; sanitized `details["raw"]`)
+- `src/core/connection_tester.py` — new `_test_neo4j` branch + `encrypted` threaded through `test_connection`. Sanitization regex broadened to `[A-Za-z][\w+.-]*://` so `neo4j+s://` is matched in full.
+- `src/api/endpoints/connections.py` — `neo4j` in `ConnectionCreate` regex + `DB_NAME_OPTIONAL_TYPES`; `encrypted` + `read_only` columns persisted; `_ensure_graph_mode_enabled()` gate consults `GRAPH_MODE_ENABLED` on both create and test.
+- Alembic migration `7b1e9f3a2c4d`: nullable `encrypted` + `read_only` columns (no server_default — application layer sets True only when `database_type='neo4j'`).
+- Frontend: 12th DB type "neo4j" in `DatabaseConnectionModal.tsx` with Bolt URI form, TLS toggle, read-only toggle.
+- `requirements.txt`: `neo4j==5.27.0`.
+- Docker Compose: opt-in `graph` profile with `neo4j:5-community` (ports 7474 / 7687).
+- `src/config/settings.py`: 10 `GRAPH_*` flags wired; `GRAPH_MODE_ENABLED` consumed by endpoint guard.
 
-Deliverable: User can save and successfully test a Neo4j connection. Passwords encrypted at rest.
+**Endpoint surface (25.1):** Reuses existing `/api/connections/test` and `/api/connections/`. No new `/api/graph/*` routes ship in 25.1 — that namespace is introduced in 25.2 alongside introspection.
 
-Tests:
-- `tests/graph/test_neo4j_connection.py` — connect success/fail, auth fail, TLS mismatch, read-only mode.
+Deliverable: User can save and successfully test a Neo4j connection (including AuraDB `neo4j+s://` URIs). Operator can kill-switch Graph Mode via `GRAPH_MODE_ENABLED=False`.
+
+Tests (`tests/graph/test_neo4j_connection.py`):
+- 9 URI scheme cases (incl. `neo4j+s`, `bolt+ssc`, case-insensitive, empty/None)
+- 3 sanitizer cases (credential stripping)
+- 4 `build_driver` cases (incl. `encrypted=` kwarg conflict guard for `+s` schemes)
+- 8 adapter cases (happy / auth fail / unreachable / timeout / config error / database unavailable / non-fatal metadata probe failure / short-circuits)
+- 2 `ConnectionTester` wrapper cases
+- Integration skeleton (`@pytest.mark.integration`, skipped unless `NEO4J_TEST_URI` is set)
 
 ### Phase 25.2 — Schema Introspection + Overview UI — ~800 LOC, ~15 tests
 

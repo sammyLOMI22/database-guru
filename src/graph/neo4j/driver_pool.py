@@ -111,18 +111,26 @@ class Neo4jDriverPool:
     Phase 25.1 leaves this in place for forward use; the connection-test
     endpoint deliberately uses :func:`build_driver` instead so unverified
     credentials never enter the pool.
+
+    Thread/coroutine safety: ``_singleton_lock`` (class-level) guards
+    instance creation. ``_mutation_lock`` (per-instance) guards every read
+    that's followed by a write — without it two coroutines could race past
+    the cache-miss check in :meth:`get` and both call :func:`build_driver`,
+    silently leaking one of the drivers. All mutations to ``_drivers`` go
+    through the lock.
     """
 
     _instance: Optional["Neo4jDriverPool"] = None
-    _lock = asyncio.Lock()
+    _singleton_lock = asyncio.Lock()
 
     def __init__(self) -> None:
         # connection_id → (driver, last_used)
         self._drivers: Dict[int, Tuple[AsyncDriver, datetime]] = {}
+        self._mutation_lock = asyncio.Lock()
 
     @classmethod
     async def get_instance(cls) -> "Neo4jDriverPool":
-        async with cls._lock:
+        async with cls._singleton_lock:
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
@@ -140,22 +148,36 @@ class Neo4jDriverPool:
         *,
         encrypted: bool = False,
     ) -> AsyncDriver:
-        await self._cleanup_stale()
+        async with self._mutation_lock:
+            await self._cleanup_stale_locked()
 
-        entry = self._drivers.get(connection_id)
-        if entry is not None:
-            driver, _ = entry
+            entry = self._drivers.get(connection_id)
+            if entry is not None:
+                driver, _ = entry
+                self._drivers[connection_id] = (driver, self._now())
+                return driver
+
+            driver = build_driver(uri, username, password, encrypted=encrypted)
             self._drivers[connection_id] = (driver, self._now())
+            await self._enforce_max_size_locked()
+            logger.info("Cached Neo4j driver for connection %s", connection_id)
             return driver
-
-        driver = build_driver(uri, username, password, encrypted=encrypted)
-        self._drivers[connection_id] = (driver, self._now())
-        await self._enforce_max_size()
-        logger.info("Cached Neo4j driver for connection %s", connection_id)
-        return driver
 
     async def close(self, connection_id: int) -> None:
         """Close and remove a single driver. Idempotent."""
+        async with self._mutation_lock:
+            await self._close_locked(connection_id)
+
+    async def close_all(self) -> None:
+        """Close every cached driver. Call on application shutdown."""
+        async with self._mutation_lock:
+            ids = list(self._drivers.keys())
+            for cid in ids:
+                await self._close_locked(cid)
+
+    # ── Locked helpers (callers MUST hold _mutation_lock) ───────────────
+
+    async def _close_locked(self, connection_id: int) -> None:
         entry = self._drivers.pop(connection_id, None)
         if entry is None:
             return
@@ -165,13 +187,7 @@ class Neo4jDriverPool:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Error closing Neo4j driver %s: %s", connection_id, exc)
 
-    async def close_all(self) -> None:
-        """Close every cached driver. Call on application shutdown."""
-        ids = list(self._drivers.keys())
-        for cid in ids:
-            await self.close(cid)
-
-    async def _cleanup_stale(self) -> None:
+    async def _cleanup_stale_locked(self) -> None:
         now = self._now()
         stale = [
             cid
@@ -179,13 +195,13 @@ class Neo4jDriverPool:
             if (now - last_used).total_seconds() > IDLE_TTL_SECONDS
         ]
         for cid in stale:
-            await self.close(cid)
+            await self._close_locked(cid)
             logger.info("Evicted idle Neo4j driver for connection %s", cid)
 
-    async def _enforce_max_size(self) -> None:
+    async def _enforce_max_size_locked(self) -> None:
         while len(self._drivers) > MAX_POOL_SIZE:
             lru_id = min(self._drivers, key=lambda c: self._drivers[c][1])
-            await self.close(lru_id)
+            await self._close_locked(lru_id)
             logger.info("Evicted LRU Neo4j driver for connection %s (pool full)", lru_id)
 
 

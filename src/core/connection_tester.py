@@ -17,8 +17,11 @@ def _sanitize_error(error: Exception) -> str:
     """
     msg = str(error)
     # Strip URIs like mongodb://user:pass@host, postgresql://..., redis://..., etc.
+    # The scheme class must include digits + `.` + `-` so URIs like
+    # ``neo4j+s://...`` and ``bolt+ssc://...`` are matched in full (the digit
+    # in "neo4j" used to leak as a prefix).
     msg = re.sub(
-        r"[a-zA-Z+]+://[^\s,)\"']+",
+        r"[A-Za-z][\w+.-]*://[^\s,)\"']+",
         "<connection-uri-redacted>",
         msg,
     )
@@ -45,6 +48,7 @@ class ConnectionTester:
         database_name: str,
         username: str,
         password: str,
+        encrypted: bool = False,
     ) -> Dict[str, Any]:
         """
         Test a database connection
@@ -56,6 +60,8 @@ class ConnectionTester:
             database_name: Database name or file path (for SQLite)
             username: Database username
             password: Database password
+            encrypted: Graph-only — request TLS on the underlying connection
+                (currently consumed by the Neo4j path; ignored elsewhere).
 
         Returns:
             Dict with success status and message
@@ -80,7 +86,9 @@ class ConnectionTester:
             elif database_type == "elasticsearch":
                 return await self._test_elasticsearch(host, port, username, password)
             elif database_type == "neo4j":
-                return await self._test_neo4j(host, database_name, username, password)
+                return await self._test_neo4j(
+                    host, database_name, username, password, encrypted=encrypted
+                )
             else:
                 return {
                     "success": False,
@@ -411,15 +419,23 @@ class ConnectionTester:
             }
 
     async def _test_neo4j(
-        self, host: str, database_name: str, username: str, password: str
+        self,
+        host: str,
+        database_name: str,
+        username: str,
+        password: str,
+        encrypted: bool = False,
     ) -> Dict[str, Any]:
         """Test Neo4j connection via the graph adapter (Phase 25).
 
         ``host`` carries the full Bolt URI (e.g. ``bolt://localhost:7687`` or
         ``neo4j+s://x.databases.neo4j.io``) — the connection modal stores it in
         the ``host`` column rather than introducing a new ``uri`` column.
-        Encryption follows the URI scheme; explicit ``encrypted`` toggle is
-        applied via the connection model in 25.2+.
+
+        ``encrypted`` toggles Bolt TLS for plain ``bolt://`` / ``neo4j://``
+        schemes. For ``neo4j+s://`` / ``bolt+s://`` URIs the scheme already
+        encodes TLS and the flag is ignored to avoid the driver's
+        ``ConfigurationError``.
         """
         try:
             from src.graph.neo4j.handler import Neo4jGraphAdapter
@@ -441,6 +457,7 @@ class ConnectionTester:
             username=username or "",
             password=password or "",
             database_name=database_name or None,
+            encrypted=encrypted,
         )
         payload: Dict[str, Any] = {"success": result.success, "message": result.message}
         if result.server_version:

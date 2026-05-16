@@ -14,6 +14,7 @@ from typing import Optional
 from neo4j.exceptions import (
     AuthError,
     ConfigurationError,
+    DatabaseUnavailable,
     ServiceUnavailable,
 )
 
@@ -153,7 +154,29 @@ class Neo4jGraphAdapter(GraphAdapter):
                 provider=self.provider.value,
                 message="Authentication failed — check username and password",
                 error_code="authentication_failed",
-                details={"raw": str(exc)},
+                details={"raw": sanitize_uri_for_log(str(exc))},
+            )
+        except DatabaseUnavailable as exc:
+            # Distinct from ServiceUnavailable: the server is reachable but the
+            # requested ``database`` does not exist or is offline. Neo4j 5.x
+            # raises this when targeting an unknown database name.
+            logger.info(
+                "Neo4j database %r unavailable on %s: %s",
+                database_name,
+                safe_uri,
+                exc,
+            )
+            db_display = database_name or "neo4j"
+            return ConnectionTestResult(
+                success=False,
+                provider=self.provider.value,
+                message=(
+                    f"Database {db_display!r} is unavailable on the server. "
+                    "Check the database name or refresh schema if it was just created."
+                ),
+                error_code="database_unavailable",
+                database_name=database_name,
+                details={"raw": sanitize_uri_for_log(str(exc))},
             )
         except ServiceUnavailable as exc:
             logger.info("Neo4j unreachable %s: %s", safe_uri, exc)
@@ -162,7 +185,7 @@ class Neo4jGraphAdapter(GraphAdapter):
                 provider=self.provider.value,
                 message=f"Could not reach database at {safe_uri}",
                 error_code="service_unavailable",
-                details={"raw": str(exc)},
+                details={"raw": sanitize_uri_for_log(str(exc))},
             )
         except Exception as exc:  # noqa: BLE001
             # Catch-all so test_connection never raises into the API layer.
@@ -172,9 +195,9 @@ class Neo4jGraphAdapter(GraphAdapter):
             return ConnectionTestResult(
                 success=False,
                 provider=self.provider.value,
-                message=f"Connection failed: {exc}",
+                message=f"Connection failed: {sanitize_uri_for_log(str(exc))}",
                 error_code="unknown_error",
-                details={"raw": str(exc)},
+                details={"raw": sanitize_uri_for_log(str(exc))},
             )
         finally:
             if driver is not None:

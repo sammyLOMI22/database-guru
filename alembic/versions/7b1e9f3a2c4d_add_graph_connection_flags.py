@@ -8,9 +8,12 @@ Adds two optional columns to ``database_connections`` used by Neo4j (and any
 future graph adapter):
 
   - ``encrypted``  : Bolt TLS toggle. NULL for non-graph rows.
-  - ``read_only``  : Defense-in-depth read-only flag. Defaults to TRUE so newly
-                     created graph connections refuse writes unless explicitly
-                     opted in.
+  - ``read_only``  : Defense-in-depth read-only flag. **Nullable with no
+                     server-side default** so existing SQL/NoSQL rows are
+                     untouched (NULL). The application layer sets it to TRUE
+                     when ``database_type='neo4j'`` so callers must always
+                     consult ``is_graph(connection.database_type)`` before
+                     interpreting this column.
 
 The columns are no-ops for existing SQL/NoSQL connections.
 """
@@ -40,14 +43,13 @@ def upgrade() -> None:
         )
 
     if "read_only" not in existing:
+        # Nullable + no server_default so existing SQL/NoSQL rows stay NULL.
+        # Application layer (src/api/endpoints/connections.py::create_connection)
+        # forces True for new ``database_type='neo4j'`` rows. Any future code
+        # that reads this column MUST gate on is_graph(connection.database_type).
         op.add_column(
             "database_connections",
-            sa.Column(
-                "read_only",
-                sa.Boolean(),
-                nullable=False,
-                server_default=sa.text("1"),
-            ),
+            sa.Column("read_only", sa.Boolean(), nullable=True),
         )
 
 

@@ -7,15 +7,53 @@ from sqlalchemy import select, update
 from pydantic import BaseModel, Field, model_validator
 
 from src.api.dependencies import get_db
+from src.api.dependencies.common import get_settings
 from src.auth.audit import log_action
 from src.auth.dependencies import get_optional_user
 from src.auth.models import User
+from src.config.settings import Settings
 from src.database.models import DatabaseConnection
 from src.core.connection_tester import ConnectionTester
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/connections", tags=["connections"])
+
+# Phase 25 — only graph database types carry a meaningful ``read_only`` value;
+# everything else stores NULL so legacy SQL/NoSQL behaviour is untouched. Keep
+# this set in sync with ``src.graph.router.GRAPH_DATABASE_TYPES``.
+_GRAPH_DB_TYPES = {"neo4j"}
+
+
+def _ensure_graph_mode_enabled(database_type: str, settings: Settings) -> None:
+    """Reject graph-type connections when ``GRAPH_MODE_ENABLED`` is False.
+
+    Surfaces the kill-switch so operators who disable Graph Mode actually
+    block create/test calls instead of silently letting Neo4j rows through.
+    """
+    if database_type in _GRAPH_DB_TYPES and not settings.GRAPH_MODE_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Graph Mode is disabled (GRAPH_MODE_ENABLED=False). "
+                f"Set the flag to True to use {database_type!r} connections."
+            ),
+        )
+
+
+def _resolve_read_only(connection_data: "ConnectionCreate") -> Optional[bool]:
+    """Apply Phase 25 read-only semantics to ``ConnectionCreate``.
+
+    * Non-graph types → ``None`` (column stays NULL).
+    * Graph types → explicit client value, falling back to True so the
+      Phase 25 spec's "read-only by default" promise holds even when the
+      client forgets to send the flag.
+    """
+    if connection_data.database_type not in _GRAPH_DB_TYPES:
+        return None
+    if connection_data.read_only is None:
+        return True
+    return bool(connection_data.read_only)
 
 
 class ConnectionCreate(BaseModel):
@@ -122,8 +160,11 @@ async def create_connection(
     connection_data: ConnectionCreate,
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
+    settings: Settings = Depends(get_settings),
 ):
     """Create a new database connection"""
+
+    _ensure_graph_mode_enabled(connection_data.database_type, settings)
 
     # Check if name already exists
     result = await db.execute(
@@ -148,12 +189,10 @@ async def create_connection(
         is_active=False,
         owner_id=current_user.id if current_user else None,
         encrypted=connection_data.encrypted,
-        # read_only defaults TRUE for any graph type if the client omits it.
-        read_only=(
-            connection_data.read_only
-            if connection_data.read_only is not None
-            else (connection_data.database_type == "neo4j")
-        ),
+        # ``read_only`` is graph-only (NULL for SQL/NoSQL types). For Neo4j,
+        # honour an explicit boolean from the client and default to True when
+        # omitted so the spec's read-only-first promise holds.
+        read_only=_resolve_read_only(connection_data),
     )
 
     db.add(new_connection)
@@ -184,8 +223,13 @@ async def create_connection(
 
 
 @router.post("/test", response_model=TestConnectionResponse)
-async def test_connection(connection_data: ConnectionCreate):
+async def test_connection(
+    connection_data: ConnectionCreate,
+    settings: Settings = Depends(get_settings),
+):
     """Test a database connection without saving it"""
+    _ensure_graph_mode_enabled(connection_data.database_type, settings)
+
     tester = ConnectionTester()
 
     try:
@@ -196,6 +240,7 @@ async def test_connection(connection_data: ConnectionCreate):
             database_name=connection_data.database_name,
             username=connection_data.username or "",
             password=connection_data.password or "",
+            encrypted=bool(connection_data.encrypted),
         )
 
         return TestConnectionResponse(

@@ -225,9 +225,12 @@ class DatabaseConnection(Base):
     is_deleted = Column(Boolean, default=False, index=True)
     last_tested_at = Column(DateTime, nullable=True)
 
-    # Graph-specific (Phase 25 — Neo4j) — NULL/no-op for non-graph databases
+    # Graph-specific (Phase 25 — Neo4j) — NULL/no-op for non-graph databases.
+    # ``read_only`` is nullable so it stays NULL for existing SQL/NoSQL rows.
+    # The application layer (connections.create_connection) sets it to True
+    # when database_type='neo4j'. Always gate reads with is_graph().
     encrypted = Column(Boolean, nullable=True)
-    read_only = Column(Boolean, nullable=False, default=True, server_default="1")
+    read_only = Column(Boolean, nullable=True)
 
     # Timestamps
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
