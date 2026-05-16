@@ -21,16 +21,19 @@ router = APIRouter(prefix="/connections", tags=["connections"])
 class ConnectionCreate(BaseModel):
     """Request model for creating a database connection"""
     name: str = Field(..., min_length=1, max_length=255)
-    database_type: str = Field(..., pattern="^(postgresql|mysql|sqlite|mongodb|duckdb|redis|cassandra|dynamodb|elasticsearch)$")
+    database_type: str = Field(..., pattern="^(postgresql|mysql|sqlite|mongodb|duckdb|redis|cassandra|dynamodb|elasticsearch|neo4j)$")
     host: Optional[str] = None
     port: Optional[int] = None
     database_name: str = Field(default="", min_length=0)
     username: Optional[str] = None
     password: Optional[str] = None
+    # Phase 25 (Graph Mode). NULL for non-graph types.
+    encrypted: Optional[bool] = None
+    read_only: Optional[bool] = None
 
-    # DynamoDB and Elasticsearch don't require a database_name;
-    # all other types do.
-    DB_NAME_OPTIONAL_TYPES: ClassVar[Set[str]] = {"dynamodb", "elasticsearch", "redis"}
+    # Types that don't require an explicit database_name from the user.
+    # Neo4j defaults to the database literally named "neo4j" on the server.
+    DB_NAME_OPTIONAL_TYPES: ClassVar[Set[str]] = {"dynamodb", "elasticsearch", "redis", "neo4j"}
 
     @model_validator(mode="after")
     def validate_database_name(self):
@@ -144,6 +147,13 @@ async def create_connection(
         password_encrypted=connection_data.password,  # Store as-is for now
         is_active=False,
         owner_id=current_user.id if current_user else None,
+        encrypted=connection_data.encrypted,
+        # read_only defaults TRUE for any graph type if the client omits it.
+        read_only=(
+            connection_data.read_only
+            if connection_data.read_only is not None
+            else (connection_data.database_type == "neo4j")
+        ),
     )
 
     db.add(new_connection)

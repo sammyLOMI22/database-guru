@@ -23,6 +23,7 @@ oracledb==2.3.0  # Oracle Database driver — thin mode (no Oracle Client requir
 cassandra-driver==3.28.0  # Cassandra CQL driver (Phase 14)
 aioboto3==12.3.0  # Async AWS SDK for DynamoDB (Phase 14)
 elasticsearch[async]==8.11.0  # Elasticsearch with async support (Phase 14)
+neo4j==5.27.0  # Neo4j Bolt driver, async (Phase 25 — Graph Mode)
 alembic==1.13.0
 
 # LLM & AI

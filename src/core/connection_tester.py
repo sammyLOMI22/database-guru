@@ -79,6 +79,8 @@ class ConnectionTester:
                 return await self._test_dynamodb(username, password, host)
             elif database_type == "elasticsearch":
                 return await self._test_elasticsearch(host, port, username, password)
+            elif database_type == "neo4j":
+                return await self._test_neo4j(host, database_name, username, password)
             else:
                 return {
                     "success": False,
@@ -407,3 +409,42 @@ class ConnectionTester:
                 "success": False,
                 "message": f"Elasticsearch connection failed: {_sanitize_error(e)}",
             }
+
+    async def _test_neo4j(
+        self, host: str, database_name: str, username: str, password: str
+    ) -> Dict[str, Any]:
+        """Test Neo4j connection via the graph adapter (Phase 25).
+
+        ``host`` carries the full Bolt URI (e.g. ``bolt://localhost:7687`` or
+        ``neo4j+s://x.databases.neo4j.io``) — the connection modal stores it in
+        the ``host`` column rather than introducing a new ``uri`` column.
+        Encryption follows the URI scheme; explicit ``encrypted`` toggle is
+        applied via the connection model in 25.2+.
+        """
+        try:
+            from src.graph.neo4j.handler import Neo4jGraphAdapter
+        except ImportError:
+            return {
+                "success": False,
+                "message": "Neo4j support not installed. Run: pip install neo4j",
+            }
+
+        if not host:
+            return {
+                "success": False,
+                "message": "Neo4j URI is required (e.g. bolt://localhost:7687)",
+            }
+
+        adapter = Neo4jGraphAdapter()
+        result = await adapter.test_connection(
+            uri=host,
+            username=username or "",
+            password=password or "",
+            database_name=database_name or None,
+        )
+        payload: Dict[str, Any] = {"success": result.success, "message": result.message}
+        if result.server_version:
+            payload["server_version"] = result.server_version
+        if result.edition:
+            payload["edition"] = result.edition
+        return payload

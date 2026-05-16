@@ -203,6 +203,29 @@ class Settings(BaseSettings):
     AUTH_PASSWORD_HISTORY_DEPTH: int = 0
     AUTH_REQUIRE_ADMIN_QUORUM: bool = False
 
+    # ── Phase 25 — Graph Mode (Neo4j) ────────────────────────────────────
+    # All defaults are safe + opt-in where security-sensitive. See
+    # docs/planning/PHASE_25_GRAPH_MODE_NEO4J_PLAN.md §11 for the full table.
+    GRAPH_MODE_ENABLED: bool = True
+    # When True, newly-created graph connections start in read-only mode and
+    # the driver opens sessions with default_access_mode=READ.
+    GRAPH_DEFAULT_READ_ONLY: bool = True
+    # Server-side query timeout passed to the driver.
+    GRAPH_QUERY_TIMEOUT_MS: int = 10_000
+    # Whole-introspection timeout (used in Phase 25.2+).
+    GRAPH_INTROSPECTION_TIMEOUT_MS: int = 30_000
+    # Skip exact count(*) on labels estimated to be larger than this.
+    GRAPH_INTROSPECTION_COUNT_CAP: int = 10_000_000
+    # Hard cap on records returned per query.
+    GRAPH_MAX_RECORDS: int = 1000
+    # Visualization caps (Phase 25.5).
+    GRAPH_MAX_VIZ_NODES: int = 200
+    GRAPH_MAX_VIZ_EDGES: int = 500
+    # APOC procedures are deny-by-default. Flip to True in trusted environments.
+    GRAPH_ALLOW_APOC: bool = False
+    # Post-MVP knob — flips writes from blocked → confirmation-required.
+    GRAPH_ALLOW_WRITES: bool = False
+
     class Config:
         env_file = ".env"
         case_sensitive = True

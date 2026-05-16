@@ -11,6 +11,10 @@ interface DatabaseConnection {
   database_name: string;
   username?: string;
   password?: string;
+  /** Phase 25 — Neo4j only. NULL for other types. */
+  encrypted?: boolean | null;
+  /** Phase 25 — Neo4j only. Defaults true; defense-in-depth read-only enforcement. */
+  read_only?: boolean | null;
 }
 
 interface Props {
@@ -102,6 +106,12 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
         const esScheme = formData.username ? 'https' : 'http';
         return `${esScheme}://${authStr}${host}:${formData.port || 9200}`;
       }
+      case 'neo4j': {
+        // host carries the full Bolt URI (e.g. bolt://localhost:7687 or neo4j+s://x.databases.neo4j.io)
+        const uri = formData.host || 'bolt://localhost:7687';
+        const dbDisplay = formData.database_name || 'neo4j';
+        return `${uri} → ${dbDisplay} (user: ${user})`;
+      }
       default:
         return `postgresql://${user}:${pass}@${host}:${port}/${db}`;
     }
@@ -129,6 +139,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
       cassandra: 9042,
       dynamodb: 0,
       elasticsearch: 9200,
+      neo4j: 0,
     };
 
     const defaults: Partial<DatabaseConnection> = {
@@ -146,6 +157,13 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
       defaults.username = '';
     } else if (type === 'elasticsearch') {
       defaults.host = 'localhost';
+    } else if (type === 'neo4j') {
+      // host holds the full Bolt URI; database_name defaults to "neo4j".
+      defaults.host = 'bolt://localhost:7687';
+      defaults.username = 'neo4j';
+      defaults.database_name = 'neo4j';
+      defaults.encrypted = false;
+      defaults.read_only = true;
     }
 
     setFormData((prev) => ({ ...prev, ...defaults }));
@@ -178,6 +196,20 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
     } else if (FILE_PATH_TYPES.includes(dbType)) {
       if (!formData.database_name || !formData.database_name.trim()) {
         setTestResult({ success: false, message: 'Database file path is required' });
+        return;
+      }
+    } else if (dbType === 'neo4j') {
+      // Neo4j: host carries the full Bolt URI; port lives inside the URI.
+      if (!formData.host || !formData.host.trim()) {
+        setTestResult({ success: false, message: 'Bolt URI is required (e.g. bolt://localhost:7687)' });
+        return;
+      }
+      if (!formData.username || !formData.username.trim()) {
+        setTestResult({ success: false, message: 'Username is required' });
+        return;
+      }
+      if (!formData.password) {
+        setTestResult({ success: false, message: 'Password is required' });
         return;
       }
     } else {
@@ -481,6 +513,106 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
       );
     }
 
+    // --- Neo4j (Bolt URI + database + auth + encryption / read-only toggles) ---
+    if (dbType === 'neo4j') {
+      return (
+        <>
+          <div className="space-y-3">
+            <label className={labelClass}>Bolt URI *</label>
+            <input
+              type="text"
+              name="host"
+              value={formData.host}
+              onChange={handleChange}
+              required
+              placeholder="bolt://localhost:7687  or  neo4j+s://xxx.databases.neo4j.io"
+              className={inputClass}
+            />
+            <div className="p-4 glass-panel bg-blue-500/5 border-blue-500/10 rounded-xl text-[11px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+              URI includes the port. ``+s`` schemes auto-enable TLS.
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <label className={labelClass}>Username *</label>
+              <input
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                required
+                placeholder="neo4j"
+                className={inputClass}
+              />
+            </div>
+            <div className="space-y-3">
+              <label className={labelClass}>Password *</label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                placeholder="••••••••"
+                className={`${inputClass} font-mono`}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className={labelClass}>Database Name</label>
+            <input
+              type="text"
+              name="database_name"
+              value={formData.database_name}
+              onChange={handleChange}
+              placeholder="neo4j"
+              className={inputClass}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="flex items-center gap-3 p-4 glass-panel bg-white/5 dark:bg-black/10 rounded-2xl cursor-pointer border-white/5">
+              <input
+                type="checkbox"
+                checked={!!formData.encrypted}
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, encrypted: e.target.checked }));
+                  setTestResult(null);
+                }}
+                className="w-4 h-4 accent-blue-500"
+              />
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-widest text-gray-300">Bolt TLS</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Ignored for neo4j+s / bolt+s URIs
+                </div>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 p-4 glass-panel bg-white/5 dark:bg-black/10 rounded-2xl cursor-pointer border-emerald-500/10">
+              <input
+                type="checkbox"
+                checked={formData.read_only !== false}
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, read_only: e.target.checked }));
+                  setTestResult(null);
+                }}
+                className="w-4 h-4 accent-emerald-500"
+              />
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-widest text-emerald-400">Read-only mode</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Recommended. Driver refuses writes.
+                </div>
+              </div>
+            </label>
+          </div>
+        </>
+      );
+    }
+
     // --- Standard layout (PostgreSQL, MySQL, MSSQL, Oracle, MongoDB, Cassandra) ---
     return (
       <>
@@ -615,7 +747,7 @@ export default function DatabaseConnectionModal({ isOpen, onClose, onSave, conne
           <div className="space-y-4">
             <label className={labelClass}>Select Protocol *</label>
             <div className="flex flex-wrap gap-2.5">
-              {['postgresql', 'mysql', 'sqlite', 'mssql', 'oracle', 'mongodb', 'duckdb', 'redis', 'cassandra', 'dynamodb', 'elasticsearch'].map((type) => (
+              {['postgresql', 'mysql', 'sqlite', 'mssql', 'oracle', 'mongodb', 'duckdb', 'redis', 'cassandra', 'dynamodb', 'elasticsearch', 'neo4j'].map((type) => (
                 <button
                   key={type}
                   type="button"

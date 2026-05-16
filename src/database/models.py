@@ -225,6 +225,10 @@ class DatabaseConnection(Base):
     is_deleted = Column(Boolean, default=False, index=True)
     last_tested_at = Column(DateTime, nullable=True)
 
+    # Graph-specific (Phase 25 — Neo4j) — NULL/no-op for non-graph databases
+    encrypted = Column(Boolean, nullable=True)
+    read_only = Column(Boolean, nullable=False, default=True, server_default="1")
+
     # Timestamps
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
