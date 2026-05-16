@@ -13,6 +13,13 @@
 import axios from 'axios';
 import { getStoredToken } from '../hooks/useAuth';
 
+// NOTE: This file deliberately creates its own axios instance instead of
+// importing the shared client from `src/services/api.ts`. Graph endpoints
+// run slow introspections (large `MATCH (a)-[r]->(b)` samples) so we want
+// a longer per-request timeout than the shared SQL/REST client uses, and
+// we want graph-specific error logging without coupling the two surfaces.
+// If we later need shared auth-refresh / 401 redirect behavior, lift it
+// into a `createApiClient(opts)` factory rather than re-importing here.
 const api = axios.create({
   baseURL: (import.meta as any).env?.VITE_API_URL || '',
   timeout: 60_000,

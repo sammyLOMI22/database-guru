@@ -18,7 +18,7 @@ export function useGraphSchema(connectionId: number | null) {
   return useQuery<GraphSchemaResponse>({
     queryKey: SCHEMA_KEY(connectionId),
     queryFn: () => graphAPI.getSchema(connectionId as number),
-    enabled: connectionId !== null && connectionId !== undefined,
+    enabled: connectionId !== null,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

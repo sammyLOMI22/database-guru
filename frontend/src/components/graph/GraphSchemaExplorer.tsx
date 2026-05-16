@@ -133,7 +133,13 @@ export default function GraphSchemaExplorer({ connectionId }: Props) {
         <input
           type="search"
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={(e) => {
+            setFilter(e.target.value);
+            // Filter change can hide whatever the user selected; clear
+            // the selection so we don't silently snap focus to whatever
+            // happens to survive the filter.
+            setSelected(null);
+          }}
           placeholder="Filter…"
           aria-label="Filter schema entries"
           className="px-3 py-1.5 rounded-lg glass-panel text-sm w-64 bg-white/40 dark:bg-black/40 border border-white/10 text-gray-900 dark:text-white placeholder:text-gray-400"

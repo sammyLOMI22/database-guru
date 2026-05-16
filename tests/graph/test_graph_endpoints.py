@@ -219,6 +219,33 @@ class TestGetSchemaEndpoint:
         assert "disabled" in resp.json()["detail"].lower()
         app.dependency_overrides.clear()
 
+    def test_corrupt_cache_falls_back_to_fresh_introspection(self):
+        # A cache payload missing required keys (no "labels", no "provider"
+        # — anything that breaks graph_schema_from_dict). The endpoint
+        # logs a warning and silently re-introspects rather than 500-ing.
+        # This is the most likely real-world failure when a future schema
+        # migration changes the cache shape.
+        bad_cache = {"unexpected": "shape", "labels": [{"missing_name": True}]}
+        conn = _neo4j_conn(schema_cache=bad_cache)
+        app = _make_app()
+        _override_db(app, conn)
+
+        fresh = _sample_schema()
+        with patch(
+            "src.api.endpoints.graph._run_introspection",
+            new=AsyncMock(return_value=fresh),
+        ):
+            resp = TestClient(app).get("/api/graph/connections/42/schema")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        # Served from fresh introspection, not the broken cache.
+        assert body["cached"] is False
+        assert body["label_count"] == 2
+        # Cache was healed in-place — next request will hit the cache path.
+        assert conn.schema_cache["label_count"] == 2
+        app.dependency_overrides.clear()
+
 
 class TestIntrospectEndpoint:
     def test_introspect_persists_fresh_schema(self):
@@ -250,14 +277,25 @@ class TestIntrospectEndpoint:
         app = _make_app()
         _override_db(app, conn)
 
+        # The driver's exception text — which we must NOT echo to the
+        # caller, because Neo4j errors can embed the connection URI
+        # (potentially with credentials). Use a value that would be
+        # obviously bad to leak so a regression is visible.
+        leaky_msg = "boom @ bolt://user:hunter2@host:7687"
         with patch(
             "src.api.endpoints.graph._run_introspection",
-            new=AsyncMock(side_effect=RuntimeError("driver boom")),
+            new=AsyncMock(side_effect=RuntimeError(leaky_msg)),
         ):
             resp = TestClient(app).post("/api/graph/connections/42/introspect")
 
         assert resp.status_code == 502
-        assert "driver boom" in resp.json()["detail"]
+        detail = resp.json()["detail"]
+        # Sanitized body is generic and points at server logs.
+        assert "Neo4j introspection failed" in detail
+        assert "server logs" in detail.lower()
+        # Defense in depth: the raw exception text never appears in body.
+        assert "hunter2" not in detail
+        assert "bolt://" not in detail
         app.dependency_overrides.clear()
 
 
@@ -306,4 +344,34 @@ class TestSchemaSummaryEndpoint:
         )
         assert resp.status_code == 409
         assert "introspect" in resp.json()["detail"].lower()
+        app.dependency_overrides.clear()
+
+    def test_summarizer_failure_returns_fallback_not_500(self):
+        # Lock in the "fallback, not 500" contract: if the summarizer
+        # pipeline raises (router lookup error, missing provider config,
+        # internal try/except regressed in a future change), the endpoint
+        # still returns a 200 with a deterministic fallback blurb so the
+        # Overview card renders something useful.
+        conn = _neo4j_conn(schema_cache=_sample_schema().to_dict())
+        app = _make_app()
+        _override_db(app, conn)
+
+        async def boom(_db):
+            raise RuntimeError("model router exploded")
+
+        with patch(
+            "src.graph.ai.schema_summarizer.get_graph_schema_summarizer",
+            new=boom,
+        ):
+            resp = TestClient(app).post(
+                "/api/graph/connections/42/ai/schema-summary"
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        # Used the deterministic fallback string from graph_prompts.
+        assert body["used_fallback"] is True
+        assert body["summary"]
+        assert body["model"] is None
+        assert body["provider"] is None
         app.dependency_overrides.clear()

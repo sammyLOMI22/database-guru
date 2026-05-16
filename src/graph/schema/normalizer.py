@@ -178,6 +178,28 @@ class GraphSchema:
             "constraint_count": len(self.constraints),
         }
 
+    def to_response_payload(
+        self,
+        *,
+        connection_id: int,
+        schema_updated_at: Optional[str],
+        cached: bool,
+    ) -> Dict[str, Any]:
+        """Shape this schema for the GraphSchemaResponse wire model.
+
+        Lives on the dataclass (not on the endpoint module) so adding a
+        schema field only requires touching one file. Callers pass the
+        connection-scoped bits (``connection_id`` and
+        ``schema_updated_at``) that the dataclass itself doesn't know
+        about.
+        """
+        return {
+            "connection_id": connection_id,
+            "schema_updated_at": schema_updated_at,
+            "cached": cached,
+            **self.to_dict(),
+        }
+
 
 # ── Inverse: re-hydrate from cache dict ───────────────────────────────────
 

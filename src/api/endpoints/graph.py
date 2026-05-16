@@ -96,30 +96,18 @@ def _to_schema_response(
     *,
     cached: bool,
 ) -> GraphSchemaResponse:
-    data = schema.to_dict()
-    return GraphSchemaResponse(
+    """Thin wrapper around ``GraphSchema.to_response_payload`` for the
+    endpoint layer. Kept as a helper so the call sites read cleanly; the
+    real shaping lives on the dataclass.
+    """
+    payload = schema.to_response_payload(
         connection_id=conn.id,
-        provider=data["provider"],
-        database_name=data["database_name"],
-        labels=data["labels"],
-        relationships=data["relationships"],
-        patterns=data["patterns"],
-        indexes=data["indexes"],
-        constraints=data["constraints"],
-        warnings=data["warnings"],
-        collected_at=data["collected_at"],
         schema_updated_at=(
             conn.schema_updated_at.isoformat() if conn.schema_updated_at else None
         ),
-        server_version=data.get("server_version"),
-        edition=data.get("edition"),
-        label_count=data["label_count"],
-        relationship_type_count=data["relationship_type_count"],
-        pattern_count=data["pattern_count"],
-        index_count=data["index_count"],
-        constraint_count=data["constraint_count"],
         cached=cached,
     )
+    return GraphSchemaResponse(**payload)
 
 
 async def _run_introspection(
@@ -204,11 +192,15 @@ async def get_graph_schema(
             query_timeout_ms=None,
             settings=settings,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
+        # Don't echo the driver's exception string — Neo4j's
+        # ServiceUnavailable / AuthError / ConfigurationError can embed
+        # the connection URI (which may include user:pass) verbatim. The
+        # full trace is captured server-side by logger.exception.
         logger.exception("Graph introspection failed for connection %s", connection_id)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Neo4j introspection failed: {exc}",
+            detail="Neo4j introspection failed. Check server logs for details.",
         )
 
     conn.schema_cache = schema.to_dict()
@@ -244,11 +236,12 @@ async def introspect_graph(
             query_timeout_ms=qtimeout,
             settings=settings,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
+        # See get_graph_schema above for why exc is not in the body.
         logger.exception("Graph introspection failed for connection %s", connection_id)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Neo4j introspection failed: {exc}",
+            detail="Neo4j introspection failed. Check server logs for details.",
         )
 
     conn.schema_cache = schema.to_dict()
@@ -289,10 +282,36 @@ async def graph_schema_summary(
 
     # Lazy import — keeps the LLM stack out of the import graph for tests
     # that only need schema endpoints.
-    from src.graph.ai.schema_summarizer import get_graph_schema_summarizer
+    from src.graph.ai.schema_summarizer import (
+        GraphSchemaSummary,
+        get_graph_schema_summarizer,
+    )
+    from src.llm.prompts.graph_prompts import fallback_schema_summary
 
-    summarizer = await get_graph_schema_summarizer(db)
-    summary = await summarizer.summarize(conn.schema_cache, db=db)
+    # Defensive guard around the whole summarizer pipeline. The summarizer
+    # is *supposed* to catch its own timeouts/errors and return a fallback
+    # GraphSchemaSummary — but if get_graph_schema_summarizer() itself
+    # raises (router lookup failure, missing provider config, etc.), or if
+    # a future contributor inadvertently regresses the summarizer's
+    # internal try/except, we still want the Overview card to render a
+    # blurb rather than a 500. Failing closed here would force the
+    # frontend to special-case the AI endpoint when none of the schema
+    # endpoints fail in this way.
+    try:
+        summarizer = await get_graph_schema_summarizer(db)
+        summary = await summarizer.summarize(conn.schema_cache, db=db)
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Graph schema summarizer failed for connection %s; "
+            "returning deterministic fallback.",
+            connection_id,
+        )
+        summary = GraphSchemaSummary(
+            summary=fallback_schema_summary(conn.schema_cache),
+            model=None,
+            provider=None,
+            used_fallback=True,
+        )
 
     return GraphSchemaSummaryResponse(
         connection_id=conn.id,
