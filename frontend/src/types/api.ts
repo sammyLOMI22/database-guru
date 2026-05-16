@@ -705,3 +705,41 @@ export interface FileSourceListResponse {
   files: FileSource[];
   total: number;
 }
+
+// ── Observability (Phase 24 / 24.7) ────────────────────────────────────
+//
+// Subset of `GET /api/settings/` used by SettingsPanel and SystemHealthPanel
+// to render the observability gate matrix and the Prometheus/Jaeger/Grafana
+// deep-links. Pulled into a shared type so the two surfaces can't drift when
+// the backend exposes new flags via SystemSettingsResponse.
+export interface ObservabilityConfig {
+  metrics_enabled?: boolean;
+  metrics_endpoint_exposed?: boolean;
+  metrics_public_url?: string | null;
+  otel_enabled?: boolean;
+  otel_service_name?: string | null;
+  otel_traces_sampler_ratio?: number | null;
+  jaeger_ui_url?: string | null;
+  grafana_url?: string | null;
+  admin_ui_enabled?: boolean;
+}
+
+// Read-only mirror of the auth-hardening flags from SystemSettingsResponse.
+// Surfaced in Admin → Health → Security so an operator can tell at a glance
+// which protections are currently live. See
+// docs/planning/PASSWORD_AUTH_HARDENING_PLAN.md for what each flag does.
+export interface AuthHardeningConfig {
+  auth_token_versioning_enabled?: boolean;
+  auth_invalidate_tokens_on_deactivate?: boolean;
+  auth_invalidate_tokens_on_logout?: boolean;
+  auth_rate_limit_change_password?: boolean;
+  auth_change_password_per_user_per_minute?: number;
+  auth_rate_limit_login_lockout_enabled?: boolean;
+  auth_login_lockout_threshold?: number;
+  auth_login_lockout_window_seconds?: number;
+  auth_password_reset_mode?: 'temp_password' | 'reset_token' | 'both' | string;
+  auth_password_reset_token_ttl_minutes?: number;
+  auth_password_reset_base_url?: string | null;
+  auth_password_history_depth?: number;
+  auth_require_admin_quorum?: boolean;
+}

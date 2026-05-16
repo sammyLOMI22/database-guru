@@ -17,6 +17,7 @@ except ImportError:
     RedisConnectionError = Exception
 
 from src.config.settings import Settings
+from src.observability import metrics as _metrics
 
 logger = logging.getLogger(__name__)
 
@@ -103,9 +104,11 @@ class RedisCache:
             value = await self.redis.get(key)
             if value:
                 logger.debug(f"Cache hit: {key}")
+                _metrics.record_cache_hit("redis")
                 return json.loads(value)
 
             logger.debug(f"Cache miss: {key}")
+            _metrics.record_cache_miss("redis")
             return None
 
         except json.JSONDecodeError as e:

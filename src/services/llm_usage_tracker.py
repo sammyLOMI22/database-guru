@@ -8,6 +8,7 @@ import tiktoken
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import LLMUsage
+from src.observability import tracing as _tracing
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +221,38 @@ class _TrackingContext:
                 await self.db.flush()
         except Exception as e:
             logger.error(f"Failed to save LLM usage record: {e}")
+
+        # Phase 24: emit Prometheus metrics from the same numbers we just wrote
+        # to the LLMUsage row. No double-tokenization or double-pricing.
+        try:
+            from src.observability import metrics as _metrics
+            _metrics.record_llm_call(
+                provider=self.provider or "unknown",
+                model=self.model_name or "unknown",
+                agent_type=self.agent_type or "unknown",
+                success=self.success,
+                duration_s=response_time_ms / 1000.0,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost_usd=float(estimated_cost) if estimated_cost else None,
+            )
+        except Exception as metrics_err:  # noqa: BLE001
+            logger.debug(f"metrics record_llm_call failed: {metrics_err}")
+
+        # Phase 24: attach attrs to the active LLM span. Caller stack must have
+        # opened ``llm_call_span(...)`` already; if not, this is a no-op.
+        try:
+            from opentelemetry import trace as _otel_trace
+            span = _otel_trace.get_current_span()
+            if span and span.is_recording():
+                span.set_attribute("llm.prompt_tokens", int(input_tokens or 0))
+                span.set_attribute("llm.completion_tokens", int(output_tokens or 0))
+                if estimated_cost is not None:
+                    span.set_attribute("llm.cost_usd", float(estimated_cost))
+                span.set_attribute("llm.success", bool(self.success))
+                span.set_attribute("llm.duration_ms", float(response_time_ms))
+        except Exception:  # noqa: BLE001
+            pass
 
         return usage_record
 

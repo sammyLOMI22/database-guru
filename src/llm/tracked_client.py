@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.llm.providers.base import BaseLLMProvider, LLMResponse
+from src.observability import tracing as _tracing
 from src.services.llm_usage_tracker import llm_usage_tracker
 
 logger = logging.getLogger(__name__)
@@ -84,24 +85,46 @@ class TrackedLLMClient:
             If return_full_response=True: dict (raw provider response)
             If return_full_response=False: str (generated text)
         """
+        provider_name = self._provider.provider_name
+        model_name = model or getattr(self._provider, "default_model", "unknown")
         try:
             if db:
-                model_name = model or getattr(self._provider, "default_model", "unknown")
-                prompt_text = prompt
-
-                async with llm_usage_tracker.track_call(
-                    db=db,
+                with _tracing.llm_call_span(
+                    provider=provider_name,
+                    model=model_name,
                     agent_type=agent_type,
-                    model_name=model_name,
-                    llm_method="generate",
-                    prompt=prompt_text,
-                    provider=self._provider.provider_name,
-                    query_history_id=query_history_id,
-                    chat_session_id=chat_session_id,
-                    chat_message_id=chat_message_id,
-                    agent_name=agent_name,
-                    data_locality=self._provider.data_locality.value,
-                ) as tracking:
+                ):
+                    async with llm_usage_tracker.track_call(
+                        db=db,
+                        agent_type=agent_type,
+                        model_name=model_name,
+                        llm_method="generate",
+                        prompt=prompt,
+                        provider=provider_name,
+                        query_history_id=query_history_id,
+                        chat_session_id=chat_session_id,
+                        chat_message_id=chat_message_id,
+                        agent_name=agent_name,
+                        data_locality=self._provider.data_locality.value,
+                    ) as tracking:
+                        llm_response = await self._provider.generate(
+                            prompt=prompt,
+                            model=model,
+                            system=system,
+                            temperature=temperature,
+                            **kwargs,
+                        )
+                        tracking.set_response(llm_response.text, llm_response.raw_response)
+
+                        if return_full_response:
+                            return self._to_legacy_generate_dict(llm_response)
+                        return llm_response.text
+            else:
+                with _tracing.llm_call_span(
+                    provider=provider_name,
+                    model=model_name,
+                    agent_type=agent_type,
+                ):
                     llm_response = await self._provider.generate(
                         prompt=prompt,
                         model=model,
@@ -109,22 +132,9 @@ class TrackedLLMClient:
                         temperature=temperature,
                         **kwargs,
                     )
-                    tracking.set_response(llm_response.text, llm_response.raw_response)
-
                     if return_full_response:
                         return self._to_legacy_generate_dict(llm_response)
                     return llm_response.text
-            else:
-                llm_response = await self._provider.generate(
-                    prompt=prompt,
-                    model=model,
-                    system=system,
-                    temperature=temperature,
-                    **kwargs,
-                )
-                if return_full_response:
-                    return self._to_legacy_generate_dict(llm_response)
-                return llm_response.text
 
         except Exception as e:
             logger.error(f"{self._provider.provider_name} generation error: {e}")
@@ -152,47 +162,58 @@ class TrackedLLMClient:
             If return_full_response=True: dict (raw provider response)
             If return_full_response=False: str (assistant message text)
         """
+        provider_name = self._provider.provider_name
+        model_name = model or getattr(self._provider, "default_model", "unknown")
         try:
             if db:
-                model_name = model or getattr(self._provider, "default_model", "unknown")
                 prompt_text = "\n".join(
                     f"{m['role']}: {m['content']}" for m in messages
                 )
 
-                async with llm_usage_tracker.track_call(
-                    db=db,
+                with _tracing.llm_call_span(
+                    provider=provider_name,
+                    model=model_name,
                     agent_type=agent_type,
-                    model_name=model_name,
-                    llm_method="chat",
-                    prompt=prompt_text,
-                    provider=self._provider.provider_name,
-                    query_history_id=query_history_id,
-                    chat_session_id=chat_session_id,
-                    chat_message_id=chat_message_id,
-                    agent_name=agent_name,
-                    data_locality=self._provider.data_locality.value,
-                ) as tracking:
+                ):
+                    async with llm_usage_tracker.track_call(
+                        db=db,
+                        agent_type=agent_type,
+                        model_name=model_name,
+                        llm_method="chat",
+                        prompt=prompt_text,
+                        provider=provider_name,
+                        query_history_id=query_history_id,
+                        chat_session_id=chat_session_id,
+                        chat_message_id=chat_message_id,
+                        agent_name=agent_name,
+                        data_locality=self._provider.data_locality.value,
+                    ) as tracking:
+                        llm_response = await self._provider.chat(
+                            messages=messages,
+                            model=model,
+                            temperature=temperature,
+                            **kwargs,
+                        )
+                        tracking.set_response(llm_response.text, llm_response.raw_response)
+
+                        if return_full_response:
+                            return self._to_legacy_chat_dict(llm_response)
+                        return llm_response.text
+            else:
+                with _tracing.llm_call_span(
+                    provider=provider_name,
+                    model=model_name,
+                    agent_type=agent_type,
+                ):
                     llm_response = await self._provider.chat(
                         messages=messages,
                         model=model,
                         temperature=temperature,
                         **kwargs,
                     )
-                    tracking.set_response(llm_response.text, llm_response.raw_response)
-
                     if return_full_response:
                         return self._to_legacy_chat_dict(llm_response)
                     return llm_response.text
-            else:
-                llm_response = await self._provider.chat(
-                    messages=messages,
-                    model=model,
-                    temperature=temperature,
-                    **kwargs,
-                )
-                if return_full_response:
-                    return self._to_legacy_chat_dict(llm_response)
-                return llm_response.text
 
         except Exception as e:
             logger.error(f"{self._provider.provider_name} chat error: {e}")

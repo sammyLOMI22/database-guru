@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import time
+from functools import lru_cache
 from typing import Callable, Dict, Optional
 from fastapi import Request, Response, status, HTTPException
 from fastapi.responses import JSONResponse
@@ -12,7 +13,18 @@ from src.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
-_settings = Settings()
+
+@lru_cache(maxsize=1)
+def _get_jwt_settings() -> tuple[str, str]:
+    """Read JWT_SECRET / JWT_ALGORITHM lazily on first use.
+
+    Constructed lazily (rather than at module import) so tests that override
+    settings via the FastAPI dependency system are not bypassed by an early
+    import-time snapshot. Cached because Settings() re-parses .env on every
+    construction.
+    """
+    s = Settings()
+    return s.JWT_SECRET, s.JWT_ALGORITHM
 
 
 def get_client_ip(request: Request) -> str:
@@ -44,18 +56,24 @@ def _extract_rate_limit_key(request: Request) -> Optional[str]:
     if not token:
         return None
     # Validate JWT and extract stable user identity
+    secret, algorithm = _get_jwt_settings()
     try:
-        payload = jwt.decode(
-            token,
-            _settings.JWT_SECRET,
-            algorithms=[_settings.JWT_ALGORITHM],
-        )
+        payload = jwt.decode(token, secret, algorithms=[algorithm])
     except JWTError:
         return None
     # Key by the stable user ID from the token, not the token itself
     sub = payload.get("sub")
     if not sub:
         return None
+    # Best-effort: bind the verified user ID into the structlog contextvar so
+    # endpoints that do not declare an auth dependency still get user_id on
+    # their log lines (Phase 24.1, gated by LOG_INCLUDE_USER_ID in the
+    # request-context middleware).
+    try:
+        from src.observability.logging_config import set_user_id
+        set_user_id(str(sub))
+    except Exception:  # noqa: BLE001
+        pass
     return f"user:{sub}"
 
 
@@ -160,6 +178,199 @@ llm_rate_limiter = EndpointRateLimiter(calls=20, period=60)  # 20 LLM calls/min
 auth_rate_limiter = EndpointRateLimiter(calls=5, period=60)  # 5 login/register attempts/min
 
 
+# ============================================================================
+# Phase B — change-password rate limit + login lockout
+# Both are in-process: simple, no Redis dependency, but they don't share state
+# across multiple uvicorn workers. Documented in PASSWORD_AUTH_HARDENING_PLAN.md
+# (open question §8). For multi-worker deployments swap in a Redis backend.
+# ============================================================================
+
+
+class _UserKeyedRateLimiter:
+    """Per-user rate limiter for endpoints that already require auth.
+
+    Keyed by ``user.id``, not IP, because the caller is authenticated and
+    we want to limit *that account's* rate regardless of how many devices
+    they hop across. Sliding-window with a fixed cap; oldest call exits the
+    window first.
+
+    Memory is bounded two ways: empty buckets are dropped on read, and the
+    total key count is capped at ``_MAX_KEYS``. Beyond the cap we evict the
+    bucket whose newest timestamp is oldest (LRU by activity). The cap is
+    high enough that legitimate users never collide with eviction; it exists
+    to keep an authenticated abuser from growing the dict without bound.
+    """
+
+    _MAX_KEYS = 10_000
+
+    def __init__(self):
+        self._buckets: Dict[int, list[float]] = {}
+        self._lock = asyncio.Lock()
+
+    def _evict_if_full(self) -> None:
+        if len(self._buckets) <= self._MAX_KEYS:
+            return
+        oldest_key = min(
+            self._buckets,
+            key=lambda k: max(self._buckets[k]) if self._buckets[k] else 0.0,
+        )
+        self._buckets.pop(oldest_key, None)
+
+    async def check(self, user_id: int, *, limit: int, period_s: int) -> None:
+        """Raise 429 if ``user_id`` is over the limit, otherwise record the call."""
+        if limit <= 0:
+            return  # operator misconfig; treat as disabled
+        now = time.time()
+        async with self._lock:
+            calls = [t for t in self._buckets.get(user_id, []) if t > now - period_s]
+            if len(calls) >= limit:
+                oldest = min(calls)
+                retry_after = max(1, int(oldest + period_s - now))
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=(
+                        f"Too many password-change attempts. "
+                        f"Try again in {retry_after} seconds."
+                    ),
+                    headers={"Retry-After": str(retry_after)},
+                )
+            calls.append(now)
+            self._buckets[user_id] = calls
+            self._evict_if_full()
+
+    def reset(self) -> None:
+        """Clear all buckets — for tests and post-success teardown."""
+        self._buckets.clear()
+
+
+change_password_rate_limiter = _UserKeyedRateLimiter()
+
+
+async def enforce_change_password_limit(user_id: int, settings: Settings) -> None:
+    """Apply change-password rate limit when AUTH_RATE_LIMIT_CHANGE_PASSWORD=True.
+
+    Called from inside the endpoint (after auth) so we have the user.id.
+    """
+    if not settings.AUTH_RATE_LIMIT_CHANGE_PASSWORD:
+        return
+    await change_password_rate_limiter.check(
+        user_id,
+        limit=settings.AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE,
+        period_s=60,
+    )
+
+
+class LoginAttemptTracker:
+    """Per-username failed-login counter with sliding-window lockout.
+
+    Behavior when ``AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED=True``:
+    - record_failure(name) appends a timestamp.
+    - is_locked(name) returns True once >= threshold failures sit inside
+      the rolling window.
+    - record_success(name) clears the bucket (and emits an unlock signal).
+
+    Keys are ``username.lower()`` so casing doesn't let an attacker dodge
+    the counter. We do not look up Users — the tracker is dumb on purpose
+    so it works for both real and unknown usernames (timing-attack parity).
+
+    Memory is bounded explicitly because the dict is keyed by *attacker-
+    supplied* usernames: a credential-stuffing run iterating random handles
+    would otherwise grow the map without limit. Two defenses run together:
+    each write does an opportunistic GC pass that drops keys whose newest
+    timestamp is outside the window, and the total key count is capped at
+    ``_MAX_KEYS``. Above the cap we evict the bucket with the oldest newest-
+    timestamp (LRU-ish by recency-of-failure). The cap is sized for tens of
+    thousands of legitimate concurrent users; if you operate a deployment
+    where that's not enough, swap in the Redis-backed tracker — see the
+    multi-worker note above.
+    """
+
+    _MAX_KEYS = 10_000
+    _GC_EVERY = 1_000  # Run a full sweep when this many writes have happened.
+
+    def __init__(self):
+        self._failures: Dict[str, list[float]] = {}
+        self._lock = asyncio.Lock()
+        self._writes_since_gc = 0
+
+    @staticmethod
+    def _key(username: str) -> str:
+        return (username or "").strip().lower()
+
+    def _gc(self, now: float, window_s: int) -> None:
+        """Drop keys whose newest timestamp has fallen outside the window.
+        Caller must hold ``self._lock``.
+        """
+        cutoff = now - window_s
+        stale = [k for k, ts in self._failures.items() if not ts or max(ts) < cutoff]
+        for k in stale:
+            self._failures.pop(k, None)
+        self._writes_since_gc = 0
+
+    def _evict_if_full(self) -> None:
+        """Caller must hold ``self._lock``."""
+        if len(self._failures) <= self._MAX_KEYS:
+            return
+        oldest_key = min(
+            self._failures,
+            key=lambda k: max(self._failures[k]) if self._failures[k] else 0.0,
+        )
+        self._failures.pop(oldest_key, None)
+
+    async def is_locked(
+        self,
+        username: str,
+        *,
+        threshold: int,
+        window_s: int,
+    ) -> tuple[bool, int]:
+        """Return ``(locked, retry_after_s)``."""
+        if threshold <= 0 or window_s <= 0:
+            return False, 0
+        now = time.time()
+        key = self._key(username)
+        async with self._lock:
+            recent = [t for t in self._failures.get(key, []) if t > now - window_s]
+            if recent:
+                self._failures[key] = recent
+            else:
+                # Don't keep an empty list around — that's the most common
+                # vector for unbounded growth on credential-stuffing traffic.
+                self._failures.pop(key, None)
+            if len(recent) >= threshold:
+                oldest = min(recent)
+                return True, max(1, int(oldest + window_s - now))
+        return False, 0
+
+    async def record_failure(self, username: str, *, window_s: int) -> None:
+        now = time.time()
+        key = self._key(username)
+        async with self._lock:
+            recent = [t for t in self._failures.get(key, []) if t > now - window_s]
+            recent.append(now)
+            self._failures[key] = recent
+            self._writes_since_gc += 1
+            if self._writes_since_gc >= self._GC_EVERY:
+                self._gc(now, window_s)
+            self._evict_if_full()
+
+    async def record_success(self, username: str) -> bool:
+        """Clear the failure counter on success. Returns True if anything cleared
+        (so the caller can audit-log an unlock)."""
+        key = self._key(username)
+        async with self._lock:
+            had = bool(self._failures.get(key))
+            self._failures.pop(key, None)
+            return had
+
+    def reset(self) -> None:
+        self._failures.clear()
+        self._writes_since_gc = 0
+
+
+login_attempt_tracker = LoginAttemptTracker()
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
     Simple rate limiting middleware using in-memory storage
@@ -187,6 +398,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Skip rate limiting for health/monitoring endpoints
         exempt_paths = [
             "/health", "/", "/docs", "/openapi.json",
+            # Phase 24: Prometheus scrape endpoint
+            "/metrics",
             # Pool monitoring endpoints (internal health checks, polled frequently)
             "/api/pools/stats", "/api/pools/health",
             # Model listing (needed on every page load)

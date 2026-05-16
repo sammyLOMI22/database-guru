@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.schemas import SystemSettingsResponse, SystemSettingsUpdateRequest
 from src.api.dependencies import get_db
 from src.api.dependencies.common import get_settings
+from src.auth.dependencies import get_optional_user
+from src.auth.models import User
 from src.config.settings import Settings
 from src.database.models import SystemSettings
 
@@ -70,6 +72,7 @@ async def get_or_create_settings(db: AsyncSession) -> SystemSettings:
 async def get_app_settings(
     db: AsyncSession = Depends(get_db),
     app_settings: Settings = Depends(get_settings),
+    user: Optional[User] = Depends(get_optional_user),
 ):
     """
     Get current system settings
@@ -81,11 +84,46 @@ async def get_app_settings(
     - Test before learning
     - Audit logging settings
     - require_auth: whether the server requires authentication
+
+    Auth-hardening flags (lockout thresholds, password history depth, reset
+    mode, etc.) are only included when the caller is an admin — leaking those
+    to anonymous visitors lets an attacker tune credential-stuffing to stay
+    under the lockout window.
     """
     try:
         settings = await get_or_create_settings(db)
         response = SystemSettingsResponse.model_validate(settings)
         response.require_auth = app_settings.REQUIRE_AUTH
+        # Surface observability config so the admin UI can render deep-links
+        # and conditionally enable the Health/metrics views (Phase 24).
+        response.metrics_enabled = app_settings.METRICS_ENABLED
+        response.metrics_endpoint_exposed = app_settings.METRICS_EXPOSE_ENDPOINT
+        response.metrics_public_url = app_settings.METRICS_PUBLIC_URL or None
+        response.otel_enabled = app_settings.OTEL_ENABLED
+        response.otel_service_name = app_settings.OTEL_SERVICE_NAME or None
+        response.otel_traces_sampler_ratio = app_settings.OTEL_TRACES_SAMPLER_RATIO
+        response.jaeger_ui_url = app_settings.JAEGER_UI_URL or None
+        response.grafana_url = app_settings.GRAFANA_URL or None
+        response.admin_ui_enabled = app_settings.ADMIN_UI_ENABLED
+
+        # Auth hardening flags are admin-gated. Non-admin callers see the
+        # fields as None — the frontend's SystemHealthPanel is already
+        # rendered behind a RequireAdmin guard so it always has the values
+        # it needs.
+        if user is not None and user.is_admin:
+            response.auth_token_versioning_enabled = app_settings.AUTH_TOKEN_VERSIONING_ENABLED
+            response.auth_invalidate_tokens_on_deactivate = app_settings.AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE
+            response.auth_invalidate_tokens_on_logout = app_settings.AUTH_INVALIDATE_TOKENS_ON_LOGOUT
+            response.auth_rate_limit_change_password = app_settings.AUTH_RATE_LIMIT_CHANGE_PASSWORD
+            response.auth_change_password_per_user_per_minute = app_settings.AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE
+            response.auth_rate_limit_login_lockout_enabled = app_settings.AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED
+            response.auth_login_lockout_threshold = app_settings.AUTH_LOGIN_LOCKOUT_THRESHOLD
+            response.auth_login_lockout_window_seconds = app_settings.AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS
+            response.auth_password_reset_mode = app_settings.AUTH_PASSWORD_RESET_MODE
+            response.auth_password_reset_token_ttl_minutes = app_settings.AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES
+            response.auth_password_reset_base_url = app_settings.AUTH_PASSWORD_RESET_BASE_URL or None
+            response.auth_password_history_depth = app_settings.AUTH_PASSWORD_HISTORY_DEPTH
+            response.auth_require_admin_quorum = app_settings.AUTH_REQUIRE_ADMIN_QUORUM
         return response
     except Exception as e:
         logger.error(f"Failed to get settings: {e}", exc_info=True)

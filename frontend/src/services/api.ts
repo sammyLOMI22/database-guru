@@ -10,11 +10,30 @@ import type {
   ConversationContextResponse,
 } from '../types/api';
 import { getStoredToken, TOKEN_KEY } from '../hooks/useAuth';
+import { useLastRequestStore } from '../stores/lastRequestStore';
 
 const api = axios.create({
   baseURL: (import.meta as any).env?.VITE_API_URL || '',
   timeout: 60000, // 60 seconds for LLM queries
 });
+
+const recordLastRequest = (
+  headers: Record<string, any> | undefined,
+  config: { method?: string; url?: string } | undefined,
+  status: number | null,
+) => {
+  if (!headers) return;
+  const requestId = headers['x-request-id'] || headers['X-Request-ID'];
+  if (!requestId) return;
+  useLastRequestStore.getState().setLast({
+    requestId: String(requestId),
+    traceparent: (headers['traceparent'] as string | undefined) ?? null,
+    method: (config?.method || 'GET').toUpperCase(),
+    url: config?.url || '',
+    status,
+    timestamp: Date.now(),
+  });
+};
 
 // Request interceptor — attach auth token and log
 api.interceptors.request.use(
@@ -31,10 +50,14 @@ api.interceptors.request.use(
 
 // Response interceptor — handle errors and expired tokens
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    recordLastRequest(response.headers as any, response.config, response.status);
+    return response;
+  },
   (error) => {
     if (error.response) {
       console.error(`[API Error] ${error.response.status}:`, error.response.data);
+      recordLastRequest(error.response.headers, error.config, error.response.status);
 
       // Clear auth state on 401 (expired/invalid token) — skip for login/register
       if (error.response.status === 401 && error.config?.url && !error.config.url.includes('/auth/')) {
@@ -616,6 +639,14 @@ export interface AuthUserResponse {
   is_active: boolean;
   is_admin: boolean;
   created_at: string;
+  // True after an operator-driven reset; the UI must force a password change
+  // before the user can do anything else.
+  must_change_password?: boolean;
+}
+
+export interface PasswordChangeRequest {
+  current_password: string;
+  new_password: string;
 }
 
 export interface AuthTokenResponse {
@@ -638,6 +669,13 @@ export const authAPI = {
 
   async getMe(): Promise<AuthUserResponse> {
     const { data: resp } = await api.get<AuthUserResponse>('/api/auth/me');
+    return resp;
+  },
+
+  async changePassword(data: PasswordChangeRequest): Promise<AuthTokenResponse> {
+    // Returns a fresh token so the caller stays signed in after the
+    // password_version bump invalidates the previous JWT (Phase A).
+    const { data: resp } = await api.post<AuthTokenResponse>('/api/auth/change-password', data);
     return resp;
   },
 };

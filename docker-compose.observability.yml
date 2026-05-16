@@ -1,0 +1,29 @@
+# Compose override that wires the backend's observability flags so the
+# Prometheus/Grafana/Jaeger stack actually has data to display.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml \
+#     --profile observability up -d
+#
+# Anything you set in .env.docker still wins (compose merges in order); these
+# values are the defaults that turn an "empty dashboards" deploy into a working
+# one with no extra editing.
+services:
+  backend:
+    environment:
+      - LOG_FORMAT=json
+      - METRICS_ENABLED=true
+      - METRICS_EXPOSE_ENDPOINT=true
+      - OTEL_ENABLED=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_SERVICE_NAME=database-guru
+      - OTEL_TRACES_SAMPLER_RATIO=0.1
+      # Browser-visible deep links surfaced in the Admin → Health tab.
+      - JAEGER_UI_URL=http://localhost:16686
+      - GRAFANA_URL=http://localhost:3001
+      - METRICS_PUBLIC_URL=http://localhost:9090
+      # The admin UI also exposes the Health/Observability sub-tab; turn it
+      # on so the operator-visible side of the stack matches the running
+      # services. Override to `false` if you want metrics + tracing without
+      # the Admin tab.
+      - ADMIN_UI_ENABLED=true

@@ -11,6 +11,23 @@ _COMMON_PASSWORDS = frozenset({
 })
 
 
+def validate_password_complexity(v: str) -> str:
+    """Shared password complexity check.
+
+    Reused by `UserCreate` (self-service) and `AdminUserCreate` (admin
+    endpoints) so the rules can't drift between the two paths.
+    """
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("Password must contain at least one uppercase letter.")
+    if not re.search(r"[a-z]", v):
+        raise ValueError("Password must contain at least one lowercase letter.")
+    if not re.search(r"\d", v):
+        raise ValueError("Password must contain at least one digit.")
+    if v.lower() in _COMMON_PASSWORDS:
+        raise ValueError("This password is too common. Please choose a stronger one.")
+    return v
+
+
 class UserCreate(BaseModel):
     """Request model for user registration"""
     email: EmailStr
@@ -20,15 +37,7 @@ class UserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def password_complexity(cls, v: str) -> str:
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("Password must contain at least one uppercase letter.")
-        if not re.search(r"[a-z]", v):
-            raise ValueError("Password must contain at least one lowercase letter.")
-        if not re.search(r"\d", v):
-            raise ValueError("Password must contain at least one digit.")
-        if v.lower() in _COMMON_PASSWORDS:
-            raise ValueError("This password is too common. Please choose a stronger one.")
-        return v
+        return validate_password_complexity(v)
 
 
 class UserLogin(BaseModel):
@@ -45,6 +54,10 @@ class UserResponse(BaseModel):
     is_active: bool
     is_admin: bool
     created_at: datetime
+    # True after an operator-driven password reset; the frontend uses this to
+    # route the user into a forced-change screen before letting them do
+    # anything else with the session.
+    must_change_password: bool = False
 
     class Config:
         from_attributes = True
@@ -56,5 +69,27 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
+
+
+class PasswordChangeRequest(BaseModel):
+    """Request model for self-service password change."""
+    current_password: str
+    new_password: str = Field(..., min_length=12, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return validate_password_complexity(v)
+
+
+class PasswordResetRedeemRequest(BaseModel):
+    """Request model for redeeming an admin-issued password reset token."""
+    token: str = Field(..., min_length=10, max_length=512)
+    new_password: str = Field(..., min_length=12, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return validate_password_complexity(v)
 
 

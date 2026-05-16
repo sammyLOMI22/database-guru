@@ -136,9 +136,106 @@ class Settings(BaseSettings):
     DUCKDB_FILE_MEMORY_LIMIT: str = "1GB"  # Memory limit for file query DuckDB session
     DUCKDB_FILE_THREADS: int = 4  # Number of threads for file query processing
 
+    # Observability (Phase 24) — all default to off-by-default / no-op values
+    LOG_FORMAT: str = "console"  # "json" in production, "console" in dev
+    LOG_LEVEL: str = "INFO"
+    LOG_INCLUDE_REQUEST_ID: bool = True
+    LOG_INCLUDE_USER_ID: bool = False
+
+    METRICS_ENABLED: bool = False        # gate Prometheus collectors
+    METRICS_EXPOSE_ENDPOINT: bool = False  # gate GET /metrics
+
+    OTEL_ENABLED: bool = False
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://jaeger:4318"
+    OTEL_SERVICE_NAME: str = "database-guru"
+    OTEL_TRACES_SAMPLER_RATIO: float = 0.1
+
+    # External observability UI deep-links (Phase 24 admin UI). All optional —
+    # when unset the UI hides the link rather than dead-linking to a host that
+    # may not be reachable from the operator's browser.
+    JAEGER_UI_URL: str = ""           # e.g. http://localhost:16686
+    GRAFANA_URL: str = ""             # e.g. http://localhost:3001
+    METRICS_PUBLIC_URL: str = ""      # browser-accessible URL for /metrics
+
+    # Hard kill-switch for the Phase 24 admin UI (audit log, user management,
+    # observability surface). When False the routers are not mounted and the
+    # frontend hides the Admin tab and Observability section entirely.
+    #
+    # Defaults to False (opt-in) to match the rest of the security/observability
+    # surface (METRICS_ENABLED, OTEL_ENABLED, METRICS_EXPOSE_ENDPOINT). Operators
+    # who want the Admin tab must set ADMIN_UI_ENABLED=true explicitly — this is
+    # the safer posture for a feature that exposes user CRUD + audit logs and
+    # avoids accidentally enabling the surface in fresh deployments.
+    ADMIN_UI_ENABLED: bool = False
+
+    # ── Auth Hardening (see docs/planning/PASSWORD_AUTH_HARDENING_PLAN.md) ──
+    # Every flag defaults to off so an upgrade is behavior-preserving. Each
+    # phase wires the actual enforcement; today these are read-only surface
+    # the Admin UI renders so operators can pre-plan their rollout.
+
+    # Phase A — token versioning. When enabled, JWTs carry a `pv` claim and
+    # tokens with a stale pv are rejected. Bumps happen on password change /
+    # admin reset; per-trigger bumps below extend that to deactivate/logout.
+    AUTH_TOKEN_VERSIONING_ENABLED: bool = False
+    AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE: bool = False
+    AUTH_INVALIDATE_TOKENS_ON_LOGOUT: bool = False
+
+    # Phase B — rate limit + lockout. The change-password limiter is keyed by
+    # user id (caller is authenticated); the login lockout is keyed by username.
+    # Change-password defaults to ON because the endpoint is auth-required and
+    # the limit (5/min/user) is well above any legitimate workflow — the only
+    # callers it slows down are token-holding attackers probing reuse history.
+    AUTH_RATE_LIMIT_CHANGE_PASSWORD: bool = True
+    AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE: int = 5
+    AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED: bool = False
+    AUTH_LOGIN_LOCKOUT_THRESHOLD: int = 5            # failures before temp lock
+    AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS: int = 900     # 15 minutes
+
+    # Phase C — one-shot reset tokens. `temp_password` keeps current behavior;
+    # `reset_token` returns a redemption URL instead; `both` returns both during
+    # a UX transition.
+    AUTH_PASSWORD_RESET_MODE: str = "temp_password"  # temp_password | reset_token | both
+    AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES: int = 15
+    AUTH_PASSWORD_RESET_BASE_URL: str = ""           # e.g. http://localhost:3000
+
+    # Phase D — optional hardening. 0 disables history; quorum guard blocks
+    # demoting/deactivating the last active admin.
+    AUTH_PASSWORD_HISTORY_DEPTH: int = 0
+    AUTH_REQUIRE_ADMIN_QUORUM: bool = False
+
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    def check_auth_hardening(self) -> None:
+        """Validate the auth-hardening flag combinations at startup.
+
+        Catches typos (`AUTH_PASSWORD_RESET_MODE=token` instead of
+        `reset_token`) before they surface as silent fallbacks at request time.
+        """
+        valid_modes = {"temp_password", "reset_token", "both"}
+        if self.AUTH_PASSWORD_RESET_MODE not in valid_modes:
+            raise ValueError(
+                f"AUTH_PASSWORD_RESET_MODE must be one of {sorted(valid_modes)}, "
+                f"got {self.AUTH_PASSWORD_RESET_MODE!r}"
+            )
+        if self.AUTH_PASSWORD_RESET_MODE in ("reset_token", "both") and not self.AUTH_PASSWORD_RESET_BASE_URL:
+            import logging
+            logging.getLogger(__name__).warning(
+                "AUTH_PASSWORD_RESET_MODE=%s but AUTH_PASSWORD_RESET_BASE_URL is empty — "
+                "the redemption link will be a bare /reset?token=… path.",
+                self.AUTH_PASSWORD_RESET_MODE,
+            )
+        if self.AUTH_PASSWORD_HISTORY_DEPTH < 0:
+            raise ValueError("AUTH_PASSWORD_HISTORY_DEPTH must be >= 0")
+        if self.AUTH_LOGIN_LOCKOUT_THRESHOLD < 1:
+            raise ValueError("AUTH_LOGIN_LOCKOUT_THRESHOLD must be >= 1")
+        if self.AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS < 1:
+            raise ValueError("AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS must be >= 1")
+        if self.AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE < 1:
+            raise ValueError("AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE must be >= 1")
+        if self.AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES < 1:
+            raise ValueError("AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES must be >= 1")
 
     def check_jwt_secret(self) -> None:
         """Reject the default JWT secret at startup.

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.executor import SQLExecutor
 from src.database.models import DatabaseConnection
 from src.config.settings import Settings
+from src.observability import tracing as _tracing
 
 logger = logging.getLogger(__name__)
 
@@ -796,6 +797,63 @@ class SelfCorrectingSQLAgent:
             }
 
     async def generate_and_execute_with_retry(
+        self,
+        question: str,
+        schema: str,
+        session,
+        database_type: str = "postgresql",
+        allow_write: bool = False,
+        model: Optional[str] = None,
+        schema_dict: Optional[Dict] = None,
+        use_parallel_corrections: bool = True,
+        connection_name: Optional[str] = None,
+        schema_inspector=None,
+        schema_cache=None,
+        connection_id: Optional[int] = None,
+        row_limit: int = 100,
+        db: Optional[AsyncSession] = None,
+        query_history_id: Optional[int] = None,
+        chat_session_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Public entrypoint; opens an OTel span (Phase 24.3) and delegates to
+        the existing implementation. Span attributes describe the *outcome* —
+        attempts, self-correction, dialect, success — never prompts or SQL.
+        """
+        with _tracing.self_correcting_span(agent_type="self_correcting") as span:
+            try:
+                span.set_attribute("db.dialect", database_type)
+            except Exception:
+                pass
+            result = await self._generate_and_execute_with_retry_impl(
+                question=question,
+                schema=schema,
+                session=session,
+                database_type=database_type,
+                allow_write=allow_write,
+                model=model,
+                schema_dict=schema_dict,
+                use_parallel_corrections=use_parallel_corrections,
+                connection_name=connection_name,
+                schema_inspector=schema_inspector,
+                schema_cache=schema_cache,
+                connection_id=connection_id,
+                row_limit=row_limit,
+                db=db,
+                query_history_id=query_history_id,
+                chat_session_id=chat_session_id,
+                chat_message_id=chat_message_id,
+            )
+            try:
+                if isinstance(result, dict):
+                    span.set_attribute("execution.success", bool(result.get("success", False)))
+                    span.set_attribute("agent.attempts", int(result.get("total_attempts", 0)))
+                    span.set_attribute("agent.self_corrected", bool(result.get("self_corrected", False)))
+            except Exception:
+                pass
+            return result
+
+    async def _generate_and_execute_with_retry_impl(
         self,
         question: str,
         schema: str,

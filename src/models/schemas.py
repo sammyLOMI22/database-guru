@@ -1,4 +1,17 @@
-"""Pydantic schemas for API requests and responses"""
+"""Pydantic schemas for API requests and responses
+
+Note on schema location: most request/response models live here, but a few
+endpoint-local schemas are intentionally co-located with their routers when
+they're a private contract for that one endpoint:
+
+- Auth (`UserCreate`, `UserLogin`, `UserResponse`, `TokenResponse`) →
+  `src/auth/schemas.py` — kept next to the auth service so the password
+  complexity validator and the User model travel together.
+- Admin user CRUD (`AdminUserCreate`, `AdminUserUpdate`, `AdminUserResponse`,
+  `AdminUserListResponse`, `AdminPasswordResetResponse`) →
+  `src/api/endpoints/admin_users.py` — only used by the Phase 24.7 admin
+  router and gated by `ADMIN_UI_ENABLED`.
+"""
 from datetime import datetime
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field, validator, field_validator, model_validator
@@ -512,6 +525,39 @@ class SystemSettingsResponse(BaseModel):
 
     # Server-level auth configuration (read-only, from environment)
     require_auth: bool = False
+
+    # Server-level observability configuration (read-only, from environment).
+    # Phase 24 admin UI uses these to render deep-links and feature gates.
+    metrics_enabled: bool = False
+    metrics_endpoint_exposed: bool = False
+    metrics_public_url: Optional[str] = None
+    otel_enabled: bool = False
+    otel_service_name: Optional[str] = None
+    otel_traces_sampler_ratio: Optional[float] = None
+    jaeger_ui_url: Optional[str] = None
+    grafana_url: Optional[str] = None
+
+    # Hard kill-switch for the Phase 24 admin UI as a whole.
+    admin_ui_enabled: bool = True
+
+    # Auth hardening flags (read-only mirror of Settings; Admin UI surfaces
+    # these so an operator can tell at a glance which protections are live).
+    # Only populated for admin callers — leaking lockout thresholds /
+    # rate-limit windows to anonymous visitors helps an attacker tune
+    # credential-stuffing under the threshold. See PASSWORD_AUTH_HARDENING_PLAN.md.
+    auth_token_versioning_enabled: Optional[bool] = None
+    auth_invalidate_tokens_on_deactivate: Optional[bool] = None
+    auth_invalidate_tokens_on_logout: Optional[bool] = None
+    auth_rate_limit_change_password: Optional[bool] = None
+    auth_change_password_per_user_per_minute: Optional[int] = None
+    auth_rate_limit_login_lockout_enabled: Optional[bool] = None
+    auth_login_lockout_threshold: Optional[int] = None
+    auth_login_lockout_window_seconds: Optional[int] = None
+    auth_password_reset_mode: Optional[str] = None
+    auth_password_reset_token_ttl_minutes: Optional[int] = None
+    auth_password_reset_base_url: Optional[str] = None
+    auth_password_history_depth: Optional[int] = None
+    auth_require_admin_quorum: Optional[bool] = None
 
     class Config:
         from_attributes = True

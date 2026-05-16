@@ -124,7 +124,7 @@ Intelligent query similarity matching:
 
 #### Components
 - `AuthService` (`src/auth/service.py`) - JWT token creation/validation, bcrypt password hashing, user CRUD
-- `User` model (`src/auth/models.py`) - SQLAlchemy model (id, email, username, hashed_password, is_active, is_admin)
+- `User` model (`src/auth/models.py`) - SQLAlchemy model (id, email, username, hashed_password, is_active, is_admin, must_change_password, password_version)
 - Auth dependencies (`src/auth/dependencies.py`) - FastAPI dependencies for auth injection
 - `AuditLog` model (`src/auth/audit.py`) - Audit trail for security-sensitive operations
 
@@ -137,6 +137,44 @@ Intelligent query similarity matching:
 - **Per-User Rate Limiting** - JWT-based user ID extraction in middleware, IP fallback for unauthenticated
 - **Audit Logging** - Never-raising `log_action()` for create/delete/login events
 - **61 tests** across 4 test files (auth, ownership, rate limiting, audit)
+
+### Auth Hardening (Phase 24.8 - April 2026)
+**Status**: PRODUCTION-READY (Phases A / B / C / D1 / D3 shipped behind toggles; D2 deferred — needs Redis)
+
+Every behavior below defaults OFF; operators flip flags in `.env` / `.env.docker` per deployment posture. The Admin → Health → "Auth hardening" panel renders the live state of each flag.
+
+#### Phase A — Token Versioning
+- New `users.password_version INTEGER` (alembic `4f9a1c8b2e3d`); incremented by `bump_password_version(user)` helper.
+- `AuthService.create_access_token()` stamps a `pv` JWT claim **only** when `AUTH_TOKEN_VERSIONING_ENABLED=True`.
+- `get_current_user` rejects tokens whose `pv` doesn't match the user's current value (legacy tokens with no `pv` are accepted so flipping the flag is non-destructive).
+- Bumps fire on `change-password`, admin reset, optionally on logout (`AUTH_INVALIDATE_TOKENS_ON_LOGOUT`) and deactivate (`AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE`).
+- `change-password` returns a fresh `TokenResponse` so the caller stays signed in while every other device they were on is evicted.
+
+#### Phase B — Rate Limit + Login Lockout
+- `_UserKeyedRateLimiter` (in-process, sliding window) — `change_password_rate_limiter` singleton, gate `enforce_change_password_limit()`. Configurable via `AUTH_RATE_LIMIT_CHANGE_PASSWORD` + `AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE`.
+- `LoginAttemptTracker` keyed by lowercase username (case-insensitive so casing can't dodge it; unknown usernames count too to defeat enumeration via lockout-vs-401). Configurable via `AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED`, `AUTH_LOGIN_LOCKOUT_THRESHOLD`, `AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS`.
+- `account_locked` and `account_unlocked` audit events. In-process trackers are per-uvicorn-worker; multi-worker deployments swap in a Redis backend.
+
+#### Phase C — One-Shot Password Reset Tokens
+- New `password_reset_tokens` table (alembic `5e2b7a9d4c8f`). Plaintext token never persisted — only the bcrypt hash.
+- `AUTH_PASSWORD_RESET_MODE` 3-way switch: `temp_password` (default; current behavior), `reset_token` (returns redemption URL with TTL), `both` (transition mode).
+- `POST /api/auth/redeem-reset` is unauthenticated by design (the token IS the credential), bcrypt-walks outstanding tokens, marks `used_at`, rotates the password, returns a fresh `TokenResponse`. Generic 401 on unknown / expired / used / inactive-user to defeat enumeration.
+- Frontend `/reset?token=…` route short-circuits the rest of the gating (auth + forced-change) until the user redeems or cancels.
+
+#### Phase D1 — Password History
+- New `password_history` table (alembic `6a3c5f8e7b1d`). Stores bcrypt hashes only; trimmed on every insert to keep the table bounded.
+- `check_password_history()` rejects reuse against current + last `AUTH_PASSWORD_HISTORY_DEPTH` hashes (0 = disabled). Wired into `change-password` and `redeem-reset`; redeem rolls back so the token isn't burned on a recoverable input error.
+
+#### Phase D3 — Admin Quorum
+- `count_active_admins()` + `_enforce_admin_quorum()` helper. When `AUTH_REQUIRE_ADMIN_QUORUM=True`, refuses any change that would drop the active-admin count to 0 (PATCH role/active toggle and DELETE soft-deactivate). Layered with the existing self-edit protection.
+
+#### Phase D2 — JWT JTI Denylist (DEFERRED)
+Phase A's `AUTH_INVALIDATE_TOKENS_ON_LOGOUT` covers the coarse "log me out everywhere" case via `password_version` bump. D2 only matters when per-session revocation matters AND the version-bump approach is too coarse. Slot in once Redis is in the standard deploy story (Phase 23 `full` profile).
+
+#### Settings + Validation
+13 new `AUTH_*` flags in `Settings`. `Settings.check_auth_hardening()` runs at startup (called from `src/main.py` lifespan, alongside `check_jwt_secret()`) — typo'd `AUTH_PASSWORD_RESET_MODE` raises before serving traffic; missing `AUTH_PASSWORD_RESET_BASE_URL` warns when reset mode requires it.
+
+**44 new tests** across `test_auth_change_password.py` (4), `test_auth_token_versioning.py` (7), `test_auth_rate_limit.py` (8), `test_auth_reset_tokens.py` (9), `test_auth_history_and_quorum.py` (9), `test_settings_auth_hardening.py` (7).
 
 ## File Data Source System (Phase 13 - January 2026)
 **Status**: PRODUCTION-READY
@@ -291,6 +329,8 @@ The system maintains its own metadata database (`database_guru.db`):
 | `llm_usage` | Individual LLM API call records with tokens, cost, timing (Phase 16) |
 | `llm_usage_aggregate` | Pre-computed hourly/daily usage statistics (Phase 16) |
 | `llm_model_config` | Model metadata, capabilities, and cost rates (Phase 16) |
-| `users` | User accounts for JWT authentication (Phase 21) |
-| `audit_logs` | Security audit trail — actions, resources, IP addresses (Phase 21) |
+| `users` | User accounts for JWT authentication (Phase 21); adds `must_change_password` and `password_version` columns in Phase 24.8 |
+| `audit_logs` | Security audit trail — actions, resources, IP addresses (Phase 21); Phase 24.8 adds `password_change`, `password_change_failed`, `password_reset_redeemed`, `password_reset_redeem_failed`, `account_locked`, `account_unlocked` actions |
+| `password_reset_tokens` | One-shot, TTL-bounded password reset tokens (Phase 24.8 — Phase C). Stores bcrypt hashes only; `used_at` marks single-use redemption |
+| `password_history` | Bcrypt hashes of a user's previous passwords (Phase 24.8 — Phase D1). Trimmed to `AUTH_PASSWORD_HISTORY_DEPTH` rows on insert; consulted by change-password / redeem-reset to block reuse |
 | `connection_write_permissions` | Per-connection DML permissions (INSERT/UPDATE/DELETE toggles, allowed tables, row limits) (Phase 18) |

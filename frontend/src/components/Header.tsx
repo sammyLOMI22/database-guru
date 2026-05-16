@@ -1,6 +1,7 @@
 import { Database, Sun, Moon, LogIn, LogOut, User } from 'lucide-react';
 import mascot from '../assets/boxer_mascot.png';
 import type { AuthUser } from '../hooks/useAuth';
+import LastRequestBadge from './common/LastRequestBadge';
 
 interface HeaderProps {
   isHealthy: boolean;
@@ -9,11 +10,12 @@ interface HeaderProps {
   activeTab: string;
   onTabChange: (tabId: string) => void;
   user?: AuthUser | null;
+  isAdmin?: boolean;
   onLogout?: () => void;
   onSignIn?: () => void;
 }
 
-const TABS = [
+const BASE_TABS = [
   { id: 'chat', label: 'Chat', icon: '💬' },
   { id: 'schema', label: 'Schema', icon: '🗂️' },
   { id: 'lineage', label: 'Lineage', icon: '🔀' },
@@ -27,7 +29,12 @@ const TABS = [
   { id: 'settings', label: 'Config', icon: '⚙️' },
 ];
 
-export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTab, onTabChange, user, onLogout, onSignIn }: HeaderProps) {
+const ADMIN_TAB = { id: 'admin', label: 'Admin', icon: '🛡️' };
+
+export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTab, onTabChange, user, isAdmin, onLogout, onSignIn }: HeaderProps) {
+  const tabs = isAdmin
+    ? [...BASE_TABS.slice(0, -1), ADMIN_TAB, BASE_TABS[BASE_TABS.length - 1]]
+    : BASE_TABS;
   return (
     <header className="sticky top-0 z-50 bg-white/60 dark:bg-gray-900/60 backdrop-blur-2xl border-b border-white/20 dark:border-white/5 px-8 py-3 transition-all duration-500 animate-fadeIn">
       <div className="max-w-[1800px] mx-auto flex items-center justify-between">
@@ -56,7 +63,7 @@ export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTa
         {/* Center: Navigation */}
         <div className="flex-1 flex justify-center px-4">
           <nav className="flex p-1 bg-black/5 dark:bg-white/5 rounded-2xl border border-white/10 dark:border-white/5 backdrop-blur-xl">
-            {TABS.map((tab) => (
+            {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
@@ -74,6 +81,9 @@ export default function Header({ isHealthy, isDarkMode, toggleDarkMode, activeTa
 
         {/* Right Side: Status & Controls */}
         <div className="flex items-center space-x-6 min-w-[240px] justify-end">
+          {/* Last request id (Phase 24 observability) */}
+          <LastRequestBadge />
+
           {/* Theme Toggle */}
           <button
             onClick={toggleDarkMode}

@@ -14,3 +14,19 @@ export const formatCurrency = (num: number | undefined | null): string => {
     minimumFractionDigits: 2,
   }).format(num);
 };
+
+/**
+ * Format an ISO-8601 timestamp string for display in the user's locale.
+ *
+ * Falls back to the raw input on parse failure so the UI never shows "Invalid
+ * Date" for an unexpected payload — useful for the audit log + system health
+ * panels where the source is the backend and any drift would be a regression
+ * we'd rather see verbatim than silently mask.
+ */
+export const formatTimestamp = (iso: string): string => {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+};

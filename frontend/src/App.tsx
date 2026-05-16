@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 import EnhancedChatInterface from './components/EnhancedChatInterface';
 import Header from './components/Header';
 import AuthPage from './components/AuthPage';
-import { ObservabilityDemo } from './components/ObservabilityDemo';
+import ForcedPasswordChange from './components/ForcedPasswordChange';
+import PasswordReset from './components/PasswordReset';
 import { FeedbackStats } from './components/FeedbackStats';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ToolsPanel } from './components/ToolsPanel';
@@ -13,10 +14,13 @@ import { LineagePanel } from './components/lineage/LineagePanel';
 import { LLMUsageDashboard } from './components/dashboard/LLMUsageDashboard';
 import { MigrationPanel } from './components/migration/MigrationPanel';
 import { PerformancePanel } from './components/performance/PerformancePanel';
+import AdminPanel from './components/admin/AdminPanel';
+import RequireAdmin from './components/common/RequireAdmin';
 import SchemaPanel from './components/SchemaPanel';
 import { healthAPI, settingsAPI } from './services/api';
 import { useDarkMode } from './hooks/useDarkMode';
 import { useAuth } from './hooks/useAuth';
+import { useLastRequestStore } from './stores/lastRequestStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,14 +31,28 @@ const queryClient = new QueryClient({
   },
 });
 
+// Detect a Phase C redemption URL on initial load. We don't have a router, so
+// we read window.location once at module load time and let App decide whether
+// to render the redemption flow before anything else.
+function _readResetTokenFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  if (!window.location.pathname.startsWith('/reset')) return null;
+  const params = new URLSearchParams(window.location.search);
+  const t = params.get('token');
+  return t && t.length >= 10 ? t : null;
+}
+
 function App() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
-  const { user, isLoading: authLoading, isAuthenticated, login, register, logout } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated, login, register, logout, applyTokenResponse } = useAuth();
+  const [resetToken, setResetToken] = useState<string | null>(() => _readResetTokenFromUrl());
   const [isHealthy, setIsHealthy] = useState(false);
-  const [showDemo, setShowDemo] = useState(false);
   const [requireAuth, setRequireAuth] = useState(false);
+  // Default false until /api/settings confirms it. If the settings fetch fails
+  // we'd rather hide the Admin tab than render a tab that 404s on every click.
+  const [adminUiEnabled, setAdminUiEnabled] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'migration' | 'performance' | 'settings'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'migration' | 'performance' | 'admin' | 'settings'>('chat');
 
   // Cross-component lineage navigation state
   const [lineageNav, setLineageNav] = useState<{ sql?: string; tab?: 'explore' | 'history' | 'impact'; impactTable?: string } | null>(null);
@@ -64,28 +82,40 @@ function App() {
       .then(() => setIsHealthy(true))
       .catch(() => setIsHealthy(false));
 
-    // Check if backend requires auth via the public settings endpoint.
+    // Check if backend requires auth + whether the admin UI kill-switch is on.
     settingsAPI.getSettings()
       .then((data: any) => {
         if (data?.require_auth) {
           setRequireAuth(true);
         }
+        // Older backends (pre-Phase 24.7) don't return admin_ui_enabled; treat
+        // a missing field as "enabled" so existing deployments don't lose the
+        // Admin tab on upgrade. New backends explicitly set the flag.
+        if (data?.admin_ui_enabled !== false) {
+          setAdminUiEnabled(true);
+        }
       })
-      .catch(() => {/* settings fetch failed — default to no auth required */});
+      .catch(() => {/* settings fetch failed — default to no auth required, hide Admin tab */});
 
-    // Check URL for demo parameter
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('demo') === 'true') {
-      setShowDemo(true);
-    }
   }, []);
 
-  // Show demo if ?demo=true in URL
-  if (showDemo) {
+  // Phase C: a /reset?token=... link short-circuits the rest of the gating
+  // so the user can redeem an admin-issued reset before anything else
+  // (auth, forced-change, etc.). On success we drop them straight in.
+  if (resetToken) {
     return (
-      <QueryClientProvider client={queryClient}>
-        <ObservabilityDemo />
-      </QueryClientProvider>
+      <PasswordReset
+        token={resetToken}
+        onSuccess={(resp) => {
+          applyTokenResponse(resp);
+          setResetToken(null);
+          window.history.replaceState({}, '', '/');
+        }}
+        onCancel={() => {
+          setResetToken(null);
+          window.history.replaceState({}, '', '/');
+        }}
+      />
     );
   }
 
@@ -110,6 +140,22 @@ function App() {
     );
   }
 
+  // After an operator-driven password reset the backend flags the account
+  // until the user picks a new password; intercept the whole UI here so the
+  // temporary credential cannot be used to perform any other action.
+  if (isAuthenticated && user?.must_change_password) {
+    return (
+      <ForcedPasswordChange
+        username={user.username}
+        onChanged={(resp) => applyTokenResponse(resp)}
+        onLogout={() => {
+          logout();
+          if (requireAuth) setShowAuth(true);
+        }}
+      />
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="flex flex-col h-screen bg-transparent transition-colors duration-500">
@@ -120,7 +166,14 @@ function App() {
           activeTab={activeTab}
           onTabChange={(id) => setActiveTab(id as any)}
           user={user}
-          onLogout={() => { logout(); if (requireAuth) setShowAuth(true); }}
+          isAdmin={adminUiEnabled && !!user?.is_admin}
+          onLogout={() => {
+            logout();
+            // Clear the last-request badge so it doesn't keep surfacing the
+            // previous user's request_id / traceparent across the auth boundary.
+            useLastRequestStore.getState().clear();
+            if (requireAuth) setShowAuth(true);
+          }}
           onSignIn={() => setShowAuth(true)}
         />
 
@@ -191,6 +244,17 @@ function App() {
                 />
               </div>
             </div>
+
+            {/* Admin */}
+            {adminUiEnabled && (
+              <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'admin' ? '' : 'hidden'}`}>
+                <div className="flex-1 flex flex-col h-full min-h-0">
+                  <RequireAdmin user={user}>
+                    <AdminPanel currentUserId={user?.id} />
+                  </RequireAdmin>
+                </div>
+              </div>
+            )}
 
             {/* Settings */}
             <div className={`flex-1 overflow-auto pb-32 ${activeTab === 'settings' ? '' : 'hidden'}`}>

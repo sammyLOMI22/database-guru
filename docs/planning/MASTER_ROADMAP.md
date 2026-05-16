@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: April 12, 2026
+**Last Updated**: May 15, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -310,27 +310,150 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-    │                    OBSERVABILITY & MONITORING (Phase 24) - MEDIUM PRIORITY              │
+    │                    OBSERVABILITY & MONITORING (Phase 24) ✅ COMPLETE                    │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-    │              OBSERVABILITY STACK (Phase 24) - MEDIUM PRIORITY                            │
+    │              OBSERVABILITY STACK (Phase 24) ✅ COMPLETE                                  │
     │                                                                                           │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
-    │  │ 24.1 Struct-│   │ 24.2 Open-  │   │ 24.3 Metrics│   │ 24.4 Docker │                   │
-    │  │ ured Logging│──▶│ Telemetry   │──▶│ & Dashboards│──▶│ Integration │                   │
-    │  │             │   │ Tracing     │   │             │   │             │                   │
-    │  │ • JSON logs │   │ • OTEL SDK  │   │ • Prometheus│   │ • Compose   │                   │
-    │  │ • Request   │   │ • Span per  │   │   exporter  │   │   profile   │                   │
-    │  │   context   │   │   agent call│   │ • Grafana   │   │ • Jaeger    │                   │
-    │  │ • Log       │   │ • Jaeger    │   │   dashboards│   │   container │                   │
-    │  │   aggregator│   │   exporter  │   │ • Alerting  │   │ • Grafana   │                   │
-    │  │             │   │ • LLM spans │   │   rules     │   │   container │                   │
-    │  │ ~300 lines  │   │ ~500 lines  │   │ ~400 lines  │   │ ~100 lines  │                   │
+    │  │ 24.1 Struct-│   │ 24.2 Metrics│   │ 24.3 Open-  │   │ 24.4 Docker │                   │
+    │  │ ured Logging│──▶│ + /metrics  │──▶│ Telemetry   │──▶│ Profile     │                   │
+    │  │             │   │             │   │ Tracing     │   │             │                   │
+    │  │ • structlog │   │ • Prometheus│   │ • OTEL SDK  │   │ • Compose   │                   │
+    │  │   JSON      │   │   collectors│   │ • OTLP HTTP │   │   profile   │                   │
+    │  │ • request_id│   │ • Bounded   │   │ • Auto-     │   │ • Jaeger    │                   │
+    │  │ • redaction │   │   labels    │   │   instrument│   │ • Prometheus│                   │
+    │  │ • stdout    │   │ • /metrics  │   │ • LLM +     │   │ • Grafana   │                   │
+    │  │   only      │   │   gated     │   │   agent     │   │   provisioned│                  │
+    │  │             │   │             │   │   spans     │   │   dashboard │                   │
     │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
     │                                                                                           │
-    │  Prereq: Phase 23 ✅ (Docker) | Priority: MEDIUM | Est: 2 weeks | ~1,300 lines          │
-    │  Adds observability profile to Docker Compose                                            │
+    │  Prereq: Phase 23 ✅ (Docker) | Status: ✅ Complete | Stdout JSON only (no aggregator)  │
+    │  Guide: OBSERVABILITY_GUIDE.md | Test guide: PHASE_24_OBSERVABILITY_TESTING.md          │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │              ADMIN & OBSERVABILITY UI (Phase 24.7) ✅ COMPLETE                          │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │              UI INTEGRATION GAPS (Phase 24.7) ✅ COMPLETE — Apr 25, 2026                 │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                   │
+    │  │ PR1: Trace- │   │ PR2: Audit  │   │ PR3: Health │   │ PR4: User   │                   │
+    │  │ ID Header   │──▶│ Log Viewer  │──▶│ Sub-Tab +   │──▶│ Management  │                   │
+    │  │ + Axios     │   │ + Admin Tab │   │ Deep-links  │   │ CRUD        │                   │
+    │  │ Interceptor │   │             │   │             │   │             │                   │
+    │  │             │   │ • paginated │   │ • Prometheus│   │ • list/create│                  │
+    │  │ • zustand   │   │ • filters   │   │   /Jaeger/  │   │ • role toggl│                   │
+    │  │   store     │   │ • JSON      │   │   Grafana   │   │ • disable   │                   │
+    │  │ • header    │   │   drawer    │   │   deep-links│   │ • reset pwd │                   │
+    │  │   badge     │   │ • facets    │   │ • /health   │   │ • audit-log │                   │
+    │  │ • copy id   │   │   endpoint  │   │   cards     │   │   side-eff  │                   │
+    │  │             │   │             │   │ • obs gates │   │ • self-lock │                   │
+    │  │             │   │             │   │ • last-req  │   │   protection│                   │
+    │  │             │   │             │   │   widget    │   │             │                   │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘                   │
+    │                                                                                           │
+    │  Plus: removed mock data (1,133 LOC ObservabilityDemo.tsx), introduced ADMIN_UI_ENABLED   │
+    │  kill-switch (gates router mounting + frontend tab/section rendering), exposed            │
+    │  observability config via /api/settings (jaeger_ui_url, grafana_url, metrics_public_url,  │
+    │  metrics_enabled, metrics_endpoint_exposed, otel_enabled, otel_service_name,              │
+    │  otel_traces_sampler_ratio, admin_ui_enabled).                                            │
+    │                                                                                           │
+    │  Prereq: Phase 21 ✅ (Auth+Audit), Phase 24 ✅ (Observability backend)                   │
+    │  Plan: PHASE_24_Observability_&_Monitoring_UI_PLAN.md                                    │
+    │  Tests: tests/test_admin_users_endpoints.py (320), tests/test_audit_endpoints.py (237),   │
+    │         tests/test_admin_ui_toggle.py (35), tests/test_settings_observability.py (163)    │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │              AUTH HARDENING (Phase 24.8) ✅ A/B/C/D1/D3 — Apr 26, 2026                   │
+    │                                                                                           │
+    │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                   │
+    │  │ Phase A      │  │ Phase B      │  │ Phase C      │  │ Phase D1+D3  │                   │
+    │  │ Token        │  │ Rate limit + │  │ One-shot     │  │ Pwd history  │                   │
+    │  │ versioning   │  │ login lockout│  │ reset tokens │  │ + Admin       │                   │
+    │  │              │  │              │  │              │  │ quorum       │                   │
+    │  │ • password_  │  │ • per-user   │  │ • password_  │  │ • last-N hash│                   │
+    │  │   version    │  │   change-pwd │  │   reset_     │  │   reuse block│                   │
+    │  │   column     │  │   limiter    │  │   tokens     │  │ • depth-     │                   │
+    │  │ • pv claim   │  │ • per-user   │  │   table      │  │   bounded    │                   │
+    │  │   in JWT     │  │   login      │  │ • redeem     │  │ • no-quorum  │                   │
+    │  │ • bumps on   │  │   lockout    │  │   endpoint   │  │   guard:     │                   │
+    │  │   change/    │  │   tracker    │  │ • mode flag  │  │   block last │                   │
+    │  │   reset      │  │ • case-      │  │   3-way      │  │   admin      │                   │
+    │  │ • opt-in     │  │   insensitive│  │   (temp/     │  │   demote/    │                   │
+    │  │   logout/    │  │ • account_   │  │   token/     │  │   deactivate │                   │
+    │  │   deactivate │  │   locked     │  │   both)      │  │              │                   │
+    │  │   triggers   │  │   audit log  │  │ • frontend   │  │              │                   │
+    │  │              │  │              │  │   /reset?token│ │              │                   │
+    │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘                   │
+    │                                                                                           │
+    │  All toggles default OFF (behavior-preserving on upgrade). Surfaced read-only in           │
+    │  Admin → Health → Auth hardening so operators can see live state.                          │
+    │                                                                                           │
+    │  Migrations: 3d8f4c2a1e9b (must_change_password), 4f9a1c8b2e3d (password_version),         │
+    │              5e2b7a9d4c8f (password_reset_tokens), 6a3c5f8e7b1d (password_history)         │
+    │  New endpoints: POST /api/auth/change-password, POST /api/auth/redeem-reset                │
+    │  Tests: test_auth_change_password.py (4), test_auth_token_versioning.py (7),               │
+    │         test_auth_rate_limit.py (8), test_auth_reset_tokens.py (9),                        │
+    │         test_auth_history_and_quorum.py (9), test_settings_auth_hardening.py (7)           │
+    │  Plan: PASSWORD_AUTH_HARDENING_PLAN.md                                                    │
+    │                                                                                           │
+    │  ⏳ Phase D2 (JWT JTI denylist on logout) — DEFERRED, requires Redis                      │
+    │     Phase A's AUTH_INVALIDATE_TOKENS_ON_LOGOUT covers the coarse use case (kicks all       │
+    │     devices). D2 only matters when per-session revocation is needed AND multi-device       │
+    │     hygiene matters more than the simplicity of the version-bump approach. Slot it in     │
+    │     once REDIS_URL is part of the standard deploy story (Phase 23 full profile).          │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    GRAPH MODE / NEO4J (Phase 25) — PLANNED                              │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │              GRAPH DATABASE SUPPORT (Phase 25) — PLANNED                                  │
+    │                                                                                           │
+    │  MVP scope: Neo4j only (Bolt). Provider-agnostic adapter interface for future             │
+    │  Memgraph / Neptune / ArangoDB / AGE expansion. All write paths blocked by default.       │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐ │
+    │  │ 25.1 Found- │   │ 25.2 Schema │   │ 25.3 Cypher │   │ 25.4 AI     │   │ 25.5 Visual │ │
+    │  │ ation       │──▶│ Introspect. │──▶│ Query Lab   │──▶│ Cypher +    │──▶│ Graph       │ │
+    │  │             │   │             │   │             │   │ Explain     │   │ Explorer    │ │
+    │  │ • Neo4j     │   │ • db.labels │   │ • Editor +  │   │ • NL→Cypher │   │ • Cytoscape │ │
+    │  │   driver    │   │ • relType   │   │   Monaco    │   │   w/ schema │   │   canvas    │ │
+    │  │ • Connection│   │ • node/rel  │   │ • Safety    │   │   context   │   │ • Expand    │ │
+    │  │   CRUD      │   │   props +   │   │   classifier│   │ • Cypher    │   │   nodes /   │ │
+    │  │ • Encrypted │   │   patterns  │   │   (read-    │   │   explainer │   │   relation- │ │
+    │  │   creds     │   │ • Indexes / │   │   only MVP) │   │ • Error     │   │   ships     │ │
+    │  │ • Read-only │   │   constr.   │   │ • Table /   │   │   plain-Eng │   │ • Depth /   │ │
+    │  │   default   │   │ • Cached    │   │   JSON /    │   │   translate │   │   limit /   │ │
+    │  │ • Test conn │   │   schema    │   │   graph     │   │ • Index     │   │   filter    │ │
+    │  │             │   │   snapshots │   │   results   │   │   suggest   │   │   controls  │ │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘ │
+    │                                                                                           │
+    │  ┌─────────────┐                                                                          │
+    │  │ 25.6 Graph  │   Modeling advice: rule-based checks (missing index on id/email/sku,    │
+    │  │ Guru Advice │   overloaded labels, event-as-relationship, orphan nodes) + LLM         │
+    │  │             │   explanations. Index suggestions, query rewrites, anti-patterns.       │
+    │  │ • Rules     │                                                                          │
+    │  │ • LLM cards │   Persistence: graph_connections, graph_schema_snapshots,                │
+    │  │ • Index     │   graph_query_history, saved_graph_queries (4 new tables).               │
+    │  │   advice    │                                                                          │
+    │  │ • Anti-     │   Tech: neo4j-driver (Python), Cytoscape.js (frontend), Monaco for       │
+    │  │   patterns  │   Cypher editor. Docker Compose adds neo4j:5-community service.          │
+    │  └─────────────┘                                                                          │
+    │                                                                                           │
+    │  Prereq: Phase 21 ✅ (Auth+ownership for graph_connections), Phase 15 ✅ (LLM router      │
+    │  for NL→Cypher and explanations). Independent of Phase 14 NoSQL path — graph queries      │
+    │  do not use SQL or document-style routing.                                                │
+    │  Spec: database_guru_graph_database_support_spec.md                                       │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -594,6 +717,21 @@
     │  • 127 tests | Plan: NOSQL_EXPANSION_PLAN.md                      │
     └───────────────────────────────────────────────────────────────────┘
 
+    ┌───────────────────────────────────────────────────────────────────┐
+    │   GRAPH MODE / NEO4J (Phase 25) ◀── PLANNED                       │
+    │                                                                   │
+    │   PREREQ: Phase 21 ✅ (Auth/ownership), Phase 15 ✅ (LLM router)   │
+    │                                                                   │
+    │  • Neo4j-only MVP, Bolt protocol, read-only by default            │
+    │  • Schema introspection (labels, rel types, patterns, indexes)    │
+    │  • Cypher Query Lab w/ safety classifier (write/admin blocked)    │
+    │  • NL→Cypher generation + Cypher explanation w/ schema context    │
+    │  • Cytoscape.js visual graph explorer (expand, depth, filter)     │
+    │  • Modeling advisor (rule-based + LLM) and index suggestions      │
+    │  • 4 new tables, provider-agnostic adapter for future graphs      │
+    │  • Spec: database_guru_graph_database_support_spec.md             │
+    └───────────────────────────────────────────────────────────────────┘
+
 
     DEPENDENT FEATURES (Requires Prerequisites):
     ============================================
@@ -711,17 +849,15 @@
 
 ---
 
-## Recommended Next Steps (Updated April 12, 2026)
+## Recommended Next Steps (Updated April 25, 2026)
 
 > **Strategic Direction** (per PM Review): Focus on "depth and safety" before "width expansion".
-> Security/Auth, Edit Mode, Enterprise LLMs, and Multi-Provider Monitoring are now complete.
-
-### Priority 1: Observability & Monitoring (Phase 24) - MEDIUM
-**Why**: Production readiness — structured logging, distributed tracing, metrics dashboards
-- **Prerequisite**: Phase 23 ✅ (Docker)
-- Structured JSON logging, OpenTelemetry tracing, Prometheus/Grafana, Docker integration
+> Security/Auth, Edit Mode, Enterprise LLMs, Multi-Provider Monitoring, Observability backend, and the operator-facing Admin/Observability UI are now complete.
 
 ### Completed Priorities (this cycle)
+- ~~Auth Hardening (Phase 24.8)~~ - ✅ COMPLETE for Phases A/B/C/D1/D3 (Apr 26, 2026): **Phase A** token versioning (`users.password_version` column, `pv` JWT claim, evicts every outstanding session on password change/admin reset, optional triggers for logout/deactivate). **Phase B** per-user change-password rate limit + per-username login lockout (case-insensitive, account_locked/account_unlocked audit events). **Phase C** one-shot password reset tokens (new `password_reset_tokens` table, `AUTH_PASSWORD_RESET_MODE` 3-way switch, `POST /api/auth/redeem-reset` endpoint, frontend `/reset?token=…` redemption screen, conditional admin reset modal). **Phase D1** password history (`password_history` table, depth-bounded reuse rejection). **Phase D3** admin quorum guard (refuses to demote/deactivate the last active admin). All 13 toggles default OFF, surfaced read-only in Admin → Health → Auth hardening. 4 migrations (`3d8f4c2a1e9b`, `4f9a1c8b2e3d`, `5e2b7a9d4c8f`, `6a3c5f8e7b1d`), 2 new endpoints (`/api/auth/change-password`, `/api/auth/redeem-reset`), 44 new tests across 6 files. **Phase D2 (JTI denylist) deferred** — covered coarsely by `AUTH_INVALIDATE_TOKENS_ON_LOGOUT`; revisit when Redis is part of the standard deploy story. Plan: `PASSWORD_AUTH_HARDENING_PLAN.md`.
+- ~~Admin & Observability UI (Phase 24.7)~~ - ✅ COMPLETE: Trace-id badge in header (axios interceptor + zustand `lastRequestStore`), AuditLogViewer with server-side filters/pagination/JSON drawer + `/api/audit/facets`, UserManagement CRUD (list/create/role-toggle/disable/reset-password) with audit-log side-effects and self-lockout protection, SystemHealthPanel sub-tab replacing the 1,133-LOC `ObservabilityDemo.tsx` mock (live `/health`, recent queries, recent audit, observability gates, last-request widget), Settings → Observability section with Prometheus/Jaeger/Grafana deep-links, hard `ADMIN_UI_ENABLED` kill-switch (router mount + frontend tab/section gating). New endpoints: 5 under `/api/admin/users`, 3 under `/api/audit`. New tests: `test_admin_users_endpoints.py` (320 LOC), `test_audit_endpoints.py` (237 LOC), `test_admin_ui_toggle.py` (35 LOC), `test_settings_observability.py` (163 LOC). Plan: `PHASE_24_Observability_&_Monitoring_UI_PLAN.md`.
+- ~~Observability & Monitoring (Phase 24)~~ - ✅ COMPLETE: structlog JSON logs with request_id propagation + sensitive-key redaction, Prometheus collectors (`dbguru_*`) for HTTP/LLM/SQL/pool/cache with bounded labels, gated `/metrics` endpoint, OpenTelemetry SDK + OTLP HTTP exporter with auto-instrumentation (FastAPI/SQLAlchemy/HTTPX/Redis), manual `llm.call` and `agent.self_correcting` spans reusing LLMUsageTracker values, Docker `observability` profile (Jaeger/Prometheus/Grafana with provisioned dashboard + alert rules). 17 tests, ~1,300 lines. Stdout JSON only — no log aggregator in scope.
 - ~~Multi-Provider Monitoring (Phase 17)~~ - ✅ COMPLETE: Native token extraction for 6 provider formats (Ollama, OpenAI/Azure/LM Studio/vLLM, Anthropic, Google Vertex, AWS Bedrock), user-managed model pricing (CRUD admin API), cost summary with daily breakdown, provider performance comparison by agent type, unpriced model detection, ModelPricingManager UI. 29 tests, 7 new endpoints, ~1,373 lines.
 - ~~LLM Provider Expansion (Phase 15)~~ - ✅ COMPLETE: 8 providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM), provider abstraction + registry, data security enforcement (local/cloud_private/cloud_public), Local/Frontier toggle UI, per-task routing, fallback chains, Fernet-encrypted API keys, frontend provider management. 220 tests, 8 endpoints, ~4,000 lines.
 - ~~Edit Mode & DML (Phase 18)~~ - ✅ COMPLETE: DML generator/validator/executor, inline editing UI, per-connection write permissions, preview mode. 40 tests, 5 endpoints, ~2,450 lines.
@@ -729,6 +865,9 @@
 - ~~Migration Toolkit (Phase 20)~~ - ✅ COMPLETE: Schema diff, migration planner, script gen, data migration. 98 tests, 13 endpoints, ~5,676 lines.
 - ~~Performance Guru (Phase 22)~~ - ✅ COMPLETE: EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects. 77 tests, 2 endpoints, ~3,282 lines.
 - ~~Data Insights Enhancement (Phase 19)~~ - ✅ COMPLETE: Tiered narratives, analytics cache, parallel analysis. 108 tests.
+
+### Next Up
+- **Graph Mode / Neo4j (Phase 25)** — PLANNED. First-class graph database support, MVP scoped to Neo4j only. Six sub-phases: (25.1) connection foundation w/ encrypted creds + read-only default, (25.2) schema introspection (labels, relationship types, patterns, indexes, constraints) cached as `graph_schema_snapshots`, (25.3) Cypher Query Lab with Monaco editor and a safety classifier that blocks `CREATE/MERGE/DELETE/SET/REMOVE/DROP/LOAD CSV/CALL apoc.*` by default, (25.4) NL→Cypher and Cypher-explanation agents fed a compact schema context packet, (25.5) Cytoscape.js visual explorer with expand/depth/filter controls, (25.6) Graph Guru modeling advisor (rule-based checks + LLM cards). 4 new tables (`graph_connections`, `graph_schema_snapshots`, `graph_query_history`, `saved_graph_queries`). Provider-agnostic adapter interface so Memgraph / Neptune / ArangoDB / Postgres AGE can be slotted in later. Prereq: Phase 21 ✅ for connection ownership, Phase 15 ✅ for the AI calls. Spec: `database_guru_graph_database_support_spec.md`.
 
 ### Innovation Pipeline (Future evaluation)
 Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md) and [ROADMAP_FEEDBACK.md](ROADMAP_FEEDBACK.md):
@@ -772,6 +911,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Data Sources** | CSV & Excel File Support | **Phase 13 ✅ COMPLETE** | ~2,500 lines |
 | **LLM Monitoring** | Token usage tracking, dashboard, inline stats | **Phase 16 ✅ COMPLETE** | ~1,500 lines |
 | **Security & Auth** | JWT auth, resource ownership, per-user rate limiting, audit logging | **Phase 21 ✅ COMPLETE** | ~2,200 lines |
+| **Auth Hardening** | Token versioning (`pv` JWT claim), per-user change-pwd rate limit, login lockout, one-shot reset tokens, password history, admin quorum | **Phase 24.8 ✅ A/B/C/D1/D3** (D2 deferred) | ~1,400 lines |
 | **LLM Integration** | 8 providers (Ollama, OpenAI, Azure OpenAI, Anthropic, Vertex AI, Bedrock, LM Studio, vLLM), data security, provider routing | **Phase 15 ✅ COMPLETE** | ~4,000 lines |
 | **Migration Toolkit** | Schema diff, migration planner, script gen, data migration | **Phase 20 ✅ COMPLETE** | ~5,676 lines |
 | **Edit Mode & DML** | Inline editing, INSERT/UPDATE/DELETE, preview mode, write permissions | **Phase 18 ✅ COMPLETE** | ~2,450 lines |
@@ -779,11 +919,12 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison, model pricing admin | **Phase 17 ✅ COMPLETE** | ~1,373 lines |
 | **Data Insights** | Tiered narratives, analytics cache, multi-source quality, chart presets, parallel analysis | **Phase 19 ✅ COMPLETE** | ~1,800 lines |
 | **NoSQL Expansion** | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch, frontend integration, mixed chat | **Phase 14 ✅ COMPLETE** | ~6,000 lines |
+| **Graph Mode (Neo4j)** | Connection mgmt, schema introspection, Cypher Query Lab, NL→Cypher, visual explorer, modeling advisor | **Phase 25 — PLANNED** | TBD (6 sub-phases) |
 | **Table UX** | Sorting ✅, Resizing, Export | Sorting complete | ~400 lines remaining |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
 | **Docker Containerization** | Docker Compose, Nginx proxy, BYO LLM, profiles (ollama/full) | **Phase 23 ✅ COMPLETE** | ~200 lines config |
-| **Observability** | Structured logging, OpenTelemetry tracing, Prometheus/Grafana | **Phase 24 - MEDIUM** | ~1,300 lines |
+| **Observability** | Structured logging, OpenTelemetry tracing, Prometheus/Grafana, Docker observability profile | **Phase 24 ✅ Complete** | ~1,300 lines |
 | **Innovation Pipeline** | Synthetic Data, API-ify, Auto-Docs, Watchdog, Guru API, etc. | Ideas stage | TBD |
 
 ---
@@ -837,8 +978,11 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Phase 17** | Multi-Provider Monitoring | Phase 15✅ + 16✅ | ~1,373 lines | ✅ **COMPLETE** |
 | **Phase 19** | Data Insights Enhancement | None | ~1,800 lines | ✅ **COMPLETE** |
 | **Phase 23** | Docker Containerization | None | ~200 lines config | ✅ **COMPLETE** |
-| **Phase 24** | Observability (OpenTelemetry) | Phase 23 ✅ | ~1,300 lines | MEDIUM |
+| **Phase 24** | Observability & Monitoring | Phase 23 ✅ | ~1,300 lines | ✅ **COMPLETE** |
+| **Phase 24.7** | Admin & Observability UI | Phase 21 ✅ + Phase 24 ✅ | ~3,465 lines (4 PRs) | ✅ **COMPLETE** |
+| **Phase 24.8** | Auth Hardening (A/B/C/D1/D3) | Phase 21 ✅ + Phase 24.7 ✅ | ~1,400 lines + 4 migrations | ✅ **COMPLETE** (D2 deferred, needs Redis) |
 | **Phase 14** | NoSQL Database Expansion | None | ~6,000 lines | ✅ **COMPLETE** |
+| **Phase 25** | Graph Mode / Neo4j (MVP) | Phase 21 ✅ + Phase 15 ✅ | TBD (6 sub-phases) | 🟡 **PLANNED** |
 
 ---
 
@@ -858,12 +1002,16 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - [DATA_INSIGHTS_ENHANCEMENT_PLAN.md](DATA_INSIGHTS_ENHANCEMENT_PLAN.md) - Data Insights Enhancement (Phase 19)
 - [MIGRATION_TOOLKIT_PROPOSAL.md](MIGRATION_TOOLKIT_PROPOSAL.md) - Database Migration Toolkit (Phase 20)
 - [DOCKER_CONTAINERIZATION_PLAN.md](DOCKER_CONTAINERIZATION_PLAN.md) - Docker Containerization (Phase 23)
+- [Phase 24_Observability_&_Monitoring.md](Phase%2024_Observability_%26_Monitoring.md) - Observability backend (Phase 24) ✅
+- [PHASE_24_Observability_&_Monitoring_UI_PLAN.md](PHASE_24_Observability_%26_Monitoring_UI_PLAN.md) - Admin & Observability UI (Phase 24.7) ✅
+- [PASSWORD_AUTH_HARDENING_PLAN.md](PASSWORD_AUTH_HARDENING_PLAN.md) - Auth Hardening (Phase 24.8) ✅ A/B/C/D1/D3, ⏳ D2 deferred
+- [database_guru_graph_database_support_spec.md](database_guru_graph_database_support_spec.md) - Graph Mode / Neo4j Support (Phase 25) 🟡 PLANNED
 - [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md) - Innovation pipeline ideas
 - [ROADMAP_FEEDBACK.md](ROADMAP_FEEDBACK.md) - PM review & strategic recommendations
 
 ---
 
-**Updated**: April 12, 2026
+**Updated**: April 26, 2026
 - **Phase 17 ✅ COMPLETE**: Multi-Provider Monitoring
 - **Phase 15 ✅ COMPLETE**: LLM Provider Expansion
   - 15.1: Provider Abstraction — BaseLLMProvider ABC, DataLocality enum, ProviderRegistry, TrackedLLMClient wrapper
@@ -913,5 +1061,23 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
   - Nginx reverse proxy with CSP headers, non-root containers, least-privilege Postgres
   - Ollama retry logic (tenacity), prompts.py refactored into package
   - CTE support added to SQL lineage parser
-- **Phase 24 NEW**: Observability & Monitoring (OpenTelemetry, Prometheus, Grafana)
+- **Phase 24 ✅ COMPLETE**: Observability & Monitoring (structlog, Prometheus, OpenTelemetry, Docker observability profile)
+- **Phase 24.7 ✅ COMPLETE**: Admin & Observability UI (4 PRs)
+  - PR1: X-Request-ID exposed via CORS, axios response interceptor populates `useLastRequestStore`, header `LastRequestBadge` shows short id and copies the full id + traceparent
+  - PR2: Admin tab scaffolding (`AdminPanel`), `AuditLogViewer` with paginated server-side filters and JSON drawer, `auditApi.ts`, `audit.py` adds list/me/facets endpoints
+  - PR3: Observability section in `SettingsPanel` with deep-links (Prometheus / Jaeger / Grafana), `SystemHealthPanel` Health sub-tab replacing the demo (live `/health`, observability gates, last-request widget, recent queries + audit), `JAEGER_UI_URL`/`GRAFANA_URL`/`METRICS_PUBLIC_URL` settings exposed via `/api/settings`
+  - PR4: `admin_users.py` with list/create/update/reset-password/deactivate, `UserManagement.tsx` with role toggle / disable / reset, `CreateUserModal`, `adminUsersApi.ts`, self-lockout protection on the backend, every action audit-logged
+  - Plus: removed 1,133-LOC `ObservabilityDemo.tsx` mock, introduced `ADMIN_UI_ENABLED` kill-switch (router mount + frontend tab/section gating)
+- **Phase 24.8 ✅ A/B/C/D1/D3 COMPLETE**: Auth Hardening (toggleable per-deployment)
+  - **Phase A — Token versioning**: `users.password_version` column (alembic `4f9a1c8b2e3d`), JWT `pv` claim stamped only when `AUTH_TOKEN_VERSIONING_ENABLED=True`, `get_current_user` rejects stale `pv` (legacy tokens with no claim accepted so flipping the flag is non-destructive). `bump_password_version()` helper called on password change, admin reset, and conditionally on logout / deactivate (`AUTH_INVALIDATE_TOKENS_ON_LOGOUT`, `AUTH_INVALIDATE_TOKENS_ON_DEACTIVATE`). Change-password endpoint returns a fresh `TokenResponse` so the caller stays signed in while every other device is evicted.
+  - **Phase B — Rate limit + lockout**: `_UserKeyedRateLimiter` for change-password (`AUTH_RATE_LIMIT_CHANGE_PASSWORD`, `AUTH_CHANGE_PASSWORD_PER_USER_PER_MINUTE`), `LoginAttemptTracker` for username-keyed login lockout (`AUTH_RATE_LIMIT_LOGIN_LOCKOUT_ENABLED`, `AUTH_LOGIN_LOCKOUT_THRESHOLD`, `AUTH_LOGIN_LOCKOUT_WINDOW_SECONDS`). Tracker is case-insensitive so casing can't dodge it; unknown usernames count too (defeats enumeration via lockout-vs-401). `account_locked` / `account_unlocked` audit events. In-process — multi-worker deployments swap in a Redis backend.
+  - **Phase C — One-shot reset tokens**: `password_reset_tokens` table (alembic `5e2b7a9d4c8f`), `AUTH_PASSWORD_RESET_MODE` 3-way switch (`temp_password` | `reset_token` | `both`), `POST /api/auth/redeem-reset` walks outstanding tokens via bcrypt comparison, frontend `/reset?token=…` redemption screen short-circuits the rest of the gating. Admin reset modal conditionally renders password OR redemption URL OR both. `AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES` and `AUTH_PASSWORD_RESET_BASE_URL` configurable.
+  - **Phase D1 — Password history**: `password_history` table (alembic `6a3c5f8e7b1d`), `AUTH_PASSWORD_HISTORY_DEPTH` (0 = disabled). Reuse against current or last N hashes returns 400 from both `change-password` and `redeem-reset`. Trimmed on insert so the table stays bounded.
+  - **Phase D3 — Admin quorum**: `count_active_admins()` + `_enforce_admin_quorum()` helper. When `AUTH_REQUIRE_ADMIN_QUORUM=True`, refuses any demote/deactivate that would drop the active-admin count to 0. Layered with the existing self-edit protection.
+  - **Plumbed everywhere**: 13 new `AUTH_*` settings, `Settings.check_auth_hardening()` startup validator, `SystemSettingsResponse` mirror, frontend `AuthHardeningConfig` type, Admin → Health "Auth hardening" panel with live gates and inline warnings (e.g. `reset_token` mode + missing base URL).
+  - 4 migrations, 2 new endpoints (`/api/auth/change-password`, `/api/auth/redeem-reset`), ~1,400 lines, 44 new tests across 6 files (`test_auth_change_password.py`, `test_auth_token_versioning.py`, `test_auth_rate_limit.py`, `test_auth_reset_tokens.py`, `test_auth_history_and_quorum.py`, `test_settings_auth_hardening.py`).
+  - **⏳ Phase D2 (JWT JTI denylist on logout) — DEFERRED.** Phase A's `AUTH_INVALIDATE_TOKENS_ON_LOGOUT` covers the coarse case (logout kicks every device). D2 only matters when per-session revocation is needed and the version-bump approach is too coarse. Slot it in once Redis is part of the standard deploy story (Phase 23 `full` profile).
 - Previous: Added Phase 20-22, Innovation Pipeline, promoted Security to CRITICAL
+
+**Updated**: May 15, 2026
+- **Phase 25 🟡 PLANNED**: Graph Mode / Neo4j MVP added to roadmap from spec `database_guru_graph_database_support_spec.md`. Six sub-phases (foundation → schema introspection → Cypher Query Lab → AI Cypher generation/explanation → visual graph explorer → modeling advisor). Read-only by default; write/admin Cypher blocked by safety classifier in MVP. 4 new persistence tables. Provider-agnostic adapter so future providers (Memgraph, Neptune, ArangoDB, Postgres AGE) can be added without rewriting the AI/visualization layers. Prereqs already satisfied — Phase 21 (auth/ownership) for connection records, Phase 15 (LLM router) for NL→Cypher and explanation calls.

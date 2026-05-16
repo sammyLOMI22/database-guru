@@ -1,0 +1,131 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Request volume (req/s)",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "sum by (route) (rate(dbguru_http_requests_total[5m]))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Request latency p50 / p95 / p99",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(dbguru_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dbguru_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(dbguru_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Error rate",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 7},
+      "targets": [
+        {
+          "expr": "sum(rate(dbguru_http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum(rate(dbguru_http_requests_total[5m])), 1)",
+          "legendFormat": "5xx ratio"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM calls by provider/model",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 7},
+      "targets": [
+        {
+          "expr": "sum by (provider, model) (rate(dbguru_llm_calls_total[5m]))",
+          "legendFormat": "{{provider}}/{{model}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM latency p95 by model",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 14},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, model) (rate(dbguru_llm_latency_seconds_bucket[5m])))",
+          "legendFormat": "{{model}} p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM cost per hour (USD)",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 14},
+      "targets": [
+        {
+          "expr": "sum by (provider, model) (rate(dbguru_llm_cost_usd_total[1h])) * 3600",
+          "legendFormat": "{{provider}}/{{model}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "SQL latency p95 by dialect",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 21},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, dialect) (rate(dbguru_sql_query_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{dialect}} p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache hit ratio",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 21},
+      "targets": [
+        {
+          "expr": "sum by (cache) (rate(dbguru_cache_hits_total[5m])) / clamp_min(sum by (cache) (rate(dbguru_cache_hits_total[5m]) + rate(dbguru_cache_misses_total[5m])), 1)",
+          "legendFormat": "{{cache}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Connection pool size",
+      "datasource": "Prometheus",
+      "gridPos": {"h": 7, "w": 24, "x": 0, "y": 28},
+      "targets": [
+        {
+          "expr": "dbguru_connection_pool_size",
+          "legendFormat": "{{dialect}}"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["database-guru"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "",
+  "title": "Database Guru — Overview",
+  "version": 1
+}

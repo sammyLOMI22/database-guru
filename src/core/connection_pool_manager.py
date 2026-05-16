@@ -33,6 +33,7 @@ from sqlalchemy.engine import Engine
 
 from src.config.settings import Settings
 from src.database.models import DatabaseConnection
+from src.observability import metrics as _metrics
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +217,7 @@ class ConnectionPoolManager:
                 pool.metrics.last_used = datetime.now()
                 pool.metrics.total_checkouts += 1
                 logger.debug(f"Reusing pool for connection {connection.id} ({connection.database_type})")
+                _metrics.record_pool_checkout(connection.database_type)
                 return pool
 
         # Create new pool
@@ -230,6 +232,7 @@ class ConnectionPoolManager:
         async with self._lock:
             self._pools[key] = pool
 
+        _metrics.record_pool_checkout(connection.database_type)
         return pool
 
     async def _create_pool(self, connection: DatabaseConnection) -> PoolEntry:
@@ -428,6 +431,26 @@ class ConnectionPoolManager:
 
         logger.info(f"Closed {len(pool_keys)} connection pool(s)")
         self._initialized = False
+
+    async def get_pool_metrics_snapshot(self) -> list[dict]:
+        """Return a per-pool snapshot suitable for metrics export.
+
+        Holds ``self._lock`` while copying so callers cannot observe a torn
+        state during pool churn. Each entry is a small dict with just the
+        fields the observability layer needs — keep it minimal so this stays
+        cheap to call on every Prometheus scrape.
+        """
+        snapshot: list[dict] = []
+        async with self._lock:
+            for (_, dialect), pool in self._pools.items():
+                m = pool.metrics
+                snapshot.append({
+                    "dialect": dialect,
+                    "active": int(m.active_connections),
+                    "idle": int(m.idle_connections),
+                    "total_capacity": int(m.total_capacity),
+                })
+        return snapshot
 
     def get_all_metrics(self) -> dict:
         """Get metrics for all pools"""

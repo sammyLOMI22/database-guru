@@ -1,0 +1,49 @@
+groups:
+  - name: dbguru.starter
+    interval: 30s
+    rules:
+      - alert: DbGuruHighErrorRate
+        expr: |
+          (
+            sum(rate(dbguru_http_requests_total{status=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(dbguru_http_requests_total[5m])), 1)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database Guru error rate above 5%"
+          description: "5xx rate exceeded 5% over the last 5 minutes."
+
+      - alert: DbGuruLLMLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le, provider, model) (rate(dbguru_llm_latency_seconds_bucket[10m]))
+          ) > 30
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM p99 latency > 30s"
+          description: "Some provider/model is consistently slow — investigate prompt size, model availability, or upstream rate limits."
+
+      - alert: DbGuruConnectionPoolSaturation
+        # Fires when (current pool size / configured capacity) >= 90% per dialect.
+        # Skips dialects where max_size is missing or zero so a partial
+        # registration does not produce divide-by-zero alerts.
+        expr: |
+          (
+            sum by (dialect) (dbguru_connection_pool_size)
+            /
+            clamp_min(sum by (dialect) (dbguru_connection_pool_max_size), 1)
+          ) >= 0.9
+          and
+          sum by (dialect) (dbguru_connection_pool_max_size) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pool saturation > 90% for {{ $labels.dialect }}"
+          description: "Connection pool utilization is sustained above 90%."

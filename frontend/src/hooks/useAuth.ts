@@ -8,6 +8,7 @@ export interface AuthUser {
   is_active: boolean;
   is_admin: boolean;
   created_at: string;
+  must_change_password?: boolean;
 }
 
 interface AuthState {
@@ -86,6 +87,22 @@ export function useAuth() {
     setState({ token: null, user: null, isLoading: false });
   }, []);
 
+  // Patch the cached user (e.g. after a successful password change clears
+  // must_change_password) so the rest of the app reads the fresh state
+  // without forcing a re-login round trip.
+  const updateUser = useCallback((user: AuthUser) => {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    setState((prev) => ({ ...prev, user }));
+  }, []);
+
+  // Swap in a fresh token + user (e.g. /api/auth/change-password issues a new
+  // JWT after Phase A bumps password_version, invalidating the previous one).
+  const applyTokenResponse = useCallback((resp: { access_token: string; user: AuthUser }) => {
+    localStorage.setItem(TOKEN_KEY, resp.access_token);
+    localStorage.setItem(USER_KEY, JSON.stringify(resp.user));
+    setState({ token: resp.access_token, user: resp.user, isLoading: false });
+  }, []);
+
   return {
     user: state.user,
     token: state.token,
@@ -94,6 +111,8 @@ export function useAuth() {
     login,
     register,
     logout,
+    updateUser,
+    applyTokenResponse,
   };
 }
 
