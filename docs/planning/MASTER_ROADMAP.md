@@ -1,6 +1,6 @@
 # Database Guru - Master Development Roadmap
 
-**Last Updated**: April 25, 2026
+**Last Updated**: May 15, 2026
 **Purpose**: Unified view of all planned features and their dependencies
 
 ---
@@ -413,6 +413,51 @@
 
 
     ┌─────────────────────────────────────────────────────────────────────────────────────────┐
+    │                    GRAPH MODE / NEO4J (Phase 25) — PLANNED                              │
+    └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │              GRAPH DATABASE SUPPORT (Phase 25) — PLANNED                                  │
+    │                                                                                           │
+    │  MVP scope: Neo4j only (Bolt). Provider-agnostic adapter interface for future             │
+    │  Memgraph / Neptune / ArangoDB / AGE expansion. All write paths blocked by default.       │
+    │                                                                                           │
+    │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐ │
+    │  │ 25.1 Found- │   │ 25.2 Schema │   │ 25.3 Cypher │   │ 25.4 AI     │   │ 25.5 Visual │ │
+    │  │ ation       │──▶│ Introspect. │──▶│ Query Lab   │──▶│ Cypher +    │──▶│ Graph       │ │
+    │  │             │   │             │   │             │   │ Explain     │   │ Explorer    │ │
+    │  │ • Neo4j     │   │ • db.labels │   │ • Editor +  │   │ • NL→Cypher │   │ • Cytoscape │ │
+    │  │   driver    │   │ • relType   │   │   Monaco    │   │   w/ schema │   │   canvas    │ │
+    │  │ • Connection│   │ • node/rel  │   │ • Safety    │   │   context   │   │ • Expand    │ │
+    │  │   CRUD      │   │   props +   │   │   classifier│   │ • Cypher    │   │   nodes /   │ │
+    │  │ • Encrypted │   │   patterns  │   │   (read-    │   │   explainer │   │   relation- │ │
+    │  │   creds     │   │ • Indexes / │   │   only MVP) │   │ • Error     │   │   ships     │ │
+    │  │ • Read-only │   │   constr.   │   │ • Table /   │   │   plain-Eng │   │ • Depth /   │ │
+    │  │   default   │   │ • Cached    │   │   JSON /    │   │   translate │   │   limit /   │ │
+    │  │ • Test conn │   │   schema    │   │   graph     │   │ • Index     │   │   filter    │ │
+    │  │             │   │   snapshots │   │   results   │   │   suggest   │   │   controls  │ │
+    │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘ │
+    │                                                                                           │
+    │  ┌─────────────┐                                                                          │
+    │  │ 25.6 Graph  │   Modeling advice: rule-based checks (missing index on id/email/sku,    │
+    │  │ Guru Advice │   overloaded labels, event-as-relationship, orphan nodes) + LLM         │
+    │  │             │   explanations. Index suggestions, query rewrites, anti-patterns.       │
+    │  │ • Rules     │                                                                          │
+    │  │ • LLM cards │   Persistence: graph_connections, graph_schema_snapshots,                │
+    │  │ • Index     │   graph_query_history, saved_graph_queries (4 new tables).               │
+    │  │   advice    │                                                                          │
+    │  │ • Anti-     │   Tech: neo4j-driver (Python), Cytoscape.js (frontend), Monaco for       │
+    │  │   patterns  │   Cypher editor. Docker Compose adds neo4j:5-community service.          │
+    │  └─────────────┘                                                                          │
+    │                                                                                           │
+    │  Prereq: Phase 21 ✅ (Auth+ownership for graph_connections), Phase 15 ✅ (LLM router      │
+    │  for NL→Cypher and explanations). Independent of Phase 14 NoSQL path — graph queries      │
+    │  do not use SQL or document-style routing.                                                │
+    │  Spec: database_guru_graph_database_support_spec.md                                       │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────────────────────┐
     │                              INNOVATION PIPELINE (Future)                                │
     └─────────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -672,6 +717,21 @@
     │  • 127 tests | Plan: NOSQL_EXPANSION_PLAN.md                      │
     └───────────────────────────────────────────────────────────────────┘
 
+    ┌───────────────────────────────────────────────────────────────────┐
+    │   GRAPH MODE / NEO4J (Phase 25) ◀── PLANNED                       │
+    │                                                                   │
+    │   PREREQ: Phase 21 ✅ (Auth/ownership), Phase 15 ✅ (LLM router)   │
+    │                                                                   │
+    │  • Neo4j-only MVP, Bolt protocol, read-only by default            │
+    │  • Schema introspection (labels, rel types, patterns, indexes)    │
+    │  • Cypher Query Lab w/ safety classifier (write/admin blocked)    │
+    │  • NL→Cypher generation + Cypher explanation w/ schema context    │
+    │  • Cytoscape.js visual graph explorer (expand, depth, filter)     │
+    │  • Modeling advisor (rule-based + LLM) and index suggestions      │
+    │  • 4 new tables, provider-agnostic adapter for future graphs      │
+    │  • Spec: database_guru_graph_database_support_spec.md             │
+    └───────────────────────────────────────────────────────────────────┘
+
 
     DEPENDENT FEATURES (Requires Prerequisites):
     ============================================
@@ -806,6 +866,9 @@
 - ~~Performance Guru (Phase 22)~~ - ✅ COMPLETE: EXPLAIN analysis, LLM interpretation, index suggestions, 4 dialects. 77 tests, 2 endpoints, ~3,282 lines.
 - ~~Data Insights Enhancement (Phase 19)~~ - ✅ COMPLETE: Tiered narratives, analytics cache, parallel analysis. 108 tests.
 
+### Next Up
+- **Graph Mode / Neo4j (Phase 25)** — PLANNED. First-class graph database support, MVP scoped to Neo4j only. Six sub-phases: (25.1) connection foundation w/ encrypted creds + read-only default, (25.2) schema introspection (labels, relationship types, patterns, indexes, constraints) cached as `graph_schema_snapshots`, (25.3) Cypher Query Lab with Monaco editor and a safety classifier that blocks `CREATE/MERGE/DELETE/SET/REMOVE/DROP/LOAD CSV/CALL apoc.*` by default, (25.4) NL→Cypher and Cypher-explanation agents fed a compact schema context packet, (25.5) Cytoscape.js visual explorer with expand/depth/filter controls, (25.6) Graph Guru modeling advisor (rule-based checks + LLM cards). 4 new tables (`graph_connections`, `graph_schema_snapshots`, `graph_query_history`, `saved_graph_queries`). Provider-agnostic adapter interface so Memgraph / Neptune / ArangoDB / Postgres AGE can be slotted in later. Prereq: Phase 21 ✅ for connection ownership, Phase 15 ✅ for the AI calls. Spec: `database_guru_graph_database_support_spec.md`.
+
 ### Innovation Pipeline (Future evaluation)
 Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md) and [ROADMAP_FEEDBACK.md](ROADMAP_FEEDBACK.md):
 
@@ -856,6 +919,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Multi-Provider Monitoring** | Native tokens, cost tracking, provider comparison, model pricing admin | **Phase 17 ✅ COMPLETE** | ~1,373 lines |
 | **Data Insights** | Tiered narratives, analytics cache, multi-source quality, chart presets, parallel analysis | **Phase 19 ✅ COMPLETE** | ~1,800 lines |
 | **NoSQL Expansion** | MongoDB, Redis, Cassandra, DynamoDB, Elasticsearch, frontend integration, mixed chat | **Phase 14 ✅ COMPLETE** | ~6,000 lines |
+| **Graph Mode (Neo4j)** | Connection mgmt, schema introspection, Cypher Query Lab, NL→Cypher, visual explorer, modeling advisor | **Phase 25 — PLANNED** | TBD (6 sub-phases) |
 | **Table UX** | Sorting ✅, Resizing, Export | Sorting complete | ~400 lines remaining |
 | **Insight Quality** | Preprocessing, Pattern Learning | Not started | ~1,200 lines |
 | **Performance** | Streaming Results | Future | ~1,500 lines |
@@ -918,6 +982,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 | **Phase 24.7** | Admin & Observability UI | Phase 21 ✅ + Phase 24 ✅ | ~3,465 lines (4 PRs) | ✅ **COMPLETE** |
 | **Phase 24.8** | Auth Hardening (A/B/C/D1/D3) | Phase 21 ✅ + Phase 24.7 ✅ | ~1,400 lines + 4 migrations | ✅ **COMPLETE** (D2 deferred, needs Redis) |
 | **Phase 14** | NoSQL Database Expansion | None | ~6,000 lines | ✅ **COMPLETE** |
+| **Phase 25** | Graph Mode / Neo4j (MVP) | Phase 21 ✅ + Phase 15 ✅ | TBD (6 sub-phases) | 🟡 **PLANNED** |
 
 ---
 
@@ -940,6 +1005,7 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
 - [Phase 24_Observability_&_Monitoring.md](Phase%2024_Observability_%26_Monitoring.md) - Observability backend (Phase 24) ✅
 - [PHASE_24_Observability_&_Monitoring_UI_PLAN.md](PHASE_24_Observability_%26_Monitoring_UI_PLAN.md) - Admin & Observability UI (Phase 24.7) ✅
 - [PASSWORD_AUTH_HARDENING_PLAN.md](PASSWORD_AUTH_HARDENING_PLAN.md) - Auth Hardening (Phase 24.8) ✅ A/B/C/D1/D3, ⏳ D2 deferred
+- [database_guru_graph_database_support_spec.md](database_guru_graph_database_support_spec.md) - Graph Mode / Neo4j Support (Phase 25) 🟡 PLANNED
 - [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md) - Innovation pipeline ideas
 - [ROADMAP_FEEDBACK.md](ROADMAP_FEEDBACK.md) - PM review & strategic recommendations
 
@@ -1012,3 +1078,6 @@ Ideas from [FEATURE_SUGGESTIONS_BRAINSTORM.md](FEATURE_SUGGESTIONS_BRAINSTORM.md
   - 4 migrations, 2 new endpoints (`/api/auth/change-password`, `/api/auth/redeem-reset`), ~1,400 lines, 44 new tests across 6 files (`test_auth_change_password.py`, `test_auth_token_versioning.py`, `test_auth_rate_limit.py`, `test_auth_reset_tokens.py`, `test_auth_history_and_quorum.py`, `test_settings_auth_hardening.py`).
   - **⏳ Phase D2 (JWT JTI denylist on logout) — DEFERRED.** Phase A's `AUTH_INVALIDATE_TOKENS_ON_LOGOUT` covers the coarse case (logout kicks every device). D2 only matters when per-session revocation is needed and the version-bump approach is too coarse. Slot it in once Redis is part of the standard deploy story (Phase 23 `full` profile).
 - Previous: Added Phase 20-22, Innovation Pipeline, promoted Security to CRITICAL
+
+**Updated**: May 15, 2026
+- **Phase 25 🟡 PLANNED**: Graph Mode / Neo4j MVP added to roadmap from spec `database_guru_graph_database_support_spec.md`. Six sub-phases (foundation → schema introspection → Cypher Query Lab → AI Cypher generation/explanation → visual graph explorer → modeling advisor). Read-only by default; write/admin Cypher blocked by safety classifier in MVP. 4 new persistence tables. Provider-agnostic adapter so future providers (Memgraph, Neptune, ArangoDB, Postgres AGE) can be added without rewriting the AI/visualization layers. Prereqs already satisfied — Phase 21 (auth/ownership) for connection records, Phase 15 (LLM router) for NL→Cypher and explanation calls.
