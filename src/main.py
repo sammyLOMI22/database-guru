@@ -16,7 +16,7 @@ from src.middleware.request_context import RequestContextMiddleware
 from src.observability.logging_config import configure_logging
 from src.observability import metrics as observability_metrics
 from src.observability import tracing as observability_tracing
-from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance, auth, audit, admin_users, dml, llm_providers
+from src.api.endpoints import query, health, schema, models, connections, chat, multi_db_query, learned_corrections, result_verification, query_planning, feedback, mappings, tools, cache, pools, lineage, files, llm_usage, migration, performance, auth, audit, admin_users, dml, llm_providers, graph
 from src.api.endpoints import settings as settings_endpoints
 from src.core.file_source_session import FileSourceDuckDBSession
 from src.core.file_source_handler import cleanup_expired_files
@@ -274,6 +274,10 @@ def create_app(settings: Settings) -> FastAPI:
         app.include_router(admin_users.router, prefix="/api")
     app.include_router(dml.router, prefix="/api")
     app.include_router(llm_providers.router, prefix="/api")
+    # Phase 25 — Graph Mode (Neo4j). Mounted unconditionally; per-endpoint
+    # guards reject calls when GRAPH_MODE_ENABLED is False so the kill-switch
+    # behaves the same as for create/test in connections.py.
+    app.include_router(graph.router, prefix="/api")
 
     # /metrics endpoint, gated by METRICS_EXPOSE_ENDPOINT. Mounted at import
     # time (not in lifespan) so reverse-proxies can scrape it as soon as the

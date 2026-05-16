@@ -18,6 +18,7 @@ interface HeaderProps {
 const BASE_TABS = [
   { id: 'chat', label: 'Chat', icon: '💬' },
   { id: 'schema', label: 'Schema', icon: '🗂️' },
+  { id: 'graph', label: 'Graph', icon: '🕸️' },
   { id: 'lineage', label: 'Lineage', icon: '🔀' },
   { id: 'migration', label: 'Migrate', icon: '🔄' },
   { id: 'performance', label: 'Perf', icon: '🏎️' },

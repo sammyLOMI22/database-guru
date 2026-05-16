@@ -4,8 +4,10 @@
  * Tests the chat message display component
  */
 
+import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Message from '../src/components/Message';
 
 // Mock QueryResults component
@@ -18,6 +20,18 @@ vi.mock('../src/components/QueryResults', () => ({
     </div>
   ),
 }));
+
+// MultiDatabaseResults → EditModeWrapper transitively calls useQuery, so
+// every render of <Message queryResponse={...} /> needs a QueryClient in
+// scope. Disable retries so a missing endpoint can't slow tests down.
+function renderWithQueryClient(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
+}
 
 describe('Message', () => {
   describe('User Messages', () => {
@@ -76,7 +90,9 @@ describe('Message', () => {
         warnings: [],
       };
 
-      render(<Message type="assistant" content="Results:" queryResponse={mockQueryResponse} />);
+      renderWithQueryClient(
+        <Message type="assistant" content="Results:" queryResponse={mockQueryResponse} />,
+      );
 
       // Message now uses MultiDatabaseResults, so look for that container
       // The mock is no longer directly used - real MultiDatabaseResults renders
@@ -125,7 +141,9 @@ describe('Message', () => {
         used_planning: false,
       };
 
-      render(<Message type="assistant" content="Query complete" queryResponse={mockQueryResponse} />);
+      renderWithQueryClient(
+        <Message type="assistant" content="Query complete" queryResponse={mockQueryResponse} />,
+      );
 
       // Message uses MultiDatabaseResults - verify content is rendered
       expect(screen.getByText('Query complete')).toBeInTheDocument();
@@ -141,7 +159,9 @@ describe('Message', () => {
         warnings: [],
       };
 
-      render(<Message type="assistant" content="Deleted successfully" queryResponse={mockQueryResponse} />);
+      renderWithQueryClient(
+        <Message type="assistant" content="Deleted successfully" queryResponse={mockQueryResponse} />,
+      );
 
       // Message renders the text content
       expect(screen.getByText('Deleted successfully')).toBeInTheDocument();

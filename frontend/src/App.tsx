@@ -17,6 +17,7 @@ import { PerformancePanel } from './components/performance/PerformancePanel';
 import AdminPanel from './components/admin/AdminPanel';
 import RequireAdmin from './components/common/RequireAdmin';
 import SchemaPanel from './components/SchemaPanel';
+import GraphPanel from './components/graph/GraphPanel';
 import { healthAPI, settingsAPI } from './services/api';
 import { useDarkMode } from './hooks/useDarkMode';
 import { useAuth } from './hooks/useAuth';
@@ -52,7 +53,7 @@ function App() {
   // we'd rather hide the Admin tab than render a tab that 404s on every click.
   const [adminUiEnabled, setAdminUiEnabled] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'migration' | 'performance' | 'admin' | 'settings'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'schema' | 'graph' | 'feedback' | 'tools' | 'cache' | 'pools' | 'lineage' | 'usage' | 'migration' | 'performance' | 'admin' | 'settings'>('chat');
 
   // Cross-component lineage navigation state
   const [lineageNav, setLineageNav] = useState<{ sql?: string; tab?: 'explore' | 'history' | 'impact'; impactTable?: string } | null>(null);
@@ -188,6 +189,11 @@ function App() {
             {/* Schema */}
             <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'schema' ? '' : 'hidden'}`}>
               <SchemaPanel onAnalyzeImpact={handleAnalyzeImpact} lastSql={lastExecutedSql} />
+            </div>
+
+            {/* Graph (Phase 25) */}
+            <div className={`flex-1 flex h-full min-h-0 ${activeTab === 'graph' ? '' : 'hidden'}`}>
+              <GraphPanel />
             </div>
 
             {/* Lineage */}

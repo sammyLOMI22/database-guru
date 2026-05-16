@@ -50,13 +50,25 @@ vi.mock('../src/services/api', () => ({
     }),
   },
   connectionsAPI: {
-    getConnections: vi.fn().mockResolvedValue({
+    // EnhancedChatInterface.fetchActiveConnection() calls listConnections().
+    // The real api/services name is `listConnections` (api.ts:319), not
+    // `getConnections` — the old mock name silently became undefined and
+    // produced "connectionsAPI.listConnections is not a function" noise.
+    listConnections: vi.fn().mockResolvedValue({
       connections: [],
       count: 0,
     }),
   },
   multiQueryAPI: {
     processQuery: vi.fn(),
+  },
+  // EnhancedChatInterface.fetchPerTaskModels() reads from settingsAPI; if
+  // the export is missing vitest throws synchronously inside the mocked
+  // module proxy. Stub with a permissive payload so the destructure in
+  // setPerTaskModels(...) just yields undefineds.
+  settingsAPI: {
+    getSettings: vi.fn().mockResolvedValue({}),
+    updateSetting: vi.fn().mockResolvedValue({}),
   },
 }));
 

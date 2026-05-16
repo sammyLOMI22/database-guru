@@ -1773,3 +1773,103 @@ class ExplainOnlyResponse(BaseModel):
     dialect: str
     analyzed: bool
     warnings: List[str] = Field(default_factory=list)
+
+
+# ── Phase 25: Graph Mode (Neo4j) ──────────────────────────────────────────
+
+
+class GraphPropertySchema(BaseModel):
+    name: str
+    types: List[str] = Field(default_factory=list)
+    indexed: bool = False
+    nullable: Optional[bool] = None
+    sample_values: Optional[List[Any]] = None
+
+
+class GraphNodeLabelSchema(BaseModel):
+    name: str
+    estimated_count: Optional[int] = None
+    properties: List[GraphPropertySchema] = Field(default_factory=list)
+
+
+class GraphRelationshipTypeSchema(BaseModel):
+    name: str
+    estimated_count: Optional[int] = None
+    properties: List[GraphPropertySchema] = Field(default_factory=list)
+
+
+class GraphRelationshipPatternSchema(BaseModel):
+    source_labels: List[str] = Field(default_factory=list)
+    relationship_type: str
+    target_labels: List[str] = Field(default_factory=list)
+    estimated_count: Optional[int] = None
+
+
+class GraphIndexSchema(BaseModel):
+    name: str
+    entity_type: str
+    labels_or_types: List[str] = Field(default_factory=list)
+    properties: List[str] = Field(default_factory=list)
+    type: Optional[str] = None
+    state: Optional[str] = None
+
+
+class GraphConstraintSchema(BaseModel):
+    name: str
+    entity_type: str
+    labels_or_types: List[str] = Field(default_factory=list)
+    properties: List[str] = Field(default_factory=list)
+    type: str
+
+
+class GraphSchemaResponse(BaseModel):
+    """Cached or fresh schema for a graph connection (Phase 25.2)."""
+
+    connection_id: int
+    provider: str
+    database_name: str
+    labels: List[GraphNodeLabelSchema] = Field(default_factory=list)
+    relationships: List[GraphRelationshipTypeSchema] = Field(default_factory=list)
+    patterns: List[GraphRelationshipPatternSchema] = Field(default_factory=list)
+    indexes: List[GraphIndexSchema] = Field(default_factory=list)
+    constraints: List[GraphConstraintSchema] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    collected_at: Optional[str] = None
+    schema_updated_at: Optional[str] = None
+    server_version: Optional[str] = None
+    edition: Optional[str] = None
+    label_count: int = 0
+    relationship_type_count: int = 0
+    pattern_count: int = 0
+    index_count: int = 0
+    constraint_count: int = 0
+    # True when the response is served from DatabaseConnection.schema_cache,
+    # False when this request triggered a fresh introspection.
+    cached: bool = False
+
+
+class GraphIntrospectRequest(BaseModel):
+    """Force-refresh introspection request payload."""
+
+    overall_timeout_ms: Optional[int] = Field(
+        default=None,
+        ge=1000,
+        le=600_000,
+        description="Override server-wide GRAPH_INTROSPECTION_TIMEOUT_MS for this call.",
+    )
+    query_timeout_ms: Optional[int] = Field(
+        default=None,
+        ge=500,
+        le=120_000,
+        description="Override per-statement query timeout for this introspection only.",
+    )
+
+
+class GraphSchemaSummaryResponse(BaseModel):
+    """LLM-rendered (or fallback) overview blurb for the GraphOverview card."""
+
+    connection_id: int
+    summary: str
+    model: Optional[str] = None
+    provider: Optional[str] = None
+    used_fallback: bool = False

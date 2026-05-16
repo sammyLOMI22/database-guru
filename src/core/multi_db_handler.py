@@ -49,6 +49,93 @@ class MultiDatabaseHandler:
             "table_count": len(tables_list),
         }
 
+    async def _introspect_graph_database(self, conn: DatabaseConnection) -> Dict[str, Any]:
+        """Introspect schema for a graph database (Phase 25).
+
+        Surfaces graph-native dimensions (labels, relationship types, patterns)
+        alongside a SQL-compatible ``tables`` projection so existing
+        multi-DB consumers — and the ``total_tables`` rollup in
+        :meth:`build_combined_schema` — keep working without graph-specific
+        branches. Each node label is mirrored as one "table" with its
+        properties as columns; the full GraphSchema dict is preserved under
+        ``graph_schema`` for any downstream agent that wants the rich view.
+        """
+        from src.config.settings import Settings
+        from src.graph.neo4j.driver_pool import Neo4jDriverPool
+        from src.graph.neo4j.schema_inspector import Neo4jSchemaInspector
+        from src.graph.schema.normalizer import graph_schema_from_dict
+
+        settings = Settings()
+
+        # Prefer cached schema if present — avoids racing the live Neo4j
+        # server during every multi-DB chat introspection.
+        if conn.schema_cache:
+            try:
+                schema = graph_schema_from_dict(conn.schema_cache)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Graph cache for '%s' unreadable, re-introspecting: %s",
+                    conn.name,
+                    exc,
+                )
+                schema = None
+        else:
+            schema = None
+
+        if schema is None:
+            pool = await Neo4jDriverPool.get_instance()
+            driver = await pool.get(
+                connection_id=conn.id,
+                uri=conn.host or "",
+                username=conn.username or "",
+                password=conn.password_encrypted or "",
+                encrypted=bool(conn.encrypted),
+            )
+            inspector = Neo4jSchemaInspector(
+                driver=driver,
+                database_name=conn.database_name or "neo4j",
+                query_timeout_s=settings.GRAPH_QUERY_TIMEOUT_MS / 1000,
+                overall_timeout_s=settings.GRAPH_INTROSPECTION_TIMEOUT_MS / 1000,
+                count_cap=settings.GRAPH_INTROSPECTION_COUNT_CAP,
+            )
+            schema = await inspector.introspect()
+
+        graph_dict = schema.to_dict()
+        # Project labels → "tables" so legacy callers continue working.
+        tables_list = [
+            {
+                "name": label.name,
+                "columns": [
+                    {
+                        "name": prop.name,
+                        "type": ",".join(prop.types) if prop.types else "unknown",
+                        "nullable": prop.nullable,
+                    }
+                    for prop in label.properties
+                ],
+                "row_count": label.estimated_count,
+            }
+            for label in schema.labels
+        ]
+
+        logger.info(
+            "Introspected graph schema for '%s': %d labels, %d rel types, %d patterns",
+            conn.name,
+            len(schema.labels),
+            len(schema.relationships),
+            len(schema.patterns),
+        )
+
+        return {
+            "connection_id": conn.id,
+            "name": conn.name,
+            "database_type": conn.database_type,
+            "database_name": conn.database_name,
+            "tables": tables_list,
+            "table_count": len(tables_list),
+            "graph_schema": graph_dict,
+        }
+
     async def _introspect_single_database(self, conn: DatabaseConnection) -> Dict[str, Any]:
         """
         Introspect schema for a single database connection
@@ -60,6 +147,12 @@ class MultiDatabaseHandler:
             Dict with database info and schema, or error info
         """
         try:
+            # Phase 25: graph databases route ahead of NoSQL because Neo4j is
+            # neither in the SQL nor the NoSQL set today. Order matters here.
+            from src.graph.router import is_graph
+            if is_graph(conn.database_type):
+                return await self._introspect_graph_database(conn)
+
             # Route NoSQL databases to their own schema inspectors
             from src.nosql.router import is_nosql
             if is_nosql(conn.database_type):
