@@ -52,6 +52,8 @@ class TaskType(Enum):
     MIGRATION_PLANNER = "migration_planner"
     # Phase 22: Performance Guru
     EXPLAIN_ANALYSIS = "explain_analysis"
+    # Phase 25: Graph Mode (Neo4j)
+    GRAPH_SCHEMA_SUMMARY = "graph_schema_summary"
 
 
 @dataclass
@@ -99,6 +101,8 @@ class ModelRouter:
         TaskType.MIGRATION_PLANNER: 30,
         # Phase 22: Performance Guru
         TaskType.EXPLAIN_ANALYSIS: 25,
+        # Phase 25: Graph Mode (Neo4j)
+        TaskType.GRAPH_SCHEMA_SUMMARY: 15,
     }
 
     def __init__(
