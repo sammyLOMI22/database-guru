@@ -96,6 +96,12 @@ The system uses a multi-agent architecture with 40+ specialized agents (includin
 | Cassandra Handler | `src/nosql/cassandra/handler.py` | CQL generation, partition-aware queries (Phase 14) |
 | DynamoDB Handler | `src/nosql/dynamodb/handler.py` | PartiQL generation, boto3 integration (Phase 14) |
 | Elasticsearch Handler | `src/nosql/elasticsearch/handler.py` | Query DSL generation, aggregations (Phase 14) |
+| Graph Router | `src/graph/router.py` | Graph dispatch by `database_type`; canonical `GRAPH_DATABASE_TYPES` (Phase 25) |
+| Neo4j Graph Adapter | `src/graph/neo4j/handler.py` | `GraphAdapter` impl — connection-test surface (Phase 25.1) |
+| Neo4j Driver Pool | `src/graph/neo4j/driver_pool.py` | Per-connection `AsyncDriver` cache, LRU, lifespan-closed (Phase 25.1) |
+| Neo4j Schema Inspector | `src/graph/neo4j/schema_inspector.py` | Parallel Cypher probes (labels/rels/indexes/constraints/patterns/counts) in `READ_ACCESS` sessions, partial-failure tolerant (Phase 25.2) |
+| Graph Schema Normalizer | `src/graph/schema/normalizer.py` | Raw Neo4j rows → `GraphSchema` dataclass; `graph_schema_from_dict` reload (Phase 25.2) |
+| Graph Schema Summarizer | `src/graph/ai/schema_summarizer.py` | LLM "Overview" card with `fallback_schema_summary` (Phase 25.2) |
 | Auth Service | `src/auth/service.py` | JWT auth, bcrypt hashing, user CRUD; `bump_password_version()`, `check_password_history()`, `record_password_history()`, `count_active_admins()` helpers (Phase 21 + 24.8) |
 | Auth Dependencies | `src/auth/dependencies.py` | get_current_user, get_optional_user, require_admin; rejects stale `pv` JWT claim (Phase 21 + 24.8 token versioning) |
 | Audit Logger | `src/auth/audit.py` | AuditLog model, never-raising log_action(), facets/count helpers (Phase 21 + 24.7) |
@@ -197,6 +203,7 @@ Settings in `src/config/settings.py`:
   - **Phase C** — `AUTH_PASSWORD_RESET_MODE` (`temp_password` | `reset_token` | `both`; default `temp_password`), `AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES` (15), `AUTH_PASSWORD_RESET_BASE_URL` (used to build redemption links — startup warning if mode requires it but it's empty)
   - **Phase D1/D3** — `AUTH_PASSWORD_HISTORY_DEPTH` (0 = disabled; e.g. 5 to block reuse of last 5), `AUTH_REQUIRE_ADMIN_QUORUM` (false; blocks demoting/deactivating the last active admin)
   - All flags surface read-only via `/api/settings` and render in Admin → Health → Auth hardening so an operator can see live state. Phase D2 (JWT JTI denylist on logout) deferred — covered coarsely by `AUTH_INVALIDATE_TOKENS_ON_LOGOUT`; revisit when Redis is in the standard deploy story.
+- Graph Mode (Phase 25, opt-in): `GRAPH_MODE_ENABLED` (default `False` — matches the project's opt-in feature-flag convention; when off, the `/graph` router and connection create/test endpoints return HTTP 400 for `database_type='neo4j'`), `GRAPH_DEFAULT_READ_ONLY` (default True), `GRAPH_QUERY_TIMEOUT_MS` (10_000), `GRAPH_INTROSPECTION_TIMEOUT_MS` (30_000), `GRAPH_INTROSPECTION_COUNT_CAP` (10_000_000), `GRAPH_MAX_RECORDS` (1000), `GRAPH_MAX_VIZ_NODES` (200), `GRAPH_MAX_VIZ_EDGES` (500), `GRAPH_ALLOW_APOC` (False — APOC procedures deny-by-default), `GRAPH_ALLOW_WRITES` (False)
 
 ## Documentation
 

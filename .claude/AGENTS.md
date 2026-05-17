@@ -756,6 +756,108 @@ Executes DML statements against user databases:
 
 ---
 
+## Graph Mode System (Phase 25 — Neo4j)
+
+**Location**: `src/graph/`
+
+Mirrors the `src/nosql/` package layout. All entry points are gated by
+`Settings.GRAPH_MODE_ENABLED` (default `False` — opt-in, matching
+`ADMIN_UI_ENABLED` / `METRICS_ENABLED` / `OTEL_ENABLED`). When the flag is
+off the `/graph` router and the connection create/test guards return
+HTTP 400 for `database_type='neo4j'`.
+
+### Graph Router
+**File**: `src/graph/router.py`
+
+- `GRAPH_DATABASE_TYPES` — canonical set of graph database type strings
+  (single source of truth; `src/api/endpoints/connections.py` imports it
+  as `_GRAPH_DB_TYPES` so future providers don't desync).
+- `is_graph(database_type)` — dispatch predicate used by
+  `MultiDatabaseHandler._introspect_single_database` (graph routes ahead
+  of NoSQL).
+- `get_adapter(database_type)` — lazy import of the per-provider adapter
+  so the optional `neo4j` driver dependency never loads when Graph Mode
+  is disabled.
+
+### Neo4j Graph Adapter
+**File**: `src/graph/neo4j/handler.py`
+
+Implements the `GraphAdapter` Protocol from `src/graph/base.py`.
+Phase 25.1 ships the connection-test surface; later sub-phases extend it
+with `introspect_schema` / `execute_query` / etc.
+
+### Neo4j Driver Pool
+**File**: `src/graph/neo4j/driver_pool.py`
+
+Per-connection singleton cache of `neo4j.AsyncDriver` instances. LRU
+eviction at `MAX_POOL_SIZE` (20). Closed on app shutdown by
+`src/main.py` lifespan (alongside the five NoSQL client pools). Use
+`build_driver(...)` for one-shot connection tests so test failures don't
+poison the pooled instance.
+
+### Neo4j Schema Inspector
+**File**: `src/graph/neo4j/schema_inspector.py`
+
+Runs the Phase 25.2 introspection pipeline (`db.labels`,
+`db.relationshipTypes`, `db.schema.nodeTypeProperties`,
+`db.schema.relTypeProperties`, `SHOW INDEXES`, `SHOW CONSTRAINTS`,
+sampled patterns + per-label counts) in parallel under per-query and
+overall timeouts. Always opens sessions with
+`default_access_mode=neo4j.READ_ACCESS` so the path is safe against
+write-restricted databases. Partial failure is first-class — failed
+probes append a warning and the inspector continues. Counts are capped
+at `GRAPH_INTROSPECTION_COUNT_CAP` and skipped past
+`MAX_LABELS_TO_COUNT` to keep wide schemas tractable.
+
+**Key methods**: `introspect()`, `_safe_query()`, `_populate_counts()`,
+`_sample_patterns()`
+
+### Graph Schema Normalizer
+**File**: `src/graph/schema/normalizer.py`
+
+Pure dataclasses + functional normalizers that turn raw Neo4j rows into
+the `GraphSchema` dict served to the frontend. `graph_schema_from_dict`
+is defensively coded against missing keys so cached schemas survive
+forward-compatible additions.
+
+### Graph Schema Summarizer (AI Overview)
+**File**: `src/graph/ai/schema_summarizer.py`
+
+LLM-powered "Overview" card that explains the schema in human terms.
+Falls back to `fallback_schema_summary` so the UI never renders blank
+when the LLM is unavailable.
+
+### Graph API Endpoints
+**File**: `src/api/endpoints/graph.py`
+
+- `GET /graph/connections/{id}/schema` — cached or fresh introspection,
+  persists `schema_cache` + `schema_updated_at` on the connection row.
+- `POST /graph/connections/{id}/introspect` — force-refresh.
+- `POST /graph/connections/{id}/ai/schema-summary` — LLM Overview.
+- Every endpoint guards `GRAPH_MODE_ENABLED` and refuses to echo driver
+  error strings (which can embed credentialed Bolt URIs).
+
+### Multi-DB Integration
+`MultiDatabaseHandler._introspect_graph_database` projects each Neo4j
+label as one "table" with its properties as columns so the existing
+`total_tables` rollup and SQL-flavored combined-schema consumers keep
+working. The full `GraphSchema` dict is preserved under
+`graph_schema`. Fresh introspections are persisted back to
+`DatabaseConnection.schema_cache` via
+`_persist_graph_schema_cache` so subsequent multi-DB passes don't
+re-introspect on every chat round-trip.
+
+### Frontend
+**Location**: `frontend/src/components/graph/`
+
+- `GraphPanel.tsx` — top-level Graph Mode panel; connection picker +
+  five sub-tabs (Overview / Schema / Visual / Query Lab / Guru Advice).
+  Loads connections via react-query (`['connections', 'graph']`).
+- `GraphOverview.tsx` — AI Overview card.
+- `GraphSchemaExplorer.tsx` — labels / relationships / indexes browser.
+
+---
+
 ## Tool System
 **Location**: `src/tools/`
 

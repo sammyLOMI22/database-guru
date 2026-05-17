@@ -10,6 +10,7 @@
  * later sub-phases just fill in the panel content.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { connectionsAPI } from '../../services/api';
 import type { DatabaseConnection } from '../../types/api';
 import GraphOverview from './GraphOverview';
@@ -26,32 +27,31 @@ const SUB_TABS: { id: SubTab; label: string; icon: string }[] = [
 ];
 
 export default function GraphPanel() {
-  const [connections, setConnections] = useState<DatabaseConnection[]>([]);
-  const [loadingConns, setLoadingConns] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('overview');
 
+  // Use react-query so the connection list stays in sync with the rest of
+  // the app (cache, refetch-on-focus) — same pattern as useModels/useHistory.
+  const {
+    data: connections = [],
+    isLoading: loadingConns,
+  } = useQuery<DatabaseConnection[]>({
+    queryKey: ['connections', 'graph'],
+    queryFn: async () => {
+      const data = await connectionsAPI.listConnections();
+      const all = ((data as any)?.connections ?? []) as DatabaseConnection[];
+      return all.filter((c) => c.database_type === 'neo4j');
+    },
+    staleTime: 30 * 1000,
+  });
+
+  // Default-select the first active connection once the list loads.
   useEffect(() => {
-    let cancelled = false;
-    setLoadingConns(true);
-    connectionsAPI
-      .listConnections()
-      .then((data: any) => {
-        if (cancelled) return;
-        const all = (data?.connections ?? []) as DatabaseConnection[];
-        const graph = all.filter((c) => c.database_type === 'neo4j');
-        setConnections(graph);
-        const firstActive = graph.find((c) => c.is_active) || graph[0];
-        if (firstActive) setSelectedId(firstActive.id);
-      })
-      .catch((err) => console.error('[GraphPanel] connection load failed', err))
-      .finally(() => {
-        if (!cancelled) setLoadingConns(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (selectedId !== null) return;
+    if (connections.length === 0) return;
+    const firstActive = connections.find((c) => c.is_active) || connections[0];
+    if (firstActive) setSelectedId(firstActive.id);
+  }, [connections, selectedId]);
 
   const selectedConn = useMemo(
     () => connections.find((c) => c.id === selectedId) || null,

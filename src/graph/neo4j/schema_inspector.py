@@ -30,7 +30,7 @@ import logging
 import time
 from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar
 
-from neo4j import AsyncDriver
+from neo4j import READ_ACCESS, AsyncDriver
 
 from src.graph.schema.normalizer import (
     GraphIndex,
@@ -353,7 +353,7 @@ class Neo4jSchemaInspector:
         """Execute a Cypher statement in a READ session and return record dicts."""
         async with self.driver.session(
             database=self.database_name,
-            default_access_mode="r",  # type: ignore[arg-type]
+            default_access_mode=READ_ACCESS,
         ) as session:
             result = await session.run(cypher)
             records = await result.data()

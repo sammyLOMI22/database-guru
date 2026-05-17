@@ -202,6 +202,12 @@ async def lifespan(app: FastAPI):
             await pool_cls._instance.close_all()
     logger.info("✅ NoSQL client pools closed")
 
+    # Close graph driver pool (Phase 25).
+    from src.graph.neo4j.driver_pool import Neo4jDriverPool
+    if Neo4jDriverPool._instance is not None:
+        await Neo4jDriverPool._instance.close_all()
+        logger.info("✅ Neo4j driver pool closed")
+
     # Flush any pending OTEL spans (Phase 24.3).
     observability_tracing.shutdown()
 

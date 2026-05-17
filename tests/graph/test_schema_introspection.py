@@ -282,6 +282,33 @@ async def test_label_count_phase_respects_max():
     assert any("Counted first" in w for w in schema.warnings)
 
 
+# ── Driver-session kwargs regression ─────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_session_opens_with_neo4j_read_access_constant():
+    """Sessions must request ``default_access_mode=READ_ACCESS`` ("READ").
+
+    The neo4j 5.x driver's ``check_access_mode`` rejects anything that isn't
+    the literal strings ``"READ"`` or ``"WRITE"``. We previously passed
+    ``"r"``, which raised ``ConfigurationError`` against a real server but
+    was silently accepted by ``MagicMock``-based tests. This test pins the
+    contract so the regression can't return.
+    """
+    from neo4j import READ_ACCESS
+
+    driver, _session = make_driver({})
+    await Neo4jSchemaInspector(driver=driver).introspect()
+
+    assert driver.session.called, "introspect() should open at least one session"
+    # Inspect every session() call: every kwarg set must include the
+    # canonical READ_ACCESS constant — never the shorthand string.
+    for call in driver.session.call_args_list:
+        kwargs = call.kwargs
+        assert kwargs.get("default_access_mode") == READ_ACCESS
+        assert kwargs.get("default_access_mode") == "READ"
+
+
 # ── Integration suite (opt-in) ────────────────────────────────────────────
 
 

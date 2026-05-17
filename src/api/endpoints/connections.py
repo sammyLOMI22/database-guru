@@ -14,15 +14,11 @@ from src.auth.models import User
 from src.config.settings import Settings
 from src.database.models import DatabaseConnection
 from src.core.connection_tester import ConnectionTester
+from src.graph.router import GRAPH_DATABASE_TYPES as _GRAPH_DB_TYPES
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/connections", tags=["connections"])
-
-# Phase 25 — only graph database types carry a meaningful ``read_only`` value;
-# everything else stores NULL so legacy SQL/NoSQL behaviour is untouched. Keep
-# this set in sync with ``src.graph.router.GRAPH_DATABASE_TYPES``.
-_GRAPH_DB_TYPES = {"neo4j"}
 
 
 def _ensure_graph_mode_enabled(database_type: str, settings: Settings) -> None:

@@ -206,7 +206,9 @@ class Settings(BaseSettings):
     # ── Phase 25 — Graph Mode (Neo4j) ────────────────────────────────────
     # All defaults are safe + opt-in where security-sensitive. See
     # docs/planning/PHASE_25_GRAPH_MODE_NEO4J_PLAN.md §11 for the full table.
-    GRAPH_MODE_ENABLED: bool = True
+    # Off by default to match the project's "opt-in feature flag" convention
+    # (cf. ADMIN_UI_ENABLED, METRICS_ENABLED, OTEL_ENABLED).
+    GRAPH_MODE_ENABLED: bool = False
     # When True, newly-created graph connections start in read-only mode and
     # the driver opens sessions with default_access_mode=READ.
     GRAPH_DEFAULT_READ_ONLY: bool = True

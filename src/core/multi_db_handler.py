@@ -2,7 +2,9 @@
 import logging
 import asyncio
 from asyncio import Semaphore
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import DatabaseConnection, FileSource
@@ -99,6 +101,11 @@ class MultiDatabaseHandler:
                 count_cap=settings.GRAPH_INTROSPECTION_COUNT_CAP,
             )
             schema = await inspector.introspect()
+            # Persist the freshly introspected schema so subsequent multi-DB
+            # passes don't re-introspect on every chat round-trip. Mirrors the
+            # cache-write done by the dedicated /graph endpoint. Failures here
+            # are non-fatal — the in-memory schema is still usable.
+            await self._persist_graph_schema_cache(conn, schema.to_dict())
 
         graph_dict = schema.to_dict()
         # Project labels → "tables" so legacy callers continue working.
@@ -135,6 +142,36 @@ class MultiDatabaseHandler:
             "table_count": len(tables_list),
             "graph_schema": graph_dict,
         }
+
+    async def _persist_graph_schema_cache(
+        self, conn: DatabaseConnection, schema_dict: Dict[str, Any]
+    ) -> None:
+        """Write a freshly introspected graph schema back to ``DatabaseConnection``.
+
+        Uses a short-lived session so we don't depend on whichever session
+        loaded ``conn`` still being open. Non-fatal — a failed write only
+        means the next multi-DB pass will re-introspect.
+        """
+        from src.database.connection import db_manager
+
+        try:
+            async with db_manager.get_async_session() as session:
+                await session.execute(
+                    update(DatabaseConnection)
+                    .where(DatabaseConnection.id == conn.id)
+                    .values(
+                        schema_cache=schema_dict,
+                        schema_updated_at=datetime.now(timezone.utc),
+                    )
+                )
+            # Keep the in-memory conn instance in sync for the rest of this request.
+            conn.schema_cache = schema_dict
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to persist graph schema cache for '%s': %s",
+                conn.name,
+                exc,
+            )
 
     async def _introspect_single_database(self, conn: DatabaseConnection) -> Dict[str, Any]:
         """
