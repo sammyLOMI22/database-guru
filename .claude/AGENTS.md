@@ -834,8 +834,80 @@ when the LLM is unavailable.
   persists `schema_cache` + `schema_updated_at` on the connection row.
 - `POST /graph/connections/{id}/introspect` — force-refresh.
 - `POST /graph/connections/{id}/ai/schema-summary` — LLM Overview.
+- `POST /graph/connections/{id}/query` (Phase 25.3) — run a Cypher
+  statement under the safety classifier. Returns 200 + `GraphQueryResult`
+  on success, 400 + `GraphQueryBlocked` when refused by the classifier,
+  502 + `GraphQueryError` on driver failure. Every attempt is persisted
+  to `graph_query_history` (non-fatal on write failure).
+- `GET /graph/connections/{id}/history` (Phase 25.3) — paginated
+  `graph_query_history` with same owner-visibility rules as the schema
+  endpoints.
 - Every endpoint guards `GRAPH_MODE_ENABLED` and refuses to echo driver
   error strings (which can embed credentialed Bolt URIs).
+
+### Cypher Safety Classifier (Phase 25.3)
+**File**: `src/graph/safety/classifier.py`, `src/graph/safety/rules.py`
+
+Text-based, no Cypher parser dependency. Strips string literals + line/block
+comments + back-ticked identifiers, then matches uppercased tokens against
+`WRITE_KEYWORDS`, `DANGEROUS_KEYWORDS`, and procedure FQN rule sets in
+`rules.py`. APOC is deny-by-default (gated by `GRAPH_ALLOW_APOC`); when
+permitted, known APOC write prefixes still escalate to `WRITE`. Returns
+`SafetyClassification(level, reasons, procedures)` so the API layer can
+surface a structured `blocked_reason`. The companion `explain_blocked`
+helper composes the user-facing message.
+
+**Key methods**: `classify()`, `explain_blocked()`
+
+### Cypher Query Executor (Phase 25.3)
+**File**: `src/graph/neo4j/query_executor.py`
+
+Composes the safety classifier, the pooled driver, and the result
+formatter. Always opens sessions with `default_access_mode=READ_ACCESS`,
+wraps `session.run` in `asyncio.wait_for(..., timeout=query_timeout_s)`,
+and streams records up to `GRAPH_MAX_RECORDS` before stopping. Never
+raises — every exception is routed through `classify_error` and packaged
+into the returned `ExecutionResult`. Server-side notifications from
+`ResultSummary.notifications` are surfaced as `server_warnings` so the UI
+can hint at deprecations.
+
+**Key method**: `execute_cypher()`
+
+### Cypher Result Formatter (Phase 25.3)
+**File**: `src/graph/result_formatter.py`
+
+Duck-typed walker that recognizes `Node`/`Relationship`/`Path` by their
+public attributes (no `neo4j.graph` import needed, so the formatter is
+testable without the driver). Produces two complementary views: a
+`table` (columns + rows) and a `graph_viz` (Cytoscape-flavored
+nodes/edges with display-name heuristics). Caps at `GRAPH_MAX_VIZ_NODES`
+and `GRAPH_MAX_VIZ_EDGES`; surfaces a warning when truncated. Records
+that hit the record cap propagate `truncated_records=True` so the
+warning carries through.
+
+**Key function**: `format_records()`
+
+### Neo4j Error Classifier (Phase 25.3)
+**File**: `src/graph/neo4j/error_classifier.py`
+
+Maps driver exceptions (and `asyncio.TimeoutError`) to one of
+`SYNTAX`/`UNKNOWN_LABEL`/`UNKNOWN_PROPERTY`/`UNKNOWN_REL_TYPE`/`AUTH`/
+`CONNECTION`/`TIMEOUT`/`PERMISSION`/`CONSTRAINT_VIOLATION`/`INTERNAL`/
+`UNKNOWN` with a user-facing message + optional hint. Uses Neo4j's
+status code when available, otherwise falls back to class-name and
+message-text heuristics. Total function — never raises. The user
+message is what the API surfaces; the raw `str(exc)` is logged
+server-side only so URIs / stacks never leak.
+
+**Key function**: `classify_error()`
+
+### GraphQueryHistory model (Phase 25.3)
+**File**: `src/database/models.py`, migration `8c2d4e6f1a3b`
+
+Separate from `QueryHistory` because the Cypher column set (safety
+classification, viz truncation flags, no NL column for hand-written
+queries) diverges enough that sharing would mean ~50% NULL columns.
+Owner-aware indexes mirror the schema endpoints' visibility rules.
 
 ### Multi-DB Integration
 `MultiDatabaseHandler._introspect_graph_database` projects each Neo4j
@@ -855,6 +927,12 @@ re-introspect on every chat round-trip.
   Loads connections via react-query (`['connections', 'graph']`).
 - `GraphOverview.tsx` — AI Overview card.
 - `GraphSchemaExplorer.tsx` — labels / relationships / indexes browser.
+- `CypherQueryLab.tsx` (Phase 25.3) — hand-written Cypher editor +
+  Run button, Table/JSON/Graph result tabs, inline blocked / driver
+  error cards with safety badges, and a "Recent queries" strip backed
+  by the `/history` endpoint. Visual rendering of nodes/edges is
+  placeholder text until Phase 25.5 ships Cytoscape; the `graph_viz`
+  payload is already captured by the API.
 
 ---
 

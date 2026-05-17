@@ -124,6 +124,108 @@ export interface GraphIntrospectOptions {
   queryTimeoutMs?: number;
 }
 
+// ── Phase 25.3: Cypher Query Lab ────────────────────────────────────────
+
+export type GraphQuerySafetyLevel =
+  | 'read_only'
+  | 'write'
+  | 'admin'
+  | 'dangerous'
+  | 'unknown';
+
+export interface GraphVizNode {
+  id: string;
+  labels: string[];
+  properties: Record<string, unknown>;
+  displayName: string;
+}
+
+export interface GraphVizEdge {
+  id: string;
+  source: string;
+  target: string;
+  type: string;
+  properties: Record<string, unknown>;
+}
+
+export interface GraphVizPayload {
+  nodes: GraphVizNode[];
+  edges: GraphVizEdge[];
+  has_graph: boolean;
+}
+
+export interface GraphTablePayload {
+  columns: string[];
+  rows: unknown[][];
+}
+
+export interface GraphQueryRequest {
+  cypher: string;
+  parameters?: Record<string, unknown>;
+  query_timeout_ms?: number;
+  max_records?: number;
+  source?: 'manual' | 'ai' | 'chat';
+  prompt?: string;
+}
+
+export interface GraphQueryResult {
+  connection_id: number;
+  cypher: string;
+  safety_level: GraphQuerySafetyLevel;
+  success: boolean;
+  record_count: number;
+  execution_time_ms: number;
+  truncated: boolean;
+  table: GraphTablePayload;
+  graph_viz: GraphVizPayload;
+  warnings: string[];
+  server_warnings: string[];
+}
+
+export interface GraphQueryBlocked {
+  connection_id: number;
+  safety_level: GraphQuerySafetyLevel;
+  blocked_reason: string;
+  reasons: string[];
+  procedures: string[];
+}
+
+export interface GraphQueryErrorPayload {
+  connection_id: number;
+  safety_level: GraphQuerySafetyLevel;
+  success: false;
+  error_category: string;
+  error_message: string;
+  error_hint: string | null;
+  error_code: string | null;
+  execution_time_ms: number;
+}
+
+export interface GraphHistoryItem {
+  id: number;
+  connection_id: number;
+  source: string;
+  cypher: string;
+  prompt: string | null;
+  safety_level: GraphQuerySafetyLevel;
+  success: boolean;
+  execution_time_ms: number | null;
+  record_count: number | null;
+  truncated: boolean;
+  blocked_reason: string | null;
+  error_category: string | null;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface GraphHistoryResponse {
+  connection_id: number;
+  items: GraphHistoryItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const graphAPI = {
@@ -161,6 +263,35 @@ export const graphAPI = {
   ): Promise<GraphSchemaSummaryResponse> {
     const { data } = await api.post<GraphSchemaSummaryResponse>(
       `/api/graph/connections/${connectionId}/ai/schema-summary`,
+    );
+    return data;
+  },
+
+  /** Run a Cypher statement. Resolves on 200; rejects on 400/502 — the
+   *  caller is expected to inspect `error.response.data` for the
+   *  `GraphQueryBlocked` or `GraphQueryErrorPayload` shape so the UI can
+   *  render the structured reason inline. */
+  async runQuery(
+    connectionId: number,
+    request: GraphQueryRequest,
+  ): Promise<GraphQueryResult> {
+    const { data } = await api.post<GraphQueryResult>(
+      `/api/graph/connections/${connectionId}/query`,
+      request,
+    );
+    return data;
+  },
+
+  async listHistory(
+    connectionId: number,
+    options?: { limit?: number; offset?: number },
+  ): Promise<GraphHistoryResponse> {
+    const params: Record<string, number> = {};
+    if (options?.limit !== undefined) params.limit = options.limit;
+    if (options?.offset !== undefined) params.offset = options.offset;
+    const { data } = await api.get<GraphHistoryResponse>(
+      `/api/graph/connections/${connectionId}/history`,
+      { params },
     );
     return data;
   },

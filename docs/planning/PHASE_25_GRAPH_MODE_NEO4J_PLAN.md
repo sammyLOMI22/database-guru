@@ -493,7 +493,7 @@ Tests:
 - `tests/graph/test_schema_normalizer.py` — Neo4j rows → GraphSchema mapping.
 - Frontend vitest: `GraphSchemaExplorer` renders + filter state.
 
-### Phase 25.3 — Cypher Query Lab — ~900 LOC, ~20 tests
+### Phase 25.3 — Cypher Query Lab — ~900 LOC, ~20 tests ✅ SHIPPED
 
 Files:
 - `src/graph/safety/classifier.py`, `src/graph/safety/rules.py`

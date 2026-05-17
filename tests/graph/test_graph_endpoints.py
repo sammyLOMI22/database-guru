@@ -375,3 +375,215 @@ class TestSchemaSummaryEndpoint:
         assert body["model"] is None
         assert body["provider"] is None
         app.dependency_overrides.clear()
+
+
+# ── Phase 25.3 — /query endpoint ──────────────────────────────────────────
+
+
+def _override_db_with_history(app: FastAPI, conn):
+    """DB override that supports the connection lookup + history insert + count."""
+    from src.api.dependencies import get_db
+
+    def make_db():
+        db = MagicMock()
+        # First execute() — connection lookup. Subsequent execute() calls (history
+        # insert, count, fetch) all return empty/zero scalars so the endpoint
+        # works against an in-memory stand-in. We use a side_effect list so
+        # we don't have to introspect the SQL.
+        def fake_scalar_one_or_none():
+            return conn
+
+        conn_lookup_result = MagicMock()
+        conn_lookup_result.scalar_one_or_none = fake_scalar_one_or_none
+
+        count_result = MagicMock()
+        count_result.scalar_one = MagicMock(return_value=0)
+
+        fetch_result = MagicMock()
+        fetch_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+
+        results = [
+            conn_lookup_result,  # _load_graph_connection
+            count_result,         # count() for history
+            fetch_result,         # rows for history
+        ]
+        results_iter = iter(results)
+
+        async def execute(*args, **kwargs):
+            try:
+                return next(results_iter)
+            except StopIteration:
+                return MagicMock()
+
+        db.execute = execute
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        db.rollback = AsyncMock()
+        db.add = MagicMock()
+        return db
+
+    async def fake_get_db():
+        yield make_db()
+
+    app.dependency_overrides[get_db] = fake_get_db
+
+
+class TestRunGraphQueryEndpoint:
+    def test_blocked_write_returns_400_with_reason(self):
+        conn = _neo4j_conn()
+        app = _make_app()
+        _override_db_with_history(app, conn)
+
+        with patch(
+            "src.api.endpoints.graph.Neo4jDriverPool.get_instance",
+            new=AsyncMock(return_value=MagicMock(
+                get=AsyncMock(return_value=MagicMock())
+            )),
+        ):
+            resp = TestClient(app).post(
+                "/api/graph/connections/42/query",
+                json={"cypher": "CREATE (n:User {name: 'Alice'})"},
+            )
+
+        assert resp.status_code == 400, resp.text
+        detail = resp.json()["detail"]
+        assert detail["safety_level"] == "write"
+        assert "read-only" in detail["blocked_reason"].lower()
+        assert detail["connection_id"] == 42
+        app.dependency_overrides.clear()
+
+    def test_read_query_executes_and_returns_payload(self):
+        conn = _neo4j_conn()
+        app = _make_app()
+        _override_db_with_history(app, conn)
+
+        from src.graph.neo4j.query_executor import ExecutionResult
+        from src.graph.result_formatter import FormattedResult
+        from src.graph.safety.classifier import (
+            GraphQuerySafetyLevel,
+            SafetyClassification,
+        )
+
+        formatted = FormattedResult(
+            table_columns=["name"],
+            table_rows=[["Alice"]],
+            nodes=[],
+            edges=[],
+        )
+        canned = ExecutionResult(
+            success=True,
+            cypher="MATCH (u) RETURN u.name AS name",
+            safety=SafetyClassification(level=GraphQuerySafetyLevel.READ_ONLY),
+            formatted=formatted,
+            record_count=1,
+            execution_time_ms=12.3,
+            server_warnings=["Deprecated: foo"],
+        )
+
+        with patch(
+            "src.api.endpoints.graph.Neo4jDriverPool.get_instance",
+            new=AsyncMock(return_value=MagicMock(get=AsyncMock(return_value=MagicMock()))),
+        ), patch(
+            "src.api.endpoints.graph.execute_cypher",
+            new=AsyncMock(return_value=canned),
+        ):
+            resp = TestClient(app).post(
+                "/api/graph/connections/42/query",
+                json={"cypher": "MATCH (u) RETURN u.name AS name"},
+            )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["success"] is True
+        assert body["safety_level"] == "read_only"
+        assert body["record_count"] == 1
+        assert body["table"]["columns"] == ["name"]
+        assert body["table"]["rows"] == [["Alice"]]
+        assert body["graph_viz"]["has_graph"] is False
+        assert body["server_warnings"] == ["Deprecated: foo"]
+        app.dependency_overrides.clear()
+
+    def test_driver_error_returns_502_with_category(self):
+        conn = _neo4j_conn()
+        app = _make_app()
+        _override_db_with_history(app, conn)
+
+        from src.graph.neo4j.error_classifier import (
+            ClassifiedError,
+            GraphErrorCategory,
+        )
+        from src.graph.neo4j.query_executor import ExecutionResult
+        from src.graph.safety.classifier import (
+            GraphQuerySafetyLevel,
+            SafetyClassification,
+        )
+
+        canned = ExecutionResult(
+            success=False,
+            cypher="MATCH (n) RETURN n",
+            safety=SafetyClassification(level=GraphQuerySafetyLevel.READ_ONLY),
+            error=ClassifiedError(
+                category=GraphErrorCategory.AUTH,
+                user_message="Authentication failed.",
+                hint="Check credentials.",
+            ),
+            execution_time_ms=5.0,
+        )
+
+        with patch(
+            "src.api.endpoints.graph.Neo4jDriverPool.get_instance",
+            new=AsyncMock(return_value=MagicMock(get=AsyncMock(return_value=MagicMock()))),
+        ), patch(
+            "src.api.endpoints.graph.execute_cypher",
+            new=AsyncMock(return_value=canned),
+        ):
+            resp = TestClient(app).post(
+                "/api/graph/connections/42/query",
+                json={"cypher": "MATCH (n) RETURN n"},
+            )
+
+        assert resp.status_code == 502, resp.text
+        detail = resp.json()["detail"]
+        assert detail["error_category"] == "auth"
+        assert detail["safety_level"] == "read_only"
+        assert "Authentication" in detail["error_message"]
+        app.dependency_overrides.clear()
+
+    def test_kill_switch_blocks_query(self):
+        conn = _neo4j_conn()
+        app = _make_app(graph_mode=False)
+        _override_db_with_history(app, conn)
+
+        resp = TestClient(app).post(
+            "/api/graph/connections/42/query",
+            json={"cypher": "MATCH (n) RETURN n"},
+        )
+        assert resp.status_code == 400
+        assert "GRAPH_MODE_ENABLED" in resp.json()["detail"]
+        app.dependency_overrides.clear()
+
+
+class TestGraphHistoryEndpoint:
+    def test_history_empty_returns_zero_total(self):
+        conn = _neo4j_conn()
+        app = _make_app()
+        _override_db_with_history(app, conn)
+
+        resp = TestClient(app).get("/api/graph/connections/42/history")
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["connection_id"] == 42
+        assert body["items"] == []
+        assert body["total"] == 0
+        assert body["limit"] == 50
+        assert body["offset"] == 0
+        app.dependency_overrides.clear()
+
+    def test_history_kill_switch_blocks(self):
+        conn = _neo4j_conn()
+        app = _make_app(graph_mode=False)
+        _override_db_with_history(app, conn)
+
+        resp = TestClient(app).get("/api/graph/connections/42/history")
+        assert resp.status_code == 400
+        app.dependency_overrides.clear()

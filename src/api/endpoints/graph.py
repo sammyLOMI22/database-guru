@@ -17,8 +17,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db
@@ -26,15 +26,25 @@ from src.api.dependencies.common import get_settings
 from src.auth.dependencies import get_optional_user
 from src.auth.models import User
 from src.config.settings import Settings
-from src.database.models import DatabaseConnection
+from src.database.models import DatabaseConnection, GraphQueryHistory
 from src.graph.neo4j.driver_pool import Neo4jDriverPool
+from src.graph.neo4j.query_executor import ExecutionResult, execute_cypher
 from src.graph.neo4j.schema_inspector import Neo4jSchemaInspector
 from src.graph.router import is_graph
+from src.graph.safety.classifier import GraphQuerySafetyLevel
 from src.graph.schema.normalizer import GraphSchema, graph_schema_from_dict
 from src.models.schemas import (
+    GraphHistoryItem,
+    GraphHistoryResponse,
     GraphIntrospectRequest,
+    GraphQueryBlocked,
+    GraphQueryError,
+    GraphQueryRequest,
+    GraphQueryResult,
     GraphSchemaResponse,
     GraphSchemaSummaryResponse,
+    GraphTablePayload,
+    GraphVizPayload,
 )
 
 logger = logging.getLogger(__name__)
@@ -319,6 +329,250 @@ async def graph_schema_summary(
         model=summary.model,
         provider=summary.provider,
         used_fallback=summary.used_fallback,
+    )
+
+
+# ── Phase 25.3 — Cypher Query Lab ────────────────────────────────────────
+
+
+async def _record_query_history(
+    db: AsyncSession,
+    *,
+    conn: DatabaseConnection,
+    owner_id: Optional[int],
+    request: GraphQueryRequest,
+    execution: ExecutionResult,
+) -> Optional[int]:
+    """Persist one ``graph_query_history`` row. Returns the row id.
+
+    Non-fatal — if the write fails we log and continue so a transient
+    metadata-DB hiccup never blocks the user's query response.
+    """
+    safety_level = (
+        execution.safety_level.value
+        if execution.safety_level
+        else GraphQuerySafetyLevel.UNKNOWN.value
+    )
+    record = GraphQueryHistory(
+        connection_id=conn.id,
+        owner_id=owner_id,
+        source=request.source or "manual",
+        cypher=request.cypher,
+        prompt=request.prompt,
+        safety_level=safety_level,
+        blocked_reason=execution.blocked_reason,
+        success=execution.success,
+        execution_time_ms=execution.execution_time_ms,
+        record_count=execution.record_count if execution.success else None,
+        truncated=bool(execution.formatted and execution.formatted.truncated),
+        error_category=execution.error.category.value if execution.error else None,
+        error_message=execution.error.user_message if execution.error else None,
+    )
+    try:
+        db.add(record)
+        await db.commit()
+        await db.refresh(record)
+        return record.id
+    except Exception as exc:  # noqa: BLE001
+        await db.rollback()
+        logger.warning(
+            "Failed to persist graph_query_history row for connection %s: %s",
+            conn.id,
+            exc,
+        )
+        return None
+
+
+@router.post(
+    "/connections/{connection_id}/query",
+    response_model=GraphQueryResult,
+    responses={
+        400: {"model": GraphQueryBlocked, "description": "Query blocked by safety classifier"},
+        502: {"model": GraphQueryError, "description": "Driver-level execution error"},
+    },
+)
+async def run_graph_query(
+    connection_id: int,
+    request: GraphQueryRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+    settings: Settings = Depends(get_settings),
+) -> GraphQueryResult:
+    """Run a Cypher statement against the connection's Neo4j database.
+
+    Three response codes:
+
+    * ``200`` — query passed safety classification and executed cleanly.
+    * ``400`` — classifier rejected the query (WRITE/DANGEROUS/ADMIN/UNKNOWN).
+                Body is :class:`GraphQueryBlocked` so the Lab can render
+                the reason inline.
+    * ``502`` — query ran but the driver returned an error (auth, syntax,
+                timeout, unknown label, etc.). Body is :class:`GraphQueryError`
+                with a category the UI can surface.
+    """
+    _ensure_graph_mode(settings)
+    conn = await _load_graph_connection(connection_id, db, current_user)
+
+    pool = await Neo4jDriverPool.get_instance()
+    driver = await pool.get(
+        connection_id=conn.id,
+        uri=conn.host or "",
+        username=conn.username or "",
+        password=conn.password_encrypted or "",
+        encrypted=bool(conn.encrypted),
+    )
+
+    query_timeout_s = (
+        (request.query_timeout_ms or settings.GRAPH_QUERY_TIMEOUT_MS) / 1000
+    )
+    max_records = request.max_records or settings.GRAPH_MAX_RECORDS
+
+    execution = await execute_cypher(
+        driver,
+        request.cypher,
+        database_name=conn.database_name or "neo4j",
+        query_timeout_s=query_timeout_s,
+        max_records=max_records,
+        max_viz_nodes=settings.GRAPH_MAX_VIZ_NODES,
+        max_viz_edges=settings.GRAPH_MAX_VIZ_EDGES,
+        allow_apoc=settings.GRAPH_ALLOW_APOC,
+        allow_writes=settings.GRAPH_ALLOW_WRITES,
+        parameters=request.parameters,
+    )
+
+    owner_id = current_user.id if current_user else None
+    await _record_query_history(
+        db, conn=conn, owner_id=owner_id, request=request, execution=execution
+    )
+
+    # ── Blocked: 400 with structured reason ──
+    if execution.blocked_reason is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=GraphQueryBlocked(
+                connection_id=conn.id,
+                safety_level=execution.safety_level.value,
+                blocked_reason=execution.blocked_reason,
+                reasons=list(execution.safety.reasons),
+                procedures=list(execution.safety.procedures),
+            ).model_dump(),
+        )
+
+    # ── Driver error: 502 with category ──
+    if not execution.success:
+        err = execution.error
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=GraphQueryError(
+                connection_id=conn.id,
+                safety_level=execution.safety_level.value,
+                success=False,
+                error_category=(err.category.value if err else "unknown"),
+                error_message=(err.user_message if err else "Neo4j rejected the query."),
+                error_hint=(err.hint if err else None),
+                error_code=(err.code if err else None),
+                execution_time_ms=execution.execution_time_ms,
+            ).model_dump(),
+        )
+
+    # ── Success ──
+    formatted = execution.formatted
+    assert formatted is not None  # success implies formatted is set
+    return GraphQueryResult(
+        connection_id=conn.id,
+        cypher=execution.cypher,
+        safety_level=execution.safety_level.value,
+        success=True,
+        record_count=execution.record_count,
+        execution_time_ms=execution.execution_time_ms,
+        truncated=formatted.truncated,
+        table=GraphTablePayload(
+            columns=list(formatted.table_columns),
+            rows=list(formatted.table_rows),
+        ),
+        graph_viz=GraphVizPayload(
+            nodes=[n.to_dict() for n in formatted.nodes],
+            edges=[e.to_dict() for e in formatted.edges],
+            has_graph=formatted.has_graph,
+        ),
+        warnings=list(formatted.warnings),
+        server_warnings=list(execution.server_warnings),
+    )
+
+
+@router.get(
+    "/connections/{connection_id}/history",
+    response_model=GraphHistoryResponse,
+)
+async def get_graph_query_history(
+    connection_id: int,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+    settings: Settings = Depends(get_settings),
+) -> GraphHistoryResponse:
+    """Paginated history of Cypher executions for this connection.
+
+    Visibility rules match the schema endpoints: authenticated users see
+    their own rows; anonymous callers see only rows with ``owner_id IS NULL``.
+    """
+    _ensure_graph_mode(settings)
+    conn = await _load_graph_connection(connection_id, db, current_user)
+
+    base = select(GraphQueryHistory).where(
+        GraphQueryHistory.connection_id == conn.id
+    )
+    if current_user is None:
+        base = base.where(GraphQueryHistory.owner_id.is_(None))
+    else:
+        base = base.where(
+            (GraphQueryHistory.owner_id.is_(None))
+            | (GraphQueryHistory.owner_id == current_user.id)
+        )
+
+    total = (
+        await db.execute(
+            select(func.count()).select_from(base.subquery())
+        )
+    ).scalar_one()
+
+    rows = (
+        await db.execute(
+            base.order_by(GraphQueryHistory.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).scalars().all()
+
+    items = [
+        GraphHistoryItem(
+            id=row.id,
+            connection_id=row.connection_id,
+            source=row.source,
+            cypher=row.cypher,
+            prompt=row.prompt,
+            safety_level=row.safety_level,
+            success=row.success,
+            execution_time_ms=row.execution_time_ms,
+            record_count=row.record_count,
+            truncated=row.truncated,
+            blocked_reason=row.blocked_reason,
+            error_category=row.error_category,
+            error_message=row.error_message,
+            created_at=(
+                row.created_at.isoformat() if row.created_at else ""
+            ),
+        )
+        for row in rows
+    ]
+
+    return GraphHistoryResponse(
+        connection_id=conn.id,
+        items=items,
+        total=int(total or 0),
+        limit=limit,
+        offset=offset,
     )
 
 

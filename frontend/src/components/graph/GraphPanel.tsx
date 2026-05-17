@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { connectionsAPI } from '../../services/api';
 import type { DatabaseConnection } from '../../types/api';
+import CypherQueryLab from './CypherQueryLab';
 import GraphOverview from './GraphOverview';
 import GraphSchemaExplorer from './GraphSchemaExplorer';
 
@@ -154,10 +155,7 @@ export default function GraphPanel() {
           />
         )}
         {activeSubTab === 'querylab' && (
-          <PlaceholderPanel
-            title="Cypher Query Lab"
-            body="Hand-written Cypher + AI-generated queries with safety classification ship in Phase 25.3 / 25.4."
-          />
+          <CypherQueryLab connectionId={selectedConn?.id ?? null} />
         )}
         {activeSubTab === 'advice' && (
           <PlaceholderPanel

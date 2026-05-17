@@ -1873,3 +1873,136 @@ class GraphSchemaSummaryResponse(BaseModel):
     model: Optional[str] = None
     provider: Optional[str] = None
     used_fallback: bool = False
+
+
+# ── Phase 25.3 — Cypher Query Lab ────────────────────────────────────────
+
+
+class GraphQueryRequest(BaseModel):
+    """Request body for ``POST /graph/connections/{id}/query``.
+
+    ``parameters`` carries Cypher parameters so the caller doesn't have
+    to interpolate values into the query (which would defeat the safety
+    classifier's string-stripping step).
+    """
+
+    cypher: str = Field(..., min_length=1, max_length=20_000)
+    parameters: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Cypher parameters dict (passed to the driver verbatim).",
+    )
+    query_timeout_ms: Optional[int] = Field(
+        default=None,
+        ge=500,
+        le=120_000,
+        description="Override server-wide GRAPH_QUERY_TIMEOUT_MS for this call.",
+    )
+    max_records: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=10_000,
+        description="Override server-wide GRAPH_MAX_RECORDS for this call.",
+    )
+    source: Optional[str] = Field(
+        default="manual",
+        description="Where the query came from — 'manual', 'ai', or 'chat'.",
+    )
+    prompt: Optional[str] = Field(
+        default=None,
+        max_length=5_000,
+        description="Original NL prompt when source='ai'; logged to history only.",
+    )
+
+
+class GraphVizNodePayload(BaseModel):
+    id: str
+    labels: List[str]
+    properties: Dict[str, Any] = Field(default_factory=dict)
+    displayName: str  # Stays camelCase to match the Cytoscape data shape on the frontend.
+
+
+class GraphVizEdgePayload(BaseModel):
+    id: str
+    source: str
+    target: str
+    type: str
+    properties: Dict[str, Any] = Field(default_factory=dict)
+
+
+class GraphVizPayload(BaseModel):
+    nodes: List[GraphVizNodePayload] = Field(default_factory=list)
+    edges: List[GraphVizEdgePayload] = Field(default_factory=list)
+    has_graph: bool = False
+
+
+class GraphTablePayload(BaseModel):
+    columns: List[str] = Field(default_factory=list)
+    rows: List[List[Any]] = Field(default_factory=list)
+
+
+class GraphQueryResult(BaseModel):
+    """Response for a successful Cypher execution."""
+
+    connection_id: int
+    cypher: str
+    safety_level: str
+    success: bool
+    record_count: int
+    execution_time_ms: float
+    truncated: bool
+    table: GraphTablePayload
+    graph_viz: GraphVizPayload
+    warnings: List[str] = Field(default_factory=list)
+    server_warnings: List[str] = Field(default_factory=list)
+
+
+class GraphQueryBlocked(BaseModel):
+    """Response body for a query blocked by the safety classifier (HTTP 400)."""
+
+    connection_id: int
+    safety_level: str
+    blocked_reason: str
+    reasons: List[str] = Field(default_factory=list)
+    procedures: List[str] = Field(default_factory=list)
+
+
+class GraphQueryError(BaseModel):
+    """Response body for a query that ran but errored at the driver layer."""
+
+    connection_id: int
+    safety_level: str
+    success: bool = False
+    error_category: str
+    error_message: str
+    error_hint: Optional[str] = None
+    error_code: Optional[str] = None
+    execution_time_ms: float = 0.0
+
+
+class GraphHistoryItem(BaseModel):
+    """A single ``graph_query_history`` row in the listing endpoint."""
+
+    id: int
+    connection_id: int
+    source: str
+    cypher: str
+    prompt: Optional[str] = None
+    safety_level: str
+    success: bool
+    execution_time_ms: Optional[float] = None
+    record_count: Optional[int] = None
+    truncated: bool = False
+    blocked_reason: Optional[str] = None
+    error_category: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: str
+
+
+class GraphHistoryResponse(BaseModel):
+    """Paginated graph query history."""
+
+    connection_id: int
+    items: List[GraphHistoryItem]
+    total: int
+    limit: int
+    offset: int

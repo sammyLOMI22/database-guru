@@ -655,3 +655,69 @@ class ConnectionWritePermission(Base):
 
     # Relationship
     connection = relationship("DatabaseConnection", backref="write_permission")
+
+
+class GraphQueryHistory(Base):
+    """Cypher Query Lab execution history (Phase 25.3).
+
+    Separate from :class:`QueryHistory` because the Cypher column-set is
+    different enough (safety classification, viz truncation flags, no
+    natural-language column for hand-written queries) that mixing them
+    would mean either many NULL columns or a dialect column with
+    type-narrowed reads.
+    """
+    __tablename__ = "graph_query_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    connection_id = Column(
+        Integer,
+        ForeignKey("database_connections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    owner_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # Source of the query — ``manual`` (typed in the Lab), ``ai`` (NL→Cypher,
+    # Phase 25.4), or ``chat`` (came in through the chat pipeline).
+    source = Column(String(20), nullable=False, default="manual")
+
+    cypher = Column(Text, nullable=False)
+    # Optional natural-language prompt the AI generator was given.
+    prompt = Column(Text, nullable=True)
+
+    # Classifier outcome at execution time so we can audit even if the
+    # rules later change.
+    safety_level = Column(String(20), nullable=False, default="read_only")
+    # When blocked, the human-readable reason surfaced to the user.
+    blocked_reason = Column(Text, nullable=True)
+
+    success = Column(Boolean, default=False, nullable=False)
+    execution_time_ms = Column(Float, nullable=True)
+    record_count = Column(Integer, nullable=True)
+    truncated = Column(Boolean, default=False, nullable=False)
+
+    # On error: structured category + user-facing message. Raw driver
+    # text is NOT stored so URIs / stack traces don't leak.
+    error_category = Column(String(40), nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+
+    # Relationships
+    connection = relationship("DatabaseConnection")
+
+    __table_args__ = (
+        Index("idx_graph_history_connection_created", "connection_id", "created_at"),
+        Index("idx_graph_history_owner_created", "owner_id", "created_at"),
+        Index("idx_graph_history_safety", "safety_level"),
+    )
