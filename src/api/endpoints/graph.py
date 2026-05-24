@@ -383,12 +383,12 @@ async def _record_query_history(
         error_message=execution.error.user_message if execution.error else None,
     )
     try:
-        db.add(record)
+        async with db.begin_nested():
+            db.add(record)
         await db.commit()
         await db.refresh(record)
         return record.id
     except Exception as exc:  # noqa: BLE001
-        await db.rollback()
         logger.warning(
             "Failed to persist graph_query_history row for connection %s: %s",
             conn.id,
@@ -491,7 +491,11 @@ async def run_graph_query(
 
     # ── Success ──
     formatted = execution.formatted
-    assert formatted is not None  # success implies formatted is set
+    if formatted is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Query succeeded but produced no formatted result.",
+        )
     return GraphQueryResult(
         connection_id=conn.id,
         cypher=execution.cypher,
@@ -813,7 +817,11 @@ async def explore_graph(
         )
 
     formatted = execution.formatted
-    assert formatted is not None
+    if formatted is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Expand succeeded but produced no formatted result.",
+        )
     return GraphExploreResponse(
         connection_id=conn.id,
         start_label=request.start_label,
@@ -881,9 +889,8 @@ async def modeling_advice(
             connection_id,
         )
         from src.graph.schema.advisor_rules import run_all_rules
-        from src.graph.schema.normalizer import graph_schema_from_dict as _rehydrate
 
-        schema = _rehydrate(conn.schema_cache)
+        schema = graph_schema_from_dict(conn.schema_cache)
         findings = run_all_rules(schema)
         return GraphModelingAdviceResponse(
             connection_id=conn.id,

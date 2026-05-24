@@ -56,6 +56,11 @@ DANGEROUS_KEYWORDS: FrozenSet[str] = frozenset(
 # Anything outside this set requires an explicit opt-in (e.g.
 # ``GRAPH_ALLOW_APOC=True`` for ``apoc.*``). The schema-introspection set
 # is read-only by definition.
+#
+# Note: ``dbms.components`` is intentionally absent — the ``dbms.`` prefix
+# in ADMIN_PROCEDURE_PREFIXES catches it first, and we want user-facing
+# Cypher to treat all ``dbms.*`` as admin. The introspection pipeline calls
+# it internally without going through the classifier.
 ALLOWED_READ_PROCEDURES: FrozenSet[str] = frozenset(
     {
         "db.labels",
@@ -65,7 +70,6 @@ ALLOWED_READ_PROCEDURES: FrozenSet[str] = frozenset(
         "db.indexes",
         "db.constraints",
         "db.schema.visualization",
-        "dbms.components",
     }
 )
 

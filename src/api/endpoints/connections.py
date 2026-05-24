@@ -382,3 +382,12 @@ async def delete_connection(
         await evict_nosql_pool(connection_id, connection.database_type)
     except Exception as e:
         logger.warning(f"Failed to evict NoSQL pool for connection {connection_id}: {e}")
+
+    # Evict from Neo4j driver pool if applicable
+    if connection.database_type in _GRAPH_DB_TYPES:
+        try:
+            from src.graph.neo4j.driver_pool import Neo4jDriverPool
+            if Neo4jDriverPool._instance is not None:
+                await Neo4jDriverPool._instance.close(connection_id)
+        except Exception as e:
+            logger.warning(f"Failed to evict Neo4j driver for connection {connection_id}: {e}")

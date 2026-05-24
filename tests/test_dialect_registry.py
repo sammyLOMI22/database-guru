@@ -21,6 +21,7 @@ class TestDialectRegistry:
             DatabaseDialect.CASSANDRA,
             DatabaseDialect.DYNAMODB,
             DatabaseDialect.ELASTICSEARCH,
+            DatabaseDialect.NEO4J,
         }
         for dialect in DatabaseDialect:
             if dialect in nosql_dialects:
