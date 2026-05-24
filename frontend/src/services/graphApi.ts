@@ -226,6 +226,37 @@ export interface GraphHistoryResponse {
   offset: number;
 }
 
+// ── Phase 25.4: AI Cypher Generation + Explanation ─────────────────────
+
+export interface CypherGenerateRequest {
+  question: string;
+}
+
+export interface CypherGenerateResponse {
+  connection_id: number;
+  cypher: string;
+  question: string;
+  model: string | null;
+  provider: string | null;
+  unknown_labels: string[];
+  used_fallback: boolean;
+  error: string | null;
+}
+
+export interface CypherExplainRequest {
+  cypher: string;
+  include_schema?: boolean;
+}
+
+export interface CypherExplainResponse {
+  connection_id: number;
+  explanation: string;
+  cypher: string;
+  model: string | null;
+  provider: string | null;
+  used_fallback: boolean;
+}
+
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const graphAPI = {
@@ -292,6 +323,28 @@ export const graphAPI = {
     const { data } = await api.get<GraphHistoryResponse>(
       `/api/graph/connections/${connectionId}/history`,
       { params },
+    );
+    return data;
+  },
+
+  async generateCypher(
+    connectionId: number,
+    request: CypherGenerateRequest,
+  ): Promise<CypherGenerateResponse> {
+    const { data } = await api.post<CypherGenerateResponse>(
+      `/api/graph/connections/${connectionId}/ai/generate-cypher`,
+      request,
+    );
+    return data;
+  },
+
+  async explainCypher(
+    connectionId: number,
+    request: CypherExplainRequest,
+  ): Promise<CypherExplainResponse> {
+    const { data } = await api.post<CypherExplainResponse>(
+      `/api/graph/connections/${connectionId}/ai/explain-cypher`,
+      request,
     );
     return data;
   },

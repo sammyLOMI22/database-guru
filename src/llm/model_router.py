@@ -54,6 +54,8 @@ class TaskType(Enum):
     EXPLAIN_ANALYSIS = "explain_analysis"
     # Phase 25: Graph Mode (Neo4j)
     GRAPH_SCHEMA_SUMMARY = "graph_schema_summary"
+    CYPHER_GENERATION = "cypher_generation"
+    CYPHER_EXPLANATION = "cypher_explanation"
 
 
 @dataclass
@@ -103,6 +105,8 @@ class ModelRouter:
         TaskType.EXPLAIN_ANALYSIS: 25,
         # Phase 25: Graph Mode (Neo4j)
         TaskType.GRAPH_SCHEMA_SUMMARY: 15,
+        TaskType.CYPHER_GENERATION: 25,
+        TaskType.CYPHER_EXPLANATION: 15,
     }
 
     def __init__(

@@ -1,14 +1,17 @@
-"""Graph Mode API endpoints (Phase 25.2).
+"""Graph Mode API endpoints (Phase 25.2 + 25.3 + 25.4).
 
-Phase 25.2 ships three endpoints:
+Endpoints shipped so far:
 
-* ``GET  /api/graph/connections/{id}/schema``        — cached or fresh schema.
-* ``POST /api/graph/connections/{id}/introspect``    — force-refresh.
-* ``POST /api/graph/connections/{id}/ai/schema-summary`` — 2-3 sentence blurb.
+* ``GET  /api/graph/connections/{id}/schema``             — cached or fresh schema.
+* ``POST /api/graph/connections/{id}/introspect``         — force-refresh.
+* ``POST /api/graph/connections/{id}/ai/schema-summary``  — 2-3 sentence blurb.
+* ``POST /api/graph/connections/{id}/query``              — run Cypher.
+* ``GET  /api/graph/connections/{id}/history``            — paginated history.
+* ``POST /api/graph/connections/{id}/ai/generate-cypher`` — NL → Cypher (25.4).
+* ``POST /api/graph/connections/{id}/ai/explain-cypher``  — Cypher → English (25.4).
 
-Later sub-phases extend this module with ``/query``, ``/explore``, AI
-Cypher generation/explanation, and modeling-advice routes. Endpoint
-ordering / prefix is fixed now so frontend clients won't need to retarget.
+Later sub-phases extend this module with ``/explore`` and modeling-advice
+routes.
 """
 
 from __future__ import annotations
@@ -34,6 +37,10 @@ from src.graph.router import is_graph
 from src.graph.safety.classifier import GraphQuerySafetyLevel
 from src.graph.schema.normalizer import GraphSchema, graph_schema_from_dict
 from src.models.schemas import (
+    CypherExplainRequest,
+    CypherExplainResponse,
+    CypherGenerateRequest,
+    CypherGenerateResponse,
     GraphHistoryItem,
     GraphHistoryResponse,
     GraphIntrospectRequest,
@@ -573,6 +580,116 @@ async def get_graph_query_history(
         total=int(total or 0),
         limit=limit,
         offset=offset,
+    )
+
+
+# ── Phase 25.4 — AI Cypher Generation + Explanation ────────────────────
+
+
+@router.post(
+    "/connections/{connection_id}/ai/generate-cypher",
+    response_model=CypherGenerateResponse,
+)
+async def generate_cypher(
+    connection_id: int,
+    request: CypherGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+    settings: Settings = Depends(get_settings),
+) -> CypherGenerateResponse:
+    """Convert a natural-language question into a Cypher READ query.
+
+    Uses the cached graph schema as context. Returns 409 if no schema has
+    been introspected yet (same guard as the schema-summary endpoint).
+    """
+    _ensure_graph_mode(settings)
+    conn = await _load_graph_connection(connection_id, db, current_user)
+
+    if not conn.schema_cache:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "No cached graph schema. Call POST /api/graph/connections/"
+                f"{connection_id}/introspect first."
+            ),
+        )
+
+    from src.graph.neo4j.cypher_generator import get_cypher_generator
+
+    try:
+        generator = await get_cypher_generator(db)
+        result = await generator.generate(
+            question=request.question,
+            schema=conn.schema_cache,
+            db=db,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Cypher generation failed for connection %s", connection_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Cypher generation failed. Check server logs for details.",
+        )
+
+    return CypherGenerateResponse(
+        connection_id=conn.id,
+        cypher=result.cypher,
+        question=result.question,
+        model=result.model,
+        provider=result.provider,
+        unknown_labels=result.unknown_labels,
+        used_fallback=result.used_fallback,
+        error=result.error,
+    )
+
+
+@router.post(
+    "/connections/{connection_id}/ai/explain-cypher",
+    response_model=CypherExplainResponse,
+)
+async def explain_cypher(
+    connection_id: int,
+    request: CypherExplainRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+    settings: Settings = Depends(get_settings),
+) -> CypherExplainResponse:
+    """Explain a Cypher query in plain English.
+
+    Optionally includes cached graph schema context (``include_schema=true``,
+    the default) so the explanation references domain labels and types.
+    """
+    _ensure_graph_mode(settings)
+    conn = await _load_graph_connection(connection_id, db, current_user)
+
+    schema_ctx = conn.schema_cache if request.include_schema else None
+
+    from src.graph.neo4j.cypher_explainer import get_cypher_explainer
+
+    try:
+        explainer = await get_cypher_explainer(db)
+        result = await explainer.explain(
+            cypher=request.cypher,
+            schema=schema_ctx,
+            db=db,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Cypher explanation failed for connection %s", connection_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Cypher explanation failed. Check server logs for details.",
+        )
+
+    return CypherExplainResponse(
+        connection_id=conn.id,
+        explanation=result.explanation,
+        cypher=result.cypher,
+        model=result.model,
+        provider=result.provider,
+        used_fallback=result.used_fallback,
     )
 
 

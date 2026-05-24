@@ -121,4 +121,138 @@ def fallback_schema_summary(schema: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-__all__ = ["build_graph_schema_summary_prompt", "fallback_schema_summary"]
+def build_cypher_generation_prompt(
+    question: str,
+    schema: Dict[str, Any],
+    *,
+    max_labels: int = 30,
+    max_relationships: int = 30,
+    max_patterns: int = 15,
+    default_limit: int = 25,
+) -> str:
+    """Build a prompt that converts a natural-language question to Cypher.
+
+    The prompt embeds a compact schema context so the LLM can reference real
+    labels, relationship types, and properties. A ``LIMIT`` hint is baked in
+    to prevent unbounded result sets from models that forget.
+    """
+    labels: List[Dict[str, Any]] = list(schema.get("labels") or [])[:max_labels]
+    rels: List[Dict[str, Any]] = list(schema.get("relationships") or [])[:max_relationships]
+    patterns: List[Dict[str, Any]] = list(schema.get("patterns") or [])[:max_patterns]
+    indexes: List[Dict[str, Any]] = list(schema.get("indexes") or [])
+
+    label_lines: List[str] = []
+    for lbl in labels:
+        props = lbl.get("properties") or []
+        prop_names = ", ".join(p.get("name", "?") for p in props[:12])
+        count = lbl.get("estimated_count")
+        suffix = f" (~{count:,})" if isinstance(count, int) else ""
+        label_lines.append(f"  :{lbl.get('name')}{suffix}  {{ {prop_names} }}")
+
+    rel_lines: List[str] = []
+    for rel in rels:
+        props = rel.get("properties") or []
+        prop_names = ", ".join(p.get("name", "?") for p in props[:8])
+        bracket = f" {{ {prop_names} }}" if prop_names else ""
+        rel_lines.append(f"  [:{rel.get('name')}{bracket}]")
+
+    pattern_lines: List[str] = []
+    for pat in patterns:
+        sa = ",".join(pat.get("source_labels") or []) or "?"
+        tb = ",".join(pat.get("target_labels") or []) or "?"
+        pattern_lines.append(
+            f"  (:{sa})-[:{pat.get('relationship_type')}]->(:{tb})"
+        )
+
+    index_lines: List[str] = []
+    for idx in indexes[:10]:
+        lts = ", ".join(idx.get("labels_or_types") or [])
+        ps = ", ".join(idx.get("properties") or [])
+        index_lines.append(f"  {idx.get('name', '?')} ON :{lts}({ps})")
+
+    return dedent(
+        f"""
+        You are a Cypher query expert. Convert the user's natural-language
+        question into a single, valid Cypher READ query for a Neo4j database.
+
+        Rules:
+        1. Return ONLY the Cypher query — no explanation, no markdown fences.
+        2. Use ONLY labels, relationship types, and properties listed below.
+        3. ALWAYS include a LIMIT clause (default {default_limit}) to prevent
+           unbounded result sets. The user may specify a different limit.
+        4. NEVER generate write operations (CREATE, MERGE, DELETE, SET,
+           REMOVE, DETACH DELETE, DROP, CALL … YIELD with side effects).
+        5. Prefer indexed properties for lookups when an index exists.
+        6. Use parameterized values ($param) when the question contains
+           specific literal values that should be parameterized.
+
+        === Graph Schema ===
+
+        Node labels ({len(labels)}):
+{chr(10).join(label_lines) or '  (none)'}
+
+        Relationship types ({len(rels)}):
+{chr(10).join(rel_lines) or '  (none)'}
+
+        Patterns:
+{chr(10).join(pattern_lines) or '  (none)'}
+
+        Indexes:
+{chr(10).join(index_lines) or '  (none)'}
+
+        === User Question ===
+        {question}
+        """
+    ).strip()
+
+
+def build_cypher_explanation_prompt(
+    cypher: str,
+    schema: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Build a prompt that explains a Cypher query in plain English.
+
+    Optionally includes schema context so the LLM can reference the domain
+    model when describing what the query does.
+    """
+    schema_section = ""
+    if schema:
+        labels = [lbl.get("name", "?") for lbl in (schema.get("labels") or [])[:20]]
+        rels = [rel.get("name", "?") for rel in (schema.get("relationships") or [])[:20]]
+        if labels or rels:
+            schema_section = dedent(
+                f"""
+                === Graph Context ===
+                Node labels: {", ".join(labels) or "(none)"}
+                Relationship types: {", ".join(rels) or "(none)"}
+                """
+            ).strip() + "\n\n"
+
+    return dedent(
+        f"""
+        You are a graph database expert explaining Cypher queries to a
+        colleague who knows SQL but is new to Neo4j.
+
+        Explain the following Cypher query in plain English. Include:
+        1. What the query does in one clear sentence.
+        2. Step-by-step breakdown of each clause (MATCH, WHERE, RETURN, etc.).
+        3. Performance notes — mention if the query scans all nodes of a
+           label (no index), uses variable-length paths, or could be expensive.
+        4. If the query uses aggregation or list operations, explain the
+           output shape.
+
+        Keep the explanation concise — under 200 words. No markdown headings.
+        Use plain prose with numbered steps.
+
+        {schema_section}=== Cypher Query ===
+        {cypher}
+        """
+    ).strip()
+
+
+__all__ = [
+    "build_graph_schema_summary_prompt",
+    "fallback_schema_summary",
+    "build_cypher_generation_prompt",
+    "build_cypher_explanation_prompt",
+]

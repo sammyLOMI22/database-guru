@@ -106,6 +106,8 @@ The system uses a multi-agent architecture with 40+ specialized agents (includin
 | Cypher Query Executor | `src/graph/neo4j/query_executor.py` | Wraps `session.run` with safety gate, READ_ACCESS sessions, query timeout, record cap; never raises (Phase 25.3) |
 | Cypher Result Formatter | `src/graph/result_formatter.py` | Duck-typed walker: Node/Relationship/Path → table + Cytoscape `graph_viz`, viz caps via `GRAPH_MAX_VIZ_*` (Phase 25.3) |
 | Neo4j Error Classifier | `src/graph/neo4j/error_classifier.py` | Maps driver exceptions to UX categories (auth/timeout/syntax/unknown_label/…) without leaking URIs (Phase 25.3) |
+| Cypher Generator | `src/graph/neo4j/cypher_generator.py` | NL → Cypher via LLM, fence stripping, LIMIT injection, unknown-label detection (Phase 25.4) |
+| Cypher Explainer | `src/graph/neo4j/cypher_explainer.py` | Cypher → plain-English explanation with deterministic fallback (Phase 25.4) |
 | Auth Service | `src/auth/service.py` | JWT auth, bcrypt hashing, user CRUD; `bump_password_version()`, `check_password_history()`, `record_password_history()`, `count_active_admins()` helpers (Phase 21 + 24.8) |
 | Auth Dependencies | `src/auth/dependencies.py` | get_current_user, get_optional_user, require_admin; rejects stale `pv` JWT claim (Phase 21 + 24.8 token versioning) |
 | Audit Logger | `src/auth/audit.py` | AuditLog model, never-raising log_action(), facets/count helpers (Phase 21 + 24.7) |

@@ -587,3 +587,192 @@ class TestGraphHistoryEndpoint:
         resp = TestClient(app).get("/api/graph/connections/42/history")
         assert resp.status_code == 400
         app.dependency_overrides.clear()
+
+
+# ── Phase 25.4: AI Cypher Generation / Explanation endpoints ─────────────
+
+
+class TestGenerateCypherEndpoint:
+    def test_generates_cypher_from_question(self):
+        cached = _sample_schema().to_dict()
+        conn = _neo4j_conn(schema_cache=cached)
+        app = _make_app()
+        _override_db(app, conn)
+
+        from src.graph.neo4j.cypher_generator import CypherGenerationResult
+
+        mock_result = CypherGenerationResult(
+            cypher="MATCH (u:User) RETURN u LIMIT 25",
+            question="show all users",
+            model="llama3",
+            provider="ollama",
+            unknown_labels=[],
+        )
+
+        with patch(
+            "src.graph.neo4j.cypher_generator.get_cypher_generator",
+            new=AsyncMock(return_value=MagicMock(
+                generate=AsyncMock(return_value=mock_result),
+            )),
+        ):
+            resp = TestClient(app).post(
+                "/api/graph/connections/42/ai/generate-cypher",
+                json={"question": "show all users"},
+            )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["connection_id"] == 42
+        assert body["cypher"] == "MATCH (u:User) RETURN u LIMIT 25"
+        assert body["question"] == "show all users"
+        assert body["model"] == "llama3"
+        assert body["used_fallback"] is False
+        app.dependency_overrides.clear()
+
+    def test_409_when_no_schema_cache(self):
+        conn = _neo4j_conn(schema_cache=None)
+        app = _make_app()
+        _override_db(app, conn)
+
+        resp = TestClient(app).post(
+            "/api/graph/connections/42/ai/generate-cypher",
+            json={"question": "show all users"},
+        )
+        assert resp.status_code == 409
+        assert "introspect" in resp.json()["detail"].lower()
+        app.dependency_overrides.clear()
+
+    def test_kill_switch_blocks_generation(self):
+        cached = _sample_schema().to_dict()
+        conn = _neo4j_conn(schema_cache=cached)
+        app = _make_app(graph_mode=False)
+        _override_db(app, conn)
+
+        resp = TestClient(app).post(
+            "/api/graph/connections/42/ai/generate-cypher",
+            json={"question": "show all users"},
+        )
+        assert resp.status_code == 400
+        assert "GRAPH_MODE_ENABLED" in resp.json()["detail"]
+        app.dependency_overrides.clear()
+
+    def test_non_graph_connection_rejected(self):
+        conn = _sql_conn()
+        app = _make_app()
+        _override_db(app, conn)
+
+        resp = TestClient(app).post(
+            "/api/graph/connections/42/ai/generate-cypher",
+            json={"question": "show all users"},
+        )
+        assert resp.status_code == 400
+        assert "not a graph database" in resp.json()["detail"]
+        app.dependency_overrides.clear()
+
+    def test_returns_unknown_labels(self):
+        cached = _sample_schema().to_dict()
+        conn = _neo4j_conn(schema_cache=cached)
+        app = _make_app()
+        _override_db(app, conn)
+
+        from src.graph.neo4j.cypher_generator import CypherGenerationResult
+
+        mock_result = CypherGenerationResult(
+            cypher="MATCH (p:Product) RETURN p LIMIT 25",
+            question="show products",
+            model="llama3",
+            provider="ollama",
+            unknown_labels=["Product"],
+        )
+
+        with patch(
+            "src.graph.neo4j.cypher_generator.get_cypher_generator",
+            new=AsyncMock(return_value=MagicMock(
+                generate=AsyncMock(return_value=mock_result),
+            )),
+        ):
+            resp = TestClient(app).post(
+                "/api/graph/connections/42/ai/generate-cypher",
+                json={"question": "show products"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["unknown_labels"] == ["Product"]
+        app.dependency_overrides.clear()
+
+
+class TestExplainCypherEndpoint:
+    def test_explains_cypher_query(self):
+        cached = _sample_schema().to_dict()
+        conn = _neo4j_conn(schema_cache=cached)
+        app = _make_app()
+        _override_db(app, conn)
+
+        from src.graph.neo4j.cypher_explainer import CypherExplanationResult
+
+        mock_result = CypherExplanationResult(
+            explanation="This query finds all User nodes and returns them.",
+            cypher="MATCH (u:User) RETURN u LIMIT 10",
+            model="llama3",
+            provider="ollama",
+        )
+
+        with patch(
+            "src.graph.neo4j.cypher_explainer.get_cypher_explainer",
+            new=AsyncMock(return_value=MagicMock(
+                explain=AsyncMock(return_value=mock_result),
+            )),
+        ):
+            resp = TestClient(app).post(
+                "/api/graph/connections/42/ai/explain-cypher",
+                json={"cypher": "MATCH (u:User) RETURN u LIMIT 10"},
+            )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["connection_id"] == 42
+        assert "User" in body["explanation"]
+        assert body["used_fallback"] is False
+        assert body["model"] == "llama3"
+        app.dependency_overrides.clear()
+
+    def test_explain_without_schema(self):
+        conn = _neo4j_conn(schema_cache=None)
+        app = _make_app()
+        _override_db(app, conn)
+
+        from src.graph.neo4j.cypher_explainer import CypherExplanationResult
+
+        mock_result = CypherExplanationResult(
+            explanation="This query returns all nodes.",
+            cypher="MATCH (n) RETURN n LIMIT 10",
+            model="llama3",
+            provider="ollama",
+        )
+
+        with patch(
+            "src.graph.neo4j.cypher_explainer.get_cypher_explainer",
+            new=AsyncMock(return_value=MagicMock(
+                explain=AsyncMock(return_value=mock_result),
+            )),
+        ):
+            resp = TestClient(app).post(
+                "/api/graph/connections/42/ai/explain-cypher",
+                json={"cypher": "MATCH (n) RETURN n LIMIT 10"},
+            )
+
+        assert resp.status_code == 200
+        app.dependency_overrides.clear()
+
+    def test_kill_switch_blocks_explanation(self):
+        conn = _neo4j_conn()
+        app = _make_app(graph_mode=False)
+        _override_db(app, conn)
+
+        resp = TestClient(app).post(
+            "/api/graph/connections/42/ai/explain-cypher",
+            json={"cypher": "MATCH (n) RETURN n"},
+        )
+        assert resp.status_code == 400
+        assert "GRAPH_MODE_ENABLED" in resp.json()["detail"]
+        app.dependency_overrides.clear()

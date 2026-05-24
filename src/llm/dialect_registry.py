@@ -14,6 +14,7 @@ class DatabaseDialect(Enum):
     CASSANDRA = "cassandra"
     DYNAMODB = "dynamodb"
     ELASTICSEARCH = "elasticsearch"
+    NEO4J = "neo4j"
 
 @dataclass
 class DialectRules:
@@ -300,6 +301,24 @@ DATABASE: Elasticsearch (Query DSL)
 - Aggregation types: terms, date_histogram, avg, sum, min, max, cardinality
 - Return ONLY valid JSON with keys: index, query, aggs, sort, size
 """,
+        DatabaseDialect.NEO4J: """
+DATABASE: Neo4j (Cypher)
+- Queries use Cypher query language, NOT SQL
+- Nodes are enclosed in parentheses: (n:Label)
+- Relationships use square brackets and arrows: -[r:TYPE]->
+- MATCH patterns describe graph traversals
+- RETURN selects what to output, WHERE filters
+- Properties accessed with dot notation: n.name
+- Aggregations: count(), collect(), sum(), avg(), min(), max()
+- Path functions: shortestPath(), allShortestPaths()
+- List comprehensions: [x IN list WHERE pred | expr]
+- OPTIONAL MATCH for left-outer-join semantics
+- UNWIND to expand lists into rows
+- WITH for subquery chaining / intermediate aggregation
+- Always include LIMIT to prevent unbounded result sets
+- NEVER generate CREATE, MERGE, DELETE, SET, REMOVE, or DETACH DELETE
+- Return ONLY valid Cypher — no surrounding markdown or explanation
+""",
     }
     return contexts.get(dialect, "")
 
@@ -328,6 +347,8 @@ def get_dialect_for_database_type(db_type: str) -> DatabaseDialect:
         return DatabaseDialect.DYNAMODB
     elif "elastic" in normalized or "opensearch" in normalized:
         return DatabaseDialect.ELASTICSEARCH
+    elif "neo4j" in normalized:
+        return DatabaseDialect.NEO4J
     else:
         # Default to SQLite if unknown, as it's the safest lowest common denominator
         return DatabaseDialect.SQLITE

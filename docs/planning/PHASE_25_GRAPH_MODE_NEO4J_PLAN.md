@@ -512,7 +512,7 @@ Tests:
 - `tests/graph/test_graph_endpoints.py` — query API auth/rate-limit/blocked-status.
 - Integration test against Docker Neo4j (marked `@pytest.mark.integration`).
 
-### Phase 25.4 — AI Cypher Generation + Explanation — ~800 LOC, ~18 tests
+### Phase 25.4 — AI Cypher Generation + Explanation — ~800 LOC, ~18 tests ✅ SHIPPED
 
 Files:
 - `src/graph/neo4j/cypher_generator.py`, `src/graph/neo4j/cypher_explainer.py`

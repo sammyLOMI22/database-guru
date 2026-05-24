@@ -2006,3 +2006,46 @@ class GraphHistoryResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+# ── Phase 25.4: AI Cypher Generation + Explanation ─────────────────────────
+
+
+class CypherGenerateRequest(BaseModel):
+    """Request body for POST /api/graph/connections/:id/ai/generate-cypher."""
+
+    question: str = Field(..., min_length=1, max_length=2000)
+
+
+class CypherGenerateResponse(BaseModel):
+    """Response from the Cypher generation endpoint."""
+
+    connection_id: int
+    cypher: str
+    question: str
+    model: Optional[str] = None
+    provider: Optional[str] = None
+    unknown_labels: List[str] = Field(default_factory=list)
+    used_fallback: bool = False
+    error: Optional[str] = None
+
+
+class CypherExplainRequest(BaseModel):
+    """Request body for POST /api/graph/connections/:id/ai/explain-cypher."""
+
+    cypher: str = Field(..., min_length=1, max_length=10000)
+    include_schema: bool = Field(
+        default=True,
+        description="Include graph schema context for domain-aware explanations.",
+    )
+
+
+class CypherExplainResponse(BaseModel):
+    """Response from the Cypher explanation endpoint."""
+
+    connection_id: int
+    explanation: str
+    cypher: str
+    model: Optional[str] = None
+    provider: Optional[str] = None
+    used_fallback: bool = False

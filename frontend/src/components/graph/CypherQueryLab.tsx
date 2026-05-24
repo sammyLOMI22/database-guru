@@ -18,6 +18,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import {
   graphAPI,
+  type CypherExplainResponse,
+  type CypherGenerateResponse,
   type GraphHistoryItem,
   type GraphQueryBlocked,
   type GraphQueryErrorPayload,
@@ -36,7 +38,9 @@ const DEFAULT_CYPHER =
 
 export default function CypherQueryLab({ connectionId }: Props) {
   const [cypher, setCypher] = useState<string>(DEFAULT_CYPHER);
+  const [nlPrompt, setNlPrompt] = useState<string>('');
   const [activeResultTab, setActiveResultTab] = useState<ResultTab>('table');
+  const [explanation, setExplanation] = useState<CypherExplainResponse | null>(null);
   const queryClient = useQueryClient();
 
   const runMutation = useMutation<
@@ -55,6 +59,32 @@ export default function CypherQueryLab({ connectionId }: Props) {
           queryKey: ['graph', 'history', connectionId],
         });
       }
+    },
+  });
+
+  const generateMutation = useMutation<
+    CypherGenerateResponse,
+    unknown,
+    string
+  >({
+    mutationFn: (question: string) =>
+      graphAPI.generateCypher(connectionId as number, { question }),
+    onSuccess: (data) => {
+      if (data.cypher) {
+        setCypher(data.cypher);
+      }
+    },
+  });
+
+  const explainMutation = useMutation<
+    CypherExplainResponse,
+    unknown,
+    string
+  >({
+    mutationFn: (text: string) =>
+      graphAPI.explainCypher(connectionId as number, { cypher: text }),
+    onSuccess: (data) => {
+      setExplanation(data);
     },
   });
 
@@ -105,23 +135,86 @@ export default function CypherQueryLab({ connectionId }: Props) {
     const trimmed = cypher.trim();
     if (!trimmed) return;
     runMutation.reset();
+    setExplanation(null);
     runMutation.mutate(trimmed);
+  };
+
+  const onGenerate = () => {
+    const trimmed = nlPrompt.trim();
+    if (!trimmed) return;
+    generateMutation.reset();
+    generateMutation.mutate(trimmed);
+  };
+
+  const onExplain = () => {
+    const trimmed = cypher.trim();
+    if (!trimmed) return;
+    explainMutation.reset();
+    setExplanation(null);
+    explainMutation.mutate(trimmed);
   };
 
   const onLoadFromHistory = (item: GraphHistoryItem) => {
     setCypher(item.cypher);
+    setExplanation(null);
   };
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Editor + Run button */}
+      {/* NL prompt → Generate Cypher */}
+      <div className="glass-panel rounded-2xl p-4">
+        <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+          Ask in plain English
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={nlPrompt}
+            onChange={(e) => setNlPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                onGenerate();
+              }
+            }}
+            placeholder="e.g. Show users who purchased from the same category twice"
+            className="flex-1 font-sans text-sm p-3 rounded-xl bg-black/40 text-gray-100 border border-white/10 focus:outline-none focus:border-purple-500/60 placeholder-gray-600"
+          />
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={generateMutation.isPending || !nlPrompt.trim()}
+            className="px-4 py-2 rounded-xl bg-purple-600 text-white text-sm font-bold uppercase tracking-wider shadow-lg shadow-purple-500/30 disabled:opacity-50 whitespace-nowrap"
+          >
+            {generateMutation.isPending ? 'Generating…' : 'Generate'}
+          </button>
+        </div>
+        {generateMutation.data?.unknown_labels && generateMutation.data.unknown_labels.length > 0 && (
+          <p className="mt-2 text-xs text-amber-300">
+            Warning: generated query references unknown labels:{' '}
+            {generateMutation.data.unknown_labels.join(', ')}
+          </p>
+        )}
+        {generateMutation.data?.error && (
+          <p className="mt-2 text-xs text-red-300">
+            {generateMutation.data.error}
+          </p>
+        )}
+        {!!generateMutation.error && (
+          <p className="mt-2 text-xs text-red-300">
+            Failed to generate Cypher. Check your LLM provider configuration.
+          </p>
+        )}
+      </div>
+
+      {/* Cypher editor + Run/Explain buttons */}
       <div className="glass-panel rounded-2xl p-4">
         <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
           Cypher
         </label>
         <textarea
           value={cypher}
-          onChange={(e) => setCypher(e.target.value)}
+          onChange={(e) => { setCypher(e.target.value); setExplanation(null); }}
           spellCheck={false}
           className="w-full min-h-[140px] font-mono text-sm p-3 rounded-xl bg-black/40 text-gray-100 border border-white/10 focus:outline-none focus:border-blue-500/60 resize-y"
         />
@@ -133,16 +226,36 @@ export default function CypherQueryLab({ connectionId }: Props) {
             <code className="px-1 rounded bg-black/30">DELETE</code> ) are
             blocked at the API.
           </p>
-          <button
-            type="button"
-            onClick={onRun}
-            disabled={runMutation.isPending || !cypher.trim()}
-            className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold uppercase tracking-wider shadow-lg shadow-blue-500/30 disabled:opacity-50"
-          >
-            {runMutation.isPending ? 'Running…' : 'Run query'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onExplain}
+              disabled={explainMutation.isPending || !cypher.trim()}
+              className="px-4 py-2 rounded-xl bg-gray-600 text-white text-sm font-bold uppercase tracking-wider shadow-lg shadow-gray-500/20 disabled:opacity-50"
+            >
+              {explainMutation.isPending ? 'Explaining…' : 'Explain'}
+            </button>
+            <button
+              type="button"
+              onClick={onRun}
+              disabled={runMutation.isPending || !cypher.trim()}
+              className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold uppercase tracking-wider shadow-lg shadow-blue-500/30 disabled:opacity-50"
+            >
+              {runMutation.isPending ? 'Running…' : 'Run query'}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Explanation card */}
+      {explanation && <ExplanationCard payload={explanation} />}
+      {!!explainMutation.error && !explanation && (
+        <div className="glass-panel rounded-2xl p-4 border border-red-500/30 bg-red-500/5">
+          <p className="text-sm text-red-200">
+            Failed to explain query. Check your LLM provider configuration.
+          </p>
+        </div>
+      )}
 
       {/* Blocked / error / success cards */}
       {blocked && <BlockedCard payload={blocked} />}
@@ -206,6 +319,31 @@ function ErrorCard({ payload }: { payload: GraphQueryErrorPayload }) {
           {payload.error_code}
         </p>
       )}
+    </div>
+  );
+}
+
+function ExplanationCard({ payload }: { payload: CypherExplainResponse }) {
+  return (
+    <div className="glass-panel rounded-2xl p-4 border border-purple-500/20 bg-purple-500/5">
+      <div className="flex items-center gap-2 mb-2">
+        <h4 className="text-sm font-bold text-purple-200 uppercase tracking-wider">
+          Explanation
+        </h4>
+        {payload.used_fallback && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-400 border border-gray-500/30">
+            fallback
+          </span>
+        )}
+        {payload.model && (
+          <span className="text-[10px] text-gray-500 font-mono">
+            {payload.provider}/{payload.model}
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">
+        {payload.explanation}
+      </p>
     </div>
   );
 }

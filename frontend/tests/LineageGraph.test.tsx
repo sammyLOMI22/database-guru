@@ -174,7 +174,7 @@ describe('LineageGraph', () => {
     });
 
     await waitFor(() => {
-      expect(lineageAPI.parseSql).toHaveBeenCalledWith('SELECT name FROM customers');
+      expect(lineageAPI.parseSql).toHaveBeenCalledWith('SELECT name FROM customers', undefined, false);
     });
   });
 
