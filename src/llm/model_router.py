@@ -56,6 +56,7 @@ class TaskType(Enum):
     GRAPH_SCHEMA_SUMMARY = "graph_schema_summary"
     CYPHER_GENERATION = "cypher_generation"
     CYPHER_EXPLANATION = "cypher_explanation"
+    GRAPH_MODELING_ADVICE = "graph_modeling_advice"
 
 
 @dataclass
@@ -107,6 +108,7 @@ class ModelRouter:
         TaskType.GRAPH_SCHEMA_SUMMARY: 15,
         TaskType.CYPHER_GENERATION: 25,
         TaskType.CYPHER_EXPLANATION: 15,
+        TaskType.GRAPH_MODELING_ADVICE: 20,
     }
 
     def __init__(

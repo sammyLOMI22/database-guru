@@ -2131,3 +2131,30 @@ class GraphExploreResponse(BaseModel):
     graph_viz: GraphVizPayload
     warnings: List[str] = Field(default_factory=list)
     server_warnings: List[str] = Field(default_factory=list)
+
+
+# ── Phase 25.6: Guru Advice ─────────────────────────────────────────────
+
+
+class GraphAdvisorFinding(BaseModel):
+    """A single rule-based modeling finding."""
+    rule_id: str
+    severity: str
+    title: str
+    description: str
+    why: str
+    suggested_fix: str
+    entity_name: Optional[str] = None
+    entity_type: Optional[str] = None
+    details: Dict[str, Any] = Field(default_factory=dict)
+
+
+class GraphModelingAdviceResponse(BaseModel):
+    """Response for POST /api/graph/connections/{id}/ai/modeling-advice."""
+    connection_id: int
+    findings: List[GraphAdvisorFinding] = Field(default_factory=list)
+    finding_count: int = 0
+    ai_summary: Optional[str] = None
+    model: Optional[str] = None
+    provider: Optional[str] = None
+    used_fallback: bool = False

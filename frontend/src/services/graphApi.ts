@@ -289,6 +289,30 @@ export interface GraphExploreResponse {
   server_warnings: string[];
 }
 
+// ── Phase 25.6: Guru Advice ──────────────────────────────────────────────
+
+export interface GraphAdvisorFinding {
+  rule_id: string;
+  severity: 'high' | 'medium' | 'low' | 'info';
+  title: string;
+  description: string;
+  why: string;
+  suggested_fix: string;
+  entity_name: string | null;
+  entity_type: string | null;
+  details: Record<string, unknown>;
+}
+
+export interface GraphModelingAdviceResponse {
+  connection_id: number;
+  findings: GraphAdvisorFinding[];
+  finding_count: number;
+  ai_summary: string | null;
+  model: string | null;
+  provider: string | null;
+  used_fallback: boolean;
+}
+
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const graphAPI = {
@@ -395,6 +419,15 @@ export const graphAPI = {
     const { data } = await api.post<GraphExploreResponse>(
       `/api/graph/connections/${connectionId}/explore`,
       request,
+    );
+    return data;
+  },
+
+  async getModelingAdvice(
+    connectionId: number,
+  ): Promise<GraphModelingAdviceResponse> {
+    const { data } = await api.post<GraphModelingAdviceResponse>(
+      `/api/graph/connections/${connectionId}/ai/modeling-advice`,
     );
     return data;
   },

@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { connectionsAPI } from '../../services/api';
 import type { DatabaseConnection } from '../../types/api';
 import CypherQueryLab from './CypherQueryLab';
+import GraphAdvicePanel from './GraphAdvicePanel';
 import GraphOverview from './GraphOverview';
 import GraphSchemaExplorer from './GraphSchemaExplorer';
 import GraphVisualExplorer from './GraphVisualExplorer';
@@ -156,23 +157,9 @@ export default function GraphPanel() {
           <CypherQueryLab connectionId={selectedConn?.id ?? null} />
         )}
         {activeSubTab === 'advice' && (
-          <PlaceholderPanel
-            title="Guru Advice"
-            body="Rule-based + AI modeling advice (missing indexes, overloaded labels, event-as-relationship, etc.) ships in Phase 25.6."
-          />
+          <GraphAdvicePanel connectionId={selectedConn?.id ?? null} />
         )}
       </div>
-    </div>
-  );
-}
-
-function PlaceholderPanel({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="max-w-xl mx-auto mt-12 glass-panel rounded-2xl p-8 text-center">
-      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
-        {title}
-      </h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400">{body}</p>
     </div>
   );
 }

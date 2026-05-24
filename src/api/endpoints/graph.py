@@ -1,6 +1,6 @@
-"""Graph Mode API endpoints (Phase 25.2 + 25.3 + 25.4).
+"""Graph Mode API endpoints (Phase 25.2 – 25.6).
 
-Endpoints shipped so far:
+Endpoints:
 
 * ``GET  /api/graph/connections/{id}/schema``             — cached or fresh schema.
 * ``POST /api/graph/connections/{id}/introspect``         — force-refresh.
@@ -9,9 +9,8 @@ Endpoints shipped so far:
 * ``GET  /api/graph/connections/{id}/history``            — paginated history.
 * ``POST /api/graph/connections/{id}/ai/generate-cypher`` — NL → Cypher (25.4).
 * ``POST /api/graph/connections/{id}/ai/explain-cypher``  — Cypher → English (25.4).
-
-Later sub-phases extend this module with ``/explore`` and modeling-advice
-routes.
+* ``POST /api/graph/connections/{id}/explore``            — bounded expand (25.5).
+* ``POST /api/graph/connections/{id}/ai/modeling-advice`` — guru advice (25.6).
 """
 
 from __future__ import annotations
@@ -45,11 +44,13 @@ from src.models.schemas import (
     CypherExplainResponse,
     CypherGenerateRequest,
     CypherGenerateResponse,
+    GraphAdvisorFinding,
     GraphExploreRequest,
     GraphExploreResponse,
     GraphHistoryItem,
     GraphHistoryResponse,
     GraphIntrospectRequest,
+    GraphModelingAdviceResponse,
     GraphQueryBlocked,
     GraphQueryError,
     GraphQueryRequest,
@@ -835,6 +836,73 @@ async def explore_graph(
         ),
         warnings=list(formatted.warnings),
         server_warnings=list(execution.server_warnings),
+    )
+
+
+# ── Phase 25.6 — Guru Advice ────────────────────────────────────────────
+
+
+@router.post(
+    "/connections/{connection_id}/ai/modeling-advice",
+    response_model=GraphModelingAdviceResponse,
+)
+async def modeling_advice(
+    connection_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+    settings: Settings = Depends(get_settings),
+) -> GraphModelingAdviceResponse:
+    """Run rule-based checks + optional LLM summary on the cached graph schema.
+
+    Returns 409 if no schema has been introspected yet (same guard as the
+    schema-summary and generate-cypher endpoints).
+    """
+    _ensure_graph_mode(settings)
+    conn = await _load_graph_connection(connection_id, db, current_user)
+
+    if not conn.schema_cache:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "No cached graph schema. Call POST /api/graph/connections/"
+                f"{connection_id}/introspect first."
+            ),
+        )
+
+    from src.graph.ai.modeling_advisor import get_modeling_advisor
+
+    try:
+        advisor = await get_modeling_advisor(db)
+        result = await advisor.advise(conn.schema_cache, db=db)
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Graph modeling advice failed for connection %s; "
+            "falling back to rule-only findings.",
+            connection_id,
+        )
+        from src.graph.schema.advisor_rules import run_all_rules
+        from src.graph.schema.normalizer import graph_schema_from_dict as _rehydrate
+
+        schema = _rehydrate(conn.schema_cache)
+        findings = run_all_rules(schema)
+        return GraphModelingAdviceResponse(
+            connection_id=conn.id,
+            findings=[GraphAdvisorFinding(**f.to_dict()) for f in findings],
+            finding_count=len(findings),
+            ai_summary=None,
+            model=None,
+            provider=None,
+            used_fallback=True,
+        )
+
+    return GraphModelingAdviceResponse(
+        connection_id=conn.id,
+        findings=[GraphAdvisorFinding(**f.to_dict()) for f in result.findings],
+        finding_count=len(result.findings),
+        ai_summary=result.ai_summary,
+        model=result.model,
+        provider=result.provider,
+        used_fallback=result.used_fallback,
     )
 
 

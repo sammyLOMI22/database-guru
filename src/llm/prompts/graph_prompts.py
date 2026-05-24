@@ -250,9 +250,59 @@ def build_cypher_explanation_prompt(
     ).strip()
 
 
+def build_modeling_advice_prompt(
+    schema: Dict[str, Any],
+    findings: List[Any],
+    *,
+    max_findings: int = 10,
+) -> str:
+    """Build a prompt that asks the LLM to summarize rule-based findings.
+
+    The LLM receives the schema overview plus the rule-engine's findings
+    and produces a short narrative tying them together — prioritized
+    action items an engineer can act on.
+    """
+    name = schema.get("database_name") or "graph"
+    label_count = len(schema.get("labels") or [])
+    rel_count = len(schema.get("relationships") or [])
+    index_count = len(schema.get("indexes") or [])
+
+    finding_lines: List[str] = []
+    for f in findings[:max_findings]:
+        d = f.to_dict() if hasattr(f, "to_dict") else f
+        finding_lines.append(
+            f"- [{d.get('severity', '?').upper()}] {d.get('title', '?')}: "
+            f"{d.get('description', '')}"
+        )
+    if len(findings) > max_findings:
+        finding_lines.append(f"- ... and {len(findings) - max_findings} more findings")
+
+    return dedent(
+        f"""
+        You are a senior graph-database architect reviewing a Neo4j database
+        called "{name}" ({label_count} labels, {rel_count} relationship types,
+        {index_count} indexes).
+
+        An automated rule engine found the following issues:
+
+        {chr(10).join(finding_lines) or '(none)'}
+
+        Write a concise action-plan (3-5 sentences, under 150 words) that:
+        1. Prioritizes the most impactful issue first.
+        2. Groups related findings when possible.
+        3. Gives concrete next steps an engineer can take right now.
+        4. Notes any trade-offs (e.g. "adding this index speeds lookups but
+           increases write latency").
+
+        Plain prose only. No bullet lists, no markdown headings, no preamble.
+        """
+    ).strip()
+
+
 __all__ = [
     "build_graph_schema_summary_prompt",
     "fallback_schema_summary",
     "build_cypher_generation_prompt",
     "build_cypher_explanation_prompt",
+    "build_modeling_advice_prompt",
 ]

@@ -545,7 +545,7 @@ Tests:
 - Frontend vitest (`tests/GraphVisualExplorer.test.tsx`): auto-populated form state, rel-type chips, refusal on empty value, truncation banner, node-click property panel, "Expand from here" reuses anchor key, error_message + error_hint surfacing.
 - Visual smoke test: render 200 nodes / 500 edges within 1.5s on M-series local (deferred — Cytoscape benchmark not applicable now that React Flow is the renderer).
 
-### Phase 25.6 — Guru Advice (Modeling + Index Recommendations) — ~700 LOC, ~14 tests
+### Phase 25.6 — Guru Advice (Modeling + Index Recommendations) — ~700 LOC, ~14 tests ✅ SHIPPED
 
 Files:
 - `src/graph/schema/advisor_rules.py` — implements spec §11 rules
