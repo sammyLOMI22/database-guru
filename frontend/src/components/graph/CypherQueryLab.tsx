@@ -26,6 +26,7 @@ import {
   type GraphQueryResult,
   type GraphQuerySafetyLevel,
 } from '../../services/graphApi';
+import GraphCanvas from './GraphCanvas';
 
 type ResultTab = 'table' | 'json' | 'graph';
 
@@ -499,16 +500,21 @@ function GraphPlaceholder({ result }: { result: GraphQueryResult }) {
     );
   }
   return (
-    <div className="text-sm text-gray-300 p-3 space-y-2">
-      <p>
-        Found <strong>{result.graph_viz.nodes.length}</strong> node(s) and{' '}
-        <strong>{result.graph_viz.edges.length}</strong> relationship(s).
-      </p>
-      <p className="text-xs text-gray-500">
-        Interactive Cytoscape visualization lands in Phase 25.5. For now the
-        graph payload is captured server-side and is accessible via the JSON
-        tab.
-      </p>
+    <div className="flex flex-col gap-2">
+      <div className="text-xs text-gray-400 px-1">
+        {result.graph_viz.nodes.length} node(s) ·{' '}
+        {result.graph_viz.edges.length} relationship(s)
+        {result.truncated && (
+          <span className="ml-2 text-amber-400 font-medium">(truncated)</span>
+        )}
+      </div>
+      <div className="rounded-xl border border-white/10 bg-black/20 overflow-hidden" style={{ height: 480 }}>
+        <GraphCanvas
+          payload={result.graph_viz}
+          truncated={result.truncated}
+          warnings={result.warnings}
+        />
+      </div>
     </div>
   );
 }

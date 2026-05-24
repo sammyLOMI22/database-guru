@@ -16,6 +16,7 @@ import type { DatabaseConnection } from '../../types/api';
 import CypherQueryLab from './CypherQueryLab';
 import GraphOverview from './GraphOverview';
 import GraphSchemaExplorer from './GraphSchemaExplorer';
+import GraphVisualExplorer from './GraphVisualExplorer';
 
 type SubTab = 'overview' | 'schema' | 'visual' | 'querylab' | 'advice';
 
@@ -149,10 +150,7 @@ export default function GraphPanel() {
           <GraphSchemaExplorer connectionId={selectedConn?.id ?? null} />
         )}
         {activeSubTab === 'visual' && (
-          <PlaceholderPanel
-            title="Visual Explorer"
-            body="Visual graph traversal ships in Phase 25.5 — Cytoscape canvas with start label, depth, and direction controls."
-          />
+          <GraphVisualExplorer connectionId={selectedConn?.id ?? null} />
         )}
         {activeSubTab === 'querylab' && (
           <CypherQueryLab connectionId={selectedConn?.id ?? null} />

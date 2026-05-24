@@ -108,6 +108,8 @@ The system uses a multi-agent architecture with 40+ specialized agents (includin
 | Neo4j Error Classifier | `src/graph/neo4j/error_classifier.py` | Maps driver exceptions to UX categories (auth/timeout/syntax/unknown_label/…) without leaking URIs (Phase 25.3) |
 | Cypher Generator | `src/graph/neo4j/cypher_generator.py` | NL → Cypher via LLM, fence stripping, LIMIT injection, unknown-label detection (Phase 25.4) |
 | Cypher Explainer | `src/graph/neo4j/cypher_explainer.py` | Cypher → plain-English explanation with deterministic fallback (Phase 25.4) |
+| Graph Expand Helper | `src/graph/neo4j/query_executor.py:expand_from_node` | Bounded 1-3 hop traversal — validates label/property/rel-type idents, clamps depth, parameterized `start_value`, reuses safety gate + READ_ACCESS session + formatter (Phase 25.5) |
+| Visual Explorer (UI) | `frontend/src/components/graph/GraphVisualExplorer.tsx` + `GraphCanvas.tsx` | Start-label / property / depth / direction / rel-type controls; React Flow + dagre renderer (no Cytoscape — reuses existing deps); node-click property panel with "Expand from here" follow-up (Phase 25.5) |
 | Auth Service | `src/auth/service.py` | JWT auth, bcrypt hashing, user CRUD; `bump_password_version()`, `check_password_history()`, `record_password_history()`, `count_active_admins()` helpers (Phase 21 + 24.8) |
 | Auth Dependencies | `src/auth/dependencies.py` | get_current_user, get_optional_user, require_admin; rejects stale `pv` JWT claim (Phase 21 + 24.8 token versioning) |
 | Audit Logger | `src/auth/audit.py` | AuditLog model, never-raising log_action(), facets/count helpers (Phase 21 + 24.7) |

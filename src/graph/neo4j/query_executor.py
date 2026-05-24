@@ -14,15 +14,21 @@ formatter. The executor:
   :func:`classify_error` so callers get a structured payload.
 
 Returns an :class:`ExecutionResult`; never raises into the API layer.
+
+Phase 25.5 adds :func:`expand_from_node`, a bounded traversal helper for
+the Visual Graph Explorer. It composes a parameterized Cypher MATCH and
+reuses :func:`execute_cypher` so the safety gate, READ_ACCESS session,
+timeout, and graph_viz formatter all stay in one place.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from neo4j import READ_ACCESS, AsyncDriver
 
@@ -233,11 +239,160 @@ async def _run_and_stream(
         return records, len(records), truncated, warnings_out
 
 
+# ── Phase 25.5 — Visual Graph Explorer ───────────────────────────────────
+
+# Cypher identifier guard. Neo4j label / rel-type / property identifiers
+# can be quoted with backticks, but we'd rather refuse anything weird than
+# build a backtick-escaping mini-parser. This regex matches "plain" Cypher
+# identifiers (letter or underscore, then letters/digits/underscores).
+_CYPHER_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+# Bounded depth — spec §10.5 / plan 25.5 say 1–3 hops. Depth 1 is the bare
+# minimum useful traversal; depth 3 already produces ~degree^3 candidates
+# so we hard-cap it server-side regardless of caller intent.
+EXPAND_MIN_DEPTH = 1
+EXPAND_MAX_DEPTH = 3
+
+
+def _validate_ident(value: str, kind: str) -> str:
+    """Reject anything that isn't a plain Cypher identifier.
+
+    Used for label / rel-type names that we splice into the MATCH pattern.
+    Parameters can't carry labels in Cypher, so we have to interpolate —
+    but only after this check.
+    """
+    if not isinstance(value, str) or not _CYPHER_IDENT.match(value):
+        raise ValueError(f"Invalid {kind}: {value!r}")
+    return value
+
+
+async def expand_from_node(
+    driver: AsyncDriver,
+    *,
+    start_label: str,
+    start_property: str,
+    start_value: Any,
+    depth: int = 1,
+    rel_types: Optional[Sequence[str]] = None,
+    direction: str = "any",
+    node_cap: int = 100,
+    database_name: str = "neo4j",
+    query_timeout_s: float = DEFAULT_QUERY_TIMEOUT_S,
+    max_viz_nodes: int = DEFAULT_MAX_VIZ_NODES,
+    max_viz_edges: int = DEFAULT_MAX_VIZ_EDGES,
+    allow_apoc: bool = False,
+) -> ExecutionResult:
+    """Bounded expansion from a single starting node.
+
+    Composes a parameterized Cypher MATCH that:
+
+    * Locates the starting node by ``start_label`` + ``start_property`` =
+      ``$start_value``. (Internal element-id lookups are intentionally not
+      exposed — start-by-property keeps the call surface small and avoids
+      the user having to know about Neo4j's opaque element ids.)
+    * Walks 1–``depth`` hops in the requested ``direction`` (``out``,
+      ``in``, or ``any``).
+    * Filters by ``rel_types`` if supplied (a small whitelist that we
+      validate as Cypher identifiers).
+    * Stops at ``node_cap`` distinct nodes — this is enforced both
+      server-side (``LIMIT``) and at the formatter (``max_viz_nodes``).
+      The smaller of the two wins.
+
+    Returns the same :class:`ExecutionResult` shape as
+    :func:`execute_cypher`, which means the API layer can branch on
+    ``blocked_reason`` / ``error`` / ``formatted.graph_viz`` exactly as
+    for ad-hoc queries.
+
+    Args:
+        driver: Pooled neo4j ``AsyncDriver``.
+        start_label: Node label to match — must be a valid Cypher ident.
+        start_property: Property name used for the match — must be valid.
+        start_value: Value to match against the property (passed as a
+            parameter, not interpolated).
+        depth: 1..3 hops. Clamped to that range.
+        rel_types: Optional whitelist of relationship type names.
+        direction: ``"out"``, ``"in"``, or ``"any"`` (default).
+        node_cap: Maximum distinct nodes to keep in the result (also
+            informs the Cypher ``LIMIT`` so we don't pull more than we
+            can show).
+        database_name: Target database — usually ``"neo4j"``.
+        query_timeout_s: Per-statement wall-clock cap.
+        max_viz_nodes/max_viz_edges: Caps passed to the formatter.
+        allow_apoc: Surfaces ``GRAPH_ALLOW_APOC`` (Cypher generated here
+            never calls APOC, but the safety classifier still needs the
+            flag for consistency).
+
+    Raises:
+        ValueError: when ``direction``, identifiers, or types fail
+            validation. The API layer catches this and returns 400 —
+            keeping the error surface narrower than execute_cypher's
+            never-raise contract.
+    """
+    if direction not in ("out", "in", "any"):
+        raise ValueError(f"Invalid direction: {direction!r} (expected out/in/any)")
+
+    # Clamp depth — accept anything in [1, 3] and silently snap out-of-range
+    # values. The API layer's Pydantic schema enforces the same bounds, but
+    # defense in depth: a future caller (chat agent, internal hook) might
+    # bypass that.
+    depth = max(EXPAND_MIN_DEPTH, min(EXPAND_MAX_DEPTH, int(depth)))
+
+    label = _validate_ident(start_label, "label")
+    prop = _validate_ident(start_property, "property name")
+
+    # Validate every rel type up-front so a single bad value rejects the
+    # whole expansion (instead of producing a half-populated graph).
+    rel_types = list(rel_types or [])
+    rel_filter = ""
+    if rel_types:
+        validated = [_validate_ident(t, "relationship type") for t in rel_types]
+        rel_filter = ":" + "|".join(validated)
+
+    if direction == "out":
+        arrow_left, arrow_right = "-", "->"
+    elif direction == "in":
+        arrow_left, arrow_right = "<-", "-"
+    else:
+        arrow_left, arrow_right = "-", "-"
+
+    # Effective per-result-row cap. We MATCH a path of length 1..depth,
+    # which for high-degree neighbourhoods can produce many duplicate
+    # records that the formatter dedupes. Multiplying by 2 gives the
+    # formatter enough material to fill the node cap without inflating
+    # the work too much.
+    effective_cap = max(1, min(node_cap, max_viz_nodes))
+    fetch_limit = effective_cap * 2
+
+    cypher = (
+        f"MATCH (start:`{label}` {{`{prop}`: $start_value}})\n"
+        f"MATCH p = (start){arrow_left}[{rel_filter}*1..{depth}]{arrow_right}(neighbor)\n"
+        "RETURN p\n"
+        f"LIMIT {fetch_limit}"
+    )
+
+    return await execute_cypher(
+        driver,
+        cypher,
+        database_name=database_name,
+        query_timeout_s=query_timeout_s,
+        max_records=fetch_limit,
+        max_viz_nodes=effective_cap,
+        max_viz_edges=max_viz_edges,
+        allow_apoc=allow_apoc,
+        allow_writes=False,  # Expand is always read-only.
+        parameters={"start_value": start_value},
+    )
+
+
 __all__ = [
     "DEFAULT_MAX_RECORDS",
     "DEFAULT_MAX_VIZ_EDGES",
     "DEFAULT_MAX_VIZ_NODES",
     "DEFAULT_QUERY_TIMEOUT_S",
+    "EXPAND_MAX_DEPTH",
+    "EXPAND_MIN_DEPTH",
     "ExecutionResult",
     "execute_cypher",
+    "expand_from_node",
 ]

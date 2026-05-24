@@ -2049,3 +2049,85 @@ class CypherExplainResponse(BaseModel):
     model: Optional[str] = None
     provider: Optional[str] = None
     used_fallback: bool = False
+
+
+# ── Phase 25.5: Visual Graph Explorer ───────────────────────────────────────
+
+
+class GraphExploreRequest(BaseModel):
+    """Request body for ``POST /api/graph/connections/{id}/explore``.
+
+    Identifies a starting node by label + property = value, then expands
+    1–3 hops, optionally filtering relationships by type.
+
+    The depth/cap/types fields are echoed back in the response so the UI
+    can render the "expanded N nodes (cap M)" banner without re-tracking
+    its own request state.
+    """
+
+    start_label: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        description="Cypher label of the starting node (plain identifier).",
+    )
+    start_property: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        description="Property name used to locate the starting node.",
+    )
+    start_value: Any = Field(
+        ...,
+        description="Value to match against ``start_property`` (parameterized).",
+    )
+    depth: int = Field(
+        default=1,
+        ge=1,
+        le=3,
+        description="Hops to expand (1-3).",
+    )
+    rel_types: Optional[List[str]] = Field(
+        default=None,
+        description="Optional whitelist of relationship type names.",
+    )
+    direction: str = Field(
+        default="any",
+        pattern="^(out|in|any)$",
+        description="Traversal direction: 'out', 'in', or 'any'.",
+    )
+    node_cap: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=1000,
+        description="Override server-wide GRAPH_MAX_VIZ_NODES (clamped to it).",
+    )
+    query_timeout_ms: Optional[int] = Field(
+        default=None,
+        ge=500,
+        le=120_000,
+        description="Override server-wide GRAPH_QUERY_TIMEOUT_MS.",
+    )
+
+
+class GraphExploreResponse(BaseModel):
+    """Response body for a successful expand.
+
+    Reuses the same ``graph_viz`` shape as the Cypher Query Lab so the
+    GraphCanvas component can render either source without branching.
+    """
+
+    connection_id: int
+    start_label: str
+    depth: int
+    direction: str
+    rel_types: List[str] = Field(default_factory=list)
+    safety_level: str
+    success: bool
+    record_count: int
+    execution_time_ms: float
+    truncated: bool
+    table: GraphTablePayload
+    graph_viz: GraphVizPayload
+    warnings: List[str] = Field(default_factory=list)
+    server_warnings: List[str] = Field(default_factory=list)

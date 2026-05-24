@@ -31,7 +31,11 @@ from src.auth.models import User
 from src.config.settings import Settings
 from src.database.models import DatabaseConnection, GraphQueryHistory
 from src.graph.neo4j.driver_pool import Neo4jDriverPool
-from src.graph.neo4j.query_executor import ExecutionResult, execute_cypher
+from src.graph.neo4j.query_executor import (
+    ExecutionResult,
+    execute_cypher,
+    expand_from_node,
+)
 from src.graph.neo4j.schema_inspector import Neo4jSchemaInspector
 from src.graph.router import is_graph
 from src.graph.safety.classifier import GraphQuerySafetyLevel
@@ -41,6 +45,8 @@ from src.models.schemas import (
     CypherExplainResponse,
     CypherGenerateRequest,
     CypherGenerateResponse,
+    GraphExploreRequest,
+    GraphExploreResponse,
     GraphHistoryItem,
     GraphHistoryResponse,
     GraphIntrospectRequest,
@@ -690,6 +696,145 @@ async def explain_cypher(
         model=result.model,
         provider=result.provider,
         used_fallback=result.used_fallback,
+    )
+
+
+# ── Phase 25.5 — Visual Graph Explorer ───────────────────────────────────
+
+
+@router.post(
+    "/connections/{connection_id}/explore",
+    response_model=GraphExploreResponse,
+    responses={
+        400: {
+            "model": GraphQueryBlocked,
+            "description": "Invalid expand parameters or query blocked by safety classifier",
+        },
+        502: {"model": GraphQueryError, "description": "Driver-level execution error"},
+    },
+)
+async def explore_graph(
+    connection_id: int,
+    request: GraphExploreRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+    settings: Settings = Depends(get_settings),
+) -> GraphExploreResponse:
+    """Expand from a starting node 1–3 hops with depth/type/cap filters.
+
+    Same shape as :func:`run_graph_query` but with a smaller request
+    surface — the caller never writes Cypher, so we generate it from
+    structured fields and run it through the same safety + executor path.
+
+    Error codes mirror ``/query``:
+
+    * ``200`` — expansion succeeded; ``graph_viz`` is the Cytoscape payload.
+    * ``400`` — invalid label / property / rel-type / direction. Body uses
+                :class:`GraphQueryBlocked` so the same UI banner renders.
+    * ``502`` — driver returned an error (auth, syntax, timeout, etc.).
+    """
+    _ensure_graph_mode(settings)
+    conn = await _load_graph_connection(connection_id, db, current_user)
+
+    pool = await Neo4jDriverPool.get_instance()
+    driver = await pool.get(
+        connection_id=conn.id,
+        uri=conn.host or "",
+        username=conn.username or "",
+        password=conn.password_encrypted or "",
+        encrypted=bool(conn.encrypted),
+    )
+
+    query_timeout_s = (
+        (request.query_timeout_ms or settings.GRAPH_QUERY_TIMEOUT_MS) / 1000
+    )
+    node_cap = request.node_cap or settings.GRAPH_MAX_VIZ_NODES
+
+    try:
+        execution = await expand_from_node(
+            driver,
+            start_label=request.start_label,
+            start_property=request.start_property,
+            start_value=request.start_value,
+            depth=request.depth,
+            rel_types=request.rel_types,
+            direction=request.direction,
+            node_cap=node_cap,
+            database_name=conn.database_name or "neo4j",
+            query_timeout_s=query_timeout_s,
+            max_viz_nodes=settings.GRAPH_MAX_VIZ_NODES,
+            max_viz_edges=settings.GRAPH_MAX_VIZ_EDGES,
+            allow_apoc=settings.GRAPH_ALLOW_APOC,
+        )
+    except ValueError as exc:
+        # Invalid label / rel-type / direction — the executor rejected
+        # the call before opening a session. 400 with the same
+        # GraphQueryBlocked shape so the UI can reuse its banner.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=GraphQueryBlocked(
+                connection_id=conn.id,
+                safety_level=GraphQuerySafetyLevel.UNKNOWN.value,
+                blocked_reason=str(exc),
+                reasons=[str(exc)],
+                procedures=[],
+            ).model_dump(),
+        )
+
+    # ── Blocked (defense in depth — expand always generates READ_ONLY,
+    # but a future change could regress this) ──
+    if execution.blocked_reason is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=GraphQueryBlocked(
+                connection_id=conn.id,
+                safety_level=execution.safety_level.value,
+                blocked_reason=execution.blocked_reason,
+                reasons=list(execution.safety.reasons),
+                procedures=list(execution.safety.procedures),
+            ).model_dump(),
+        )
+
+    if not execution.success:
+        err = execution.error
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=GraphQueryError(
+                connection_id=conn.id,
+                safety_level=execution.safety_level.value,
+                success=False,
+                error_category=(err.category.value if err else "unknown"),
+                error_message=(err.user_message if err else "Neo4j rejected the query."),
+                error_hint=(err.hint if err else None),
+                error_code=(err.code if err else None),
+                execution_time_ms=execution.execution_time_ms,
+            ).model_dump(),
+        )
+
+    formatted = execution.formatted
+    assert formatted is not None
+    return GraphExploreResponse(
+        connection_id=conn.id,
+        start_label=request.start_label,
+        depth=request.depth,
+        direction=request.direction,
+        rel_types=list(request.rel_types or []),
+        safety_level=execution.safety_level.value,
+        success=True,
+        record_count=execution.record_count,
+        execution_time_ms=execution.execution_time_ms,
+        truncated=formatted.truncated,
+        table=GraphTablePayload(
+            columns=list(formatted.table_columns),
+            rows=list(formatted.table_rows),
+        ),
+        graph_viz=GraphVizPayload(
+            nodes=[n.to_dict() for n in formatted.nodes],
+            edges=[e.to_dict() for e in formatted.edges],
+            has_graph=formatted.has_graph,
+        ),
+        warnings=list(formatted.warnings),
+        server_warnings=list(execution.server_warnings),
     )
 
 

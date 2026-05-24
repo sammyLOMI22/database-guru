@@ -257,6 +257,38 @@ export interface CypherExplainResponse {
   used_fallback: boolean;
 }
 
+// ── Phase 25.5: Visual Graph Explorer ─────────────────────────────────────
+
+export type ExpandDirection = 'out' | 'in' | 'any';
+
+export interface GraphExploreRequest {
+  start_label: string;
+  start_property: string;
+  start_value: unknown;
+  depth?: number;
+  rel_types?: string[];
+  direction?: ExpandDirection;
+  node_cap?: number;
+  query_timeout_ms?: number;
+}
+
+export interface GraphExploreResponse {
+  connection_id: number;
+  start_label: string;
+  depth: number;
+  direction: ExpandDirection;
+  rel_types: string[];
+  safety_level: GraphQuerySafetyLevel;
+  success: boolean;
+  record_count: number;
+  execution_time_ms: number;
+  truncated: boolean;
+  table: GraphTablePayload;
+  graph_viz: GraphVizPayload;
+  warnings: string[];
+  server_warnings: string[];
+}
+
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const graphAPI = {
@@ -344,6 +376,24 @@ export const graphAPI = {
   ): Promise<CypherExplainResponse> {
     const { data } = await api.post<CypherExplainResponse>(
       `/api/graph/connections/${connectionId}/ai/explain-cypher`,
+      request,
+    );
+    return data;
+  },
+
+  /**
+   * Expand from a starting node (Phase 25.5).
+   *
+   * Resolves on 200; rejects on 400/502 — the caller inspects
+   * `error.response.data` for `GraphQueryBlocked` / `GraphQueryErrorPayload`,
+   * the same shape as `runQuery`.
+   */
+  async explore(
+    connectionId: number,
+    request: GraphExploreRequest,
+  ): Promise<GraphExploreResponse> {
+    const { data } = await api.post<GraphExploreResponse>(
+      `/api/graph/connections/${connectionId}/explore`,
       request,
     );
     return data;

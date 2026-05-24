@@ -530,20 +530,20 @@ Tests:
 - `tests/graph/test_cypher_explainer.py` — explanation includes start node, filters, perf notes.
 - Chat-pipeline integration test: NL → Cypher → execute → table response.
 
-### Phase 25.5 — Visual Graph Explorer — ~1,400 LOC, ~12 tests
+### Phase 25.5 — Visual Graph Explorer — ~1,400 LOC, ~27 tests ✅ SHIPPED
 
 Files:
-- Frontend: `GraphCanvas.tsx`, `GraphVisualExplorer.tsx`
+- Frontend: `GraphCanvas.tsx`, `GraphVisualExplorer.tsx` (React Flow renderer)
 - `src/api/endpoints/graph.py` (POST `/explore` — bounded expand)
 - `src/graph/neo4j/query_executor.py` — `expand_from_node()` helper
-- Lazy-load Cytoscape bundle
+- Reuses already-bundled `reactflow` + `dagre` (Cytoscape not added — keeps gzip footprint flat)
 
-Deliverable: User selects label → expands node → traverses 1–3 hops with depth/limit/type filters; graph result tab in Query Lab also renders here.
+Deliverable: User selects label → expands node → traverses 1–3 hops with depth/direction/type-filter controls; graph result tab in Query Lab now renders the same canvas instead of the 25.3 placeholder; node click → property side panel + "Expand from here" follow-up.
 
 Tests:
-- `tests/graph/test_explore_endpoint.py` — depth cap, node cap, type filter.
-- Frontend vitest: expand control state, truncation banner, node-click property panel.
-- Visual smoke test: render 200 nodes / 500 edges within 1.5s on M-series local.
+- `tests/graph/test_explore_endpoint.py` — 11 unit tests for `expand_from_node` (identifier validation, depth clamp, direction-to-arrow, rel-type whitelist, parameter binding, node-cap → Cypher LIMIT) + 8 endpoint tests (happy path, truncation banner, 400/422/502/404, graph-mode-disabled).
+- Frontend vitest (`tests/GraphVisualExplorer.test.tsx`): auto-populated form state, rel-type chips, refusal on empty value, truncation banner, node-click property panel, "Expand from here" reuses anchor key, error_message + error_hint surfacing.
+- Visual smoke test: render 200 nodes / 500 edges within 1.5s on M-series local (deferred — Cytoscape benchmark not applicable now that React Flow is the renderer).
 
 ### Phase 25.6 — Guru Advice (Modeling + Index Recommendations) — ~700 LOC, ~14 tests
 
